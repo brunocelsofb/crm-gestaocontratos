@@ -4,9 +4,9 @@
 // absoluta de que os nomes de props abaixo não mudaram na versão mais
 // recente — confira a documentação (recharts.org) se algo não renderizar.
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
-export function StageValueChart({ data }: { data: { name: string; value: number }[] }) {
+export function StageValueChart({ data }: { data: { name: string; value: number; color: string }[] }) {
   return (
     <div style={{ width: '100%', height: 220 }}>
       <ResponsiveContainer>
@@ -26,7 +26,11 @@ export function StageValueChart({ data }: { data: { name: string; value: number 
               new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0)
             }
           />
-          <Bar dataKey="value" fill="#1B556B" radius={[4, 4, 0, 0]} maxBarSize={36} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={36}>
+            {data.map((entry, index) => (
+              <Cell key={index} fill={entry.color} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

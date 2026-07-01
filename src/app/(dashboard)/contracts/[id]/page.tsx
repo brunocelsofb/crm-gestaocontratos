@@ -43,7 +43,7 @@ export default async function ContractDetailPage({
   const { data: stages } = openRun
     ? await supabase
         .from('stages')
-        .select('id, name, order_index, is_won, is_lost, sla_days')
+        .select('id, name, order_index, is_won, is_lost, sla_days, color')
         .eq('pipeline_id', openRun.pipeline_id)
         .order('order_index')
     : { data: [] }

@@ -28,7 +28,7 @@ export default async function DashboardPage({
   const { data: stages } = selectedPipeline
     ? await supabase
         .from('stages')
-        .select('id, name, order_index, is_won, is_lost, sla_days')
+        .select('id, name, order_index, is_won, is_lost, sla_days, color')
         .eq('pipeline_id', selectedPipeline)
         .order('order_index')
     : { data: [] }
@@ -45,6 +45,7 @@ export default async function DashboardPage({
 
   const valueByStage = (stages ?? []).map((s) => ({
     name: s.name,
+    color: s.color ?? '#1B556B',
     value: (openRuns ?? [])
       .filter((r) => r.stage_id === s.id)
       .reduce((sum, r) => sum + Number(r.value || 0), 0),
@@ -114,6 +115,7 @@ export default async function DashboardPage({
     id: s.id,
     name: s.name,
     isWon: s.is_won,
+    color: s.color ?? '#1B556B',
     count: new Set(
       (historyRows ?? []).filter((h) => h.stage_id === s.id).map((h) => h.pipeline_run_id)
     ).size,

@@ -10,6 +10,7 @@ type Stage = {
   is_won: boolean
   is_lost: boolean
   sla_days: number | null
+  color: string | null
 }
 
 type StageTiming = {
@@ -56,12 +57,8 @@ export function StageBar({
         {stages.map((stage, i) => {
           const timing = timingFor(stage.id)
           const isCurrent = stage.id === currentStageId
-          const isPast = i < currentIndex
           const isFuture = i > currentIndex
-
-          let bg = 'bg-gray-200 text-gray-500'
-          if (isPast) bg = 'bg-blue-500 text-white'
-          if (isCurrent) bg = stage.is_lost ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
+          const color = stage.color ?? '#1B556B'
 
           return (
             <button
@@ -69,13 +66,14 @@ export function StageBar({
               disabled={isPending || isCurrent}
               onClick={() => handleMove(stage.id)}
               title={`Mover para "${stage.name}"`}
-              className={`flex min-w-[130px] flex-1 flex-col items-center justify-center gap-1 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed ${bg} ${isFuture ? 'opacity-70' : 'hover:opacity-90'}`}
+              style={{ backgroundColor: isFuture ? '#E5E7EB' : color }}
+              className={`flex min-w-[130px] flex-1 flex-col items-center justify-center gap-1 rounded-sm px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed ${isFuture ? '!text-gray-500' : 'hover:opacity-90'}`}
             >
               <span className="text-center leading-tight">{stage.name}</span>
               {timing?.days !== null && timing?.days !== undefined && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] ${
-                    timing.isOverdue ? 'bg-red-700/80' : 'bg-black/15'
+                    timing.isOverdue ? 'bg-negative-700/80' : 'bg-black/15'
                   }`}
                 >
                   {timing.days === 0 ? 'Menos de 1 dia' : `${timing.days} dias`}
@@ -98,25 +96,25 @@ export function StageBar({
               <button
                 onClick={() => handleMove(wonStage.id)}
                 disabled={isPending}
-                className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:opacity-50"
               >
-                Ganho
+                {wonStage.name}
               </button>
             )}
             {lostStage && (
               <button
                 onClick={() => handleMove(lostStage.id)}
                 disabled={isPending}
-                className="rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                className="rounded-md bg-negative-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-negative-700 disabled:opacity-50"
               >
-                Perdido
+                {lostStage.name}
               </button>
             )}
           </div>
         )}
         {status !== 'open' && (
-          <span className={`text-sm font-medium ${status === 'won' ? 'text-emerald-600' : 'text-red-600'}`}>
-            {status === 'won' ? 'Ganho' : 'Perdido'}
+          <span className={`text-sm font-medium ${status === 'won' ? 'text-positive-700' : 'text-negative-700'}`}>
+            {status === 'won' ? (wonStage?.name ?? 'Concluído') : (lostStage?.name ?? 'Encerrado')}
           </span>
         )}
       </div>
