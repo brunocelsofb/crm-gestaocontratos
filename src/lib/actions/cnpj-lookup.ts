@@ -20,14 +20,26 @@ export async function lookupCnpj(rawCnpj: string): Promise<CnpjLookupResult> {
 
   try {
     const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; ContractCRM/1.0)',
+      },
     })
 
     if (res.status === 404) {
       return { success: false, error: 'CNPJ não encontrado na base pública.' }
     }
     if (!res.ok) {
-      return { success: false, error: `Falha ao consultar (status ${res.status}). Preencha manualmente.` }
+      let bodyPreview = ''
+      try {
+        bodyPreview = (await res.text()).slice(0, 200)
+      } catch {
+        // ignora se não conseguir ler o corpo
+      }
+      return {
+        success: false,
+        error: `Falha ao consultar (status ${res.status} ${res.statusText}). ${bodyPreview ? `Detalhe: ${bodyPreview}` : ''} Preencha manualmente.`,
+      }
     }
 
     const data = await res.json()
