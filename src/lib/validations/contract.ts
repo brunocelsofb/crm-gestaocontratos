@@ -18,6 +18,11 @@ export const contractSchema = z.object({
   client_name: z
     .string()
     .min(1, 'Nome do cliente é obrigatório'),
+  company_id: z
+    .string()
+    .uuid()
+    .optional()
+    .or(z.literal('')),
   value: z
     .number()
     .nonnegative('Valor não pode ser negativo')

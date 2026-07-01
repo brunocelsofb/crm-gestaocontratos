@@ -255,3 +255,47 @@ grant all on all sequences in schema contract_crm to anon, authenticated, servic
 alter default privileges for role postgres in schema contract_crm grant all on tables to anon, authenticated, service_role;
 alter default privileges for role postgres in schema contract_crm grant all on routines to anon, authenticated, service_role;
 alter default privileges for role postgres in schema contract_crm grant all on sequences to anon, authenticated, service_role;
+
+
+-- ------------------------------------------------------------
+-- 12. COMPANIES e CONTACTS (adicionado após feedback do usuário:
+--     cliente precisa ser uma entidade própria com contatos,
+--     não só um texto solto dentro do contrato)
+-- ------------------------------------------------------------
+create table contract_crm.companies (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  cnpj text,
+  notes text,
+  owner_id uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_companies_name on contract_crm.companies(name);
+
+create table contract_crm.contacts (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references contract_crm.companies(id) on delete cascade,
+  name text not null,
+  role text,
+  email text,
+  phone text,
+  is_primary boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index idx_contacts_company on contract_crm.contacts(company_id);
+
+alter table contract_crm.contracts
+  add column company_id uuid references contract_crm.companies(id);
+
+create index idx_contracts_company on contract_crm.contracts(company_id);
+
+alter table contract_crm.companies enable row level security;
+alter table contract_crm.contacts enable row level security;
+
+create policy "all_companies" on contract_crm.companies
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "all_contacts" on contract_crm.contacts
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

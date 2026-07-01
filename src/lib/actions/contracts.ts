@@ -28,6 +28,7 @@ export async function createContract(
     process_number: formData.get('process_number') as string,
     title: formData.get('title') as string,
     client_name: formData.get('client_name') as string,
+    company_id: (formData.get('company_id') as string) || undefined,
     value: Number(formData.get('value') || 0),
     stage_id: formData.get('stage_id') as string,
     description: (formData.get('description') as string) || undefined,
@@ -41,6 +42,10 @@ export async function createContract(
   }
 
   const { stage_id, value, expected_close_date, ...contractFields } = parsed.data
+  const normalizedContractFields = {
+    ...contractFields,
+    company_id: contractFields.company_id || null,
+  }
 
   // Descobre a qual pipeline a etapa escolhida pertence, para já
   // criar a pipeline_run inicial no lugar certo.
@@ -57,7 +62,7 @@ export async function createContract(
   // 1. Cria o contrato (identidade permanente, sem dados de posição em funil)
   const { data: contract, error: contractError } = await supabase
     .from('contracts')
-    .insert({ ...contractFields, owner_id: user.id })
+    .insert({ ...normalizedContractFields, owner_id: user.id })
     .select()
     .single()
 

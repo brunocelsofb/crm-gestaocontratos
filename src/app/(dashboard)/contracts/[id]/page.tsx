@@ -24,6 +24,10 @@ export default async function ContractDetailPage({
 
   if (!contract) notFound()
 
+  const { data: linkedCompany } = contract.company_id
+    ? await supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
+    : { data: null }
+
   // Busca TODAS as pipeline_runs do contrato (não só a aberta) para
   // montar a "jornada entre funis" — isso é o que preserva a visão
   // de "saiu de um funil e entrou em outro" que você pediu.
@@ -99,6 +103,11 @@ export default async function ContractDetailPage({
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{contract.title}</span>
           </div>
           <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
+          {linkedCompany && (
+            <Link href={`/companies/${linkedCompany.id}`} className="mt-1 inline-block text-xs text-brand-700 hover:underline">
+              {linkedCompany.name} →
+            </Link>
+          )}
         </div>
         <Link
           href={`/contracts/${contract.id}/edit`}

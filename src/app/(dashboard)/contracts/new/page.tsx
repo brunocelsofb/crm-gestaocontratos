@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 
 type Stage = { id: string; name: string }
 type Pipeline = { id: string; name: string; is_default: boolean }
+type Company = { id: string; name: string }
 
 const initialState: ActionState = {}
 
@@ -24,9 +25,16 @@ export default function NewContractPage() {
   const [pipelineId, setPipelineId] = useState<string | null>(pipelineParam)
   const [pipelineName, setPipelineName] = useState<string>('')
   const [stages, setStages] = useState<Stage[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
 
   useEffect(() => {
     const supabase = createClient()
+
+    supabase
+      .from('companies')
+      .select('id, name')
+      .order('name')
+      .then(({ data }) => setCompanies(data ?? []))
 
     async function load() {
       let resolvedPipelineId = pipelineParam
@@ -103,6 +111,27 @@ export default function NewContractPage() {
             required
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
           />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">Empresa vinculada</label>
+            <a href="/companies/new" target="_blank" className="text-xs text-brand-700 hover:underline">
+              + Nova empresa
+            </a>
+          </div>
+          <select
+            name="company_id"
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          >
+            <option value="">Nenhuma (opcional)</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            Se você acabou de cadastrar uma empresa em outra aba, atualize esta página para ela aparecer na lista.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
