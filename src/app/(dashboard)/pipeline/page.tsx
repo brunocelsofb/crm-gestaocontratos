@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard, type RunCard } from '@/components/pipeline/kanban-board'
 import { PipelineSelect } from '@/components/pipeline/pipeline-select'
@@ -58,10 +59,18 @@ export default async function PipelinePage({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Funil</h1>
-        {pipelines && pipelines.length > 0 && (
-          <PipelineSelect pipelines={pipelines} selected={selectedPipeline} />
-        )}
+        <h1 className="text-[17px] font-medium text-foreground">Funil</h1>
+        <div className="flex items-center gap-2">
+          {pipelines && pipelines.length > 0 && (
+            <PipelineSelect pipelines={pipelines} selected={selectedPipeline} />
+          )}
+          <Link
+            href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
+            className="whitespace-nowrap rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
+          >
+            + Novo Contrato
+          </Link>
+        </div>
       </div>
 
       {stages && stages.length > 0 ? (

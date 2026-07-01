@@ -42,12 +42,26 @@ export default function RegisterPage() {
     // no banco (auth.users -> public.profiles). Se você criar esse
     // trigger no Supabase futuramente, este insert manual pode ser
     // removido para evitar duplicidade.
+    //
+    // CORREÇÃO: antes esse erro era ignorado silenciosamente — foi
+    // exatamente isso que causou o bug do "insert or update on table
+    // contracts violates foreign key constraint contracts_owner_id_fkey"
+    // em contas criadas antes das políticas de RLS existirem. Agora
+    // mostramos o erro real para o usuário em vez de fingir sucesso.
     if (data.user) {
-      await supabase.from('profiles').insert({
+      const { error: profileError } = await supabase.from('profiles').insert({
         id: data.user.id,
         full_name: fullName,
         email,
       })
+
+      if (profileError) {
+        setError(
+          `Conta criada, mas houve um problema ao configurar seu perfil: ${profileError.message}. Contate o administrador.`
+        )
+        setLoading(false)
+        return
+      }
     }
 
     setSuccess(true)

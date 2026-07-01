@@ -1,39 +1,76 @@
 'use client'
 
 // NOTA DE INCERTEZA: estou usando o hook `useActionState` (de 'react'),
-// que é o padrão mais recente para ligar formulários a Server Actions
-// no App Router. Em versões mais antigas do Next.js/React, o hook
-// equivalente se chamava `useFormState` e vinha de 'react-dom'.
-// Se `useActionState` não existir no pacote 'react' que você instalar,
-// troque a importação para `useFormState` de 'react-dom' — a API é
-// quase idêntica. Verifique a documentação atual do Next.js para
-// confirmar qual está correto na versão que você está usando.
+// confirmado compatível com React 19.2.4 nesta versão do projeto (testei
+// o build). Se você trocar de versão do React no futuro e isso quebrar,
+// o equivalente mais antigo é `useFormState` de 'react-dom'.
 
 import { useActionState } from 'react'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createContract, type ActionState } from '@/lib/actions/contracts'
 import { createClient } from '@/lib/supabase/client'
 
 type Stage = { id: string; name: string }
+type Pipeline = { id: string; name: string; is_default: boolean }
 
 const initialState: ActionState = {}
 
 export default function NewContractPage() {
   const [state, formAction, pending] = useActionState(createContract, initialState)
+  const searchParams = useSearchParams()
+  const pipelineParam = searchParams.get('pipeline')
+
+  const [pipelineId, setPipelineId] = useState<string | null>(pipelineParam)
+  const [pipelineName, setPipelineName] = useState<string>('')
   const [stages, setStages] = useState<Stage[]>([])
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('stages')
-      .select('id, name')
-      .order('order_index')
-      .then(({ data }) => setStages(data ?? []))
-  }, [])
+
+    async function load() {
+      let resolvedPipelineId = pipelineParam
+
+      if (!resolvedPipelineId) {
+        const { data: pipelines } = await supabase
+          .from('pipelines')
+          .select('id, name, is_default')
+          .order('name')
+        const defaultPipeline = (pipelines as Pipeline[] | null)?.find((p) => p.is_default) ?? pipelines?.[0]
+        resolvedPipelineId = defaultPipeline?.id ?? null
+        if (defaultPipeline) setPipelineName(defaultPipeline.name)
+      } else {
+        const { data: pipeline } = await supabase
+          .from('pipelines')
+          .select('name')
+          .eq('id', resolvedPipelineId)
+          .single()
+        if (pipeline) setPipelineName(pipeline.name)
+      }
+
+      setPipelineId(resolvedPipelineId)
+
+      if (resolvedPipelineId) {
+        const { data } = await supabase
+          .from('stages')
+          .select('id, name')
+          .eq('pipeline_id', resolvedPipelineId)
+          .order('order_index')
+        setStages(data ?? [])
+      }
+    }
+
+    load()
+  }, [pipelineParam])
 
   return (
     <div className="max-w-xl space-y-6">
-      <h1 className="text-lg font-semibold text-gray-900">Novo Contrato</h1>
+      <div>
+        <h1 className="text-[17px] font-medium text-foreground">Novo Contrato</h1>
+        {pipelineName && (
+          <p className="mt-0.5 text-xs text-foreground/50">Funil: {pipelineName}</p>
+        )}
+      </div>
 
       <form action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
         <div>
@@ -93,6 +130,9 @@ export default function NewContractPage() {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            {pipelineId && stages.length === 0 && (
+              <p className="mt-1 text-xs text-amber-600">Nenhuma etapa encontrada para este funil.</p>
+            )}
           </div>
         </div>
 
@@ -119,7 +159,7 @@ export default function NewContractPage() {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
         >
           {pending ? 'Salvando...' : 'Salvar Contrato'}
         </button>
