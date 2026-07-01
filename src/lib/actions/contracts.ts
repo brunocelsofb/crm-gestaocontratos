@@ -24,11 +24,104 @@ export async function createContract(
     return { error: 'Usuário não autenticado.' }
   }
 
+  // ------------------------------------------------------------
+  // 1. Resolve a EMPRESA (existente, escolhida via CNPJ já
+  //    cadastrado, ou nova, criada aqui mesmo)
+  // ------------------------------------------------------------
+  const existingCompanyId = (formData.get('existing_company_id') as string) || null
+  let companyId: string
+  let companyName: string
+
+  if (existingCompanyId) {
+    companyId = existingCompanyId
+    const { data: company } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', companyId)
+      .single()
+    companyName = company?.name ?? ''
+  } else {
+    const newCompanyCnpj = (formData.get('new_company_cnpj') as string) || null
+    const newCompanyName = (formData.get('new_company_name') as string)?.trim()
+    const newCompanyTradeName = (formData.get('new_company_trade_name') as string) || null
+
+    if (!newCompanyName) {
+      return {
+        error: 'Empresa é obrigatória: informe o CNPJ e clique em "Verificar" antes de salvar.',
+      }
+    }
+
+    const { data: newCompany, error: companyError } = await supabase
+      .from('companies')
+      .insert({
+        name: newCompanyName,
+        trade_name: newCompanyTradeName,
+        cnpj: newCompanyCnpj,
+        owner_id: user.id,
+      })
+      .select()
+      .single()
+
+    if (companyError || !newCompany) {
+      if (companyError?.code === '23505') {
+        return { error: 'Já existe uma empresa com esse CNPJ. Clique em "Verificar" de novo para encontrá-la e usá-la.' }
+      }
+      return { error: `Falha ao criar empresa: ${companyError?.message}` }
+    }
+
+    companyId = newCompany.id
+    companyName = newCompany.name
+  }
+
+  // ------------------------------------------------------------
+  // 2. Resolve o CONTATO (existente, da empresa escolhida, ou
+  //    novo, criado junto)
+  // ------------------------------------------------------------
+  const existingContactId = (formData.get('existing_contact_id') as string) || null
+  let contactId: string
+
+  if (existingContactId) {
+    contactId = existingContactId
+  } else {
+    const newContactName = (formData.get('new_contact_name') as string)?.trim()
+
+    if (!newContactName) {
+      // Empresa já foi criada acima (se era nova) — não desfazemos isso
+      // aqui; o usuário pode reaproveitar essa empresa ao tentar de novo.
+      return { error: 'Contato responsável é obrigatório: preencha ao menos o nome.' }
+    }
+
+    const newContactRole = (formData.get('new_contact_role') as string) || null
+    const newContactEmail = (formData.get('new_contact_email') as string) || null
+    const newContactPhone = (formData.get('new_contact_phone') as string) || null
+
+    const { data: newContact, error: contactError } = await supabase
+      .from('contacts')
+      .insert({
+        company_id: companyId,
+        name: newContactName,
+        role: newContactRole,
+        email: newContactEmail,
+        phone: newContactPhone,
+      })
+      .select()
+      .single()
+
+    if (contactError || !newContact) {
+      return { error: `Falha ao criar contato: ${contactError?.message}` }
+    }
+
+    contactId = newContact.id
+  }
+
+  // ------------------------------------------------------------
+  // 3. Segue o fluxo original de criação do contrato, agora com
+  //    empresa e contato já resolvidos
+  // ------------------------------------------------------------
   const raw = {
     process_number: formData.get('process_number') as string,
     title: formData.get('title') as string,
-    client_name: formData.get('client_name') as string,
-    company_id: (formData.get('company_id') as string) || undefined,
+    client_name: companyName,
     value: Number(formData.get('value') || 0),
     stage_id: formData.get('stage_id') as string,
     description: (formData.get('description') as string) || undefined,
@@ -41,14 +134,8 @@ export async function createContract(
     return { fieldErrors: parsed.error.flatten().fieldErrors }
   }
 
-  const { stage_id, value, expected_close_date, ...contractFields } = parsed.data
-  const normalizedContractFields = {
-    ...contractFields,
-    company_id: contractFields.company_id || null,
-  }
+  const { stage_id, value, expected_close_date, company_id: _ignored, ...contractFields } = parsed.data
 
-  // Descobre a qual pipeline a etapa escolhida pertence, para já
-  // criar a pipeline_run inicial no lugar certo.
   const { data: stage, error: stageError } = await supabase
     .from('stages')
     .select('id, pipeline_id')
@@ -59,10 +146,9 @@ export async function createContract(
     return { error: 'Etapa selecionada é inválida.' }
   }
 
-  // 1. Cria o contrato (identidade permanente, sem dados de posição em funil)
   const { data: contract, error: contractError } = await supabase
     .from('contracts')
-    .insert({ ...normalizedContractFields, owner_id: user.id })
+    .insert({ ...contractFields, company_id: companyId, contact_id: contactId, owner_id: user.id })
     .select()
     .single()
 
@@ -75,7 +161,6 @@ export async function createContract(
 
   const now = new Date().toISOString()
 
-  // 2. Cria a primeira pipeline_run, já na etapa escolhida
   const { data: run, error: runError } = await supabase
     .from('pipeline_runs')
     .insert({
@@ -91,15 +176,10 @@ export async function createContract(
     .single()
 
   if (runError || !run) {
-    // Contrato foi criado mas a run falhou — não deixamos órfão sem contexto:
-    // removemos o contrato para manter consistência (não há transação
-    // multi-tabela simples via supabase-js; se isso for crítico, mova essa
-    // lógica para uma função de banco de dados com transação real).
     await supabase.from('contracts').delete().eq('id', contract.id)
     return { error: 'Falha ao iniciar o contrato no funil. Tente novamente.' }
   }
 
-  // 3. Abre o primeiro registro de stage_history
   await supabase.from('stage_history').insert({
     pipeline_run_id: run.id,
     stage_id: stage.id,
@@ -107,7 +187,6 @@ export async function createContract(
     changed_by: user.id,
   })
 
-  // 4. Registra a criação na timeline
   await supabase.from('activities').insert({
     contract_id: contract.id,
     pipeline_run_id: run.id,
@@ -122,8 +201,9 @@ export async function createContract(
 
 // Edita os dados de identidade do contrato (contracts) e, se houver uma
 // pipeline_run aberta, também atualiza valor e previsão de fechamento nela.
-// Não mexe em etapa/pipeline aqui — isso continua sendo feito só pela
-// barra de etapas ou pelo Kanban, para manter o histórico consistente.
+// Não mexe em etapa/pipeline/empresa/contato aqui — isso continua sendo
+// feito só pela barra de etapas ou por telas específicas, para manter o
+// histórico consistente.
 export async function updateContract(
   contractId: string,
   _prevState: ActionState,
@@ -168,8 +248,6 @@ export async function updateContract(
     return { error: contractError.message }
   }
 
-  // Atualiza valor/previsão só na run aberta, se existir (contrato
-  // já encerrado/movido não tem uma run "atual" editável aqui).
   const { data: openRun } = await supabase
     .from('pipeline_runs')
     .select('id')

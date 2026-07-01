@@ -9,6 +9,26 @@ export type ActionState = {
   fieldErrors?: Record<string, string[]>
 }
 
+export async function findCompanyByCnpj(cnpjDigits: string) {
+  const supabase = await createClient()
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('id, name, trade_name')
+    .eq('cnpj', cnpjDigits)
+    .maybeSingle()
+
+  if (!company) return null
+
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, name, role')
+    .eq('company_id', company.id)
+    .order('created_at')
+
+  return { ...company, contacts: contacts ?? [] }
+}
+
 export async function createCompany(
   _prevState: ActionState,
   formData: FormData
@@ -22,7 +42,7 @@ export async function createCompany(
 
   const name = (formData.get('name') as string)?.trim()
   const trade_name = (formData.get('trade_name') as string) || null
-  const cnpj = (formData.get('cnpj') as string) || null
+  const cnpj = ((formData.get('cnpj') as string) || '').replace(/\D/g, '') || null
   const notes = (formData.get('notes') as string) || null
 
   if (!name) {
@@ -50,7 +70,7 @@ export async function updateCompany(
 
   const name = (formData.get('name') as string)?.trim()
   const trade_name = (formData.get('trade_name') as string) || null
-  const cnpj = (formData.get('cnpj') as string) || null
+  const cnpj = ((formData.get('cnpj') as string) || '').replace(/\D/g, '') || null
   const notes = (formData.get('notes') as string) || null
 
   if (!name) {

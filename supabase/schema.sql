@@ -293,6 +293,11 @@ alter table contract_crm.contracts
 
 create index idx_contracts_company on contract_crm.contracts(company_id);
 
+alter table contract_crm.contracts
+  add column contact_id uuid references contract_crm.contacts(id);
+
+create index idx_contracts_contact on contract_crm.contracts(contact_id);
+
 alter table contract_crm.companies enable row level security;
 alter table contract_crm.contacts enable row level security;
 
