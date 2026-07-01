@@ -56,11 +56,22 @@ export default async function ContractDetailPage({
         .in('pipeline_run_id', runIds)
     : { data: [] }
 
-  const { data: activities } = await supabase
+  const { data: activitiesRaw } = await supabase
     .from('activities')
-    .select('id, type, content, created_at, due_date, completed, profiles(full_name)')
+    .select('id, type, content, created_at, due_date, completed, user_id')
     .eq('contract_id', id)
     .order('created_at', { ascending: false })
+
+  const userIds = [...new Set((activitiesRaw ?? []).map((a) => a.user_id).filter((v): v is string => !!v))]
+  const { data: activityProfiles } = userIds.length
+    ? await supabase.from('profiles').select('id, full_name').in('id', userIds)
+    : { data: [] }
+  const profileById = new Map((activityProfiles ?? []).map((p) => [p.id, p.full_name]))
+
+  const activities = (activitiesRaw ?? []).map((a) => ({
+    ...a,
+    profiles: a.user_id ? { full_name: profileById.get(a.user_id) ?? '' } : null,
+  }))
 
   // Dias por etapa, calculados apenas dentro da run aberta atual
   // (a barra de pipeline mostra só o funil em andamento no momento).
@@ -162,8 +173,7 @@ export default async function ContractDetailPage({
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>
         <NoteForm contractId={contract.id} />
-        {/* @ts-expect-error -- tipo do join profiles ainda não gerado (types/database.types.ts pendente) */}
-        <Timeline activities={activities ?? []} />
+        <Timeline activities={activities} />
       </div>
     </div>
   )

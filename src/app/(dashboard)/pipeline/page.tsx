@@ -30,20 +30,31 @@ export default async function PipelinePage({
         .order('order_index')
     : { data: [] }
 
-  // Embedding de contracts aqui é confiável porque pipeline_runs.contract_id
-  // é uma foreign key real numa tabela real (diferente do caso da view
-  // usada na listagem de contratos).
+  // CORREÇÃO: o embedding automático `contracts(...)` não estava
+  // retornando dados no ambiente real (mostrava valor e dias certos,
+  // mas cliente/processo vinham vazios) — troquei para duas consultas
+  // separadas, juntadas aqui no código. Mesmo padrão já usado (e
+  // funcionando de verdade) na tela de Contratos.
   const { data: runs } = selectedPipeline
     ? await supabase
         .from('pipeline_runs')
-        .select('id, contract_id, stage_id, stage_entered_at, value, contracts(process_number, title, client_name)')
+        .select('id, contract_id, stage_id, stage_entered_at, value')
         .eq('pipeline_id', selectedPipeline)
         .eq('status', 'open')
     : { data: [] }
 
+  const contractIds = [...new Set((runs ?? []).map((r) => r.contract_id))]
+  const { data: contractsData } = contractIds.length
+    ? await supabase
+        .from('contracts')
+        .select('id, process_number, title, client_name')
+        .in('id', contractIds)
+    : { data: [] }
+
+  const contractById = new Map((contractsData ?? []).map((c) => [c.id, c]))
+
   const cards: RunCard[] = (runs ?? []).map((r) => {
-    const contractArr = r.contracts as unknown as { process_number: string; title: string; client_name: string }[] | null
-    const contract = contractArr?.[0] ?? null
+    const contract = contractById.get(r.contract_id)
     return {
       runId: r.id,
       contractId: r.contract_id,
