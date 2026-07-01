@@ -4,7 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 // Server Component: busca os dados direto no servidor, sem useEffect
 // nem loading state no client — reduz JS enviado ao navegador.
 
-export default async function ContractsPage() {
+export default async function ContractsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>
+}) {
+  const { q } = await searchParams
   const supabase = await createClient()
 
   // NOTA DE INCERTEZA: o Supabase/PostgREST resolve "embedding" (o join
@@ -15,10 +20,19 @@ export default async function ContractsPage() {
   // quebrar em produção, faço em duas consultas simples e junto os
   // dados aqui no servidor, em vez de depender de embedding sobre a view.
 
-  const { data: contracts, error } = await supabase
+  let query = supabase
     .from('contracts_with_current_run')
     .select('id, process_number, title, client_name, value, run_status, stage_id')
     .order('created_at', { ascending: false })
+
+  if (q?.trim()) {
+    const term = q.trim().replace(/[%_]/g, '')
+    query = query.or(
+      `process_number.ilike.%${term}%,title.ilike.%${term}%,client_name.ilike.%${term}%`
+    )
+  }
+
+  const { data: contracts, error } = await query
 
   const stageIds = [...new Set((contracts ?? []).map((c) => c.stage_id).filter(Boolean))]
   const { data: stages } = stageIds.length
@@ -38,6 +52,32 @@ export default async function ContractsPage() {
           + Novo Contrato
         </Link>
       </div>
+
+      {/* Busca via GET simples — funciona sem JavaScript no client,
+          e o resultado já vem filtrado do servidor. */}
+      <form method="GET" className="flex gap-2">
+        <input
+          type="text"
+          name="q"
+          defaultValue={q ?? ''}
+          placeholder="Buscar por nº do processo, título ou cliente..."
+          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Buscar
+        </button>
+        {q && (
+          <Link
+            href="/contracts"
+            className="rounded-md px-3 py-2 text-sm text-gray-500 hover:underline"
+          >
+            Limpar
+          </Link>
+        )}
+      </form>
 
       {error && (
         <p className="text-sm text-red-600">
@@ -87,7 +127,7 @@ export default async function ContractsPage() {
             {contracts?.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                  Nenhum contrato cadastrado ainda.
+                  {q ? `Nenhum contrato encontrado para "${q}".` : 'Nenhum contrato cadastrado ainda.'}
                 </td>
               </tr>
             )}

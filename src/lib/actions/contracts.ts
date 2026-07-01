@@ -114,3 +114,79 @@ export async function createContract(
   revalidatePath('/contracts')
   redirect('/contracts')
 }
+
+// Edita os dados de identidade do contrato (contracts) e, se houver uma
+// pipeline_run aberta, também atualiza valor e previsão de fechamento nela.
+// Não mexe em etapa/pipeline aqui — isso continua sendo feito só pela
+// barra de etapas ou pelo Kanban, para manter o histórico consistente.
+export async function updateContract(
+  contractId: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Usuário não autenticado.' }
+  }
+
+  const process_number = formData.get('process_number') as string
+  const title = formData.get('title') as string
+  const client_name = formData.get('client_name') as string
+  const description = (formData.get('description') as string) || null
+  const value = Number(formData.get('value') || 0)
+  const expected_close_date = (formData.get('expected_close_date') as string) || null
+
+  if (!process_number?.trim()) {
+    return { fieldErrors: { process_number: ['Número do processo é obrigatório'] } }
+  }
+
+  const { error: contractError } = await supabase
+    .from('contracts')
+    .update({
+      process_number,
+      title,
+      client_name,
+      description,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', contractId)
+
+  if (contractError) {
+    if (contractError.code === '23505') {
+      return { error: 'Já existe outro contrato com esse Número do Processo.' }
+    }
+    return { error: contractError.message }
+  }
+
+  // Atualiza valor/previsão só na run aberta, se existir (contrato
+  // já encerrado/movido não tem uma run "atual" editável aqui).
+  const { data: openRun } = await supabase
+    .from('pipeline_runs')
+    .select('id')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (openRun) {
+    await supabase
+      .from('pipeline_runs')
+      .update({ value, expected_close_date })
+      .eq('id', openRun.id)
+  }
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'system',
+    content: 'Dados do contrato editados.',
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/contracts')
+  redirect(`/contracts/${contractId}`)
+}

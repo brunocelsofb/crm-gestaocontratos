@@ -3,6 +3,7 @@ import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { NoteForm } from '@/components/contracts/note-form'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function ContractDetailPage({
   params,
@@ -91,12 +92,20 @@ export default async function ContractDetailPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-gray-900">{contract.client_name}</h1>
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{contract.title}</span>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-gray-900">{contract.client_name}</h1>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{contract.title}</span>
+          </div>
+          <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
         </div>
-        <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
+        <Link
+          href={`/contracts/${contract.id}/edit`}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Editar
+        </Link>
       </div>
 
       {openRun && stages && stages.length > 0 ? (
