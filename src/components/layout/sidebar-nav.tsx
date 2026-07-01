@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, FileText, Building2 } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
   { href: '/contracts', label: 'Contratos', icon: FileText },
   { href: '/companies', label: 'Empresas', icon: Building2 },
+  { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]
 
 export function SidebarNav() {
