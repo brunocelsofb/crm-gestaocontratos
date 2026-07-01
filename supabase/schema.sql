@@ -306,3 +306,22 @@ create policy "all_companies" on contract_crm.companies
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "all_contacts" on contract_crm.contacts
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 13. ORGANIZATION_SETTINGS (configurações gerais, singleton)
+-- ------------------------------------------------------------
+create table contract_crm.organization_settings (
+  id text primary key default 'default',
+  name text not null default 'Contract CRM',
+  updated_at timestamptz not null default now()
+);
+
+insert into contract_crm.organization_settings (id, name) values ('default', 'Contract CRM');
+
+alter table contract_crm.organization_settings enable row level security;
+
+create policy "org_settings_select" on contract_crm.organization_settings
+  for select using (auth.role() = 'authenticated');
+create policy "org_settings_update_admin" on contract_crm.organization_settings
+  for update using (exists (select 1 from contract_crm.profiles where id = auth.uid() and role = 'admin'));

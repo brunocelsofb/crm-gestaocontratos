@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentProfile } from '@/lib/auth/role'
 import { updateUserRole } from '@/lib/actions/users'
 import { UserRoleSelect } from '@/components/users/user-role-select'
+import { NewUserForm } from '@/components/users/new-user-form'
 
 export default async function UsersPage() {
   const currentProfile = await getCurrentProfile()
@@ -27,6 +28,8 @@ export default async function UsersPage() {
           Apenas administradores podem excluir registros (funis, etapas, contatos, empresas). Membros podem criar e editar normalmente.
         </p>
       </div>
+
+      <NewUserForm />
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
