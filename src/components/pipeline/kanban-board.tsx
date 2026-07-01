@@ -64,8 +64,13 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
   const days = daysSince(card.stageEnteredAt)
   const overdue = sla !== null && days > sla
 
-  function openAccount() {
+  function openAccount(e: React.MouseEvent) {
+    e.stopPropagation()
     router.push(card.companyId ? `/companies/${card.companyId}` : `/contracts/${card.contractId}`)
+  }
+
+  function openOpportunity() {
+    router.push(`/contracts/${card.contractId}`)
   }
 
   return (
@@ -73,6 +78,7 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={openOpportunity}
       className={`mb-2 rounded-md border border-gray-200 bg-white p-2 text-xs shadow-sm ${
         isClosed ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
       } ${isDragging ? 'opacity-40' : ''}`}
