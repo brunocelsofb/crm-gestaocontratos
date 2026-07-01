@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AddContactForm } from '@/components/companies/add-contact-form'
 import { deleteContact } from '@/lib/actions/companies'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export default async function CompanyDetailPage({
   params,
@@ -11,6 +12,7 @@ export default async function CompanyDetailPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
+  const isAdmin = await isCurrentUserAdmin()
 
   const { data: company } = await supabase
     .from('companies')
@@ -75,14 +77,16 @@ export default async function CompanyDetailPage({
                   {[contact.email, contact.phone].filter(Boolean).join(' · ') || 'Sem e-mail/telefone cadastrado'}
                 </p>
               </div>
-              <form action={deleteContact.bind(null, contact.id, company.id)}>
-                <button
-                  type="submit"
-                  className="text-xs text-gray-400 hover:text-negative-600"
-                >
-                  Remover
-                </button>
-              </form>
+              {isAdmin && (
+                <form action={deleteContact.bind(null, contact.id, company.id)}>
+                  <button
+                    type="submit"
+                    className="text-xs text-gray-400 hover:text-negative-600"
+                  >
+                    Remover
+                  </button>
+                </form>
+              )}
             </div>
           ))}
           {contacts?.length === 0 && (

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export type ActionState = {
   error?: string
@@ -34,6 +35,7 @@ export async function updatePipelineType(pipelineId: string, formData: FormData)
 }
 
 export async function deletePipeline(pipelineId: string) {
+  if (!(await isCurrentUserAdmin())) return // RLS também bloqueia; isso é só feedback mais rápido
   const supabase = await createClient()
   await supabase.from('pipelines').delete().eq('id', pipelineId)
   revalidatePath('/pipelines')
@@ -89,6 +91,7 @@ export async function updateStage(stageId: string, formData: FormData) {
 }
 
 export async function deleteStage(stageId: string) {
+  if (!(await isCurrentUserAdmin())) return
   const supabase = await createClient()
   await supabase.from('stages').delete().eq('id', stageId)
   revalidatePath('/pipelines')

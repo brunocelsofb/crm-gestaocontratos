@@ -19,6 +19,14 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isAdmin = profile?.role === 'admin'
+
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="w-56 shrink-0 bg-brand-800 p-4">
@@ -28,7 +36,7 @@ export default async function DashboardLayout({
           </div>
           <span className="text-sm font-medium text-white">Contract CRM</span>
         </div>
-        <SidebarNav />
+        <SidebarNav isAdmin={isAdmin} />
       </aside>
       <main className="flex-1 p-6">{children}</main>
     </div>

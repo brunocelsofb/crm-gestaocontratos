@@ -3,9 +3,11 @@ import { NewPipelineForm } from '@/components/pipelines/new-pipeline-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
 import { PipelineTypeSelect } from '@/components/pipelines/pipeline-type-select'
 import { createStage, updateStage, deleteStage, moveStage, deletePipeline, updatePipelineType } from '@/lib/actions/pipelines'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export default async function PipelinesPage() {
   const supabase = await createClient()
+  const isAdmin = await isCurrentUserAdmin()
 
   const { data: pipelines } = await supabase
     .from('pipelines')
@@ -48,7 +50,7 @@ export default async function PipelinesPage() {
                     action={updatePipelineType.bind(null, pipeline.id)}
                   />
                 </div>
-                {!pipeline.is_default && (
+                {!pipeline.is_default && isAdmin && (
                   <form action={deletePipeline.bind(null, pipeline.id)}>
                     <ConfirmDeleteButton
                       label="Excluir funil"
@@ -109,9 +111,11 @@ export default async function PipelinesPage() {
                       Salvar
                     </button>
 
-                    <ConfirmDeleteButton
-                      confirmMessage={`Remover a etapa "${stage.name}"? Só é possível se não houver contratos nela.`}
-                    />
+                    {isAdmin && (
+                      <ConfirmDeleteButton
+                        confirmMessage={`Remover a etapa "${stage.name}"? Só é possível se não houver contratos nela.`}
+                      />
+                    )}
                   </form>
                 ))}
 

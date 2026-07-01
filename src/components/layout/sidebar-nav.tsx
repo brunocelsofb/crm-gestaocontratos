@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2 } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users } from 'lucide-react'
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
   { href: '/contracts', label: 'Contratos', icon: FileText },
@@ -12,12 +12,16 @@ const NAV_ITEMS = [
   { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]
 
-export function SidebarNav() {
+export function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname()
+
+  const items = isAdmin
+    ? [...BASE_NAV_ITEMS, { href: '/users', label: 'Usuários', icon: Users }]
+    : BASE_NAV_ITEMS
 
   return (
     <nav className="space-y-0.5">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href
         const Icon = item.icon
         return (
