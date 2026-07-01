@@ -26,7 +26,7 @@ export function StageValueChart({ data }: { data: { name: string; value: number 
               new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0)
             }
           />
-          <Bar dataKey="value" fill="#2a78d6" radius={[4, 4, 0, 0]} maxBarSize={36} />
+          <Bar dataKey="value" fill="#1B556B" radius={[4, 4, 0, 0]} maxBarSize={36} />
         </BarChart>
       </ResponsiveContainer>
     </div>

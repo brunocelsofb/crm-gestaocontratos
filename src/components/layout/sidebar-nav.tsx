@@ -1,0 +1,38 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { LayoutDashboard, KanbanSquare, FileText } from 'lucide-react'
+
+const NAV_ITEMS = [
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
+  { href: '/contracts', label: 'Contratos', icon: FileText },
+]
+
+export function SidebarNav() {
+  const pathname = usePathname()
+
+  return (
+    <nav className="space-y-0.5">
+      {NAV_ITEMS.map((item) => {
+        const active = pathname === item.href
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+              active
+                ? 'bg-white/10 text-white'
+                : 'text-brand-100/70 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Icon size={16} strokeWidth={1.75} />
+            {item.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}

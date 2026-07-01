@@ -36,7 +36,7 @@ create table contract_crm.pipelines (
 );
 
 insert into contract_crm.pipelines (name, description, is_default) values
-  ('Novos Negócios', 'Funil comercial padrão de entrada de processos', true),
+  ('Renovação de Contratos', 'Funil padrão de acompanhamento de contratos recorrentes em renovação', true),
   ('Impugnação / Recursos', 'Funil específico para processos com impugnação ou recurso', false);
 
 
@@ -60,26 +60,27 @@ insert into contract_crm.stages (pipeline_id, name, order_index, color, is_won, 
 select id, s.name, s.order_index, s.color, s.is_won, s.is_lost, s.sla_days
 from contract_crm.pipelines,
   (values
-    ('Entrada e Identificação', 1, '#60A5FA', false, false, 1),
-    ('Contato e Qualificação',   2, '#60A5FA', false, false, 5),
-    ('Reunião e Apresentação',   3, '#94A3B8', false, false, 7),
-    ('Proposta',                 4, '#34D399', false, false, 10),
-    ('Follow-Up / Avaliação',    5, '#94A3B8', false, false, 7),
-    ('Negociação',               6, '#94A3B8', false, false, 10),
-    ('Fechamento',               7, '#34D399', true,  false, 5)
+    ('Vigente',              1, '#1B556B', false, false, null),
+    ('Notificado p/ renovação', 2, '#1B556B', false, false, 15),
+    ('Em negociação c/ fornecedor', 3, '#E98C5F', false, false, 20),
+    ('Proposta recebida',    4, '#524E9C', false, false, 10),
+    ('Renovado',             5, '#32AF9D', true,  false, 5),
+    ('Não renovado',         6, '#AF5B65', false, true,  0)
   ) as s(name, order_index, color, is_won, is_lost, sla_days)
-where contract_crm.pipelines.name = 'Novos Negócios';
+where contract_crm.pipelines.name = 'Renovação de Contratos';
 
 insert into contract_crm.stages (pipeline_id, name, order_index, color, is_won, is_lost, sla_days)
 select id, s.name, s.order_index, s.color, s.is_won, s.is_lost, s.sla_days
 from contract_crm.pipelines,
   (values
-    ('Impugnação Recebida', 1, '#FBBF24', false, false, 2),
-    ('Em Análise Jurídica', 2, '#FBBF24', false, false, 5),
-    ('Resposta Enviada',    3, '#34D399', true,  false, 3),
-    ('Indeferido',          4, '#F87171', false, true,  0)
+    ('Impugnação Recebida', 1, '#E98C5F', false, false, 2),
+    ('Em Análise Jurídica', 2, '#E98C5F', false, false, 5),
+    ('Resposta Enviada',    3, '#32AF9D', true,  false, 3),
+    ('Indeferido',          4, '#AF5B65', false, true,  0)
   ) as s(name, order_index, color, is_won, is_lost, sla_days)
 where contract_crm.pipelines.name = 'Impugnação / Recursos';
+
+
 
 
 -- ------------------------------------------------------------

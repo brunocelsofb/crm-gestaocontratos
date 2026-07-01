@@ -18,13 +18,13 @@ export function NoteForm({ contractId }: { contractId: string }) {
         name="content"
         rows={3}
         placeholder="Escreva uma nota, ex: 'Processo recebido com impugnação, respondido no prazo.'"
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
       />
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {pending ? 'Salvando...' : 'Adicionar nota'}
       </button>
