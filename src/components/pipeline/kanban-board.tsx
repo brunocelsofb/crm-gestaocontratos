@@ -13,6 +13,7 @@
 // superfície de código incerto nesta primeira versão.
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   DndContext,
   type DragEndEvent,
@@ -27,6 +28,7 @@ import { moveContractStage } from '@/lib/actions/pipeline'
 export type RunCard = {
   runId: string
   contractId: string
+  companyId: string | null
   stageId: string
   status: 'open' | 'won' | 'lost'
   processNumber: string
@@ -52,6 +54,7 @@ function fmt(value: number) {
 }
 
 function Card({ card, sla }: { card: RunCard; sla: number | null }) {
+  const router = useRouter()
   const isClosed = card.status !== 'open'
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.runId,
@@ -60,6 +63,10 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
   })
   const days = daysSince(card.stageEnteredAt)
   const overdue = sla !== null && days > sla
+
+  function openAccount() {
+    router.push(card.companyId ? `/companies/${card.companyId}` : `/contracts/${card.contractId}`)
+  }
 
   return (
     <div
@@ -71,7 +78,15 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
       } ${isDragging ? 'opacity-40' : ''}`}
     >
       <div className="flex items-start justify-between gap-1">
-        <p className="font-medium text-gray-900">{card.clientName}</p>
+        <button
+          type="button"
+          onClick={openAccount}
+          onPointerDown={(e) => e.stopPropagation()}
+          title={card.companyId ? 'Abrir empresa' : 'Abrir contrato (sem empresa vinculada ainda)'}
+          className="text-left font-medium text-gray-900 hover:text-brand-700 hover:underline"
+        >
+          {card.clientName}
+        </button>
         {card.status === 'won' && <span className="shrink-0 rounded-full bg-positive-100 px-1.5 py-0.5 text-[9px] font-medium text-positive-700">Ganho</span>}
         {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-1.5 py-0.5 text-[9px] font-medium text-negative-700">Perdido</span>}
       </div>

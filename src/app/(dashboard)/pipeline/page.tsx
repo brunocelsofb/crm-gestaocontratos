@@ -52,7 +52,7 @@ export default async function PipelinePage({
   const { data: contractsData } = contractIds.length
     ? await supabase
         .from('contracts')
-        .select('id, process_number, title, client_name')
+        .select('id, process_number, title, client_name, company_id')
         .in('id', contractIds)
     : { data: [] }
 
@@ -63,6 +63,7 @@ export default async function PipelinePage({
     return {
       runId: r.id,
       contractId: r.contract_id,
+      companyId: contract?.company_id ?? null,
       stageId: r.stage_id,
       status: r.status as 'open' | 'won' | 'lost',
       processNumber: contract?.process_number ?? '',
