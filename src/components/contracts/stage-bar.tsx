@@ -63,9 +63,9 @@ export function StageBar({
           return (
             <button
               key={stage.id}
-              disabled={isPending || isCurrent}
+              disabled={isPending || isCurrent || status !== 'open'}
               onClick={() => handleMove(stage.id)}
-              title={`Mover para "${stage.name}"`}
+              title={status !== 'open' ? 'Este contrato já está encerrado' : `Mover para "${stage.name}"`}
               style={{ backgroundColor: isFuture ? '#E5E7EB' : color }}
               className={`flex min-w-[130px] flex-1 flex-col items-center justify-center gap-1 rounded-sm px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed ${isFuture ? '!text-gray-500' : 'hover:opacity-90'}`}
             >

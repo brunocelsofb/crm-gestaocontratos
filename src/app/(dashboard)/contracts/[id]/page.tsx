@@ -38,6 +38,13 @@ export default async function ContractDetailPage({
     .order('started_at', { ascending: true })
 
   const openRun = runs?.find((r) => r.status === 'open')
+  // CORREÇÃO: antes, se a run mais recente já estivesse encerrada (Ganho/
+  // Perdido), a barra de etapas sumia inteira da tela — mesmo bug do
+  // Kanban, só que aqui. Agora mostramos a última run mesmo fechada,
+  // travada (sem poder mover), em vez de esconder tudo.
+  const lastRun = runs && runs.length > 0 ? runs[runs.length - 1] : undefined
+  const displayRun = openRun ?? lastRun
+
   const pipelineIds = [...new Set((runs ?? []).map((r) => r.pipeline_id))]
 
   const { data: pipelines } = pipelineIds.length
@@ -45,11 +52,11 @@ export default async function ContractDetailPage({
     : { data: [] }
   const pipelineById = new Map((pipelines ?? []).map((p) => [p.id, p]))
 
-  const { data: stages } = openRun
+  const { data: stages } = displayRun
     ? await supabase
         .from('stages')
         .select('id, name, order_index, is_won, is_lost, sla_days, color')
-        .eq('pipeline_id', openRun.pipeline_id)
+        .eq('pipeline_id', displayRun.pipeline_id)
         .order('order_index')
     : { data: [] }
 
@@ -81,7 +88,7 @@ export default async function ContractDetailPage({
   // Dias por etapa, calculados apenas dentro da run aberta atual
   // (a barra de pipeline mostra só o funil em andamento no momento).
   const timings = (stages ?? []).map((stage) => {
-    const rows = (history ?? []).filter((h) => h.pipeline_run_id === openRun?.id && h.stage_id === stage.id)
+    const rows = (history ?? []).filter((h) => h.pipeline_run_id === displayRun?.id && h.stage_id === stage.id)
     if (rows.length === 0) return { stageId: stage.id, days: null, isOverdue: false }
 
     const totalSeconds = rows.reduce((sum, r) => {
@@ -117,13 +124,13 @@ export default async function ContractDetailPage({
         </Link>
       </div>
 
-      {openRun && stages && stages.length > 0 ? (
+      {displayRun && stages && stages.length > 0 ? (
         <StageBar
           contractId={contract.id}
           stages={stages}
-          currentStageId={openRun.stage_id}
+          currentStageId={displayRun.stage_id}
           timings={timings}
-          status={openRun.status}
+          status={displayRun.status}
         />
       ) : (
         <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
@@ -135,14 +142,14 @@ export default async function ContractDetailPage({
         <div className="rounded-lg bg-gray-50 p-3">
           <p className="text-xs text-gray-500">Valor (run atual)</p>
           <p className="text-sm font-medium text-gray-900">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(openRun?.value || 0)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
           </p>
         </div>
         <div className="rounded-lg bg-gray-50 p-3">
           <p className="text-xs text-gray-500">Previsão de fechamento</p>
           <p className="text-sm font-medium text-gray-900">
-            {openRun?.expected_close_date
-              ? new Date(openRun.expected_close_date).toLocaleDateString('pt-BR')
+            {displayRun?.expected_close_date
+              ? new Date(displayRun.expected_close_date).toLocaleDateString('pt-BR')
               : 'Não informado'}
           </p>
         </div>
