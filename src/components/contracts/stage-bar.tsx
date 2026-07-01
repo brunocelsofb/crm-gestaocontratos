@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { moveContractStage } from '@/lib/actions/pipeline'
+import { moveContractStage, reopenRun } from '@/lib/actions/pipeline'
 
 type Stage = {
   id: string
@@ -47,6 +47,14 @@ export function StageBar({
     setError(null)
     startTransition(async () => {
       const result = await moveContractStage(contractId, stageId)
+      if (result.error) setError(result.error)
+    })
+  }
+
+  function handleReopen() {
+    setError(null)
+    startTransition(async () => {
+      const result = await reopenRun(contractId)
       if (result.error) setError(result.error)
     })
   }
@@ -113,9 +121,18 @@ export function StageBar({
           </div>
         )}
         {status !== 'open' && (
-          <span className={`text-sm font-medium ${status === 'won' ? 'text-positive-700' : 'text-negative-700'}`}>
-            {status === 'won' ? (wonStage?.name ?? 'Concluído') : (lostStage?.name ?? 'Encerrado')}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className={`text-sm font-medium ${status === 'won' ? 'text-positive-700' : 'text-negative-700'}`}>
+              {status === 'won' ? (wonStage?.name ?? 'Concluído') : (lostStage?.name ?? 'Encerrado')}
+            </span>
+            <button
+              onClick={handleReopen}
+              disabled={isPending}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isPending ? 'Reabrindo...' : 'Reabrir'}
+            </button>
+          </div>
         )}
       </div>
     </div>

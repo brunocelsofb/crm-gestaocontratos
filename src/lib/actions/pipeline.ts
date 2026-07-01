@@ -194,3 +194,86 @@ export async function moveContractStage(
   revalidatePath('/contracts')
   return { success: true }
 }
+
+// Reabre uma pipeline_run que foi encerrada como Ganho ou Perdido,
+// voltando ela para status 'open' na mesma etapa em que estava. Isso
+// NÃO apaga o histórico de quando ela foi encerrada — fica registrado
+// na timeline como um evento novo ("Reaberto"), então o rastro de
+// auditoria continua completo.
+//
+// LIMITAÇÃO CONHECIDA: só reabre se não existir NENHUMA outra run
+// aberta para esse contrato (regra "um pipeline ativo por vez" que
+// definimos desde o início) — se você já iniciou uma nova rodada de
+// renovação depois de fechar essa, reabrir a antiga criaria duas runs
+// abertas ao mesmo tempo, o que o banco bloqueia (índice único).
+export async function reopenRun(contractId: string): Promise<MoveResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { data: existingOpenRun } = await supabase
+    .from('pipeline_runs')
+    .select('id')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (existingOpenRun) {
+    return { error: 'Este contrato já tem uma passagem de funil aberta. Não é possível reabrir outra.' }
+  }
+
+  const { data: lastRun } = await supabase
+    .from('pipeline_runs')
+    .select('id, stage_id, status')
+    .eq('contract_id', contractId)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!lastRun) return { error: 'Nenhuma passagem de funil encontrada para este contrato.' }
+  if (lastRun.status === 'open') return { error: 'Esta passagem já está aberta.' }
+  if (lastRun.status === 'moved') {
+    return { error: 'Esta passagem foi movida para outro funil e não pode ser reaberta aqui — reabra a run no funil de destino, se necessário.' }
+  }
+
+  const now = new Date().toISOString()
+
+  await supabase
+    .from('pipeline_runs')
+    .update({ status: 'open', ended_at: null })
+    .eq('id', lastRun.id)
+
+  // Reabre também o registro de tempo-na-etapa mais recente, para o
+  // cálculo de "dias na etapa" continuar contando a partir de agora
+  // em vez de ficar com um buraco no meio do histórico.
+  const { data: lastHistory } = await supabase
+    .from('stage_history')
+    .select('id')
+    .eq('pipeline_run_id', lastRun.id)
+    .order('entered_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (lastHistory) {
+    await supabase
+      .from('stage_history')
+      .update({ exited_at: null, duration_seconds: null })
+      .eq('id', lastHistory.id)
+  }
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    pipeline_run_id: lastRun.id,
+    user_id: user.id,
+    type: 'system',
+    content: 'Passagem de funil reaberta.',
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/pipeline')
+  revalidatePath('/contracts')
+  return { success: true }
+}
