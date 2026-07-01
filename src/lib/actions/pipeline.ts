@@ -1,0 +1,196 @@
+'use server'
+
+// Move um contrato para uma nova etapa.
+//
+// Dois comportamentos diferentes, dependendo de para onde vai:
+//
+// A) Nova etapa está no MESMO pipeline da run aberta atual:
+//    apenas avança/retrocede a etapa dentro da mesma pipeline_run.
+//
+// B) Nova etapa está em OUTRO pipeline:
+//    encerra a run atual (status = 'moved', ended_at preenchido —
+//    o histórico completo dela fica preservado, nunca é apagado)
+//    e cria uma NOVA pipeline_run no pipeline de destino, linkada
+//    via previous_run_id. Isso é o que garante que dá pra analisar
+//    depois "quantos processos passaram pelo funil comercial antes
+//    de ir pro jurídico", sem perder o rastro.
+//
+// LIMITAÇÃO CONHECIDA: automações encadeadas podem formar loop —
+// há um limite de profundidade (_depth) como proteção mínima.
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+
+export type MoveResult = { success?: true; error?: string }
+
+export async function moveContractStage(
+  contractId: string,
+  newStageId: string,
+  _depth = 0
+): Promise<MoveResult> {
+  if (_depth > 5) {
+    return { error: 'Cadeia de automações excedeu o limite de segurança (possível loop).' }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { data: run, error: runError } = await supabase
+    .from('pipeline_runs')
+    .select('*')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (runError || !run) {
+    return { error: 'Este contrato não tem uma passagem de funil aberta no momento.' }
+  }
+
+  const { data: newStage, error: stageError } = await supabase
+    .from('stages')
+    .select('id, name, pipeline_id, is_won, is_lost')
+    .eq('id', newStageId)
+    .single()
+
+  if (stageError || !newStage) return { error: 'Etapa não encontrada.' }
+
+  const now = new Date().toISOString()
+
+  // Fecha o registro de tempo-na-etapa aberto da run atual (sempre acontece,
+  // independente de mudar de etapa dentro do mesmo funil ou trocar de funil).
+  const { data: openHistory } = await supabase
+    .from('stage_history')
+    .select('id, entered_at')
+    .eq('pipeline_run_id', run.id)
+    .is('exited_at', null)
+    .maybeSingle()
+
+  if (openHistory) {
+    const enteredAtMs = new Date(openHistory.entered_at).getTime()
+    const durationSeconds = Math.round((Date.now() - enteredAtMs) / 1000)
+    await supabase
+      .from('stage_history')
+      .update({ exited_at: now, duration_seconds: durationSeconds })
+      .eq('id', openHistory.id)
+  }
+
+  const samePipeline = newStage.pipeline_id === run.pipeline_id
+  let activeRunId = run.id
+
+  if (samePipeline) {
+    // --- Caso A: continua na mesma run, só muda a etapa ---
+    await supabase.from('stage_history').insert({
+      pipeline_run_id: run.id,
+      stage_id: newStage.id,
+      entered_at: now,
+      changed_by: user.id,
+    })
+
+    const runUpdate: Record<string, unknown> = {
+      stage_id: newStage.id,
+      stage_entered_at: now,
+    }
+    if (newStage.is_won) {
+      runUpdate.status = 'won'
+      runUpdate.ended_at = now
+    }
+    if (newStage.is_lost) {
+      runUpdate.status = 'lost'
+      runUpdate.ended_at = now
+    }
+
+    await supabase.from('pipeline_runs').update(runUpdate).eq('id', run.id)
+
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      pipeline_run_id: run.id,
+      user_id: user.id,
+      type: 'stage_change',
+      content: `Movido para a etapa "${newStage.name}".`,
+      metadata: { from_stage: run.stage_id, to_stage: newStage.id },
+    })
+  } else {
+    // --- Caso B: troca de funil — encerra a run atual, preservando
+    // seu histórico completo, e abre uma run nova no funil de destino ---
+    const [{ data: oldPipeline }, { data: newPipeline }] = await Promise.all([
+      supabase.from('pipelines').select('name').eq('id', run.pipeline_id).single(),
+      supabase.from('pipelines').select('name').eq('id', newStage.pipeline_id).single(),
+    ])
+
+    await supabase
+      .from('pipeline_runs')
+      .update({ status: 'moved', ended_at: now })
+      .eq('id', run.id)
+
+    const { data: newRun, error: newRunError } = await supabase
+      .from('pipeline_runs')
+      .insert({
+        contract_id: contractId,
+        pipeline_id: newStage.pipeline_id,
+        stage_id: newStage.id,
+        stage_entered_at: now,
+        value: run.value,                 // herda o valor da run anterior; ajuste manualmente se fizer sentido
+        previous_run_id: run.id,
+        created_by: user.id,
+      })
+      .select()
+      .single()
+
+    if (newRunError || !newRun) return { error: 'Falha ao criar a nova passagem de funil.' }
+
+    activeRunId = newRun.id
+
+    await supabase.from('stage_history').insert({
+      pipeline_run_id: newRun.id,
+      stage_id: newStage.id,
+      entered_at: now,
+      changed_by: user.id,
+    })
+
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      pipeline_run_id: newRun.id,
+      user_id: user.id,
+      type: 'pipeline_change',
+      content: `Movido do funil "${oldPipeline?.name}" para "${newPipeline?.name}", etapa "${newStage.name}". Histórico do funil anterior foi preservado.`,
+      metadata: { from_run: run.id, to_run: newRun.id, from_pipeline: run.pipeline_id, to_pipeline: newStage.pipeline_id },
+    })
+  }
+
+  // Verifica automação vinculada à nova etapa
+  const { data: rule } = await supabase
+    .from('automation_rules')
+    .select('*')
+    .eq('trigger_stage_id', newStage.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (rule) {
+    if ((rule.action_type === 'move_to_stage' || rule.action_type === 'move_to_pipeline') && rule.target_stage_id) {
+      await supabase.from('activities').insert({
+        contract_id: contractId,
+        pipeline_run_id: activeRunId,
+        type: 'automation_triggered',
+        content: `Automação "${rule.name}" disparada.`,
+        metadata: { rule_id: rule.id },
+      })
+      await moveContractStage(contractId, rule.target_stage_id, _depth + 1)
+    } else if (rule.action_type === 'create_task' && rule.task_content) {
+      await supabase.from('activities').insert({
+        contract_id: contractId,
+        pipeline_run_id: activeRunId,
+        type: 'task',
+        content: rule.task_content,
+      })
+    }
+  }
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/pipeline')
+  revalidatePath('/contracts')
+  return { success: true }
+}
