@@ -152,13 +152,13 @@ export default async function DashboardPage({
         />
       </div>
 
-      <div>
-        <h2 className="mb-2 text-xs font-medium text-foreground/60">Funil de renovação</h2>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-medium text-foreground">Funil de renovação</h2>
         <ChevronFunnel stages={funnelStages} />
       </div>
 
-      <div>
-        <h2 className="mb-2 text-xs font-medium text-foreground/60">Valor em aberto por etapa</h2>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-medium text-foreground">Valor em aberto por etapa</h2>
         <StageValueChart data={valueByStage} />
       </div>
     </div>

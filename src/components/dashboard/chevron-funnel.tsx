@@ -21,7 +21,7 @@ export function ChevronFunnel({ stages }: { stages: FunnelStage[] }) {
       {stages.map((stage, i) => (
         <div
           key={stage.id}
-          className={`flex-1 py-2.5 text-center text-[11px] text-white ${i > 0 ? '-ml-2.5 pl-4' : ''}`}
+          className={`flex-1 py-2.5 text-center text-[11px] text-white ${i > 0 ? '-ml-2.5 pl-4' : 'rounded-l-md'} ${i === stages.length - 1 ? 'rounded-r-md' : ''}`}
           style={{
             backgroundColor: stage.color,
             clipPath: i === 0 ? CHEVRON_FIRST : CHEVRON,
