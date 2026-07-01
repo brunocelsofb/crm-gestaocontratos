@@ -265,6 +265,7 @@ alter default privileges for role postgres in schema contract_crm grant all on s
 create table contract_crm.companies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  trade_name text,
   cnpj text,
   notes text,
   owner_id uuid references contract_crm.profiles(id),

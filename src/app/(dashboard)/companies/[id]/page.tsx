@@ -14,7 +14,7 @@ export default async function CompanyDetailPage({
 
   const { data: company } = await supabase
     .from('companies')
-    .select('id, name, cnpj, notes, created_at')
+    .select('id, name, trade_name, cnpj, notes, created_at')
     .eq('id', id)
     .single()
 
@@ -37,6 +37,7 @@ export default async function CompanyDetailPage({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">{company.name}</h1>
+          {company.trade_name && <p className="text-sm text-gray-500">{company.trade_name}</p>}
           {company.cnpj && <p className="mt-0.5 text-sm text-gray-500">CNPJ: {company.cnpj}</p>}
         </div>
         <Link

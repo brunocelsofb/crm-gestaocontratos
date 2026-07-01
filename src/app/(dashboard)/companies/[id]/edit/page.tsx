@@ -12,7 +12,7 @@ export default async function EditCompanyPage({
 
   const { data: company } = await supabase
     .from('companies')
-    .select('id, name, cnpj, notes')
+    .select('id, name, trade_name, cnpj, notes')
     .eq('id', id)
     .single()
 

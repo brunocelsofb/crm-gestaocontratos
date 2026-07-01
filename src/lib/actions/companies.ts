@@ -21,6 +21,7 @@ export async function createCompany(
   if (!user) return { error: 'Usuário não autenticado.' }
 
   const name = (formData.get('name') as string)?.trim()
+  const trade_name = (formData.get('trade_name') as string) || null
   const cnpj = (formData.get('cnpj') as string) || null
   const notes = (formData.get('notes') as string) || null
 
@@ -30,7 +31,7 @@ export async function createCompany(
 
   const { data: company, error } = await supabase
     .from('companies')
-    .insert({ name, cnpj, notes, owner_id: user.id })
+    .insert({ name, trade_name, cnpj, notes, owner_id: user.id })
     .select()
     .single()
 
@@ -48,6 +49,7 @@ export async function updateCompany(
   const supabase = await createClient()
 
   const name = (formData.get('name') as string)?.trim()
+  const trade_name = (formData.get('trade_name') as string) || null
   const cnpj = (formData.get('cnpj') as string) || null
   const notes = (formData.get('notes') as string) || null
 
@@ -57,7 +59,7 @@ export async function updateCompany(
 
   const { error } = await supabase
     .from('companies')
-    .update({ name, cnpj, notes, updated_at: new Date().toISOString() })
+    .update({ name, trade_name, cnpj, notes, updated_at: new Date().toISOString() })
     .eq('id', companyId)
 
   if (error) return { error: error.message }

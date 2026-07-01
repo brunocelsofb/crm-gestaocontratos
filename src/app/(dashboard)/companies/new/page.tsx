@@ -1,25 +1,37 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { createCompany, type ActionState } from '@/lib/actions/companies'
+import { CnpjLookupField } from '@/components/companies/cnpj-lookup-field'
 
 const initialState: ActionState = {}
 
 export default function NewCompanyPage() {
   const [state, formAction, pending] = useActionState(createCompany, initialState)
+  const [name, setName] = useState('')
+  const [tradeName, setTradeName] = useState('')
 
   return (
     <div className="max-w-xl space-y-6">
       <h1 className="text-[17px] font-medium text-foreground">Nova Empresa</h1>
 
       <form action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
+        <CnpjLookupField
+          onFound={({ razaoSocial, nomeFantasia }) => {
+            setName(razaoSocial)
+            setTradeName(nomeFantasia ?? '')
+          }}
+        />
+
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Nome <span className="text-red-500">*</span>
+            Razão Social (Nome) <span className="text-red-500">*</span>
           </label>
           <input
             name="name"
             required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
           />
           {state.fieldErrors?.name && (
@@ -28,9 +40,11 @@ export default function NewCompanyPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">CNPJ</label>
+          <label className="block text-sm font-medium text-gray-700">Nome Fantasia</label>
           <input
-            name="cnpj"
+            name="trade_name"
+            value={tradeName}
+            onChange={(e) => setTradeName(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
           />
         </div>
