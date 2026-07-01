@@ -34,6 +34,17 @@ export function NewPipelineForm() {
           className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
         />
       </div>
+      <div className="min-w-[180px]">
+        <label className="block text-xs font-medium text-gray-700">Tipo (define as métricas do Dashboard)</label>
+        <select
+          name="type"
+          defaultValue="gestao_contratos"
+          className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
+        >
+          <option value="gestao_contratos">Gestão de Contratos</option>
+          <option value="vendas">Vendas</option>
+        </select>
+      </div>
       <button
         type="submit"
         disabled={pending}

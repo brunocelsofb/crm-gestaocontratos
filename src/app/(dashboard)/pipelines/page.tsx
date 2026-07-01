@@ -1,14 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NewPipelineForm } from '@/components/pipelines/new-pipeline-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
-import { createStage, updateStage, deleteStage, moveStage, deletePipeline } from '@/lib/actions/pipelines'
+import { PipelineTypeSelect } from '@/components/pipelines/pipeline-type-select'
+import { createStage, updateStage, deleteStage, moveStage, deletePipeline, updatePipelineType } from '@/lib/actions/pipelines'
 
 export default async function PipelinesPage() {
   const supabase = await createClient()
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, description, is_default')
+    .select('id, name, description, is_default, type')
     .order('name')
 
   const { data: allStages } = await supabase
@@ -42,6 +43,10 @@ export default async function PipelinesPage() {
                     )}
                   </div>
                   {pipeline.description && <p className="text-xs text-gray-500">{pipeline.description}</p>}
+                  <PipelineTypeSelect
+                    defaultValue={pipeline.type}
+                    action={updatePipelineType.bind(null, pipeline.id)}
+                  />
                 </div>
                 {!pipeline.is_default && (
                   <form action={deletePipeline.bind(null, pipeline.id)}>

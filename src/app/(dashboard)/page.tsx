@@ -3,7 +3,7 @@ import { PipelineSelect } from '@/components/pipeline/pipeline-select'
 import { StageValueChart } from '@/components/dashboard/stage-value-chart'
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { ChevronFunnel } from '@/components/dashboard/chevron-funnel'
-import { Wallet, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Wallet, TrendingUp, AlertTriangle, Percent, Timer } from 'lucide-react'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -19,11 +19,13 @@ export default async function DashboardPage({
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, is_default')
+    .select('id, name, is_default, type')
     .order('name')
 
   const selectedPipeline =
     pipelineIdParam ?? pipelines?.find((p) => p.is_default)?.id ?? pipelines?.[0]?.id
+
+  const pipelineType = pipelines?.find((p) => p.id === selectedPipeline)?.type ?? 'gestao_contratos'
 
   const { data: stages } = selectedPipeline
     ? await supabase
@@ -121,6 +123,38 @@ export default async function DashboardPage({
     ).size,
   }))
 
+  // ------------------------------------------------------------
+  // Métricas específicas de PIPELINE DE VENDAS (só calculadas se
+  // for esse o tipo — evita consultas desnecessárias no caso comum)
+  // ------------------------------------------------------------
+  let conversionRate: number | null = null
+  let avgSalesCycleDays: number | null = null
+  let avgTicket: number | null = null
+
+  if (pipelineType === 'vendas' && selectedPipeline) {
+    const { data: closedRuns } = await supabase
+      .from('pipeline_runs')
+      .select('status, value, started_at, ended_at')
+      .eq('pipeline_id', selectedPipeline)
+      .in('status', ['won', 'lost'])
+
+    const wonRuns = (closedRuns ?? []).filter((r) => r.status === 'won')
+    const totalClosed = (closedRuns ?? []).length
+
+    conversionRate = totalClosed > 0 ? Math.round((wonRuns.length / totalClosed) * 100) : null
+
+    const cycleDays = wonRuns
+      .filter((r) => r.ended_at)
+      .map((r) => (new Date(r.ended_at as string).getTime() - new Date(r.started_at).getTime()) / 86_400_000)
+    avgSalesCycleDays = cycleDays.length
+      ? Math.round(cycleDays.reduce((a, b) => a + b, 0) / cycleDays.length)
+      : null
+
+    avgTicket = wonRuns.length
+      ? wonRuns.reduce((sum, r) => sum + (Number(r.value) || 0), 0) / wonRuns.length
+      : null
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -137,23 +171,45 @@ export default async function DashboardPage({
           label="Total em aberto"
           value={fmt(totalOpen)}
         />
-        <MetricCard
-          icon={TrendingUp}
-          accent="positive"
-          label="Renovado no mês"
-          value={fmt(renewedValue)}
-          hint={avgIncreasePct !== null ? `${avgIncreasePct >= 0 ? '+' : ''}${avgIncreasePct}% vs. valor anterior` : undefined}
-        />
-        <MetricCard
-          icon={AlertTriangle}
-          accent="warn"
-          label="Vencendo em 30 dias"
-          value={`${expiringRuns?.length ?? 0} contrato${expiringRuns?.length === 1 ? '' : 's'}`}
-        />
+        {pipelineType === 'vendas' ? (
+          <>
+            <MetricCard
+              icon={Percent}
+              accent="positive"
+              label="Taxa de conversão"
+              value={conversionRate !== null ? `${conversionRate}%` : '—'}
+            />
+            <MetricCard
+              icon={Timer}
+              accent="warn"
+              label="Ciclo médio de venda"
+              value={avgSalesCycleDays !== null ? `${avgSalesCycleDays} dias` : '—'}
+              hint={avgTicket !== null ? `Ticket médio: ${fmt(avgTicket)}` : undefined}
+            />
+          </>
+        ) : (
+          <>
+            <MetricCard
+              icon={TrendingUp}
+              accent="positive"
+              label="Renovado no mês"
+              value={fmt(renewedValue)}
+              hint={avgIncreasePct !== null ? `${avgIncreasePct >= 0 ? '+' : ''}${avgIncreasePct}% vs. valor anterior` : undefined}
+            />
+            <MetricCard
+              icon={AlertTriangle}
+              accent="warn"
+              label="Vencendo em 30 dias"
+              value={`${expiringRuns?.length ?? 0} contrato${expiringRuns?.length === 1 ? '' : 's'}`}
+            />
+          </>
+        )}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-foreground">Funil de renovação</h2>
+        <h2 className="mb-3 text-sm font-medium text-foreground">
+          {pipelineType === 'vendas' ? 'Funil de vendas' : 'Funil de renovação'}
+        </h2>
         <ChevronFunnel stages={funnelStages} />
       </div>
 

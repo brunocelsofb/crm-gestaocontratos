@@ -15,14 +15,22 @@ export async function createPipeline(
   const supabase = await createClient()
   const name = (formData.get('name') as string)?.trim()
   const description = (formData.get('description') as string) || null
+  const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
 
   if (!name) return { fieldErrors: { name: ['Nome é obrigatório'] } }
 
-  const { error } = await supabase.from('pipelines').insert({ name, description, is_default: false })
+  const { error } = await supabase.from('pipelines').insert({ name, description, type, is_default: false })
   if (error) return { error: error.message }
 
   revalidatePath('/pipelines')
   return {}
+}
+
+export async function updatePipelineType(pipelineId: string, formData: FormData) {
+  const supabase = await createClient()
+  const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
+  await supabase.from('pipelines').update({ type }).eq('id', pipelineId)
+  revalidatePath('/pipelines')
 }
 
 export async function deletePipeline(pipelineId: string) {
