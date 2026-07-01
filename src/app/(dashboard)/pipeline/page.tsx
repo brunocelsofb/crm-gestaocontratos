@@ -35,12 +35,17 @@ export default async function PipelinePage({
   // mas cliente/processo vinham vazios) — troquei para duas consultas
   // separadas, juntadas aqui no código. Mesmo padrão já usado (e
   // funcionando de verdade) na tela de Contratos.
+  // CORREÇÃO: antes filtrava só status='open', e por isso um contrato
+  // marcado como Ganho ou Perdido sumia do quadro inteiro (a run muda de
+  // status quando fecha). Agora mostramos open + won + lost — só 'moved'
+  // fica de fora, porque esse caso já é representado pela NOVA run no
+  // outro pipeline, então mostrar a antiga aqui seria duplicar/confundir.
   const { data: runs } = selectedPipeline
     ? await supabase
         .from('pipeline_runs')
-        .select('id, contract_id, stage_id, stage_entered_at, value')
+        .select('id, contract_id, stage_id, stage_entered_at, value, status')
         .eq('pipeline_id', selectedPipeline)
-        .eq('status', 'open')
+        .in('status', ['open', 'won', 'lost'])
     : { data: [] }
 
   const contractIds = [...new Set((runs ?? []).map((r) => r.contract_id))]
@@ -59,6 +64,7 @@ export default async function PipelinePage({
       runId: r.id,
       contractId: r.contract_id,
       stageId: r.stage_id,
+      status: r.status as 'open' | 'won' | 'lost',
       processNumber: contract?.process_number ?? '',
       clientName: contract?.client_name ?? '',
       title: contract?.title ?? '',

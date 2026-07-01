@@ -28,6 +28,7 @@ export type RunCard = {
   runId: string
   contractId: string
   stageId: string
+  status: 'open' | 'won' | 'lost'
   processNumber: string
   clientName: string
   title: string
@@ -51,9 +52,11 @@ function fmt(value: number) {
 }
 
 function Card({ card, sla }: { card: RunCard; sla: number | null }) {
+  const isClosed = card.status !== 'open'
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.runId,
     data: card,
+    disabled: isClosed,
   })
   const days = daysSince(card.stageEnteredAt)
   const overdue = sla !== null && days > sla
@@ -63,15 +66,19 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`mb-2 cursor-grab rounded-md border border-gray-200 bg-white p-2 text-xs shadow-sm active:cursor-grabbing ${
-        isDragging ? 'opacity-40' : ''
-      }`}
+      className={`mb-2 rounded-md border border-gray-200 bg-white p-2 text-xs shadow-sm ${
+        isClosed ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
+      } ${isDragging ? 'opacity-40' : ''}`}
     >
-      <p className="font-medium text-gray-900">{card.clientName}</p>
+      <div className="flex items-start justify-between gap-1">
+        <p className="font-medium text-gray-900">{card.clientName}</p>
+        {card.status === 'won' && <span className="shrink-0 rounded-full bg-positive-100 px-1.5 py-0.5 text-[9px] font-medium text-positive-700">Ganho</span>}
+        {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-1.5 py-0.5 text-[9px] font-medium text-negative-700">Perdido</span>}
+      </div>
       <p className="font-mono text-[10px] text-gray-400">{card.processNumber}</p>
       <div className="mt-1 flex items-center justify-between">
         <span className="text-gray-600">{fmt(card.value)}</span>
-        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${overdue ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${overdue ? 'bg-negative-100 text-negative-700' : 'bg-gray-100 text-gray-500'}`}>
           {days === 0 ? '< 1d' : `${days}d`}
         </span>
       </div>
@@ -123,7 +130,7 @@ export function KanbanBoard({
 
     const newStageId = String(over.id)
     const card = active.data.current as RunCard | undefined
-    if (!card || card.stageId === newStageId) return
+    if (!card || card.stageId === newStageId || card.status !== 'open') return
 
     const previousStageId = card.stageId
 
