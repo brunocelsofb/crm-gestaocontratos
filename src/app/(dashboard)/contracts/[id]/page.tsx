@@ -10,9 +10,6 @@ export default async function ContractDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  // NOTA: em versões recentes do Next.js, `params` é uma Promise em
-  // Server Components. Se sua versão usar o formato antigo (objeto
-  // direto), remova o `await` abaixo — confirme testando localmente.
   const { id } = await params
   const supabase = await createClient()
 
@@ -24,64 +21,56 @@ export default async function ContractDetailPage({
 
   if (!contract) notFound()
 
-  const { data: linkedCompany } = contract.company_id
-    ? await supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
-    : { data: null }
-
-  const { data: linkedContact } = contract.contact_id
-    ? await supabase.from('contacts').select('id, name, role, email, phone').eq('id', contract.contact_id).maybeSingle()
-    : { data: null }
-
-  // Busca TODAS as pipeline_runs do contrato (não só a aberta) para
-  // montar a "jornada entre funis" — isso é o que preserva a visão
-  // de "saiu de um funil e entrou em outro" que você pediu.
-  const { data: runs } = await supabase
-    .from('pipeline_runs')
-    .select('*')
-    .eq('contract_id', id)
-    .order('started_at', { ascending: true })
+  // PERFORMANCE: estas 4 consultas não dependem umas das outras (só do
+  // contrato já carregado acima), então saem em paralelo em vez de uma
+  // esperar a outra — reduz bastante o tempo de carregar esta tela.
+  const [
+    { data: linkedCompany },
+    { data: linkedContact },
+    { data: runs },
+    { data: activitiesRaw },
+  ] = await Promise.all([
+    contract.company_id
+      ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    contract.contact_id
+      ? supabase.from('contacts').select('id, name, role, email, phone').eq('id', contract.contact_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('pipeline_runs').select('*').eq('contract_id', id).order('started_at', { ascending: true }),
+    supabase.from('activities').select('id, type, content, created_at, due_date, completed, user_id').eq('contract_id', id).order('created_at', { ascending: false }),
+  ])
 
   const openRun = runs?.find((r) => r.status === 'open')
-  // CORREÇÃO: antes, se a run mais recente já estivesse encerrada (Ganho/
-  // Perdido), a barra de etapas sumia inteira da tela — mesmo bug do
-  // Kanban, só que aqui. Agora mostramos a última run mesmo fechada,
-  // travada (sem poder mover), em vez de esconder tudo.
   const lastRun = runs && runs.length > 0 ? runs[runs.length - 1] : undefined
   const displayRun = openRun ?? lastRun
 
   const pipelineIds = [...new Set((runs ?? []).map((r) => r.pipeline_id))]
-
-  const { data: pipelines } = pipelineIds.length
-    ? await supabase.from('pipelines').select('id, name').in('id', pipelineIds)
-    : { data: [] }
-  const pipelineById = new Map((pipelines ?? []).map((p) => [p.id, p]))
-
-  const { data: stages } = displayRun
-    ? await supabase
-        .from('stages')
-        .select('id, name, order_index, is_won, is_lost, sla_days, color')
-        .eq('pipeline_id', displayRun.pipeline_id)
-        .order('order_index')
-    : { data: [] }
-
   const runIds = (runs ?? []).map((r) => r.id)
-  const { data: history } = runIds.length
-    ? await supabase
-        .from('stage_history')
-        .select('pipeline_run_id, stage_id, entered_at, exited_at, duration_seconds')
-        .in('pipeline_run_id', runIds)
-    : { data: [] }
-
-  const { data: activitiesRaw } = await supabase
-    .from('activities')
-    .select('id, type, content, created_at, due_date, completed, user_id')
-    .eq('contract_id', id)
-    .order('created_at', { ascending: false })
-
   const userIds = [...new Set((activitiesRaw ?? []).map((a) => a.user_id).filter((v): v is string => !!v))]
-  const { data: activityProfiles } = userIds.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', userIds)
-    : { data: [] }
+
+  // PERFORMANCE: mesma lógica — estas 4 também não dependem umas das
+  // outras, só dos resultados acima.
+  const [
+    { data: pipelines },
+    { data: stages },
+    { data: history },
+    { data: activityProfiles },
+  ] = await Promise.all([
+    pipelineIds.length
+      ? supabase.from('pipelines').select('id, name').in('id', pipelineIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    displayRun
+      ? supabase.from('stages').select('id, name, order_index, is_won, is_lost, sla_days, color').eq('pipeline_id', displayRun.pipeline_id).order('order_index')
+      : Promise.resolve({ data: [] as { id: string; name: string; order_index: number; is_won: boolean; is_lost: boolean; sla_days: number | null; color: string | null }[] }),
+    runIds.length
+      ? supabase.from('stage_history').select('pipeline_run_id, stage_id, entered_at, exited_at, duration_seconds').in('pipeline_run_id', runIds)
+      : Promise.resolve({ data: [] as { pipeline_run_id: string; stage_id: string; entered_at: string; exited_at: string | null; duration_seconds: number | null }[] }),
+    userIds.length
+      ? supabase.from('profiles').select('id, full_name').in('id', userIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ])
+
+  const pipelineById = new Map((pipelines ?? []).map((p) => [p.id, p]))
   const profileById = new Map((activityProfiles ?? []).map((p) => [p.id, p.full_name]))
 
   const activities = (activitiesRaw ?? []).map((a) => ({

@@ -27,21 +27,45 @@ export default async function DashboardPage({
 
   const pipelineType = pipelines?.find((p) => p.id === selectedPipeline)?.type ?? 'gestao_contratos'
 
-  const { data: stages } = selectedPipeline
-    ? await supabase
-        .from('stages')
-        .select('id, name, order_index, is_won, is_lost, sla_days, color')
-        .eq('pipeline_id', selectedPipeline)
-        .order('order_index')
-    : { data: [] }
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
 
-  const { data: openRuns } = selectedPipeline
-    ? await supabase
-        .from('pipeline_runs')
-        .select('stage_id, value')
-        .eq('pipeline_id', selectedPipeline)
-        .eq('status', 'open')
-    : { data: [] }
+  const in30Days = new Date()
+  in30Days.setDate(in30Days.getDate() + 30)
+
+  // PERFORMANCE: as 6 consultas abaixo não dependem umas das outras —
+  // antes elas rodavam uma de cada vez (await sequencial), o que somava
+  // a latência de rede de cada uma. Com Promise.all elas saem ao mesmo
+  // tempo, e o tempo total passa a ser o da consulta mais lenta, não a
+  // soma de todas. Essa foi a causa principal da lentidão relatada.
+  const [
+    { data: stages },
+    { data: openRuns },
+    { data: wonThisMonth },
+    { data: expiringRuns },
+    { data: pipelineRunIds },
+    { data: closedRuns },
+  ] = await Promise.all([
+    selectedPipeline
+      ? supabase.from('stages').select('id, name, order_index, is_won, is_lost, sla_days, color').eq('pipeline_id', selectedPipeline).order('order_index')
+      : Promise.resolve({ data: [] as never[] }),
+    selectedPipeline
+      ? supabase.from('pipeline_runs').select('stage_id, value').eq('pipeline_id', selectedPipeline).eq('status', 'open')
+      : Promise.resolve({ data: [] as never[] }),
+    selectedPipeline
+      ? supabase.from('pipeline_runs').select('id, value, previous_run_id').eq('pipeline_id', selectedPipeline).eq('status', 'won').gte('ended_at', startOfMonth.toISOString())
+      : Promise.resolve({ data: [] as never[] }),
+    selectedPipeline
+      ? supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline).eq('status', 'open').not('expected_close_date', 'is', null).lte('expected_close_date', in30Days.toISOString().slice(0, 10))
+      : Promise.resolve({ data: [] as never[] }),
+    selectedPipeline
+      ? supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline)
+      : Promise.resolve({ data: [] as never[] }),
+    pipelineType === 'vendas' && selectedPipeline
+      ? supabase.from('pipeline_runs').select('status, value, started_at, ended_at').eq('pipeline_id', selectedPipeline).in('status', ['won', 'lost'])
+      : Promise.resolve({ data: [] as never[] }),
+  ])
 
   const totalOpen = (openRuns ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
 
@@ -53,28 +77,24 @@ export default async function DashboardPage({
       .reduce((sum, r) => sum + Number(r.value || 0), 0),
   }))
 
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
-
-  const { data: wonThisMonth } = selectedPipeline
-    ? await supabase
-        .from('pipeline_runs')
-        .select('id, value, previous_run_id')
-        .eq('pipeline_id', selectedPipeline)
-        .eq('status', 'won')
-        .gte('ended_at', startOfMonth.toISOString())
-    : { data: [] }
-
   const renewedValue = (wonThisMonth ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
 
-  // Métrica de variação: compara o valor de cada renovação com o valor da
-  // run anterior (via previous_run_id), e tira a média percentual. Isso só
-  // é possível por causa do desenho de pipeline_runs encadeadas.
+  // Estas duas dependem do resultado das consultas acima (previous_run_id
+  // e os IDs das runs), então continuam sequenciais por necessidade — mas
+  // as duas entre si também não dependem uma da outra, então seguem
+  // paralelas também.
   const previousRunIds = (wonThisMonth ?? []).map((r) => r.previous_run_id).filter((id): id is string => !!id)
-  const { data: previousRuns } = previousRunIds.length
-    ? await supabase.from('pipeline_runs').select('id, value').in('id', previousRunIds)
-    : { data: [] }
+  const runIds = (pipelineRunIds ?? []).map((r) => r.id)
+
+  const [{ data: previousRuns }, { data: historyRows }] = await Promise.all([
+    previousRunIds.length
+      ? supabase.from('pipeline_runs').select('id, value').in('id', previousRunIds)
+      : Promise.resolve({ data: [] as { id: string; value: number }[] }),
+    runIds.length
+      ? supabase.from('stage_history').select('pipeline_run_id, stage_id').in('pipeline_run_id', runIds)
+      : Promise.resolve({ data: [] as { pipeline_run_id: string; stage_id: string }[] }),
+  ])
+
   const previousValueById = new Map((previousRuns ?? []).map((r) => [r.id, Number(r.value) || 0]))
 
   const deltasPct = (wonThisMonth ?? [])
@@ -90,29 +110,6 @@ export default async function DashboardPage({
     ? Math.round((deltasPct.reduce((a, b) => a + b, 0) / deltasPct.length) * 10) / 10
     : null
 
-  // Contratos vencendo em 30 dias: runs abertas cuja etapa atual ainda não é
-  // de renovação concluída, com expected_close_date dentro da janela.
-  const in30Days = new Date()
-  in30Days.setDate(in30Days.getDate() + 30)
-  const { data: expiringRuns } = selectedPipeline
-    ? await supabase
-        .from('pipeline_runs')
-        .select('id')
-        .eq('pipeline_id', selectedPipeline)
-        .eq('status', 'open')
-        .not('expected_close_date', 'is', null)
-        .lte('expected_close_date', in30Days.toISOString().slice(0, 10))
-    : { data: [] }
-
-  const { data: pipelineRunIds } = selectedPipeline
-    ? await supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline)
-    : { data: [] }
-
-  const runIds = (pipelineRunIds ?? []).map((r) => r.id)
-  const { data: historyRows } = runIds.length
-    ? await supabase.from('stage_history').select('pipeline_run_id, stage_id').in('pipeline_run_id', runIds)
-    : { data: [] }
-
   const funnelStages = (stages ?? []).map((s) => ({
     id: s.id,
     name: s.name,
@@ -123,37 +120,23 @@ export default async function DashboardPage({
     ).size,
   }))
 
-  // ------------------------------------------------------------
-  // Métricas específicas de PIPELINE DE VENDAS (só calculadas se
-  // for esse o tipo — evita consultas desnecessárias no caso comum)
-  // ------------------------------------------------------------
-  let conversionRate: number | null = null
-  let avgSalesCycleDays: number | null = null
-  let avgTicket: number | null = null
+  // Métricas específicas de pipeline de VENDAS (closedRuns já veio vazio
+  // acima se não for esse o tipo, então esse cálculo é barato/no-op).
+  const wonRuns = (closedRuns ?? []).filter((r) => r.status === 'won')
+  const totalClosed = (closedRuns ?? []).length
 
-  if (pipelineType === 'vendas' && selectedPipeline) {
-    const { data: closedRuns } = await supabase
-      .from('pipeline_runs')
-      .select('status, value, started_at, ended_at')
-      .eq('pipeline_id', selectedPipeline)
-      .in('status', ['won', 'lost'])
+  const conversionRate = totalClosed > 0 ? Math.round((wonRuns.length / totalClosed) * 100) : null
 
-    const wonRuns = (closedRuns ?? []).filter((r) => r.status === 'won')
-    const totalClosed = (closedRuns ?? []).length
+  const cycleDays = wonRuns
+    .filter((r) => r.ended_at)
+    .map((r) => (new Date(r.ended_at as string).getTime() - new Date(r.started_at).getTime()) / 86_400_000)
+  const avgSalesCycleDays = cycleDays.length
+    ? Math.round(cycleDays.reduce((a, b) => a + b, 0) / cycleDays.length)
+    : null
 
-    conversionRate = totalClosed > 0 ? Math.round((wonRuns.length / totalClosed) * 100) : null
-
-    const cycleDays = wonRuns
-      .filter((r) => r.ended_at)
-      .map((r) => (new Date(r.ended_at as string).getTime() - new Date(r.started_at).getTime()) / 86_400_000)
-    avgSalesCycleDays = cycleDays.length
-      ? Math.round(cycleDays.reduce((a, b) => a + b, 0) / cycleDays.length)
-      : null
-
-    avgTicket = wonRuns.length
-      ? wonRuns.reduce((sum, r) => sum + (Number(r.value) || 0), 0) / wonRuns.length
-      : null
-  }
+  const avgTicket = wonRuns.length
+    ? wonRuns.reduce((sum, r) => sum + (Number(r.value) || 0), 0) / wonRuns.length
+    : null
 
   return (
     <div className="space-y-6">

@@ -36,6 +36,7 @@ export type RunCard = {
   title: string
   value: number
   stageEnteredAt: string
+  freshness: 'fresh' | 'warning' | 'stale'
 }
 
 type Stage = {
@@ -52,6 +53,12 @@ function daysSince(iso: string) {
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
+
+const FRESHNESS_STYLES = {
+  fresh: 'bg-white border-gray-200',
+  warning: 'bg-yellow-50 border-yellow-200 border-l-2 border-l-yellow-400',
+  stale: 'bg-negative-100 border-negative-600/30 border-l-2 border-l-negative-600',
+} as const
 
 function Card({ card, sla }: { card: RunCard; sla: number | null }) {
   const router = useRouter()
@@ -79,7 +86,14 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
       {...listeners}
       {...attributes}
       onClick={openOpportunity}
-      className={`mb-2 rounded-md border border-gray-200 bg-white p-2 text-xs shadow-sm ${
+      title={
+        card.freshness === 'stale'
+          ? 'Sem interação há um bom tempo — precisa de atenção'
+          : card.freshness === 'warning'
+            ? 'Começando a esfriar — considere um follow-up'
+            : 'Interação recente'
+      }
+      className={`mb-2 rounded-md border p-2 text-xs shadow-sm ${FRESHNESS_STYLES[isClosed ? 'fresh' : card.freshness]} ${
         isClosed ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
