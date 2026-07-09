@@ -36,12 +36,20 @@ export default async function CompaniesPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Empresas</h1>
-        <Link
-          href="/companies/new"
-          className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
-        >
-          + Nova Empresa
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/companies/import"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Importar CSV
+          </Link>
+          <Link
+            href="/companies/new"
+            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
+          >
+            + Nova Empresa
+          </Link>
+        </div>
       </div>
 
       <form method="GET" className="flex gap-2">
