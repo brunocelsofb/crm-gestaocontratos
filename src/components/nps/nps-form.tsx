@@ -23,6 +23,14 @@ export function NpsForm({ token, companyName }: { token: string; companyName: st
       setError('Preencha seu nome antes de enviar.')
       return
     }
+    if (!respondentEmail.trim()) {
+      setError('Preencha seu e-mail antes de enviar.')
+      return
+    }
+    if (!respondentPhone.trim()) {
+      setError('Preencha seu telefone antes de enviar.')
+      return
+    }
     setError(null)
 
     const formData = new FormData()
@@ -93,17 +101,23 @@ export function NpsForm({ token, companyName }: { token: string; companyName: st
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">E-mail (opcional)</label>
+          <label className="block text-sm font-medium text-gray-700">
+            E-mail <span className="text-red-500">*</span>
+          </label>
           <input
             type="email"
+            required
             value={respondentEmail}
             onChange={(e) => setRespondentEmail(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Telefone (opcional)</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Telefone <span className="text-red-500">*</span>
+          </label>
           <input
+            required
             value={respondentPhone}
             onChange={(e) => setRespondentPhone(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
