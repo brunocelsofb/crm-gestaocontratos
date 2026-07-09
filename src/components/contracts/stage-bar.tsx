@@ -40,6 +40,8 @@ export function StageBar({
   const [error, setError] = useState<string | null>(null)
 
   const currentIndex = stages.findIndex((s) => s.id === currentStageId)
+  const currentStage = stages[currentIndex]
+  const canMarkWon = currentStage?.is_won === true
 
   function timingFor(stageId: string) {
     return timings.find((t) => t.stageId === stageId)
@@ -118,8 +120,9 @@ export function StageBar({
           <div className="flex gap-2">
             <button
               onClick={() => handleClose('won')}
-              disabled={isPending}
-              className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:opacity-50"
+              disabled={isPending || !canMarkWon}
+              title={canMarkWon ? undefined : `Só é possível marcar "${wonLabel}" quando o contrato está numa etapa habilitada para isso`}
+              className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {wonLabel}
             </button>

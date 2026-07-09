@@ -217,6 +217,18 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 
   if (!run) return { error: 'Nenhuma passagem de funil aberta para este contrato.' }
 
+  if (outcome === 'won') {
+    const { data: currentStage } = await supabase
+      .from('stages')
+      .select('is_won')
+      .eq('id', run.stage_id)
+      .maybeSingle()
+
+    if (!currentStage?.is_won) {
+      return { error: 'A etapa atual não está habilitada para marcar sucesso. Ative "Ganho" nessa etapa em Funis e Etapas, ou mova o contrato para uma etapa habilitada.' }
+    }
+  }
+
   const now = new Date().toISOString()
 
   // Fecha o registro de tempo-na-etapa aberto (mesma lógica de quando

@@ -44,6 +44,7 @@ export default async function PipelinesPage() {
                     )}
                   </div>
                   <EditPipelineInfoForm
+                    key={`${pipeline.id}:${pipeline.name}:${pipeline.type}:${pipeline.won_label}:${pipeline.lost_label}:${pipeline.won_target_pipeline_id ?? 'none'}`}
                     name={pipeline.name}
                     description={pipeline.description}
                     type={pipeline.type}
