@@ -148,7 +148,14 @@ export async function createContract(
 
   const { data: contract, error: contractError } = await supabase
     .from('contracts')
-    .insert({ ...contractFields, company_id: companyId, contact_id: contactId, owner_id: user.id })
+    .insert({
+      ...contractFields,
+      company_id: companyId,
+      contact_id: contactId,
+      owner_id: user.id,
+      valid_from: (formData.get('valid_from') as string) || null,
+      valid_until: (formData.get('valid_until') as string) || null,
+    })
     .select()
     .single()
 
@@ -225,6 +232,8 @@ export async function updateContract(
   const description = (formData.get('description') as string) || null
   const value = Number(formData.get('value') || 0)
   const expected_close_date = (formData.get('expected_close_date') as string) || null
+  const valid_from = (formData.get('valid_from') as string) || null
+  const valid_until = (formData.get('valid_until') as string) || null
 
   if (!process_number?.trim()) {
     return { fieldErrors: { process_number: ['Número do processo é obrigatório'] } }
@@ -237,6 +246,8 @@ export async function updateContract(
       title,
       client_name,
       description,
+      valid_from,
+      valid_until,
       updated_at: new Date().toISOString(),
     })
     .eq('id', contractId)

@@ -299,6 +299,11 @@ alter table contract_crm.contracts
 
 create index idx_contracts_contact on contract_crm.contracts(contact_id);
 
+alter table contract_crm.contracts
+  add column valid_from date;
+alter table contract_crm.contracts
+  add column valid_until date;
+
 alter table contract_crm.companies enable row level security;
 alter table contract_crm.contacts enable row level security;
 

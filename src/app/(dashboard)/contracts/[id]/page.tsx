@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { NoteForm } from '@/components/contracts/note-form'
+import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -101,6 +102,7 @@ export default async function ContractDetailPage({
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold text-gray-900">{contract.client_name}</h1>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{contract.title}</span>
+            <ValidityBadge validUntil={contract.valid_until} />
           </div>
           <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
           {linkedCompany && (
@@ -139,11 +141,19 @@ export default async function ContractDetailPage({
         </p>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg bg-gray-50 p-3">
           <p className="text-xs text-gray-500">Valor (run atual)</p>
           <p className="text-sm font-medium text-gray-900">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="text-xs text-gray-500">Vigência do contrato</p>
+          <p className="text-sm font-medium text-gray-900">
+            {contract.valid_until
+              ? `${contract.valid_from ? new Date(contract.valid_from).toLocaleDateString('pt-BR') : '?'} → ${new Date(contract.valid_until).toLocaleDateString('pt-BR')}`
+              : 'Não informado'}
           </p>
         </div>
         <div className="rounded-lg bg-gray-50 p-3">

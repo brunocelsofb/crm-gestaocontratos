@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { ValidityBadge } from '@/components/contracts/validity-badge'
 
 // Server Component: busca os dados direto no servidor, sem useEffect
 // nem loading state no client — reduz JS enviado ao navegador.
@@ -34,12 +35,20 @@ export default async function ContractsPage({
 
   const { data: contracts, error } = await query
 
+  const contractIds = (contracts ?? []).map((c) => c.id)
   const stageIds = [...new Set((contracts ?? []).map((c) => c.stage_id).filter(Boolean))]
-  const { data: stages } = stageIds.length
-    ? await supabase.from('stages').select('id, name, color').in('id', stageIds)
-    : { data: [] }
+
+  const [{ data: stages }, { data: validityData }] = await Promise.all([
+    stageIds.length
+      ? supabase.from('stages').select('id, name, color').in('id', stageIds)
+      : Promise.resolve({ data: [] as { id: string; name: string; color: string | null }[] }),
+    contractIds.length
+      ? supabase.from('contracts').select('id, valid_until').in('id', contractIds)
+      : Promise.resolve({ data: [] as { id: string; valid_until: string | null }[] }),
+  ])
 
   const stageById = new Map((stages ?? []).map((s) => [s.id, s]))
+  const validUntilById = new Map((validityData ?? []).map((c) => [c.id, c.valid_until]))
 
   return (
     <div className="space-y-6">
@@ -93,6 +102,7 @@ export default async function ContractsPage({
               <th className="px-4 py-3 text-left font-medium text-gray-500">Título</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Cliente</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Etapa</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Validade</th>
               <th className="px-4 py-3 text-right font-medium text-gray-500">Valor</th>
             </tr>
           </thead>
@@ -117,6 +127,9 @@ export default async function ContractsPage({
                       <span className="text-xs text-gray-400">Sem funil ativo</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <ValidityBadge validUntil={validUntilById.get(c.id) ?? null} />
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.value || 0)}
                   </td>
@@ -126,7 +139,7 @@ export default async function ContractsPage({
 
             {contracts?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   {q ? `Nenhum contrato encontrado para "${q}".` : 'Nenhum contrato cadastrado ainda.'}
                 </td>
               </tr>

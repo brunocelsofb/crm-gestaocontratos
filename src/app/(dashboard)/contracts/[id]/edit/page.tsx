@@ -12,7 +12,7 @@ export default async function EditContractPage({
 
   const { data: contract } = await supabase
     .from('contracts')
-    .select('id, process_number, title, client_name, description')
+    .select('id, process_number, title, client_name, description, valid_from, valid_until')
     .eq('id', id)
     .single()
 
@@ -38,6 +38,8 @@ export default async function EditContractPage({
           value: Number(openRun?.value) || 0,
           expected_close_date: openRun?.expected_close_date ?? null,
           hasOpenRun: !!openRun,
+          valid_from: contract.valid_from,
+          valid_until: contract.valid_until,
         }}
       />
     </div>
