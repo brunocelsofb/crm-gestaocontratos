@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { moveContractStage, reopenRun } from '@/lib/actions/pipeline'
+import { moveContractStage, reopenRun, closeRun } from '@/lib/actions/pipeline'
 
 type Stage = {
   id: string
@@ -25,19 +25,21 @@ export function StageBar({
   currentStageId,
   timings,
   status,
+  wonLabel,
+  lostLabel,
 }: {
   contractId: string
   stages: Stage[]
   currentStageId: string
   timings: StageTiming[]
   status: string
+  wonLabel: string
+  lostLabel: string
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   const currentIndex = stages.findIndex((s) => s.id === currentStageId)
-  const wonStage = stages.find((s) => s.is_won)
-  const lostStage = stages.find((s) => s.is_lost)
 
   function timingFor(stageId: string) {
     return timings.find((t) => t.stageId === stageId)
@@ -59,8 +61,18 @@ export function StageBar({
     })
   }
 
+  function handleClose(outcome: 'won' | 'lost') {
+    setError(null)
+    startTransition(async () => {
+      const result = await closeRun(contractId, outcome)
+      if (result.error) setError(result.error)
+    })
+  }
+
   return (
     <div className="space-y-3">
+      {/* Etapa do processo — livre para mover pra frente ou pra trás,
+          independente do desfecho (Renovado/Não renovado) */}
       <div className="flex gap-1 overflow-x-auto">
         {stages.map((stage, i) => {
           const timing = timingFor(stage.id)
@@ -74,8 +86,8 @@ export function StageBar({
               disabled={isPending || isCurrent || status !== 'open'}
               onClick={() => handleMove(stage.id)}
               title={status !== 'open' ? 'Este contrato já está encerrado' : `Mover para "${stage.name}"`}
-              style={{ backgroundColor: isFuture ? '#E5E7EB' : color }}
-              className={`flex min-w-[130px] flex-1 flex-col items-center justify-center gap-1 rounded-sm px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed ${isFuture ? '!text-gray-500' : 'hover:opacity-90'}`}
+              style={{ backgroundColor: color }}
+              className="flex min-w-[130px] flex-1 flex-col items-center justify-center gap-1 rounded-sm px-3 py-2 text-xs font-medium text-white opacity-90 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-90"
             >
               <span className="text-center leading-tight">{stage.name}</span>
               {timing?.days !== null && timing?.days !== undefined && (
@@ -87,6 +99,7 @@ export function StageBar({
                   {timing.days === 0 ? 'Menos de 1 dia' : `${timing.days} dias`}
                 </span>
               )}
+              {isFuture && <span className="text-[9px] text-white/70">ainda não visitada</span>}
             </button>
           )
         })}
@@ -94,36 +107,35 @@ export function StageBar({
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {/* Desfecho — SEMPRE disponível, independente da etapa atual do
+          processo. É a mudança que separa "onde o contrato está" de
+          "qual foi o resultado final". */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          Etapa atual: <span className="font-medium text-gray-900">{stages[currentIndex]?.name}</span>
+          Etapa atual: <span className="font-medium text-gray-900">{stages[currentIndex]?.name ?? '—'}</span>
         </p>
         {status === 'open' && (
           <div className="flex gap-2">
-            {wonStage && (
-              <button
-                onClick={() => handleMove(wonStage.id)}
-                disabled={isPending}
-                className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:opacity-50"
-              >
-                {wonStage.name}
-              </button>
-            )}
-            {lostStage && (
-              <button
-                onClick={() => handleMove(lostStage.id)}
-                disabled={isPending}
-                className="rounded-md bg-negative-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-negative-700 disabled:opacity-50"
-              >
-                {lostStage.name}
-              </button>
-            )}
+            <button
+              onClick={() => handleClose('won')}
+              disabled={isPending}
+              className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:opacity-50"
+            >
+              {wonLabel}
+            </button>
+            <button
+              onClick={() => handleClose('lost')}
+              disabled={isPending}
+              className="rounded-md bg-negative-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-negative-700 disabled:opacity-50"
+            >
+              {lostLabel}
+            </button>
           </div>
         )}
         {status !== 'open' && (
           <div className="flex items-center gap-3">
             <span className={`text-sm font-medium ${status === 'won' ? 'text-positive-700' : 'text-negative-700'}`}>
-              {status === 'won' ? (wonStage?.name ?? 'Concluído') : (lostStage?.name ?? 'Encerrado')}
+              {status === 'won' ? wonLabel : lostLabel}
             </span>
             <button
               onClick={handleReopen}

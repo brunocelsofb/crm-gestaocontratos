@@ -4,11 +4,15 @@ export function EditPipelineInfoForm({
   name,
   description,
   type,
+  wonLabel,
+  lostLabel,
   action,
 }: {
   name: string
   description: string | null
   type: string
+  wonLabel: string
+  lostLabel: string
   action: (formData: FormData) => void
 }) {
   return (
@@ -39,6 +43,24 @@ export function EditPipelineInfoForm({
           <option value="gestao_contratos">Gestão de Contratos</option>
           <option value="vendas">Vendas</option>
         </select>
+      </div>
+      <div>
+        <label className="block text-[10px] text-positive-700">Botão de sucesso</label>
+        <input
+          name="won_label"
+          defaultValue={wonLabel}
+          placeholder="Ex: Renovado"
+          className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-[10px] text-negative-700">Botão de perda</label>
+        <input
+          name="lost_label"
+          defaultValue={lostLabel}
+          placeholder="Ex: Não renovado"
+          className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        />
       </div>
       <button
         type="submit"

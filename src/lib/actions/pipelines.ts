@@ -32,10 +32,12 @@ export async function updatePipelineInfo(pipelineId: string, formData: FormData)
   const name = (formData.get('name') as string)?.trim()
   const description = (formData.get('description') as string) || null
   const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
+  const won_label = (formData.get('won_label') as string)?.trim() || 'Ganho'
+  const lost_label = (formData.get('lost_label') as string)?.trim() || 'Perdido'
 
   if (!name) return // nome vazio não é salvo — mantém o anterior
 
-  await supabase.from('pipelines').update({ name, description, type }).eq('id', pipelineId)
+  await supabase.from('pipelines').update({ name, description, type, won_label, lost_label }).eq('id', pipelineId)
   revalidatePath('/pipelines')
 }
 

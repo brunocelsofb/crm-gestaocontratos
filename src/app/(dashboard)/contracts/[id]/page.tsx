@@ -59,8 +59,8 @@ export default async function ContractDetailPage({
     { data: activityProfiles },
   ] = await Promise.all([
     pipelineIds.length
-      ? supabase.from('pipelines').select('id, name').in('id', pipelineIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      ? supabase.from('pipelines').select('id, name, won_label, lost_label').in('id', pipelineIds)
+      : Promise.resolve({ data: [] as { id: string; name: string; won_label: string; lost_label: string }[] }),
     displayRun
       ? supabase.from('stages').select('id, name, order_index, is_won, is_lost, sla_days, color').eq('pipeline_id', displayRun.pipeline_id).order('order_index')
       : Promise.resolve({ data: [] as { id: string; name: string; order_index: number; is_won: boolean; is_lost: boolean; sla_days: number | null; color: string | null }[] }),
@@ -135,6 +135,8 @@ export default async function ContractDetailPage({
           currentStageId={displayRun.stage_id}
           timings={timings}
           status={displayRun.status}
+          wonLabel={pipelineById.get(displayRun.pipeline_id)?.won_label ?? 'Ganho'}
+          lostLabel={pipelineById.get(displayRun.pipeline_id)?.lost_label ?? 'Perdido'}
         />
       ) : (
         <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">

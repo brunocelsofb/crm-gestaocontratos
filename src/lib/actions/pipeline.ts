@@ -195,7 +195,75 @@ export async function moveContractStage(
   return { success: true }
 }
 
-// Reabre uma pipeline_run que foi encerrada como Ganho ou Perdido,
+// Fecha o desfecho (Renovado/Não renovado, ou Ganho/Perdido, conforme os
+// rótulos configurados no pipeline) SEM mudar a etapa atual do contrato.
+// Isso é o que permite marcar "Renovado" com o contrato ainda em
+// "Gestão de Contratos" — a etapa do processo e o desfecho final são
+// duas coisas independentes agora, não uma etapa fixa no funil.
+export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Promise<MoveResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { data: run } = await supabase
+    .from('pipeline_runs')
+    .select('id, stage_id, pipeline_id')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (!run) return { error: 'Nenhuma passagem de funil aberta para este contrato.' }
+
+  const now = new Date().toISOString()
+
+  // Fecha o registro de tempo-na-etapa aberto (mesma lógica de quando
+  // muda de etapa — o relógio para de contar quando o desfecho fecha).
+  const { data: openHistory } = await supabase
+    .from('stage_history')
+    .select('id, entered_at')
+    .eq('pipeline_run_id', run.id)
+    .is('exited_at', null)
+    .maybeSingle()
+
+  if (openHistory) {
+    const enteredAtMs = new Date(openHistory.entered_at).getTime()
+    const durationSeconds = Math.round((Date.now() - enteredAtMs) / 1000)
+    await supabase
+      .from('stage_history')
+      .update({ exited_at: now, duration_seconds: durationSeconds })
+      .eq('id', openHistory.id)
+  }
+
+  await supabase
+    .from('pipeline_runs')
+    .update({ status: outcome, ended_at: now })
+    .eq('id', run.id)
+
+  const { data: pipeline } = await supabase
+    .from('pipelines')
+    .select('won_label, lost_label')
+    .eq('id', run.pipeline_id)
+    .single()
+
+  const label = outcome === 'won' ? pipeline?.won_label ?? 'Ganho' : pipeline?.lost_label ?? 'Perdido'
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    pipeline_run_id: run.id,
+    user_id: user.id,
+    type: outcome === 'won' ? 'stage_change' : 'stage_change',
+    content: `Marcado como "${label}".`,
+    metadata: { outcome, stage_id: run.stage_id },
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/pipeline')
+  revalidatePath('/contracts')
+  return { success: true }
+}
 // voltando ela para status 'open' na mesma etapa em que estava. Isso
 // NÃO apaga o histórico de quando ela foi encerrada — fica registrado
 // na timeline como um evento novo ("Reaberto"), então o rastro de

@@ -33,6 +33,8 @@ create table contract_crm.pipelines (
   description text,
   is_default boolean not null default false,
   type text not null default 'gestao_contratos' check (type in ('vendas', 'gestao_contratos')),
+  won_label text not null default 'Ganho',
+  lost_label text not null default 'Perdido',
   created_at timestamptz not null default now()
 );
 

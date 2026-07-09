@@ -15,7 +15,7 @@ export default async function PipelinePage({
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, is_default, type')
+    .select('id, name, is_default, type, won_label, lost_label')
     .order('name')
 
   const selectedPipeline =
@@ -104,7 +104,13 @@ export default async function PipelinePage({
       </div>
 
       {stages && stages.length > 0 ? (
-        <KanbanBoard stages={stages} initialCards={cards} showValidity={pipelineType !== 'vendas'} />
+        <KanbanBoard
+          stages={stages}
+          initialCards={cards}
+          showValidity={pipelineType !== 'vendas'}
+          wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
+          lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
+        />
       ) : (
         <p className="text-sm text-gray-400">Nenhuma etapa cadastrada para este pipeline.</p>
       )}

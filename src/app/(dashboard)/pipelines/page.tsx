@@ -11,7 +11,7 @@ export default async function PipelinesPage() {
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, description, is_default, type')
+    .select('id, name, description, is_default, type, won_label, lost_label')
     .order('name')
 
   const { data: allStages } = await supabase
@@ -47,6 +47,8 @@ export default async function PipelinesPage() {
                     name={pipeline.name}
                     description={pipeline.description}
                     type={pipeline.type}
+                    wonLabel={pipeline.won_label}
+                    lostLabel={pipeline.lost_label}
                     action={updatePipelineInfo.bind(null, pipeline.id)}
                   />
                 </div>
