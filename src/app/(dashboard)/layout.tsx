@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { signOut } from '@/lib/actions/auth'
+import { RefreshButton } from '@/components/layout/refresh-button'
 import { LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -49,6 +50,9 @@ export default async function DashboardLayout({
           <SidebarNav isAdmin={isAdmin} />
         </div>
         <div className="mt-4 border-t border-white/10 pt-3">
+          <div className="px-2.5 pb-2">
+            <RefreshButton variant="dark" />
+          </div>
           <p className="truncate px-2.5 text-xs text-brand-100/70">{profile?.full_name ?? user.email}</p>
           <form action={signOut}>
             <button

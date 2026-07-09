@@ -12,7 +12,7 @@
 // para um efeito visual mais suave — deixei de fora agora para reduzir a
 // superfície de código incerto nesta primeira versão.
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   DndContext,
@@ -161,6 +161,14 @@ export function KanbanBoard({
   showValidity: boolean
 }) {
   const [cards, setCards] = useState(initialCards)
+
+  // CORREÇÃO: sem isso, o botão "Atualizar" (router.refresh()) buscaria
+  // dados novos do servidor, mas o estado local dos cards continuaria
+  // com a versão antiga — useState só usa o valor inicial na primeira
+  // renderização, não sincroniza sozinho quando a prop muda depois.
+  useEffect(() => {
+    setCards(initialCards)
+  }, [initialCards])
   const [, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
