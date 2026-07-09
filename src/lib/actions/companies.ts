@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export type ActionState = {
@@ -121,7 +122,7 @@ export async function createContact(
 
 export async function deleteContact(contactId: string, companyId: string) {
   if (!(await isCurrentUserAdmin())) return
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   await supabase.from('contacts').delete().eq('id', contactId)
   revalidatePath(`/companies/${companyId}`)
 }

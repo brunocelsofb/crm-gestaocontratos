@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export type ActionState = {
@@ -46,8 +47,13 @@ export async function updatePipelineInfo(pipelineId: string, formData: FormData)
 }
 
 export async function deletePipeline(pipelineId: string) {
-  if (!(await isCurrentUserAdmin())) return // RLS também bloqueia; isso é só feedback mais rápido
-  const supabase = await createClient()
+  if (!(await isCurrentUserAdmin())) return
+  // Uso o cliente com service_role aqui (em vez do cliente normal, que
+  // depende de RLS) porque a checagem de "é admin?" já aconteceu na
+  // linha acima — não precisamos repetir essa verificação via política
+  // de banco, e isso evita depender de uma regra de RLS mais frágil
+  // (que consulta outra tabela dentro dela mesma).
+  const supabase = createAdminClient()
   await supabase.from('pipelines').delete().eq('id', pipelineId)
   revalidatePath('/pipelines')
   // NOTA: erros aqui (ex: pipeline com contratos ativos, bloqueado por FK)
@@ -103,7 +109,10 @@ export async function updateStage(stageId: string, formData: FormData) {
 
 export async function deleteStage(stageId: string) {
   if (!(await isCurrentUserAdmin())) return
-  const supabase = await createClient()
+  // Uso o cliente com service_role aqui pelo mesmo motivo do deletePipeline
+  // acima — a checagem de admin já aconteceu, não dependemos mais de RLS
+  // pra essa exclusão específica.
+  const supabase = createAdminClient()
 
   // Só bloqueia se tiver contrato ATIVO nessa etapa agora — histórico
   // antigo (runs já encerradas, registros de stage_history) não impede
