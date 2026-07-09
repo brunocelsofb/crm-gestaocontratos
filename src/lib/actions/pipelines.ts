@@ -107,17 +107,18 @@ export async function updateStage(stageId: string, formData: FormData) {
   revalidatePath('/pipelines')
 }
 
-export async function deleteStage(stageId: string) {
-  if (!(await isCurrentUserAdmin())) return
-  // Uso o cliente com service_role aqui pelo mesmo motivo do deletePipeline
-  // acima — a checagem de admin já aconteceu, não dependemos mais de RLS
-  // pra essa exclusão específica.
+export type DeleteStageState = { error?: string; success?: boolean }
+
+export async function deleteStage(
+  stageId: string,
+  _prevState: DeleteStageState,
+  _formData: FormData
+): Promise<DeleteStageState> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) return { error: 'Você não tem permissão de administrador para excluir etapas.' }
+
   const supabase = createAdminClient()
 
-  // Só bloqueia se tiver contrato ATIVO nessa etapa agora — histórico
-  // antigo (runs já encerradas, registros de stage_history) não impede
-  // mais a exclusão, porque o banco agora aceita ficar com stage_id nulo
-  // nesses casos (a etapa "some" do histórico antigo, mas o resto continua).
   const { data: openRun } = await supabase
     .from('pipeline_runs')
     .select('id')
@@ -125,10 +126,18 @@ export async function deleteStage(stageId: string) {
     .eq('status', 'open')
     .maybeSingle()
 
-  if (openRun) return // existe contrato ativo nela — não exclui
+  if (openRun) {
+    return { error: 'Existe um contrato ativo nesta etapa agora. Mova-o antes de excluir.' }
+  }
 
-  await supabase.from('stages').delete().eq('id', stageId)
+  const { error } = await supabase.from('stages').delete().eq('id', stageId)
+
+  if (error) {
+    return { error: `Falha ao excluir: ${error.message} (código: ${error.code ?? 'desconhecido'})` }
+  }
+
   revalidatePath('/pipelines')
+  return { success: true }
 }
 
 export async function moveStage(stageId: string, direction: 'up' | 'down') {

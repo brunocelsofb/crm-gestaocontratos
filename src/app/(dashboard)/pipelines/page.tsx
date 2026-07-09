@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NewPipelineForm } from '@/components/pipelines/new-pipeline-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
+import { DeleteStageButton } from '@/components/pipelines/delete-stage-button'
 import { EditPipelineInfoForm } from '@/components/pipelines/edit-pipeline-info-form'
 import { createStage, updateStage, deleteStage, moveStage, deletePipeline, updatePipelineInfo } from '@/lib/actions/pipelines'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
@@ -67,9 +68,8 @@ export default async function PipelinesPage() {
 
               <div className="space-y-2">
                 {stages.map((stage, i) => (
-                  <form
+                  <div
                     key={stage.id}
-                    action={updateStage.bind(null, stage.id)}
                     className="flex flex-wrap items-center gap-2 rounded-md border border-gray-100 bg-gray-50 p-2"
                   >
                     <div className="flex flex-col gap-0.5">
@@ -81,47 +81,48 @@ export default async function PipelinesPage() {
                       </form>
                     </div>
 
-                    <input type="color" name="color" defaultValue={stage.color ?? '#6B7280'} className="h-8 w-8 shrink-0 cursor-pointer rounded border border-gray-300" />
-
-                    <input
-                      name="name"
-                      defaultValue={stage.name}
-                      className="min-w-[140px] flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-brand-700 focus:outline-none"
-                    />
-
-                    <label className="flex items-center gap-1 text-xs text-gray-600">
-                      SLA
-                      <input
-                        type="number"
-                        name="sla_days"
-                        defaultValue={stage.sla_days ?? ''}
-                        placeholder="dias"
-                        className="w-16 rounded-md border border-gray-300 px-1.5 py-1 text-xs focus:border-brand-700 focus:outline-none"
-                      />
-                    </label>
-
-                    <label className="flex items-center gap-1 text-xs text-gray-600">
-                      <input type="checkbox" name="is_won" defaultChecked={stage.is_won} />
-                      Ganho
-                    </label>
-                    <label className="flex items-center gap-1 text-xs text-gray-600">
-                      <input type="checkbox" name="is_lost" defaultChecked={stage.is_lost} />
-                      Perdido
-                    </label>
-
-                    <button
-                      type="submit"
-                      className="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800"
+                    <form
+                      action={updateStage.bind(null, stage.id)}
+                      className="flex flex-wrap items-center gap-2"
                     >
-                      Salvar
-                    </button>
+                      <input type="color" name="color" defaultValue={stage.color ?? '#6B7280'} className="h-8 w-8 shrink-0 cursor-pointer rounded border border-gray-300" />
 
-                    {isAdmin && (
-                      <ConfirmDeleteButton
-                        confirmMessage={`Remover a etapa "${stage.name}"? Só é possível se não houver contratos nela.`}
+                      <input
+                        name="name"
+                        defaultValue={stage.name}
+                        className="min-w-[140px] flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-brand-700 focus:outline-none"
                       />
-                    )}
-                  </form>
+
+                      <label className="flex items-center gap-1 text-xs text-gray-600">
+                        SLA
+                        <input
+                          type="number"
+                          name="sla_days"
+                          defaultValue={stage.sla_days ?? ''}
+                          placeholder="dias"
+                          className="w-16 rounded-md border border-gray-300 px-1.5 py-1 text-xs focus:border-brand-700 focus:outline-none"
+                        />
+                      </label>
+
+                      <label className="flex items-center gap-1 text-xs text-gray-600">
+                        <input type="checkbox" name="is_won" defaultChecked={stage.is_won} />
+                        Ganho
+                      </label>
+                      <label className="flex items-center gap-1 text-xs text-gray-600">
+                        <input type="checkbox" name="is_lost" defaultChecked={stage.is_lost} />
+                        Perdido
+                      </label>
+
+                      <button
+                        type="submit"
+                        className="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800"
+                      >
+                        Salvar
+                      </button>
+                    </form>
+
+                    {isAdmin && <DeleteStageButton stageId={stage.id} stageName={stage.name} />}
+                  </div>
                 ))}
 
                 {stages.length === 0 && (
