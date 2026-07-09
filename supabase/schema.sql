@@ -440,3 +440,4 @@ create policy "survey_templates_delete" on contract_crm.survey_templates for del
 
 create policy "custom_surveys_select" on contract_crm.custom_surveys for select using (auth.role() = 'authenticated');
 create policy "custom_surveys_insert" on contract_crm.custom_surveys for insert with check (auth.role() = 'authenticated');
+
