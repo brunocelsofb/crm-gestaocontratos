@@ -42,6 +42,7 @@ export function StageBar({
   const currentIndex = stages.findIndex((s) => s.id === currentStageId)
   const currentStage = stages[currentIndex]
   const canMarkWon = currentStage?.is_won === true
+  const canMarkLost = currentStage?.is_lost === true
 
   function timingFor(stageId: string) {
     return timings.find((t) => t.stageId === stageId)
@@ -128,8 +129,9 @@ export function StageBar({
             </button>
             <button
               onClick={() => handleClose('lost')}
-              disabled={isPending}
-              className="rounded-md bg-negative-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-negative-700 disabled:opacity-50"
+              disabled={isPending || !canMarkLost}
+              title={canMarkLost ? undefined : `Só é possível marcar "${lostLabel}" quando o contrato está numa etapa habilitada para isso`}
+              className="rounded-md bg-negative-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-negative-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {lostLabel}
             </button>

@@ -229,6 +229,18 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
     }
   }
 
+  if (outcome === 'lost') {
+    const { data: currentStage } = await supabase
+      .from('stages')
+      .select('is_lost')
+      .eq('id', run.stage_id)
+      .maybeSingle()
+
+    if (!currentStage?.is_lost) {
+      return { error: 'A etapa atual não está habilitada para marcar perda. Ative "Perdido" nessa etapa em Funis e Etapas, ou mova o contrato para uma etapa habilitada.' }
+    }
+  }
+
   const now = new Date().toISOString()
 
   // Fecha o registro de tempo-na-etapa aberto (mesma lógica de quando
