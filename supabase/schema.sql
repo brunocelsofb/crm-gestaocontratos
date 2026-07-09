@@ -330,3 +330,28 @@ create policy "org_settings_select" on contract_crm.organization_settings
   for select using (auth.role() = 'authenticated');
 create policy "org_settings_update_admin" on contract_crm.organization_settings
   for update using (exists (select 1 from contract_crm.profiles where id = auth.uid() and role = 'admin'));
+
+
+-- ------------------------------------------------------------
+-- 14. NPS_SURVEYS
+-- ------------------------------------------------------------
+create table contract_crm.nps_surveys (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  token text not null unique,
+  score integer check (score >= 0 and score <= 10),
+  comment text,
+  status text not null default 'pending' check (status in ('pending', 'answered')),
+  sent_at timestamptz not null default now(),
+  answered_at timestamptz,
+  created_by uuid references contract_crm.profiles(id)
+);
+
+create index idx_nps_surveys_contract on contract_crm.nps_surveys(contract_id);
+create index idx_nps_surveys_token on contract_crm.nps_surveys(token);
+
+alter table contract_crm.nps_surveys enable row level security;
+
+create policy "nps_select_staff" on contract_crm.nps_surveys for select using (auth.role() = 'authenticated');
+create policy "nps_insert_staff" on contract_crm.nps_surveys for insert with check (auth.role() = 'authenticated');
+create policy "nps_delete_staff" on contract_crm.nps_surveys for delete using (auth.role() = 'authenticated');

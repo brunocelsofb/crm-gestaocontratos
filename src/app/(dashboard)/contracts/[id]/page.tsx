@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { NoteForm } from '@/components/contracts/note-form'
+import { NpsSection } from '@/components/nps/nps-section'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -205,6 +206,8 @@ export default async function ContractDetailPage({
           </div>
         </div>
       )}
+
+      <NpsSection contractId={contract.id} />
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>

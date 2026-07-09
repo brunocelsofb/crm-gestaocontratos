@@ -38,8 +38,12 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
                        request.nextUrl.pathname.startsWith('/register')
 
+  // Rota pública: a pesquisa de NPS é respondida por clientes externos,
+  // que não têm (e não devem precisar de) conta no sistema.
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/nps/')
+
   // Usuário não logado tentando acessar área protegida -> manda para login
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
