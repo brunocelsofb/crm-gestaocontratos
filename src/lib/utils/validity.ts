@@ -15,8 +15,8 @@ export function getValidityStatus(validUntil: string | null): ValidityStatus {
 }
 
 export const VALIDITY_LABELS: Record<ValidityStatus, string> = {
-  valid: 'Válido',
-  expiring_soon: 'Vencendo em breve',
+  valid: 'Ativo',
+  expiring_soon: 'A vencer',
   expired: 'Vencido',
   unknown: 'Sem data definida',
 }

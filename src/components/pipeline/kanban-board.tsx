@@ -24,6 +24,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { moveContractStage } from '@/lib/actions/pipeline'
+import { ValidityBadge } from '@/components/contracts/validity-badge'
 
 export type RunCard = {
   runId: string
@@ -36,6 +37,7 @@ export type RunCard = {
   title: string
   value: number
   stageEnteredAt: string
+  validUntil: string | null
   freshness: 'fresh' | 'warning' | 'stale'
 }
 
@@ -111,6 +113,11 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
         {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-1.5 py-0.5 text-[9px] font-medium text-negative-700">Perdido</span>}
       </div>
       <p className="font-mono text-[10px] text-gray-400">{card.processNumber}</p>
+      {card.validUntil && (
+        <div className="mt-1">
+          <ValidityBadge validUntil={card.validUntil} />
+        </div>
+      )}
       <div className="mt-1 flex items-center justify-between">
         <span className="text-gray-600">{fmt(card.value)}</span>
         <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${overdue ? 'bg-negative-100 text-negative-700' : 'bg-gray-100 text-gray-500'}`}>

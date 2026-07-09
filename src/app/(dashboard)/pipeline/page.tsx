@@ -39,8 +39,8 @@ export default async function PipelinePage({
   // juntas também.
   const [{ data: contractsData }, { data: latestActivityRows }] = await Promise.all([
     contractIds.length
-      ? supabase.from('contracts').select('id, process_number, title, client_name, company_id').in('id', contractIds)
-      : Promise.resolve({ data: [] as { id: string; process_number: string; title: string; client_name: string; company_id: string | null }[] }),
+      ? supabase.from('contracts').select('id, process_number, title, client_name, company_id, valid_until').in('id', contractIds)
+      : Promise.resolve({ data: [] as { id: string; process_number: string; title: string; client_name: string; company_id: string | null; valid_until: string | null }[] }),
     contractIds.length
       ? supabase.from('activities').select('contract_id, created_at').in('contract_id', contractIds).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] as { contract_id: string; created_at: string }[] }),
@@ -79,6 +79,7 @@ export default async function PipelinePage({
       title: contract?.title ?? '',
       value: Number(r.value) || 0,
       stageEnteredAt: r.stage_entered_at,
+      validUntil: contract?.valid_until ?? null,
       freshness: computeFreshness(r.contract_id, r.stage_entered_at, r.stage_id),
     }
   })
