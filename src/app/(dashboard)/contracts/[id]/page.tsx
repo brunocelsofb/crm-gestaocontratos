@@ -3,6 +3,8 @@ import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { NoteForm } from '@/components/contracts/note-form'
 import { NpsSection } from '@/components/nps/nps-section'
+import { FilesSection } from '@/components/contracts/files-section'
+import { CustomSurveysSection } from '@/components/surveys/custom-surveys-section'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -31,6 +33,7 @@ export default async function ContractDetailPage({
     { data: linkedContact },
     { data: runs },
     { data: activitiesRaw },
+    { data: contractFiles },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -40,6 +43,7 @@ export default async function ContractDetailPage({
       : Promise.resolve({ data: null }),
     supabase.from('pipeline_runs').select('*').eq('contract_id', id).order('started_at', { ascending: true }),
     supabase.from('activities').select('id, type, content, created_at, due_date, completed, user_id').eq('contract_id', id).order('created_at', { ascending: false }),
+    supabase.from('contract_files').select('id, file_name, storage_path, file_size, mime_type, created_at').eq('contract_id', id).order('created_at', { ascending: false }),
   ])
 
   const openRun = runs?.find((r) => r.status === 'open')
@@ -210,6 +214,10 @@ export default async function ContractDetailPage({
       )}
 
       <NpsSection contractId={contract.id} />
+
+      <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />
+
+      <CustomSurveysSection contractId={contract.id} />
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>

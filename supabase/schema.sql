@@ -362,3 +362,81 @@ alter table contract_crm.nps_surveys enable row level security;
 create policy "nps_select_staff" on contract_crm.nps_surveys for select using (auth.role() = 'authenticated');
 create policy "nps_insert_staff" on contract_crm.nps_surveys for insert with check (auth.role() = 'authenticated');
 create policy "nps_delete_staff" on contract_crm.nps_surveys for delete using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 15. STORAGE (upload de arquivos por contrato)
+-- ------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('contract-files', 'contract-files', false)
+on conflict (id) do nothing;
+
+create policy "contract_files_select" on storage.objects
+  for select using (bucket_id = 'contract-files' and auth.role() = 'authenticated');
+create policy "contract_files_insert" on storage.objects
+  for insert with check (bucket_id = 'contract-files' and auth.role() = 'authenticated');
+create policy "contract_files_delete" on storage.objects
+  for delete using (bucket_id = 'contract-files' and auth.role() = 'authenticated');
+
+create table contract_crm.contract_files (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  file_name text not null,
+  storage_path text not null,
+  file_size bigint,
+  mime_type text,
+  uploaded_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now()
+);
+
+create index idx_contract_files_contract on contract_crm.contract_files(contract_id);
+
+alter table contract_crm.contract_files enable row level security;
+
+create policy "contract_files_meta_select" on contract_crm.contract_files
+  for select using (auth.role() = 'authenticated');
+create policy "contract_files_meta_insert" on contract_crm.contract_files
+  for insert with check (auth.role() = 'authenticated');
+create policy "contract_files_meta_delete" on contract_crm.contract_files
+  for delete using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 16. SURVEY_TEMPLATES e CUSTOM_SURVEYS (formularios customizaveis)
+-- ------------------------------------------------------------
+create table contract_crm.survey_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  questions jsonb not null default '[]'::jsonb,
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now()
+);
+
+create table contract_crm.custom_surveys (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  template_id uuid not null references contract_crm.survey_templates(id),
+  token text not null unique,
+  responses jsonb,
+  respondent_name text,
+  respondent_email text,
+  respondent_phone text,
+  status text not null default 'pending' check (status in ('pending', 'answered')),
+  sent_at timestamptz not null default now(),
+  answered_at timestamptz,
+  created_by uuid references contract_crm.profiles(id)
+);
+
+create index idx_custom_surveys_contract on contract_crm.custom_surveys(contract_id);
+create index idx_custom_surveys_token on contract_crm.custom_surveys(token);
+
+alter table contract_crm.survey_templates enable row level security;
+alter table contract_crm.custom_surveys enable row level security;
+
+create policy "survey_templates_select" on contract_crm.survey_templates for select using (auth.role() = 'authenticated');
+create policy "survey_templates_insert" on contract_crm.survey_templates for insert with check (auth.role() = 'authenticated');
+create policy "survey_templates_update" on contract_crm.survey_templates for update using (auth.role() = 'authenticated');
+create policy "survey_templates_delete" on contract_crm.survey_templates for delete using (auth.role() = 'authenticated');
+
+create policy "custom_surveys_select" on contract_crm.custom_surveys for select using (auth.role() = 'authenticated');
+create policy "custom_surveys_insert" on contract_crm.custom_surveys for insert with check (auth.role() = 'authenticated');

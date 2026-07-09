@@ -40,7 +40,7 @@ export async function proxy(request: NextRequest) {
 
   // Rota pública: a pesquisa de NPS é respondida por clientes externos,
   // que não têm (e não devem precisar de) conta no sistema.
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/nps/')
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/nps/') || request.nextUrl.pathname.startsWith('/survey/')
 
   // Usuário não logado tentando acessar área protegida -> manda para login
   if (!user && !isAuthRoute && !isPublicRoute) {

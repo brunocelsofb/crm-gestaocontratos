@@ -96,7 +96,15 @@ export default async function CompanyDetailPage({
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-sm font-medium text-gray-900">Contratos desta empresa</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-gray-900">Contratos desta empresa</h2>
+          <Link
+            href={`/contracts/new?company_id=${company.id}`}
+            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+          >
+            + Nova Oportunidade
+          </Link>
+        </div>
         <div className="space-y-2">
           {contracts?.map((c) => (
             <Link

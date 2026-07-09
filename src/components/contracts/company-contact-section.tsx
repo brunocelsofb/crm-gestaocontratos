@@ -12,18 +12,20 @@
 // Server Action tradicional) capturar tudo no submit, sem precisar de
 // state compartilhado entre componentes.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { lookupCnpj } from '@/lib/actions/cnpj-lookup'
 import { findCompanyByCnpj } from '@/lib/actions/companies'
+import { createClient } from '@/lib/supabase/client'
 
 type Contact = { id: string; name: string; role: string | null }
 type FoundCompany = { id: string; name: string; trade_name: string | null; contacts: Contact[] }
 
-export function CompanyContactSection() {
+export function CompanyContactSection({ preselectedCompanyId }: { preselectedCompanyId?: string }) {
   const [cnpj, setCnpj] = useState('')
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
+  const [loadingPreselected, setLoadingPreselected] = useState(!!preselectedCompanyId)
 
   const [foundCompany, setFoundCompany] = useState<FoundCompany | null>(null)
   const [newCompanyName, setNewCompanyName] = useState('')
@@ -35,6 +37,36 @@ export function CompanyContactSection() {
   const [newContactRole, setNewContactRole] = useState('')
   const [newContactEmail, setNewContactEmail] = useState('')
   const [newContactPhone, setNewContactPhone] = useState('')
+
+  useEffect(() => {
+    if (!preselectedCompanyId) return
+
+    async function loadPreselected() {
+      const supabase = createClient()
+      const { data: company } = await supabase
+        .from('companies')
+        .select('id, name, trade_name')
+        .eq('id', preselectedCompanyId!)
+        .maybeSingle()
+
+      if (!company) {
+        setLoadingPreselected(false)
+        return
+      }
+
+      const { data: contacts } = await supabase
+        .from('contacts')
+        .select('id, name, role')
+        .eq('company_id', preselectedCompanyId!)
+        .order('created_at')
+
+      setFoundCompany({ ...company, contacts: contacts ?? [] })
+      setChecked(true)
+      setLoadingPreselected(false)
+    }
+
+    loadPreselected()
+  }, [preselectedCompanyId])
 
   async function handleCheck() {
     setError(null)
@@ -76,31 +108,35 @@ export function CompanyContactSection() {
     <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
       <p className="text-sm font-medium text-gray-900">Empresa e contato responsável</p>
 
-      <div>
-        <label className="block text-xs font-medium text-gray-700">
-          CNPJ <span className="text-red-500">*</span>
-        </label>
-        <div className="mt-1 flex gap-2">
-          <input
-            value={cnpj}
-            onChange={(e) => {
-              setCnpj(e.target.value)
-              setChecked(false)
-            }}
-            placeholder="00.000.000/0000-00"
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={handleCheck}
-            disabled={checking || cnpj.replace(/\D/g, '').length !== 14}
-            className="whitespace-nowrap rounded-md border border-brand-700 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {checking ? 'Verificando...' : 'Verificar'}
-          </button>
+      {loadingPreselected && <p className="text-sm text-gray-400">Carregando empresa...</p>}
+
+      {!preselectedCompanyId && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700">
+            CNPJ <span className="text-red-500">*</span>
+          </label>
+          <div className="mt-1 flex gap-2">
+            <input
+              value={cnpj}
+              onChange={(e) => {
+                setCnpj(e.target.value)
+                setChecked(false)
+              }}
+              placeholder="00.000.000/0000-00"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleCheck}
+              disabled={checking || cnpj.replace(/\D/g, '').length !== 14}
+              className="whitespace-nowrap rounded-md border border-brand-700 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {checking ? 'Verificando...' : 'Verificar'}
+            </button>
+          </div>
+          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
-        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-      </div>
+      )}
 
       {checked && foundCompany && (
         <div className="rounded-md border border-positive-200 bg-positive-100 p-3">

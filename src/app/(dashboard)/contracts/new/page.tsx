@@ -21,6 +21,7 @@ export default function NewContractPage() {
   const [state, formAction, pending] = useActionState(createContract, initialState)
   const searchParams = useSearchParams()
   const pipelineParam = searchParams.get('pipeline')
+  const companyIdParam = searchParams.get('company_id')
 
   const [pipelineId, setPipelineId] = useState<string | null>(pipelineParam)
   const [pipelineName, setPipelineName] = useState<string>('')
@@ -97,7 +98,7 @@ export default function NewContractPage() {
           />
         </div>
 
-        <CompanyContactSection />
+        <CompanyContactSection preselectedCompanyId={companyIdParam ?? undefined} />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
