@@ -6,6 +6,8 @@ export function EditPipelineInfoForm({
   type,
   wonLabel,
   lostLabel,
+  wonTargetPipelineId,
+  allPipelines,
   action,
 }: {
   name: string
@@ -13,6 +15,8 @@ export function EditPipelineInfoForm({
   type: string
   wonLabel: string
   lostLabel: string
+  wonTargetPipelineId: string | null
+  allPipelines: { id: string; name: string }[]
   action: (formData: FormData) => void
 }) {
   return (
@@ -61,6 +65,19 @@ export function EditPipelineInfoForm({
           placeholder="Ex: Não renovado"
           className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
         />
+      </div>
+      <div>
+        <label className="block text-[10px] text-gray-500">Ao dar sucesso, mover pra</label>
+        <select
+          name="won_target_pipeline_id"
+          defaultValue={wonTargetPipelineId ?? ''}
+          className="w-40 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        >
+          <option value="">Nenhum (fica aqui mesmo)</option>
+          {allPipelines.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
       </div>
       <button
         type="submit"

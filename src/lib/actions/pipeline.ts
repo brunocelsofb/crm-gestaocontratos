@@ -244,7 +244,7 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 
   const { data: pipeline } = await supabase
     .from('pipelines')
-    .select('won_label, lost_label')
+    .select('won_label, lost_label, won_target_pipeline_id')
     .eq('id', run.pipeline_id)
     .single()
 
@@ -254,10 +254,64 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
     contract_id: contractId,
     pipeline_run_id: run.id,
     user_id: user.id,
-    type: outcome === 'won' ? 'stage_change' : 'stage_change',
+    type: 'stage_change',
     content: `Marcado como "${label}".`,
     metadata: { outcome, stage_id: run.stage_id },
   })
+
+  // TRANSIÇÃO AUTOMÁTICA: se este pipeline tem um "funil de destino"
+  // configurado para quando fecha como Ganho, cria automaticamente uma
+  // nova passagem lá, na primeira etapa — preservando esta run antiga
+  // como histórico (ela continua existindo, só que encerrada). É assim
+  // que "Novos Negócios" pode alimentar "Contratos" sem trabalho manual.
+  if (outcome === 'won' && pipeline?.won_target_pipeline_id) {
+    const { data: targetPipeline } = await supabase
+      .from('pipelines')
+      .select('name')
+      .eq('id', pipeline.won_target_pipeline_id)
+      .single()
+
+    const { data: firstStage } = await supabase
+      .from('stages')
+      .select('id, name')
+      .eq('pipeline_id', pipeline.won_target_pipeline_id)
+      .order('order_index', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (firstStage) {
+      const { data: newRun } = await supabase
+        .from('pipeline_runs')
+        .insert({
+          contract_id: contractId,
+          pipeline_id: pipeline.won_target_pipeline_id,
+          stage_id: firstStage.id,
+          stage_entered_at: now,
+          previous_run_id: run.id,
+          created_by: user.id,
+        })
+        .select()
+        .single()
+
+      if (newRun) {
+        await supabase.from('stage_history').insert({
+          pipeline_run_id: newRun.id,
+          stage_id: firstStage.id,
+          entered_at: now,
+          changed_by: user.id,
+        })
+
+        await supabase.from('activities').insert({
+          contract_id: contractId,
+          pipeline_run_id: newRun.id,
+          user_id: user.id,
+          type: 'pipeline_change',
+          content: `Movido automaticamente para "${targetPipeline?.name}", etapa "${firstStage.name}", após marcar "${label}" em outro funil.`,
+          metadata: { from_run: run.id, to_run: newRun.id },
+        })
+      }
+    }
+  }
 
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')

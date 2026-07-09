@@ -35,6 +35,7 @@ create table contract_crm.pipelines (
   type text not null default 'gestao_contratos' check (type in ('vendas', 'gestao_contratos')),
   won_label text not null default 'Ganho',
   lost_label text not null default 'Perdido',
+  won_target_pipeline_id uuid references contract_crm.pipelines(id),
   created_at timestamptz not null default now()
 );
 
@@ -118,7 +119,7 @@ create table contract_crm.pipeline_runs (
   id uuid primary key default gen_random_uuid(),
   contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
   pipeline_id uuid not null references contract_crm.pipelines(id),
-  stage_id uuid not null references contract_crm.stages(id),
+  stage_id uuid references contract_crm.stages(id) on delete set null,
   stage_entered_at timestamptz not null default now(),
   value numeric(14,2) default 0,
   expected_close_date date,
@@ -149,7 +150,7 @@ create unique index idx_pipeline_runs_one_open_per_contract
 create table contract_crm.stage_history (
   id uuid primary key default gen_random_uuid(),
   pipeline_run_id uuid not null references contract_crm.pipeline_runs(id) on delete cascade,
-  stage_id uuid not null references contract_crm.stages(id),
+  stage_id uuid references contract_crm.stages(id) on delete set null,
   entered_at timestamptz not null default now(),
   exited_at timestamptz,
   duration_seconds integer,

@@ -11,7 +11,7 @@ export default async function PipelinesPage() {
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, description, is_default, type, won_label, lost_label')
+    .select('id, name, description, is_default, type, won_label, lost_label, won_target_pipeline_id')
     .order('name')
 
   const { data: allStages } = await supabase
@@ -49,6 +49,8 @@ export default async function PipelinesPage() {
                     type={pipeline.type}
                     wonLabel={pipeline.won_label}
                     lostLabel={pipeline.lost_label}
+                    wonTargetPipelineId={pipeline.won_target_pipeline_id}
+                    allPipelines={(pipelines ?? []).filter((p) => p.id !== pipeline.id)}
                     action={updatePipelineInfo.bind(null, pipeline.id)}
                   />
                 </div>

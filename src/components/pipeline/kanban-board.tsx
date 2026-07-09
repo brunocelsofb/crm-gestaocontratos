@@ -175,6 +175,10 @@ export function KanbanBoard({
   }, [initialCards])
   const [, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [showClosed, setShowClosed] = useState(false)
+
+  const closedCount = cards.filter((c) => c.status !== 'open').length
+  const visibleCards = showClosed ? cards : cards.filter((c) => c.status === 'open')
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -213,11 +217,29 @@ export function KanbanBoard({
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center justify-between">
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-500">
+          <input
+            type="checkbox"
+            checked={showClosed}
+            onChange={(e) => setShowClosed(e.target.checked)}
+            className="rounded border-gray-300"
+          />
+          Mostrar encerrados ({closedCount})
+        </label>
+      </div>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {stages.map((stage) => (
-            <Column key={stage.id} stage={stage} cards={cards.filter((c) => c.stageId === stage.id)} showValidity={showValidity} wonLabel={wonLabel} lostLabel={lostLabel} />
+            <Column
+              key={stage.id}
+              stage={stage}
+              cards={visibleCards.filter((c) => c.stageId === stage.id)}
+              showValidity={showValidity}
+              wonLabel={wonLabel}
+              lostLabel={lostLabel}
+            />
           ))}
         </div>
       </DndContext>

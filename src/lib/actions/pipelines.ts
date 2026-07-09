@@ -34,10 +34,14 @@ export async function updatePipelineInfo(pipelineId: string, formData: FormData)
   const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
   const won_label = (formData.get('won_label') as string)?.trim() || 'Ganho'
   const lost_label = (formData.get('lost_label') as string)?.trim() || 'Perdido'
+  const won_target_pipeline_id = (formData.get('won_target_pipeline_id') as string) || null
 
   if (!name) return // nome vazio não é salvo — mantém o anterior
 
-  await supabase.from('pipelines').update({ name, description, type, won_label, lost_label }).eq('id', pipelineId)
+  await supabase
+    .from('pipelines')
+    .update({ name, description, type, won_label, lost_label, won_target_pipeline_id })
+    .eq('id', pipelineId)
   revalidatePath('/pipelines')
 }
 
@@ -100,6 +104,20 @@ export async function updateStage(stageId: string, formData: FormData) {
 export async function deleteStage(stageId: string) {
   if (!(await isCurrentUserAdmin())) return
   const supabase = await createClient()
+
+  // Só bloqueia se tiver contrato ATIVO nessa etapa agora — histórico
+  // antigo (runs já encerradas, registros de stage_history) não impede
+  // mais a exclusão, porque o banco agora aceita ficar com stage_id nulo
+  // nesses casos (a etapa "some" do histórico antigo, mas o resto continua).
+  const { data: openRun } = await supabase
+    .from('pipeline_runs')
+    .select('id')
+    .eq('stage_id', stageId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (openRun) return // existe contrato ativo nela — não exclui
+
   await supabase.from('stages').delete().eq('id', stageId)
   revalidatePath('/pipelines')
 }
