@@ -23,6 +23,61 @@ export async function createNpsSurvey(contractId: string) {
   revalidatePath(`/contracts/${contractId}`)
 }
 
+export type BulkSendState = { sent?: number; skipped?: number; error?: string }
+
+// Envia pesquisa NPS para todos os contratos com passagem de funil aberta
+// em pipelines do tipo "gestão de contratos" (não inclui funis de vendas,
+// já que NPS mede satisfação de quem já é cliente). Contratos que já têm
+// uma pesquisa pendente são pulados, para não disparar duplicado em massa
+// — diferente do envio manual (um por vez), que você pediu para continuar
+// sem essa restrição.
+export async function sendNpsToAllActiveContracts(
+  _prevState: BulkSendState,
+  _formData: FormData
+): Promise<BulkSendState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { data: pipelines } = await supabase.from('pipelines').select('id').eq('type', 'gestao_contratos')
+  const pipelineIds = (pipelines ?? []).map((p) => p.id)
+  if (!pipelineIds.length) return { sent: 0, skipped: 0 }
+
+  const { data: openRuns } = await supabase
+    .from('pipeline_runs')
+    .select('contract_id')
+    .in('pipeline_id', pipelineIds)
+    .eq('status', 'open')
+
+  const contractIds = [...new Set((openRuns ?? []).map((r) => r.contract_id))]
+  if (!contractIds.length) return { sent: 0, skipped: 0 }
+
+  const { data: pendingSurveys } = await supabase
+    .from('nps_surveys')
+    .select('contract_id')
+    .in('contract_id', contractIds)
+    .eq('status', 'pending')
+
+  const alreadyPending = new Set((pendingSurveys ?? []).map((s) => s.contract_id))
+  const toSend = contractIds.filter((id) => !alreadyPending.has(id))
+
+  if (toSend.length) {
+    const rows = toSend.map((contract_id) => ({
+      contract_id,
+      token: crypto.randomUUID(),
+      created_by: user.id,
+    }))
+    const { error } = await supabase.from('nps_surveys').insert(rows)
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/nps-dashboard')
+  return { sent: toSend.length, skipped: alreadyPending.size }
+}
+
 export type SubmitNpsResult =
   | { success: true }
   | { error: string }
