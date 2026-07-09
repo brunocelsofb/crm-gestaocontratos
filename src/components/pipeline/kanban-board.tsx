@@ -62,7 +62,7 @@ const FRESHNESS_STYLES = {
   stale: 'bg-negative-100 border-negative-600/30 border-l-2 border-l-negative-600',
 } as const
 
-function Card({ card, sla }: { card: RunCard; sla: number | null }) {
+function Card({ card, sla, showValidity }: { card: RunCard; sla: number | null; showValidity: boolean }) {
   const router = useRouter()
   const isClosed = card.status !== 'open'
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -113,7 +113,7 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
         {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-1.5 py-0.5 text-[9px] font-medium text-negative-700">Perdido</span>}
       </div>
       <p className="font-mono text-[10px] text-gray-400">{card.processNumber}</p>
-      {card.validUntil && (
+      {showValidity && card.validUntil && (
         <div className="mt-1">
           <ValidityBadge validUntil={card.validUntil} />
         </div>
@@ -128,7 +128,7 @@ function Card({ card, sla }: { card: RunCard; sla: number | null }) {
   )
 }
 
-function Column({ stage, cards }: { stage: Stage; cards: RunCard[] }) {
+function Column({ stage, cards, showValidity }: { stage: Stage; cards: RunCard[]; showValidity: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const total = cards.reduce((sum, c) => sum + c.value, 0)
 
@@ -142,7 +142,7 @@ function Column({ stage, cards }: { stage: Stage; cards: RunCard[] }) {
         {cards.length} · {fmt(total)}
       </p>
       {cards.map((c) => (
-        <Card key={c.runId} card={c} sla={stage.sla_days} />
+        <Card key={c.runId} card={c} sla={stage.sla_days} showValidity={showValidity} />
       ))}
       {cards.length === 0 && (
         <p className="py-6 text-center text-[11px] text-gray-400">Vazio</p>
@@ -154,9 +154,11 @@ function Column({ stage, cards }: { stage: Stage; cards: RunCard[] }) {
 export function KanbanBoard({
   stages,
   initialCards,
+  showValidity,
 }: {
   stages: Stage[]
   initialCards: RunCard[]
+  showValidity: boolean
 }) {
   const [cards, setCards] = useState(initialCards)
   const [, startTransition] = useTransition()
@@ -203,7 +205,7 @@ export function KanbanBoard({
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {stages.map((stage) => (
-            <Column key={stage.id} stage={stage} cards={cards.filter((c) => c.stageId === stage.id)} />
+            <Column key={stage.id} stage={stage} cards={cards.filter((c) => c.stageId === stage.id)} showValidity={showValidity} />
           ))}
         </div>
       </DndContext>

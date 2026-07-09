@@ -1,14 +1,15 @@
 export type ValidityStatus = 'valid' | 'expiring_soon' | 'expired' | 'unknown'
 
-export function getValidityStatus(validUntil: string | null): ValidityStatus {
-  if (!validUntil) return 'unknown'
-
+export function daysUntil(validUntil: string): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const end = new Date(validUntil)
+  return Math.floor((end.getTime() - today.getTime()) / 86_400_000)
+}
 
-  const diffDays = Math.floor((end.getTime() - today.getTime()) / 86_400_000)
-
+export function getValidityStatus(validUntil: string | null): ValidityStatus {
+  if (!validUntil) return 'unknown'
+  const diffDays = daysUntil(validUntil)
   if (diffDays < 0) return 'expired'
   if (diffDays <= 30) return 'expiring_soon'
   return 'valid'

@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NewPipelineForm } from '@/components/pipelines/new-pipeline-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
-import { PipelineTypeSelect } from '@/components/pipelines/pipeline-type-select'
-import { createStage, updateStage, deleteStage, moveStage, deletePipeline, updatePipelineType } from '@/lib/actions/pipelines'
+import { EditPipelineInfoForm } from '@/components/pipelines/edit-pipeline-info-form'
+import { createStage, updateStage, deleteStage, moveStage, deletePipeline, updatePipelineInfo } from '@/lib/actions/pipelines'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export default async function PipelinesPage() {
@@ -39,15 +39,15 @@ export default async function PipelinesPage() {
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold text-gray-900">{pipeline.name}</h2>
                     {pipeline.is_default && (
                       <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] text-brand-700">Padrão</span>
                     )}
                   </div>
-                  {pipeline.description && <p className="text-xs text-gray-500">{pipeline.description}</p>}
-                  <PipelineTypeSelect
-                    defaultValue={pipeline.type}
-                    action={updatePipelineType.bind(null, pipeline.id)}
+                  <EditPipelineInfoForm
+                    name={pipeline.name}
+                    description={pipeline.description}
+                    type={pipeline.type}
+                    action={updatePipelineInfo.bind(null, pipeline.id)}
                   />
                 </div>
                 {!pipeline.is_default && isAdmin && (

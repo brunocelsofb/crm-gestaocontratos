@@ -43,7 +43,6 @@ export default async function DashboardPage({
     { data: stages },
     { data: openRuns },
     { data: wonThisMonth },
-    { data: expiringRuns },
     { data: pipelineRunIds },
     { data: closedRuns },
   ] = await Promise.all([
@@ -51,13 +50,10 @@ export default async function DashboardPage({
       ? supabase.from('stages').select('id, name, order_index, is_won, is_lost, sla_days, color').eq('pipeline_id', selectedPipeline).order('order_index')
       : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
-      ? supabase.from('pipeline_runs').select('stage_id, value').eq('pipeline_id', selectedPipeline).eq('status', 'open')
+      ? supabase.from('pipeline_runs').select('stage_id, value, contract_id').eq('pipeline_id', selectedPipeline).eq('status', 'open')
       : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
       ? supabase.from('pipeline_runs').select('id, value, previous_run_id').eq('pipeline_id', selectedPipeline).eq('status', 'won').gte('ended_at', startOfMonth.toISOString())
-      : Promise.resolve({ data: [] as never[] }),
-    selectedPipeline
-      ? supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline).eq('status', 'open').not('expected_close_date', 'is', null).lte('expected_close_date', in30Days.toISOString().slice(0, 10))
       : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
       ? supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline)
@@ -86,13 +82,24 @@ export default async function DashboardPage({
   const previousRunIds = (wonThisMonth ?? []).map((r) => r.previous_run_id).filter((id): id is string => !!id)
   const runIds = (pipelineRunIds ?? []).map((r) => r.id)
 
-  const [{ data: previousRuns }, { data: historyRows }] = await Promise.all([
+  // CORREÇÃO: "Vencendo em 30 dias" checava pipeline_runs.expected_close_date
+  // (a previsão de fechamento da NEGOCIAÇÃO de renovação), não a vigência
+  // real do contrato (contracts.valid_until) — por isso sempre mostrava 0
+  // depois que passamos a usar vigência. Corrigido para checar o campo certo.
+  const openContractIds = [...new Set((openRuns ?? []).map((r) => r.contract_id))]
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const in30DaysStr = in30Days.toISOString().slice(0, 10)
+
+  const [{ data: previousRuns }, { data: historyRows }, { data: expiringContracts }] = await Promise.all([
     previousRunIds.length
       ? supabase.from('pipeline_runs').select('id, value').in('id', previousRunIds)
       : Promise.resolve({ data: [] as { id: string; value: number }[] }),
     runIds.length
       ? supabase.from('stage_history').select('pipeline_run_id, stage_id').in('pipeline_run_id', runIds)
       : Promise.resolve({ data: [] as { pipeline_run_id: string; stage_id: string }[] }),
+    openContractIds.length
+      ? supabase.from('contracts').select('id').in('id', openContractIds).gte('valid_until', todayStr).lte('valid_until', in30DaysStr)
+      : Promise.resolve({ data: [] as { id: string }[] }),
   ])
 
   const previousValueById = new Map((previousRuns ?? []).map((r) => [r.id, Number(r.value) || 0]))
@@ -183,7 +190,7 @@ export default async function DashboardPage({
               icon={AlertTriangle}
               accent="warn"
               label="Vencendo em 30 dias"
-              value={`${expiringRuns?.length ?? 0} contrato${expiringRuns?.length === 1 ? '' : 's'}`}
+              value={`${expiringContracts?.length ?? 0} contrato${expiringContracts?.length === 1 ? '' : 's'}`}
             />
           </>
         )}
@@ -191,7 +198,7 @@ export default async function DashboardPage({
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-medium text-foreground">
-          {pipelineType === 'vendas' ? 'Funil de vendas' : 'Funil de renovação'}
+          {pipelines?.find((p) => p.id === selectedPipeline)?.name ?? 'Funil'}
         </h2>
         <ChevronFunnel stages={funnelStages} />
       </div>

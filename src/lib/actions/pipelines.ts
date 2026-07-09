@@ -27,10 +27,15 @@ export async function createPipeline(
   return {}
 }
 
-export async function updatePipelineType(pipelineId: string, formData: FormData) {
+export async function updatePipelineInfo(pipelineId: string, formData: FormData) {
   const supabase = await createClient()
+  const name = (formData.get('name') as string)?.trim()
+  const description = (formData.get('description') as string) || null
   const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
-  await supabase.from('pipelines').update({ type }).eq('id', pipelineId)
+
+  if (!name) return // nome vazio não é salvo — mantém o anterior
+
+  await supabase.from('pipelines').update({ name, description, type }).eq('id', pipelineId)
   revalidatePath('/pipelines')
 }
 

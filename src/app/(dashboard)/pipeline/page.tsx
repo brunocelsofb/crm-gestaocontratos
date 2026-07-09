@@ -15,11 +15,13 @@ export default async function PipelinePage({
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, is_default')
+    .select('id, name, is_default, type')
     .order('name')
 
   const selectedPipeline =
     pipelineIdParam ?? pipelines?.find((p) => p.is_default)?.id ?? pipelines?.[0]?.id
+
+  const pipelineType = pipelines?.find((p) => p.id === selectedPipeline)?.type ?? 'gestao_contratos'
 
   // PERFORMANCE: stages e runs não dependem uma da outra — rodam em
   // paralelo em vez de uma esperar a outra terminar.
@@ -102,7 +104,7 @@ export default async function PipelinePage({
       </div>
 
       {stages && stages.length > 0 ? (
-        <KanbanBoard stages={stages} initialCards={cards} />
+        <KanbanBoard stages={stages} initialCards={cards} showValidity={pipelineType !== 'vendas'} />
       ) : (
         <p className="text-sm text-gray-400">Nenhuma etapa cadastrada para este pipeline.</p>
       )}
