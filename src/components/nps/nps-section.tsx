@@ -2,6 +2,14 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createNpsSurvey } from '@/lib/actions/nps'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
+import { categorizeScore } from '@/lib/utils/nps'
+
+const CATEGORY_LABELS = { promoter: 'Promotor', passive: 'Neutro', detractor: 'Detrator' } as const
+const CATEGORY_STYLES = {
+  promoter: 'bg-positive-100 text-positive-700',
+  passive: 'bg-yellow-100 text-yellow-800',
+  detractor: 'bg-negative-100 text-negative-700',
+} as const
 
 export async function NpsSection({ contractId }: { contractId: string }) {
   const supabase = await createClient()
@@ -40,16 +48,26 @@ export async function NpsSection({ contractId }: { contractId: string }) {
       <div className="space-y-2">
         {surveys?.map((s) => {
           const link = `${protocol}://${host}/nps/${s.token}`
+          const category = s.status === 'answered' && s.score !== null ? categorizeScore(s.score) : null
           return (
             <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
               <div className="flex items-center justify-between">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    s.status === 'answered' ? 'bg-positive-100 text-positive-700' : 'bg-yellow-100 text-yellow-800'
-                  }`}
-                >
-                  {s.status === 'answered' ? `Respondida — nota ${s.score}` : 'Pendente'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {s.status === 'answered' && category ? (
+                    <>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CATEGORY_STYLES[category]}`}>
+                        {CATEGORY_LABELS[category]} — nota {s.score}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        respondida em {s.answered_at ? new Date(s.answered_at).toLocaleDateString('pt-BR') : '—'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-medium text-yellow-800">
+                      Pendente
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-gray-400">
                   Enviada em {new Date(s.sent_at).toLocaleDateString('pt-BR')}
                 </span>

@@ -15,7 +15,17 @@ export default async function NpsPublicPage({
     .eq('token', token)
     .maybeSingle()
 
-  let companyName = ''
+  let clientDisplayName = ''
+  // CORREÇÃO: a pergunta do NPS precisa citar o nome da ORGANIZAÇÃO que
+  // presta o serviço (ex: "ORBIS"), não o nome do cliente que está
+  // respondendo — antes estava invertido.
+  const { data: orgSettings } = await adminClient
+    .from('organization_settings')
+    .select('name')
+    .eq('id', 'default')
+    .maybeSingle()
+  const organizationName = orgSettings?.name ?? 'nossa empresa'
+
   if (survey) {
     const { data: contract } = await adminClient
       .from('contracts')
@@ -23,7 +33,7 @@ export default async function NpsPublicPage({
       .eq('id', survey.contract_id)
       .maybeSingle()
 
-    companyName = contract?.client_name ?? ''
+    clientDisplayName = contract?.client_name ?? ''
 
     if (contract?.company_id) {
       const { data: company } = await adminClient
@@ -31,7 +41,7 @@ export default async function NpsPublicPage({
         .select('name')
         .eq('id', contract.company_id)
         .maybeSingle()
-      if (company?.name) companyName = company.name
+      if (company?.name) clientDisplayName = company.name
     }
   }
 
@@ -48,7 +58,12 @@ export default async function NpsPublicPage({
             <p className="mt-1 text-sm text-gray-500">Sua resposta a esta pesquisa já foi registrada anteriormente.</p>
           </div>
         ) : (
-          <NpsForm token={token} companyName={companyName} />
+          <>
+            {clientDisplayName && (
+              <p className="mb-4 text-xs text-gray-400">Olá, {clientDisplayName}</p>
+            )}
+            <NpsForm token={token} companyName={organizationName} />
+          </>
         )}
       </div>
     </div>
