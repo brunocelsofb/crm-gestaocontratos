@@ -7,7 +7,17 @@ function quarterRange(year: number, quarter: 1 | 2 | 3 | 4) {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
-export function PeriodSelector({ from, to }: { from: string; to: string }) {
+export function PeriodSelector({
+  from,
+  to,
+  basePath = '/nps-dashboard',
+  extraParams = {},
+}: {
+  from: string
+  to: string
+  basePath?: string
+  extraParams?: Record<string, string | undefined>
+}) {
   const year = new Date().getFullYear()
   const presets = [
     { label: 'Q1', ...quarterRange(year, 1) },
@@ -17,6 +27,16 @@ export function PeriodSelector({ from, to }: { from: string; to: string }) {
     { label: 'Ano todo', from: `${year}-01-01`, to: `${year}-12-31` },
   ]
 
+  function buildHref(f: string, t: string) {
+    const params = new URLSearchParams()
+    for (const [k, v] of Object.entries(extraParams)) {
+      if (v) params.set(k, v)
+    }
+    params.set('from', f)
+    params.set('to', t)
+    return `${basePath}?${params.toString()}`
+  }
+
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex gap-1">
@@ -25,7 +45,7 @@ export function PeriodSelector({ from, to }: { from: string; to: string }) {
           return (
             <Link
               key={p.label}
-              href={`/nps-dashboard?from=${p.from}&to=${p.to}`}
+              href={buildHref(p.from, p.to)}
               className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
                 active ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
@@ -36,7 +56,10 @@ export function PeriodSelector({ from, to }: { from: string; to: string }) {
         })}
       </div>
 
-      <form method="GET" className="flex items-end gap-2">
+      <form method="GET" action={basePath} className="flex items-end gap-2">
+        {Object.entries(extraParams).map(([k, v]) =>
+          v ? <input key={k} type="hidden" name={k} value={v} /> : null
+        )}
         <div>
           <label className="block text-[10px] text-gray-500">De</label>
           <input

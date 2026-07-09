@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { PeriodSelector } from '@/components/nps/period-selector'
+import { PeriodSelector } from '@/components/dashboard/period-selector'
 import { BulkSendNpsButton } from '@/components/nps/bulk-send-nps-button'
 import { calculateNps, categorizeScore } from '@/lib/utils/nps'
 

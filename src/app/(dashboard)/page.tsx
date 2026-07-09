@@ -1,20 +1,29 @@
 import { createClient } from '@/lib/supabase/server'
 import { PipelineSelect } from '@/components/pipeline/pipeline-select'
+import { PeriodSelector } from '@/components/dashboard/period-selector'
 import { StageValueChart } from '@/components/dashboard/stage-value-chart'
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { ChevronFunnel } from '@/components/dashboard/chevron-funnel'
-import { Wallet, TrendingUp, AlertTriangle, Percent, Timer } from 'lucide-react'
+import { getValidityStatus } from '@/lib/utils/validity'
+import { Wallet, TrendingUp, AlertTriangle, XCircle, UserX, Percent, Timer } from 'lucide-react'
 
 function fmt(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
+function currentMonthRange() {
+  const now = new Date()
+  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pipeline?: string }>
+  searchParams: Promise<{ pipeline?: string; from?: string; to?: string }>
 }) {
-  const { pipeline: pipelineIdParam } = await searchParams
+  const { pipeline: pipelineIdParam, from: fromParam, to: toParam } = await searchParams
   const supabase = await createClient()
 
   const { data: pipelines } = await supabase
@@ -27,22 +36,25 @@ export default async function DashboardPage({
 
   const pipelineType = pipelines?.find((p) => p.id === selectedPipeline)?.type ?? 'gestao_contratos'
 
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
+  // Período usado pelos cartões "Renovado" e "Churn" — o que aconteceu
+  // DENTRO desse intervalo. "Total em aberto", "A vencer" e "Vencido" são
+  // sempre em relação a HOJE (estado atual), não dependem desse período.
+  const defaultRange = currentMonthRange()
+  const periodFrom = fromParam ?? defaultRange.from
+  const periodTo = toParam ?? defaultRange.to
 
   const in30Days = new Date()
   in30Days.setDate(in30Days.getDate() + 30)
+  const in30DaysStr = in30Days.toISOString().slice(0, 10)
 
-  // PERFORMANCE: as 6 consultas abaixo não dependem umas das outras —
-  // antes elas rodavam uma de cada vez (await sequencial), o que somava
-  // a latência de rede de cada uma. Com Promise.all elas saem ao mesmo
-  // tempo, e o tempo total passa a ser o da consulta mais lenta, não a
-  // soma de todas. Essa foi a causa principal da lentidão relatada.
+  // PERFORMANCE: consultas independentes rodando em paralelo (ver
+  // explicação detalhada em commits anteriores — reduz bastante o tempo
+  // de carregamento comparado a fazer uma de cada vez).
   const [
     { data: stages },
     { data: openRuns },
-    { data: wonThisMonth },
+    { data: wonInPeriod },
+    { data: lostInPeriod },
     { data: pipelineRunIds },
     { data: closedRuns },
   ] = await Promise.all([
@@ -53,7 +65,10 @@ export default async function DashboardPage({
       ? supabase.from('pipeline_runs').select('stage_id, value, contract_id').eq('pipeline_id', selectedPipeline).eq('status', 'open')
       : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
-      ? supabase.from('pipeline_runs').select('id, value, previous_run_id').eq('pipeline_id', selectedPipeline).eq('status', 'won').gte('ended_at', startOfMonth.toISOString())
+      ? supabase.from('pipeline_runs').select('id, value, previous_run_id').eq('pipeline_id', selectedPipeline).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`)
+      : Promise.resolve({ data: [] as never[] }),
+    selectedPipeline
+      ? supabase.from('pipeline_runs').select('id, value').eq('pipeline_id', selectedPipeline).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`)
       : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
       ? supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline)
@@ -63,6 +78,10 @@ export default async function DashboardPage({
       : Promise.resolve({ data: [] as never[] }),
   ])
 
+  // "Total em aberto (receita recorrente)": soma TODOS os contratos com
+  // passagem aberta, independente de estarem vencidos ou não — um
+  // contrato só sai daqui quando alguém explicitamente marca "Não
+  // renovado" (vira churn) ou "Renovado". Vencido sozinho não tira do total.
   const totalOpen = (openRuns ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
 
   const valueByStage = (stages ?? []).map((s) => ({
@@ -73,24 +92,15 @@ export default async function DashboardPage({
       .reduce((sum, r) => sum + Number(r.value || 0), 0),
   }))
 
-  const renewedValue = (wonThisMonth ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
+  const renewedValue = (wonInPeriod ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
+  const churnValue = (lostInPeriod ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
+  const churnCount = (lostInPeriod ?? []).length
 
-  // Estas duas dependem do resultado das consultas acima (previous_run_id
-  // e os IDs das runs), então continuam sequenciais por necessidade — mas
-  // as duas entre si também não dependem uma da outra, então seguem
-  // paralelas também.
-  const previousRunIds = (wonThisMonth ?? []).map((r) => r.previous_run_id).filter((id): id is string => !!id)
+  const previousRunIds = (wonInPeriod ?? []).map((r) => r.previous_run_id).filter((id): id is string => !!id)
   const runIds = (pipelineRunIds ?? []).map((r) => r.id)
-
-  // CORREÇÃO: "Vencendo em 30 dias" checava pipeline_runs.expected_close_date
-  // (a previsão de fechamento da NEGOCIAÇÃO de renovação), não a vigência
-  // real do contrato (contracts.valid_until) — por isso sempre mostrava 0
-  // depois que passamos a usar vigência. Corrigido para checar o campo certo.
   const openContractIds = [...new Set((openRuns ?? []).map((r) => r.contract_id))]
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const in30DaysStr = in30Days.toISOString().slice(0, 10)
 
-  const [{ data: previousRuns }, { data: historyRows }, { data: expiringContracts }] = await Promise.all([
+  const [{ data: previousRuns }, { data: historyRows }, { data: openContractsValidity }] = await Promise.all([
     previousRunIds.length
       ? supabase.from('pipeline_runs').select('id, value').in('id', previousRunIds)
       : Promise.resolve({ data: [] as { id: string; value: number }[] }),
@@ -98,13 +108,13 @@ export default async function DashboardPage({
       ? supabase.from('stage_history').select('pipeline_run_id, stage_id').in('pipeline_run_id', runIds)
       : Promise.resolve({ data: [] as { pipeline_run_id: string; stage_id: string }[] }),
     openContractIds.length
-      ? supabase.from('contracts').select('id').in('id', openContractIds).gte('valid_until', todayStr).lte('valid_until', in30DaysStr)
-      : Promise.resolve({ data: [] as { id: string }[] }),
+      ? supabase.from('contracts').select('id, valid_until').in('id', openContractIds)
+      : Promise.resolve({ data: [] as { id: string; valid_until: string | null }[] }),
   ])
 
   const previousValueById = new Map((previousRuns ?? []).map((r) => [r.id, Number(r.value) || 0]))
 
-  const deltasPct = (wonThisMonth ?? [])
+  const deltasPct = (wonInPeriod ?? [])
     .filter((r) => r.previous_run_id && previousValueById.has(r.previous_run_id))
     .map((r) => {
       const prev = previousValueById.get(r.previous_run_id as string)!
@@ -117,6 +127,26 @@ export default async function DashboardPage({
     ? Math.round((deltasPct.reduce((a, b) => a + b, 0) / deltasPct.length) * 10) / 10
     : null
 
+  // "A vencer" e "Vencido": olham a vigência de cada contrato com run
+  // aberta, e somam o VALOR da run (não é só contagem).
+  const validUntilByContract = new Map((openContractsValidity ?? []).map((c) => [c.id, c.valid_until]))
+  let expiringSoonValue = 0
+  let expiringSoonCount = 0
+  let expiredValue = 0
+  let expiredCount = 0
+
+  for (const run of openRuns ?? []) {
+    const validUntil = validUntilByContract.get(run.contract_id) ?? null
+    const status = getValidityStatus(validUntil)
+    if (status === 'expiring_soon') {
+      expiringSoonValue += Number(run.value) || 0
+      expiringSoonCount++
+    } else if (status === 'expired') {
+      expiredValue += Number(run.value) || 0
+      expiredCount++
+    }
+  }
+
   const funnelStages = (stages ?? []).map((s) => ({
     id: s.id,
     name: s.name,
@@ -127,8 +157,7 @@ export default async function DashboardPage({
     ).size,
   }))
 
-  // Métricas específicas de pipeline de VENDAS (closedRuns já veio vazio
-  // acima se não for esse o tipo, então esse cálculo é barato/no-op).
+  // Métricas específicas de pipeline de VENDAS
   const wonRuns = (closedRuns ?? []).filter((r) => r.status === 'won')
   const totalClosed = (closedRuns ?? []).length
 
@@ -154,11 +183,20 @@ export default async function DashboardPage({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      {pipelineType !== 'vendas' && (
+        <PeriodSelector
+          from={periodFrom}
+          to={periodTo}
+          basePath="/"
+          extraParams={{ pipeline: selectedPipeline }}
+        />
+      )}
+
+      <div className={`grid gap-3 ${pipelineType === 'vendas' ? 'grid-cols-3' : 'grid-cols-2 lg:grid-cols-5'}`}>
         <MetricCard
           icon={Wallet}
           accent="brand"
-          label="Total em aberto"
+          label="Total em aberto (receita recorrente)"
           value={fmt(totalOpen)}
         />
         {pipelineType === 'vendas' ? (
@@ -180,17 +218,32 @@ export default async function DashboardPage({
         ) : (
           <>
             <MetricCard
+              icon={AlertTriangle}
+              accent="warn"
+              label="A vencer (30 dias)"
+              value={fmt(expiringSoonValue)}
+              hint={`${expiringSoonCount} contrato${expiringSoonCount === 1 ? '' : 's'}`}
+            />
+            <MetricCard
+              icon={XCircle}
+              accent="negative"
+              label="Vencido"
+              value={fmt(expiredValue)}
+              hint={`${expiredCount} contrato${expiredCount === 1 ? '' : 's'}`}
+            />
+            <MetricCard
               icon={TrendingUp}
               accent="positive"
-              label="Renovado no mês"
+              label="Renovado no período"
               value={fmt(renewedValue)}
               hint={avgIncreasePct !== null ? `${avgIncreasePct >= 0 ? '+' : ''}${avgIncreasePct}% vs. valor anterior` : undefined}
             />
             <MetricCard
-              icon={AlertTriangle}
-              accent="warn"
-              label="Vencendo em 30 dias"
-              value={`${expiringContracts?.length ?? 0} contrato${expiringContracts?.length === 1 ? '' : 's'}`}
+              icon={UserX}
+              accent="negative"
+              label="Churn no período"
+              value={fmt(churnValue)}
+              hint={`${churnCount} contrato${churnCount === 1 ? '' : 's'}`}
             />
           </>
         )}
