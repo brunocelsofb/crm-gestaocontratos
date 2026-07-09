@@ -93,10 +93,16 @@ export async function submitNpsResponse(
 ): Promise<SubmitNpsResult> {
   const scoreRaw = formData.get('score') as string
   const comment = (formData.get('comment') as string) || null
+  const respondent_name = (formData.get('respondent_name') as string)?.trim()
+  const respondent_email = (formData.get('respondent_email') as string) || null
+  const respondent_phone = (formData.get('respondent_phone') as string) || null
 
   const score = Number(scoreRaw)
   if (Number.isNaN(score) || score < 0 || score > 10) {
     return { error: 'Selecione uma nota de 0 a 10.' }
+  }
+  if (!respondent_name) {
+    return { error: 'Informe seu nome.' }
   }
 
   const adminClient = createAdminClient()
@@ -112,7 +118,15 @@ export async function submitNpsResponse(
 
   const { error } = await adminClient
     .from('nps_surveys')
-    .update({ score, comment, status: 'answered', answered_at: new Date().toISOString() })
+    .update({
+      score,
+      comment,
+      respondent_name,
+      respondent_email,
+      respondent_phone,
+      status: 'answered',
+      answered_at: new Date().toISOString(),
+    })
     .eq('id', survey.id)
 
   if (error) return { error: error.message }

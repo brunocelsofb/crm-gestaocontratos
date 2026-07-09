@@ -10,7 +10,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name')
+    .select('name, company_name')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -20,7 +20,10 @@ export default async function SettingsPage() {
         <h1 className="text-lg font-semibold text-gray-900">Configurações</h1>
         <p className="mt-0.5 text-sm text-gray-500">Configurações gerais da organização.</p>
       </div>
-      <OrganizationSettingsForm currentName={settings?.name ?? 'Contract CRM'} />
+      <OrganizationSettingsForm
+        currentName={settings?.name ?? 'Contract CRM'}
+        currentCompanyName={settings?.company_name ?? ''}
+      />
     </div>
   )
 }

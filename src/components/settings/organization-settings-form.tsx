@@ -5,20 +5,39 @@ import { updateOrganizationSettings, type ActionState } from '@/lib/actions/sett
 
 const initialState: ActionState = {}
 
-export function OrganizationSettingsForm({ currentName }: { currentName: string }) {
+export function OrganizationSettingsForm({
+  currentName,
+  currentCompanyName,
+}: {
+  currentName: string
+  currentCompanyName: string
+}) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
 
   return (
     <form action={formAction} className="max-w-md space-y-4 rounded-lg border border-gray-200 bg-white p-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700">Nome da organização</label>
+        <label className="block text-sm font-medium text-gray-700">Nome do sistema</label>
         <input
           name="name"
           required
           defaultValue={currentName}
           className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
         />
-        <p className="mt-1 text-xs text-gray-400">Aparece no menu lateral do sistema.</p>
+        <p className="mt-1 text-xs text-gray-400">Aparece no menu lateral (ex: nome interno do sistema, tipo "Drone").</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Nome da empresa (contratada)</label>
+        <input
+          name="company_name"
+          defaultValue={currentCompanyName}
+          placeholder="Ex: ORBIS Gestão de Tecnologia em Saúde"
+          className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Usado na pergunta da pesquisa NPS ("o quanto você recomendaria [esta empresa]?") — é o nome da sua empresa, não do sistema.
+        </p>
       </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

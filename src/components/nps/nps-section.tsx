@@ -15,7 +15,7 @@ export async function NpsSection({ contractId }: { contractId: string }) {
   const supabase = await createClient()
   const { data: surveys } = await supabase
     .from('nps_surveys')
-    .select('id, token, score, comment, status, sent_at, answered_at')
+    .select('id, token, score, comment, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone')
     .eq('contract_id', contractId)
     .order('sent_at', { ascending: false })
 
@@ -72,6 +72,14 @@ export async function NpsSection({ contractId }: { contractId: string }) {
                   Enviada em {new Date(s.sent_at).toLocaleDateString('pt-BR')}
                 </span>
               </div>
+
+              {s.status === 'answered' && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Respondido por <span className="font-medium text-gray-700">{s.respondent_name}</span>
+                  {[s.respondent_email, s.respondent_phone].filter(Boolean).length > 0 &&
+                    ` · ${[s.respondent_email, s.respondent_phone].filter(Boolean).join(' · ')}`}
+                </p>
+              )}
 
               {s.status === 'answered' && s.comment && (
                 <p className="mt-2 text-sm text-gray-600">&ldquo;{s.comment}&rdquo;</p>

@@ -15,12 +15,13 @@ export async function updateOrganizationSettings(
   }
 
   const name = (formData.get('name') as string)?.trim()
+  const company_name = (formData.get('company_name') as string)?.trim() || null
   if (!name) return { error: 'Nome é obrigatório.' }
 
   const supabase = await createClient()
   const { error } = await supabase
     .from('organization_settings')
-    .update({ name, updated_at: new Date().toISOString() })
+    .update({ name, company_name, updated_at: new Date().toISOString() })
     .eq('id', 'default')
 
   if (error) return { error: error.message }

@@ -6,6 +6,9 @@ import { submitNpsResponse } from '@/lib/actions/nps'
 export function NpsForm({ token, companyName }: { token: string; companyName: string }) {
   const [score, setScore] = useState<number | null>(null)
   const [comment, setComment] = useState('')
+  const [respondentName, setRespondentName] = useState('')
+  const [respondentEmail, setRespondentEmail] = useState('')
+  const [respondentPhone, setRespondentPhone] = useState('')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -16,11 +19,18 @@ export function NpsForm({ token, companyName }: { token: string; companyName: st
       setError('Selecione uma nota antes de enviar.')
       return
     }
+    if (!respondentName.trim()) {
+      setError('Preencha seu nome antes de enviar.')
+      return
+    }
     setError(null)
 
     const formData = new FormData()
     formData.set('score', String(score))
     formData.set('comment', comment)
+    formData.set('respondent_name', respondentName)
+    formData.set('respondent_email', respondentEmail)
+    formData.set('respondent_phone', respondentPhone)
 
     startTransition(async () => {
       const result = await submitNpsResponse(token, formData)
@@ -66,6 +76,38 @@ export function NpsForm({ token, companyName }: { token: string; companyName: st
         <div className="mt-1 flex justify-between text-[11px] text-gray-400">
           <span>Pouco provável</span>
           <span>Muito provável</span>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Seu nome completo <span className="text-red-500">*</span>
+        </label>
+        <input
+          value={respondentName}
+          onChange={(e) => setRespondentName(e.target.value)}
+          required
+          className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">E-mail (opcional)</label>
+          <input
+            type="email"
+            value={respondentEmail}
+            onChange={(e) => setRespondentEmail(e.target.value)}
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Telefone (opcional)</label>
+          <input
+            value={respondentPhone}
+            onChange={(e) => setRespondentPhone(e.target.value)}
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
         </div>
       </div>
 

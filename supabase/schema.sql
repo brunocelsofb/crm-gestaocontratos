@@ -319,6 +319,7 @@ create policy "all_contacts" on contract_crm.contacts
 create table contract_crm.organization_settings (
   id text primary key default 'default',
   name text not null default 'Contract CRM',
+  company_name text,
   updated_at timestamptz not null default now()
 );
 
@@ -341,6 +342,9 @@ create table contract_crm.nps_surveys (
   token text not null unique,
   score integer check (score >= 0 and score <= 10),
   comment text,
+  respondent_name text,
+  respondent_email text,
+  respondent_phone text,
   status text not null default 'pending' check (status in ('pending', 'answered')),
   sent_at timestamptz not null default now(),
   answered_at timestamptz,

@@ -21,10 +21,10 @@ export default async function NpsPublicPage({
   // respondendo — antes estava invertido.
   const { data: orgSettings } = await adminClient
     .from('organization_settings')
-    .select('name')
+    .select('company_name')
     .eq('id', 'default')
     .maybeSingle()
-  const organizationName = orgSettings?.name ?? 'nossa empresa'
+  const organizationName = orgSettings?.company_name || 'nossa empresa'
 
   if (survey) {
     const { data: contract } = await adminClient

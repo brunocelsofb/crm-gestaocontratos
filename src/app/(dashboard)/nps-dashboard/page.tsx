@@ -32,7 +32,7 @@ export default async function NpsDashboardPage({
 
   const { data: surveys } = await supabase
     .from('nps_surveys')
-    .select('id, contract_id, score, comment, answered_at')
+    .select('id, contract_id, score, comment, answered_at, respondent_name, respondent_email, respondent_phone')
     .eq('status', 'answered')
     .gte('answered_at', `${from}T00:00:00`)
     .lte('answered_at', `${to}T23:59:59`)
@@ -104,7 +104,7 @@ export default async function NpsDashboardPage({
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Empresa</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">CNPJ</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Contato</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Respondido por</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Categoria</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Comentário</th>
               <th className="px-4 py-3 text-right font-medium text-gray-500">Data</th>
@@ -124,7 +124,14 @@ export default async function NpsDashboardPage({
                     {company?.trade_name && <div className="text-xs text-gray-400">{company.trade_name}</div>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{company?.cnpj ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-700">{contact?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-700">
+                    <div>{s.respondent_name ?? contact?.name ?? '—'}</div>
+                    {(s.respondent_email || s.respondent_phone) && (
+                      <div className="text-xs text-gray-400">
+                        {[s.respondent_email, s.respondent_phone].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {category && (
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CATEGORY_STYLES[category]}`}>
