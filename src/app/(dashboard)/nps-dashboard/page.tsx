@@ -21,32 +21,56 @@ function currentQuarterRange() {
 export default async function NpsDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; tag?: string }>
 }) {
   const params = await searchParams
   const defaultRange = currentQuarterRange()
   const from = params.from ?? defaultRange.from
   const to = params.to ?? defaultRange.to
+  const selectedTagId = params.tag ?? 'all'
 
   const supabase = await createClient()
 
-  const { data: surveys } = await supabase
-    .from('nps_surveys')
-    .select('id, contract_id, score, comment, answered_at, respondent_name, respondent_email, respondent_phone')
-    .eq('status', 'answered')
-    .gte('answered_at', `${from}T00:00:00`)
-    .lte('answered_at', `${to}T23:59:59`)
-    .order('answered_at', { ascending: false })
+  const [{ data: surveysRaw }, { data: allTags }] = await Promise.all([
+    supabase
+      .from('nps_surveys')
+      .select('id, contract_id, score, comment, answered_at, respondent_name, respondent_email, respondent_phone')
+      .eq('status', 'answered')
+      .gte('answered_at', `${from}T00:00:00`)
+      .lte('answered_at', `${to}T23:59:59`)
+      .order('answered_at', { ascending: false }),
+    supabase.from('tags').select('id, name, color').order('name'),
+  ])
 
-  const contractIds = [...new Set((surveys ?? []).map((s) => s.contract_id))]
+  const allContractIds = [...new Set((surveysRaw ?? []).map((s) => s.contract_id))]
 
-  const { data: contracts } = contractIds.length
-    ? await supabase.from('contracts').select('id, client_name, company_id, contact_id').in('id', contractIds)
-    : { data: [] as { id: string; client_name: string; company_id: string | null; contact_id: string | null }[] }
+  const [{ data: contracts }, { data: contractTagRows }] = await Promise.all([
+    allContractIds.length
+      ? supabase.from('contracts').select('id, client_name, company_id, contact_id').in('id', allContractIds)
+      : Promise.resolve({ data: [] as { id: string; client_name: string; company_id: string | null; contact_id: string | null }[] }),
+    allContractIds.length
+      ? supabase.from('contract_tags').select('contract_id, tag_id').in('contract_id', allContractIds)
+      : Promise.resolve({ data: [] as { contract_id: string; tag_id: string }[] }),
+  ])
 
   const contractById = new Map((contracts ?? []).map((c) => [c.id, c]))
-  const companyIds = [...new Set((contracts ?? []).map((c) => c.company_id).filter((v): v is string => !!v))]
-  const contactIds = [...new Set((contracts ?? []).map((c) => c.contact_id).filter((v): v is string => !!v))]
+  const tagIdByContract = new Map((contractTagRows ?? []).map((r) => [r.contract_id, r.tag_id]))
+  const tagById = new Map((allTags ?? []).map((t) => [t.id, t]))
+
+  // Filtra pela tag selecionada — "all" mostra tudo, "none" mostra só
+  // contratos sem tag nenhuma, e um ID específico filtra só aquela tag.
+  // É essa separação que garante NPS de Clínica não se misturar com o de
+  // Hospitalar (ou qualquer outra linha de produto que vocês criarem).
+  const surveys = (surveysRaw ?? []).filter((s) => {
+    if (selectedTagId === 'all') return true
+    const contractTagId = tagIdByContract.get(s.contract_id) ?? null
+    if (selectedTagId === 'none') return !contractTagId
+    return contractTagId === selectedTagId
+  })
+
+  const contractIds = [...new Set(surveys.map((s) => s.contract_id))]
+  const companyIds = [...new Set(contractIds.map((id) => contractById.get(id)?.company_id).filter((v): v is string => !!v))]
+  const contactIds = [...new Set(contractIds.map((id) => contractById.get(id)?.contact_id).filter((v): v is string => !!v))]
 
   const [{ data: companies }, { data: contacts }] = await Promise.all([
     companyIds.length
@@ -60,8 +84,13 @@ export default async function NpsDashboardPage({
   const companyById = new Map((companies ?? []).map((c) => [c.id, c]))
   const contactById = new Map((contacts ?? []).map((c) => [c.id, c]))
 
-  const scores = (surveys ?? []).map((s) => s.score).filter((s): s is number => s !== null)
+  const scores = surveys.map((s) => s.score).filter((s): s is number => s !== null)
   const { nps, promoters, passives, detractors, total } = calculateNps(scores)
+
+  function tagFilterHref(tagId: string) {
+    const params = new URLSearchParams({ from, to, tag: tagId })
+    return `/nps-dashboard?${params.toString()}`
+  }
 
   return (
     <div className="space-y-6">
@@ -73,7 +102,36 @@ export default async function NpsDashboardPage({
         <BulkSendNpsButton />
       </div>
 
-      <PeriodSelector from={from} to={to} />
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={tagFilterHref('all')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${selectedTagId === 'all' ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+        >
+          Todas as tags
+        </a>
+        {allTags?.map((t) => (
+          <a
+            key={t.id}
+            href={tagFilterHref(t.id)}
+            className="rounded-full px-3 py-1.5 text-sm font-medium"
+            style={
+              selectedTagId === t.id
+                ? { backgroundColor: t.color, color: '#fff' }
+                : { border: '1px solid #D1D5DB', color: '#374151' }
+            }
+          >
+            {t.name}
+          </a>
+        ))}
+        <a
+          href={tagFilterHref('none')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${selectedTagId === 'none' ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+        >
+          Sem tag
+        </a>
+      </div>
+
+      <PeriodSelector from={from} to={to} basePath="/nps-dashboard" extraParams={{ tag: selectedTagId }} />
 
       <div className="grid grid-cols-4 gap-3">
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -103,6 +161,7 @@ export default async function NpsDashboardPage({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Empresa</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Tag</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">CNPJ</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Respondido por</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Categoria</th>
@@ -111,17 +170,25 @@ export default async function NpsDashboardPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {surveys?.map((s) => {
+            {surveys.map((s) => {
               const contract = contractById.get(s.contract_id)
               const company = contract?.company_id ? companyById.get(contract.company_id) : null
               const contact = contract?.contact_id ? contactById.get(contract.contact_id) : null
               const category = s.score !== null ? categorizeScore(s.score) : null
+              const tag = tagById.get(tagIdByContract.get(s.contract_id) ?? '')
 
               return (
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-900">
                     <div className="font-medium">{company?.name ?? contract?.client_name ?? '—'}</div>
                     {company?.trade_name && <div className="text-xs text-gray-400">{company.trade_name}</div>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {tag && (
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style={{ backgroundColor: tag.color }}>
+                        {tag.name}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{company?.cnpj ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-700">
@@ -147,10 +214,10 @@ export default async function NpsDashboardPage({
               )
             })}
 
-            {surveys?.length === 0 && (
+            {surveys.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                  Nenhuma resposta de NPS neste período.
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  Nenhuma resposta de NPS neste período{selectedTagId !== 'all' ? ' com esse filtro' : ''}.
                 </td>
               </tr>
             )}
