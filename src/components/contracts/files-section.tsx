@@ -8,8 +8,9 @@
 // mande a mensagem de erro exata que aparecer.
 
 import { useState, useRef } from 'react'
+import { Pencil, Check, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { registerContractFile, deleteContractFile, getFileDownloadUrl } from '@/lib/actions/files'
+import { registerContractFile, deleteContractFile, getFileDownloadUrl, renameContractFile } from '@/lib/actions/files'
 
 type ContractFile = {
   id: string
@@ -31,7 +32,26 @@ export function FilesSection({ contractId, initialFiles }: { contractId: string;
   const [files, setFiles] = useState(initialFiles)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEditing(f: ContractFile) {
+    setEditingId(f.id)
+    setEditValue(f.file_name)
+  }
+
+  async function saveRename(fileId: string) {
+    const newName = editValue.trim()
+    if (!newName) {
+      setError('O nome não pode ficar vazio.')
+      return
+    }
+    setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, file_name: newName } : f)))
+    setEditingId(null)
+    const result = await renameContractFile(fileId, contractId, newName)
+    if (result && 'error' in result) setError(result.error ?? 'Falha ao renomear.')
+  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -103,10 +123,36 @@ export function FilesSection({ contractId, initialFiles }: { contractId: string;
         <div className="space-y-2">
           {files.map((f) => (
             <div key={f.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm">
-              <div>
-                <button onClick={() => handleDownload(f.storage_path)} className="font-medium text-brand-700 hover:underline">
-                  {f.file_name}
-                </button>
+              <div className="flex-1">
+                {editingId === f.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveRename(f.id)
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
+                      className="flex-1 rounded-md border border-brand-700 px-2 py-1 text-sm focus:outline-none"
+                    />
+                    <button onClick={() => saveRename(f.id)} className="text-positive-600 hover:text-positive-700" title="Salvar">
+                      <Check size={16} />
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="text-gray-400 hover:text-gray-600" title="Cancelar">
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => handleDownload(f.storage_path)} className="font-medium text-brand-700 hover:underline">
+                      {f.file_name}
+                    </button>
+                    <button onClick={() => startEditing(f)} className="text-gray-300 hover:text-gray-600" title="Renomear">
+                      <Pencil size={13} />
+                    </button>
+                  </div>
+                )}
                 <p className="text-xs text-gray-400">
                   {fmtSize(f.file_size)} · {new Date(f.created_at).toLocaleDateString('pt-BR')}
                 </p>

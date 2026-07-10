@@ -39,6 +39,23 @@ export async function registerContractFile(
   return { success: true }
 }
 
+export async function renameContractFile(fileId: string, contractId: string, newName: string) {
+  const supabase = await createClient()
+  const trimmed = newName.trim()
+
+  if (!trimmed) return { error: 'O nome não pode ficar vazio.' }
+
+  const { error } = await supabase
+    .from('contract_files')
+    .update({ file_name: trimmed })
+    .eq('id', fileId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/contracts/${contractId}`)
+  return { success: true }
+}
+
 export async function deleteContractFile(fileId: string, contractId: string, storagePath: string) {
   const supabase = await createClient()
 
