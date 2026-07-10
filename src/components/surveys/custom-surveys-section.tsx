@@ -2,15 +2,17 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { sendCustomSurvey } from '@/lib/actions/custom-surveys'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
+import { calculateResponseScore } from '@/lib/utils/survey-score'
+import type { Question } from '@/lib/actions/custom-surveys'
 
 export async function CustomSurveysSection({ contractId }: { contractId: string }) {
   const supabase = await createClient()
 
   const [{ data: allTemplates }, { data: sentSurveys }, { data: contractTagRows }] = await Promise.all([
-    supabase.from('survey_templates').select('id, name, tag_id').order('name'),
+    supabase.from('survey_templates').select('id, name, tag_id, questions').order('name'),
     supabase
       .from('custom_surveys')
-      .select('id, token, status, sent_at, answered_at, respondent_name, template_id')
+      .select('id, token, status, sent_at, answered_at, respondent_name, template_id, responses')
       .eq('contract_id', contractId)
       .order('sent_at', { ascending: false }),
     supabase.from('contract_tags').select('tag_id').eq('contract_id', contractId),
@@ -23,7 +25,7 @@ export async function CustomSurveysSection({ contractId }: { contractId: string 
   // "Engenharia Hospitalar" e vice-versa.
   const templates = (allTemplates ?? []).filter((t) => !t.tag_id || t.tag_id === contractTagId)
 
-  const templateNameById = new Map((allTemplates ?? []).map((t) => [t.id, t.name]))
+  const templateById = new Map((allTemplates ?? []).map((t) => [t.id, t]))
 
   const headersList = await headers()
   const host = headersList.get('host') ?? 'localhost:3000'
@@ -60,18 +62,30 @@ export async function CustomSurveysSection({ contractId }: { contractId: string 
       <div className="space-y-2">
         {sentSurveys?.map((s) => {
           const link = `${protocol}://${host}/survey/${s.token}`
-          const templateName = templateNameById.get(s.template_id) ?? 'Formulário'
+          const template = templateById.get(s.template_id)
+          const templateName = template?.name ?? 'Formulário'
+          const score =
+            s.status === 'answered'
+              ? calculateResponseScore((template?.questions ?? []) as Question[], s.responses as Record<string, string | string[]> | null)
+              : null
           return (
             <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-gray-900">{templateName}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    s.status === 'answered' ? 'bg-positive-100 text-positive-700' : 'bg-yellow-100 text-yellow-800'
-                  }`}
-                >
-                  {s.status === 'answered' ? `Respondido por ${s.respondent_name}` : 'Pendente'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {score !== null && (
+                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+                      Nota {score}
+                    </span>
+                  )}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      s.status === 'answered' ? 'bg-positive-100 text-positive-700' : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                  >
+                    {s.status === 'answered' ? `Respondido por ${s.respondent_name}` : 'Pendente'}
+                  </span>
+                </div>
               </div>
               {s.status === 'pending' && (
                 <div className="mt-2 flex items-center gap-2">
