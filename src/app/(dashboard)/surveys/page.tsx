@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import { SurveyTemplateForm } from '@/components/surveys/survey-template-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
 import { deleteSurveyTemplate, duplicateSurveyTemplate } from '@/lib/actions/custom-surveys'
@@ -43,6 +44,9 @@ export default async function SurveysPage() {
                   <p className="text-xs text-gray-400">{questions.length} pergunta(s)</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <Link href={`/surveys/${t.id}/edit`} className="text-xs text-gray-500 hover:underline">
+                    Editar
+                  </Link>
                   <form action={duplicateSurveyTemplate.bind(null, t.id)}>
                     <button type="submit" className="text-xs text-brand-700 hover:underline">
                       Duplicar

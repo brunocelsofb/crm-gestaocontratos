@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useActionState } from 'react'
-import { createSurveyTemplate, type ActionState, type Question } from '@/lib/actions/custom-surveys'
+import { createSurveyTemplate, updateSurveyTemplate, type ActionState, type Question } from '@/lib/actions/custom-surveys'
 
 const initialState: ActionState = {}
 
@@ -14,19 +14,40 @@ const QUESTION_TYPES: { value: Question['type']; label: string }[] = [
   { value: 'rating', label: 'Nota (0 a 10)' },
 ]
 
-export function SurveyTemplateForm({ tags }: { tags: { id: string; name: string; color: string }[] }) {
-  const [state, formAction, pending] = useActionState(createSurveyTemplate, initialState)
-  const [questions, setQuestions] = useState<Question[]>([
-    { id: crypto.randomUUID(), type: 'text', label: '' },
-  ])
+type InitialTemplate = {
+  id: string
+  name: string
+  questions: Question[]
+  tagId: string | null
+}
+
+export function SurveyTemplateForm({
+  tags,
+  initial,
+}: {
+  tags: { id: string; name: string; color: string }[]
+  initial?: InitialTemplate
+}) {
+  const isEditing = !!initial
+  const action = isEditing ? updateSurveyTemplate.bind(null, initial.id) : createSurveyTemplate
+  const [state, formAction, pending] = useActionState(action, initialState)
+
+  const [questions, setQuestions] = useState<Question[]>(
+    initial?.questions && initial.questions.length > 0
+      ? initial.questions
+      : [{ id: crypto.randomUUID(), type: 'text', label: '' }]
+  )
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
-    if (!pending && !state.error) {
+    // No modo de criação, limpa o formulário depois de salvar com sucesso.
+    // No modo de edição, a action já redireciona pra /surveys ao terminar,
+    // então não precisamos resetar nada aqui.
+    if (!isEditing && !pending && !state.error) {
       formRef.current?.reset()
       setQuestions([{ id: crypto.randomUUID(), type: 'text', label: '' }])
     }
-  }, [pending, state])
+  }, [pending, state, isEditing])
 
   function addQuestion() {
     setQuestions((prev) => [...prev, { id: crypto.randomUUID(), type: 'text', label: '' }])
@@ -58,6 +79,7 @@ export function SurveyTemplateForm({ tags }: { tags: { id: string; name: string;
         <input
           name="name"
           required
+          defaultValue={initial?.name ?? ''}
           placeholder="Ex: Pesquisa de satisfação — Implantação"
           className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
         />
@@ -67,7 +89,7 @@ export function SurveyTemplateForm({ tags }: { tags: { id: string; name: string;
         <label className="block text-xs font-medium text-gray-700">Tag (opcional)</label>
         <select
           name="tag_id"
-          defaultValue=""
+          defaultValue={initial?.tagId ?? ''}
           className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
         >
           <option value="">Qualquer contrato (sem restrição)</option>
@@ -141,7 +163,7 @@ export function SurveyTemplateForm({ tags }: { tags: { id: string; name: string;
           disabled={pending}
           className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
         >
-          {pending ? 'Salvando...' : 'Salvar Formulário'}
+          {pending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar Formulário'}
         </button>
       </div>
     </form>

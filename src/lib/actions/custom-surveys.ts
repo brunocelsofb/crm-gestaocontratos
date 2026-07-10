@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -51,6 +52,41 @@ export async function createSurveyTemplate(
 
   revalidatePath('/surveys')
   return {}
+}
+
+export async function updateSurveyTemplate(
+  templateId: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const name = (formData.get('name') as string)?.trim()
+  const questionsRaw = formData.get('questions') as string
+  const tag_id = (formData.get('tag_id') as string) || null
+
+  if (!name) return { error: 'Nome do formulário é obrigatório.' }
+
+  let questions: Question[]
+  try {
+    questions = JSON.parse(questionsRaw)
+  } catch {
+    return { error: 'Falha ao processar as perguntas.' }
+  }
+
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return { error: 'Adicione pelo menos uma pergunta.' }
+  }
+
+  const { error } = await supabase
+    .from('survey_templates')
+    .update({ name, questions, tag_id })
+    .eq('id', templateId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/surveys')
+  redirect('/surveys')
 }
 
 export async function duplicateSurveyTemplate(templateId: string) {
