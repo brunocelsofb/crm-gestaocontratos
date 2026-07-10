@@ -42,7 +42,16 @@ export function SurveyTemplateForm() {
 
   return (
     <form ref={formRef} action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
-      <input type="hidden" name="questions" value={JSON.stringify(questions)} />
+      <input
+        type="hidden"
+        name="questions"
+        value={JSON.stringify(
+          questions.map((q) => ({
+            ...q,
+            options: q.options ? q.options.map((o) => o.trim()).filter(Boolean) : q.options,
+          }))
+        )}
+      />
 
       <div>
         <label className="block text-xs font-medium text-gray-700">Nome do formulário</label>
@@ -90,7 +99,7 @@ export function SurveyTemplateForm() {
                 <label className="block text-[10px] text-gray-500">Opções (uma por linha)</label>
                 <textarea
                   value={(q.options ?? []).join('\n')}
-                  onChange={(e) => updateQuestion(q.id, { options: e.target.value.split('\n').filter(Boolean) })}
+                  onChange={(e) => updateQuestion(q.id, { options: e.target.value.split('\n') })}
                   rows={3}
                   placeholder={'Opção 1\nOpção 2\nOpção 3'}
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-700 focus:outline-none"
