@@ -12,27 +12,23 @@ export default async function CompanyDetailPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const isAdmin = await isCurrentUserAdmin()
 
-  const { data: company } = await supabase
-    .from('companies')
-    .select('id, name, trade_name, cnpj, notes, created_at')
-    .eq('id', id)
-    .single()
+  // PERFORMANCE: as 4 consultas abaixo não dependem umas das outras (nem
+  // "contacts"/"contracts" dependem de "company" ter carregado primeiro,
+  // já que todas usam o "id" da URL diretamente) — rodam em paralelo.
+  const [
+    isAdmin,
+    { data: company },
+    { data: contacts },
+    { data: contracts },
+  ] = await Promise.all([
+    isCurrentUserAdmin(),
+    supabase.from('companies').select('id, name, trade_name, cnpj, notes, created_at').eq('id', id).single(),
+    supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('created_at'),
+    supabase.from('contracts').select('id, process_number, title, created_at').eq('company_id', id).order('created_at', { ascending: false }),
+  ])
 
   if (!company) notFound()
-
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select('id, name, role, email, phone, is_primary')
-    .eq('company_id', id)
-    .order('created_at')
-
-  const { data: contracts } = await supabase
-    .from('contracts')
-    .select('id, process_number, title, created_at')
-    .eq('company_id', id)
-    .order('created_at', { ascending: false })
 
   return (
     <div className="space-y-6">
