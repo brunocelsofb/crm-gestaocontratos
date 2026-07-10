@@ -28,15 +28,23 @@ function formatAnswer(value: string | string[] | undefined) {
 export function CustomSurveysSection({
   contractId,
   templates,
+  allTemplates,
   sentSurveys,
   linkBase,
 }: {
   contractId: string
   templates: Template[]
+  allTemplates: Template[]
   sentSurveys: SentSurvey[]
   linkBase: string
 }) {
-  const templateById = new Map(templates.map((t) => [t.id, t]))
+  // IMPORTANTE: o mapa usado para EXIBIR respostas já enviadas usa a
+  // lista COMPLETA de formulários (allTemplates), não a lista filtrada
+  // por tag (templates) — senão, se a tag do contrato mudar depois que
+  // uma pesquisa foi respondida, o formulário "some" da exibição mesmo
+  // a resposta já existindo. O filtro por tag só vale pra decidir quais
+  // botões de "+ Enviar" aparecem, nunca pra esconder histórico.
+  const templateById = new Map(allTemplates.map((t) => [t.id, t]))
 
   if (templates.length === 0 && sentSurveys.length === 0) {
     return (

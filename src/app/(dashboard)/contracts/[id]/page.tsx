@@ -258,6 +258,7 @@ export default async function ContractDetailPage({
       <CustomSurveysSection
         contractId={contract.id}
         templates={availableTemplates}
+        allTemplates={allSurveyTemplates ?? []}
         sentSurveys={sentCustomSurveys ?? []}
         linkBase={linkBase}
       />
