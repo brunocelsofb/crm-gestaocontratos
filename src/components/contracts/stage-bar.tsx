@@ -27,6 +27,7 @@ export function StageBar({
   status,
   wonLabel,
   lostLabel,
+  canChangeStage,
 }: {
   contractId: string
   stages: Stage[]
@@ -35,6 +36,7 @@ export function StageBar({
   status: string
   wonLabel: string
   lostLabel: string
+  canChangeStage: boolean
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +76,11 @@ export function StageBar({
 
   return (
     <div className="space-y-3">
+      {!canChangeStage && (
+        <p className="rounded-md bg-yellow-50 px-3 py-1.5 text-xs text-yellow-800">
+          Só o responsável atual por esta conta (ou um admin) pode mudar a etapa.
+        </p>
+      )}
       {/* Etapa do processo — livre para mover pra frente ou pra trás,
           independente do desfecho (Renovado/Não renovado) */}
       <div className="flex gap-1 overflow-x-auto">
@@ -86,9 +93,15 @@ export function StageBar({
           return (
             <button
               key={stage.id}
-              disabled={isPending || isCurrent || status !== 'open'}
+              disabled={isPending || isCurrent || status !== 'open' || !canChangeStage}
               onClick={() => handleMove(stage.id)}
-              title={status !== 'open' ? 'Este contrato já está encerrado' : `Mover para "${stage.name}"`}
+              title={
+                !canChangeStage
+                  ? 'Só o responsável atual (ou admin) pode mudar a etapa'
+                  : status !== 'open'
+                    ? 'Este contrato já está encerrado'
+                    : `Mover para "${stage.name}"`
+              }
               style={{ backgroundColor: color }}
               className="flex min-w-[130px] flex-1 flex-col items-center justify-center gap-1 rounded-sm px-3 py-2 text-xs font-medium text-white opacity-90 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-90"
             >

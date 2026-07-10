@@ -11,18 +11,17 @@ export type ActionState = { error?: string }
 // ------------------------------------------------------------
 export async function transferContract(
   contractId: string,
-  _prevState: ActionState,
-  formData: FormData
+  toDepartment: string,
+  toAssigneeId: string | null,
+  note: string,
+  filePath: string | null,
+  fileName: string | null
 ): Promise<ActionState> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
-
-  const toDepartment = formData.get('department') as string
-  const toAssigneeId = (formData.get('assignee_id') as string) || null
-  const note = (formData.get('note') as string) || null
 
   if (!toDepartment) return { error: 'Selecione o departamento de destino.' }
 
@@ -53,13 +52,23 @@ export async function transferContract(
     })
     .eq('id', contractId)
 
+  if (filePath && fileName) {
+    await supabase.from('contract_files').insert({
+      contract_id: contractId,
+      storage_path: filePath,
+      file_name: fileName,
+      uploaded_by: user.id,
+    })
+  }
+
   const destinationText = toAssigneeName ? `${toLabel} (${toAssigneeName})` : toLabel
+  const fileText = fileName ? ` Arquivo anexado: ${fileName}.` : ''
 
   const { error: logError } = await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
-    content: `Transferido de ${fromLabel} para ${destinationText}.${note ? ` Nota: ${note}` : ''}`,
+    content: `Transferido de ${fromLabel} para ${destinationText}.${note ? ` Nota: ${note}` : ''}${fileText}`,
   })
 
   revalidatePath(`/contracts/${contractId}`)
@@ -76,7 +85,7 @@ export async function transferContract(
 // última transferência — o "ele trata e retorna pra nós" de um clique só.
 // Aceita uma nota descrevendo o que foi tratado, pra ficar registrado
 // junto do pedido original (feito na hora de transferir).
-export async function returnContract(contractId: string, note: string): Promise<ActionState> {
+export async function returnContract(contractId: string, note: string, filePath: string | null, fileName: string | null): Promise<ActionState> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -112,13 +121,23 @@ export async function returnContract(contractId: string, note: string): Promise<
     })
     .eq('id', contractId)
 
+  if (filePath && fileName) {
+    await supabase.from('contract_files').insert({
+      contract_id: contractId,
+      storage_path: filePath,
+      file_name: fileName,
+      uploaded_by: user.id,
+    })
+  }
+
   const destinationText = toAssigneeName ? `${toLabel} (${toAssigneeName})` : toLabel
+  const fileText = fileName ? ` Arquivo anexado: ${fileName}.` : ''
 
   const { error: logError } = await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
-    content: `Devolvido de ${fromLabel} para ${destinationText}.${note ? ` Tratativa: ${note}` : ''}`,
+    content: `Devolvido de ${fromLabel} para ${destinationText}.${note ? ` Tratativa: ${note}` : ''}${fileText}`,
   })
 
   revalidatePath(`/contracts/${contractId}`)

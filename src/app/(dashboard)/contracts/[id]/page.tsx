@@ -12,6 +12,7 @@ import { DepartmentSection } from '@/components/contracts/department-section'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
 import { setContractTag } from '@/lib/actions/tags'
+import { getCurrentProfile } from '@/lib/auth/role'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -125,6 +126,15 @@ export default async function ContractDetailPage({
     : null
   const hasPreviousResponsible = !!contract.previous_department
 
+  // Só quem é o "dono" atual da conta (current_assignee_id) ou um admin
+  // pode mover a etapa — se ninguém foi definido como responsável ainda,
+  // libera pra qualquer autenticado (não trava um contrato sem dono).
+  const currentProfile = await getCurrentProfile()
+  const canChangeStage =
+    !contract.current_assignee_id ||
+    contract.current_assignee_id === currentProfile?.id ||
+    currentProfile?.role === 'admin'
+
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
     .map((a) => ({
@@ -195,15 +205,6 @@ export default async function ContractDetailPage({
         </Link>
       </div>
 
-      <DepartmentSection
-        contractId={contract.id}
-        currentDepartment={contract.current_department}
-        currentAssigneeName={currentAssigneeName}
-        hasPrevious={hasPreviousResponsible}
-        users={(allProfiles ?? []).filter((p) => p.department)}
-        transfers={transferLog}
-      />
-
       {displayRun && stages && stages.length > 0 ? (
         <StageBar
           contractId={contract.id}
@@ -213,12 +214,22 @@ export default async function ContractDetailPage({
           status={displayRun.status}
           wonLabel={pipelineById.get(displayRun.pipeline_id)?.won_label ?? 'Ganho'}
           lostLabel={pipelineById.get(displayRun.pipeline_id)?.lost_label ?? 'Perdido'}
+          canChangeStage={canChangeStage}
         />
       ) : (
         <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
           Este contrato não tem nenhuma passagem de funil em aberto no momento.
         </p>
       )}
+
+      <DepartmentSection
+        contractId={contract.id}
+        currentDepartment={contract.current_department}
+        currentAssigneeName={currentAssigneeName}
+        hasPrevious={hasPreviousResponsible}
+        users={(allProfiles ?? []).filter((p) => p.department)}
+        transfers={transferLog}
+      />
 
       <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg bg-gray-50 p-3">
