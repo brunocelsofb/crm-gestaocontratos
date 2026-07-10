@@ -56,7 +56,7 @@ export default async function ContractDetailPage({
     supabase.from('contract_tags').select('tag_id').eq('contract_id', id),
     supabase.from('nps_surveys').select('id, token, score, comment, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('survey_templates').select('id, name, tag_id, questions').order('name'),
-    supabase.from('custom_surveys').select('id, token, status, sent_at, answered_at, respondent_name, template_id, responses').eq('contract_id', id).order('sent_at', { ascending: false }),
+    supabase.from('custom_surveys').select('id, token, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone, template_id, responses').eq('contract_id', id).order('sent_at', { ascending: false }),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
@@ -127,6 +127,13 @@ export default async function ContractDetailPage({
 
   return (
     <div className="space-y-6">
+      <Link
+        href="/pipeline"
+        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700"
+      >
+        ← Voltar para o Funil
+      </Link>
+
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { createNpsSurvey } from '@/lib/actions/nps'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
+import { ExpandableRow } from '@/components/surveys/expandable-row'
 import { categorizeScore } from '@/lib/utils/nps'
 
 const CATEGORY_LABELS = { promoter: 'Promotor', passive: 'Neutro', detractor: 'Detrator' } as const
@@ -22,10 +23,6 @@ type NpsSurvey = {
   respondent_phone: string | null
 }
 
-// PERFORMANCE: virou componente apresentacional puro (não busca mais
-// dados sozinho) — os dados vêm prontos do componente pai, que busca
-// tudo de uma vez só em paralelo. Isso evita que esta seção vire um
-// "degrau" a mais de espera na tela do contrato.
 export function NpsSection({
   contractId,
   surveys,
@@ -57,53 +54,69 @@ export function NpsSection({
         {surveys.map((s) => {
           const link = `${linkBase}/nps/${s.token}`
           const category = s.status === 'answered' && s.score !== null ? categorizeScore(s.score) : null
+
+          if (s.status === 'pending') {
+            return (
+              <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-medium text-yellow-800">
+                    NPS · Pendente
+                  </span>
+                  <span className="text-xs text-gray-400">Enviada em {new Date(s.sent_at).toLocaleDateString('pt-BR')}</span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <input readOnly value={link} className="flex-1 truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500" />
+                  <CopyLinkButton link={link} />
+                </div>
+              </div>
+            )
+          }
+
           return (
-            <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {s.status === 'answered' && category ? (
-                    <>
+            <ExpandableRow
+              key={s.id}
+              summary={
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-gray-400">NPS</span>
+                    {category && (
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CATEGORY_STYLES[category]}`}>
                         {CATEGORY_LABELS[category]} — nota {s.score}
                       </span>
-                      <span className="text-xs text-gray-400">
-                        respondida em {s.answered_at ? new Date(s.answered_at).toLocaleDateString('pt-BR') : '—'}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-medium text-yellow-800">
-                      Pendente
-                    </span>
-                  )}
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Respondido por <span className="font-medium text-gray-700">{s.respondent_name}</span> em{' '}
+                    {s.answered_at ? new Date(s.answered_at).toLocaleDateString('pt-BR') : '—'}
+                  </p>
                 </div>
-                <span className="text-xs text-gray-400">
-                  Enviada em {new Date(s.sent_at).toLocaleDateString('pt-BR')}
-                </span>
+              }
+            >
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-gray-400">Respondente</p>
+                  <p className="text-gray-700">{s.respondent_name ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">E-mail / Telefone</p>
+                  <p className="text-gray-700">{[s.respondent_email, s.respondent_phone].filter(Boolean).join(' · ') || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Enviada em</p>
+                  <p className="text-gray-700">{new Date(s.sent_at).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Respondida em</p>
+                  <p className="text-gray-700">{s.answered_at ? new Date(s.answered_at).toLocaleDateString('pt-BR') : '—'}</p>
+                </div>
               </div>
-
-              {s.status === 'answered' && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Respondido por <span className="font-medium text-gray-700">{s.respondent_name}</span>
-                  {[s.respondent_email, s.respondent_phone].filter(Boolean).length > 0 &&
-                    ` · ${[s.respondent_email, s.respondent_phone].filter(Boolean).join(' · ')}`}
-                </p>
-              )}
-
-              {s.status === 'answered' && s.comment && (
-                <p className="mt-2 text-sm text-gray-600">&ldquo;{s.comment}&rdquo;</p>
-              )}
-
-              {s.status === 'pending' && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    readOnly
-                    value={link}
-                    className="flex-1 truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500"
-                  />
-                  <CopyLinkButton link={link} />
+              {s.comment && (
+                <div>
+                  <p className="text-xs text-gray-400">Comentário</p>
+                  <p className="text-sm text-gray-600">&ldquo;{s.comment}&rdquo;</p>
                 </div>
               )}
-            </div>
+            </ExpandableRow>
           )
         })}
       </div>
