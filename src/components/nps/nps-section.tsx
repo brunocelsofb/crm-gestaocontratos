@@ -1,5 +1,3 @@
-import { headers } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
 import { createNpsSurvey } from '@/lib/actions/nps'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { categorizeScore } from '@/lib/utils/nps'
@@ -11,22 +9,32 @@ const CATEGORY_STYLES = {
   detractor: 'bg-negative-100 text-negative-700',
 } as const
 
-export async function NpsSection({ contractId }: { contractId: string }) {
-  const supabase = await createClient()
-  const { data: surveys } = await supabase
-    .from('nps_surveys')
-    .select('id, token, score, comment, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone')
-    .eq('contract_id', contractId)
-    .order('sent_at', { ascending: false })
+type NpsSurvey = {
+  id: string
+  token: string
+  score: number | null
+  comment: string | null
+  status: string
+  sent_at: string
+  answered_at: string | null
+  respondent_name: string | null
+  respondent_email: string | null
+  respondent_phone: string | null
+}
 
-  // NOTA DE INCERTEZA: uso o header "host" da requisição pra montar o link
-  // absoluto (já que não tenho uma variável de ambiente fixa com o domínio
-  // do site). Isso funciona bem atrás do proxy da Vercel, mas não testei
-  // em outros ambientes de hospedagem — se o link vier errado, me avise.
-  const headersList = await headers()
-  const host = headersList.get('host') ?? 'localhost:3000'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
-
+// PERFORMANCE: virou componente apresentacional puro (não busca mais
+// dados sozinho) — os dados vêm prontos do componente pai, que busca
+// tudo de uma vez só em paralelo. Isso evita que esta seção vire um
+// "degrau" a mais de espera na tela do contrato.
+export function NpsSection({
+  contractId,
+  surveys,
+  linkBase,
+}: {
+  contractId: string
+  surveys: NpsSurvey[]
+  linkBase: string
+}) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -41,13 +49,13 @@ export async function NpsSection({ contractId }: { contractId: string }) {
         </form>
       </div>
 
-      {surveys?.length === 0 && (
+      {surveys.length === 0 && (
         <p className="text-sm text-gray-400">Nenhuma pesquisa enviada ainda.</p>
       )}
 
       <div className="space-y-2">
-        {surveys?.map((s) => {
-          const link = `${protocol}://${host}/nps/${s.token}`
+        {surveys.map((s) => {
+          const link = `${linkBase}/nps/${s.token}`
           const category = s.status === 'answered' && s.score !== null ? categorizeScore(s.score) : null
           return (
             <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">

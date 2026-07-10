@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
@@ -38,6 +39,9 @@ export default async function ContractDetailPage({
     { data: contractFiles },
     { data: allTags },
     { data: currentContractTags },
+    { data: npsSurveys },
+    { data: allSurveyTemplates },
+    { data: sentCustomSurveys },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -50,9 +54,22 @@ export default async function ContractDetailPage({
     supabase.from('contract_files').select('id, file_name, storage_path, file_size, mime_type, created_at').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('tags').select('id, name, color').order('name'),
     supabase.from('contract_tags').select('tag_id').eq('contract_id', id),
+    supabase.from('nps_surveys').select('id, token, score, comment, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone').eq('contract_id', id).order('sent_at', { ascending: false }),
+    supabase.from('survey_templates').select('id, name, tag_id, questions').order('name'),
+    supabase.from('custom_surveys').select('id, token, status, sent_at, answered_at, respondent_name, template_id, responses').eq('contract_id', id).order('sent_at', { ascending: false }),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
+
+  // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato.
+  const availableTemplates = (allSurveyTemplates ?? []).filter((t) => !t.tag_id || t.tag_id === currentTagId)
+
+  // NOTA DE INCERTEZA: mesmo aviso de sempre — uso o header "host" pra
+  // montar o link absoluto, funciona bem na Vercel mas não testei em
+  // outros ambientes de hospedagem.
+  const headersList = await headers()
+  const host = headersList.get('host') ?? 'localhost:3000'
+  const linkBase = `${host.includes('localhost') ? 'http' : 'https'}://${host}`
 
   const openRun = runs?.find((r) => r.status === 'open')
   const lastRun = runs && runs.length > 0 ? runs[runs.length - 1] : undefined
@@ -227,11 +244,16 @@ export default async function ContractDetailPage({
         </div>
       )}
 
-      <NpsSection contractId={contract.id} />
+      <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
 
       <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />
 
-      <CustomSurveysSection contractId={contract.id} />
+      <CustomSurveysSection
+        contractId={contract.id}
+        templates={availableTemplates}
+        sentSurveys={sentCustomSurveys ?? []}
+        linkBase={linkBase}
+      />
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>

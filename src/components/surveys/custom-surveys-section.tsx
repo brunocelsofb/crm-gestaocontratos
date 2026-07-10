@@ -1,42 +1,40 @@
-import { headers } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
 import { sendCustomSurvey } from '@/lib/actions/custom-surveys'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { calculateResponseScore } from '@/lib/utils/survey-score'
 import type { Question } from '@/lib/actions/custom-surveys'
 
-export async function CustomSurveysSection({ contractId }: { contractId: string }) {
-  const supabase = await createClient()
+type Template = { id: string; name: string; tag_id: string | null; questions: Question[] }
+type SentSurvey = {
+  id: string
+  token: string
+  status: string
+  sent_at: string
+  answered_at: string | null
+  respondent_name: string | null
+  template_id: string
+  responses: Record<string, string | string[]> | null
+}
 
-  const [{ data: allTemplates }, { data: sentSurveys }, { data: contractTagRows }] = await Promise.all([
-    supabase.from('survey_templates').select('id, name, tag_id, questions').order('name'),
-    supabase
-      .from('custom_surveys')
-      .select('id, token, status, sent_at, answered_at, respondent_name, template_id, responses')
-      .eq('contract_id', contractId)
-      .order('sent_at', { ascending: false }),
-    supabase.from('contract_tags').select('tag_id').eq('contract_id', contractId),
-  ])
+// PERFORMANCE: também virou apresentacional — mesma lógica do NpsSection.
+export function CustomSurveysSection({
+  contractId,
+  templates,
+  sentSurveys,
+  linkBase,
+}: {
+  contractId: string
+  templates: Template[]
+  sentSurveys: SentSurvey[]
+  linkBase: string
+}) {
+  const templateById = new Map(templates.map((t) => [t.id, t]))
 
-  const contractTagId = contractTagRows?.[0]?.tag_id ?? null
-
-  // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato —
-  // é isso que garante que "Engenharia Clínica" não veja formulário de
-  // "Engenharia Hospitalar" e vice-versa.
-  const templates = (allTemplates ?? []).filter((t) => !t.tag_id || t.tag_id === contractTagId)
-
-  const templateById = new Map((allTemplates ?? []).map((t) => [t.id, t]))
-
-  const headersList = await headers()
-  const host = headersList.get('host') ?? 'localhost:3000'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
-
-  if (!templates || templates.length === 0) {
+  if (templates.length === 0) {
     return (
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-gray-900">Formulários de Pesquisa</h2>
         <p className="text-sm text-gray-400">
-          Nenhum formulário criado ainda — crie um em &quot;Formulários&quot; no menu lateral.
+          Nenhum formulário disponível para este contrato — crie um em &quot;Formulários&quot; no menu lateral (ou confira se a tag do contrato bate com a do formulário).
         </p>
       </div>
     )
@@ -60,14 +58,11 @@ export async function CustomSurveysSection({ contractId }: { contractId: string 
       </div>
 
       <div className="space-y-2">
-        {sentSurveys?.map((s) => {
-          const link = `${protocol}://${host}/survey/${s.token}`
+        {sentSurveys.map((s) => {
+          const link = `${linkBase}/survey/${s.token}`
           const template = templateById.get(s.template_id)
           const templateName = template?.name ?? 'Formulário'
-          const score =
-            s.status === 'answered'
-              ? calculateResponseScore((template?.questions ?? []) as Question[], s.responses as Record<string, string | string[]> | null)
-              : null
+          const score = s.status === 'answered' ? calculateResponseScore(template?.questions ?? [], s.responses) : null
           return (
             <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
               <div className="flex items-center justify-between">
