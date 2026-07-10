@@ -171,7 +171,8 @@ create table contract_crm.activities (
   user_id uuid references contract_crm.profiles(id),
   type text not null check (type in (
     'note', 'task', 'call', 'email',
-    'stage_change', 'pipeline_change', 'automation_triggered', 'system'
+    'stage_change', 'pipeline_change', 'automation_triggered', 'system',
+    'transfer'
   )),
   content text not null,
   due_date timestamptz,

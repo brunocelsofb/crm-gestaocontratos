@@ -55,7 +55,7 @@ export async function transferContract(
 
   const destinationText = toAssigneeName ? `${toLabel} (${toAssigneeName})` : toLabel
 
-  await supabase.from('activities').insert({
+  const { error: logError } = await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
@@ -65,6 +65,10 @@ export async function transferContract(
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
   revalidatePath('/contracts')
+  // A transferência em si já aconteceu — não desfazemos por causa de
+  // falha no LOG, mas avisamos (um log que falha em silêncio foi
+  // exatamente o bug anterior).
+  if (logError) return { error: `Transferido, mas falhou ao registrar no histórico: ${logError.message}` }
   return {}
 }
 
@@ -110,7 +114,7 @@ export async function returnContract(contractId: string, note: string): Promise<
 
   const destinationText = toAssigneeName ? `${toLabel} (${toAssigneeName})` : toLabel
 
-  await supabase.from('activities').insert({
+  const { error: logError } = await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
@@ -120,6 +124,7 @@ export async function returnContract(contractId: string, note: string): Promise<
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
   revalidatePath('/contracts')
+  if (logError) return { error: `Devolvido, mas falhou ao registrar no histórico: ${logError.message}` }
   return {}
 }
 
@@ -202,7 +207,7 @@ export async function sendDimensioningReview(
 
   await supabase.from('contracts').update({ current_department: 'tecnico' }).eq('id', contractId)
 
-  await supabase.from('activities').insert({
+  const { error: logError } = await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
@@ -211,6 +216,7 @@ export async function sendDimensioningReview(
 
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
+  if (logError) return { error: `Enviado, mas falhou ao registrar no histórico: ${logError.message}` }
   return {}
 }
 
@@ -242,7 +248,7 @@ export async function reviewDimensioning(
 
   await supabase.from('contracts').update({ current_department: 'comercial' }).eq('id', contractId)
 
-  await supabase.from('activities').insert({
+  const { error: logError } = await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
@@ -251,5 +257,6 @@ export async function reviewDimensioning(
 
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
+  if (logError) return { error: `Registrado, mas falhou ao gravar no histórico: ${logError.message}` }
   return {}
 }
