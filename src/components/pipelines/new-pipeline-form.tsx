@@ -43,6 +43,7 @@ export function NewPipelineForm() {
         >
           <option value="gestao_contratos">Gestão de Contratos</option>
           <option value="vendas">Vendas</option>
+          <option value="servico_avulso">Serviço Avulso</option>
         </select>
       </div>
       <button

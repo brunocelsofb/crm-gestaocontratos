@@ -174,6 +174,24 @@ export default async function DashboardPage({
     ? wonRuns.reduce((sum, r) => sum + (Number(r.value) || 0), 0) / wonRuns.length
     : null
 
+  // Métricas específicas de SERVIÇO AVULSO — receita ÚNICA, não
+  // recorrente. Diferente de "Renovado", aqui não faz sentido comparar
+  // com "valor anterior" (não existe uma run anterior pra comparar,
+  // cada serviço é isolado) — por isso não calculamos avgIncreasePct
+  // pra esse tipo.
+  const avulsoWonCount = (wonInPeriod ?? []).length
+  const avulsoLostCount = (lostInPeriod ?? []).length
+  const avulsoClosedTotal = avulsoWonCount + avulsoLostCount
+  const avulsoConversionRate = avulsoClosedTotal > 0 ? Math.round((avulsoWonCount / avulsoClosedTotal) * 100) : null
+  const avulsoAvgTicket = avulsoWonCount > 0 ? renewedValue / avulsoWonCount : null
+
+  const totalOpenLabel =
+    pipelineType === 'gestao_contratos'
+      ? 'Total em aberto (receita recorrente)'
+      : pipelineType === 'servico_avulso'
+        ? 'Total em aberto (receita única)'
+        : 'Total em aberto'
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -192,11 +210,19 @@ export default async function DashboardPage({
         />
       )}
 
-      <div className={`grid gap-3 ${pipelineType === 'vendas' ? 'grid-cols-3' : 'grid-cols-2 lg:grid-cols-5'}`}>
+      <div
+        className={`grid gap-3 ${
+          pipelineType === 'vendas'
+            ? 'grid-cols-3'
+            : pipelineType === 'servico_avulso'
+              ? 'grid-cols-2 lg:grid-cols-4'
+              : 'grid-cols-2 lg:grid-cols-5'
+        }`}
+      >
         <MetricCard
           icon={Wallet}
           accent="brand"
-          label="Total em aberto (receita recorrente)"
+          label={totalOpenLabel}
           value={fmt(totalOpen)}
         />
         {pipelineType === 'vendas' ? (
@@ -213,6 +239,28 @@ export default async function DashboardPage({
               label="Ciclo médio de venda"
               value={avgSalesCycleDays !== null ? `${avgSalesCycleDays} dias` : '—'}
               hint={avgTicket !== null ? `Ticket médio: ${fmt(avgTicket)}` : undefined}
+            />
+          </>
+        ) : pipelineType === 'servico_avulso' ? (
+          <>
+            <MetricCard
+              icon={TrendingUp}
+              accent="positive"
+              label="Receita fechada no período"
+              value={fmt(renewedValue)}
+              hint={`${avulsoWonCount} serviço${avulsoWonCount === 1 ? '' : 's'} concluído${avulsoWonCount === 1 ? '' : 's'}`}
+            />
+            <MetricCard
+              icon={Percent}
+              accent="brand"
+              label="Taxa de conclusão"
+              value={avulsoConversionRate !== null ? `${avulsoConversionRate}%` : '—'}
+            />
+            <MetricCard
+              icon={Wallet}
+              accent="warn"
+              label="Ticket médio"
+              value={avulsoAvgTicket !== null ? fmt(avulsoAvgTicket) : '—'}
             />
           </>
         ) : (

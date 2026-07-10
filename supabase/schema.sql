@@ -32,7 +32,7 @@ create table contract_crm.pipelines (
   name text not null,
   description text,
   is_default boolean not null default false,
-  type text not null default 'gestao_contratos' check (type in ('vendas', 'gestao_contratos')),
+  type text not null default 'gestao_contratos' check (type in ('vendas', 'gestao_contratos', 'servico_avulso')),
   won_label text not null default 'Ganho',
   lost_label text not null default 'Perdido',
   won_target_pipeline_id uuid references contract_crm.pipelines(id),

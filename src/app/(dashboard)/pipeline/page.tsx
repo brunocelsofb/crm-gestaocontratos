@@ -121,7 +121,7 @@ export default async function PipelinePage({
         <KanbanBoard
           stages={stages}
           initialCards={cards}
-          showValidity={pipelineType !== 'vendas'}
+          showValidity={pipelineType === 'gestao_contratos'}
           wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
           lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
         />
