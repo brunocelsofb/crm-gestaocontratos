@@ -96,41 +96,45 @@ function Card({ card, sla, showValidity, wonLabel, lostLabel }: { card: RunCard;
             ? 'Começando a esfriar — considere um follow-up'
             : 'Interação recente'
       }
-      className={`mb-2 rounded-md border p-2 text-xs shadow-sm ${FRESHNESS_STYLES[isClosed ? 'fresh' : card.freshness]} ${
+      className={`mb-3 rounded-lg border p-3 text-sm shadow-sm ${FRESHNESS_STYLES[isClosed ? 'fresh' : card.freshness]} ${
         isClosed ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
-      <div className="flex items-start justify-between gap-1">
+      <div className="flex items-start justify-between gap-2">
         <button
           type="button"
           onClick={openAccount}
           onPointerDown={(e) => e.stopPropagation()}
           title={card.companyId ? 'Abrir empresa' : 'Abrir contrato (sem empresa vinculada ainda)'}
-          className="text-left font-medium text-gray-900 hover:text-brand-700 hover:underline"
+          className="text-left text-sm font-semibold leading-snug text-gray-900 hover:text-brand-700 hover:underline"
         >
           {card.clientName}
         </button>
-        {card.status === 'won' && <span className="shrink-0 rounded-full bg-positive-100 px-1.5 py-0.5 text-[9px] font-medium text-positive-700">{wonLabel}</span>}
-        {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-1.5 py-0.5 text-[9px] font-medium text-negative-700">{lostLabel}</span>}
+        {card.status === 'won' && <span className="shrink-0 rounded-full bg-positive-100 px-2 py-0.5 text-xs font-medium text-positive-700">{wonLabel}</span>}
+        {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-2 py-0.5 text-xs font-medium text-negative-700">{lostLabel}</span>}
       </div>
+
       {card.tag && (
         <span
-          className="mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white"
+          className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium text-white"
           style={{ backgroundColor: card.tag.color }}
         >
           {card.tag.name}
         </span>
       )}
-      <p className="font-mono text-[10px] text-gray-400">{card.processNumber}</p>
+
+      <p className="mt-1.5 font-mono text-xs text-gray-400">{card.processNumber}</p>
+
       {showValidity && card.validUntil && (
-        <div className="mt-1">
+        <div className="mt-1.5">
           <ValidityBadge validUntil={card.validUntil} />
         </div>
       )}
-      <div className="mt-1 flex items-center justify-between">
-        <span className="text-gray-600">{fmt(card.value)}</span>
-        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${overdue ? 'bg-negative-100 text-negative-700' : 'bg-gray-100 text-gray-500'}`}>
-          {days === 0 ? '< 1d' : `${days}d`}
+
+      <div className="mt-2.5 flex items-center justify-between border-t border-black/5 pt-2.5">
+        <span className="text-sm font-medium text-gray-700">{fmt(card.value)}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${overdue ? 'bg-negative-100 text-negative-700' : 'bg-gray-100 text-gray-500'}`}>
+          {days === 0 ? '< 1 dia' : `${days} dias`}
         </span>
       </div>
     </div>
@@ -144,17 +148,17 @@ function Column({ stage, cards, showValidity, wonLabel, lostLabel }: { stage: St
   return (
     <div
       ref={setNodeRef}
-      className={`w-56 shrink-0 rounded-lg p-2 transition-colors ${isOver ? 'bg-blue-50' : 'bg-gray-100'}`}
+      className={`w-72 shrink-0 rounded-lg p-3 transition-colors ${isOver ? 'bg-blue-50' : 'bg-gray-100'}`}
     >
-      <p className="px-1 text-xs font-medium text-gray-700">{stage.name}</p>
-      <p className="px-1 pb-2 text-[11px] text-gray-400">
+      <p className="px-1 text-sm font-semibold text-gray-700">{stage.name}</p>
+      <p className="px-1 pb-3 text-xs text-gray-400">
         {cards.length} · {fmt(total)}
       </p>
       {cards.map((c) => (
         <Card key={c.runId} card={c} sla={stage.sla_days} showValidity={showValidity} wonLabel={wonLabel} lostLabel={lostLabel} />
       ))}
       {cards.length === 0 && (
-        <p className="py-6 text-center text-[11px] text-gray-400">Vazio</p>
+        <p className="py-8 text-center text-xs text-gray-400">Vazio</p>
       )}
     </div>
   )
