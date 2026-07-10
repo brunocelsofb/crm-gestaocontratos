@@ -9,6 +9,7 @@ import { CustomSurveysSection } from '@/components/surveys/custom-surveys-sectio
 import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { ContractTagSelect } from '@/components/tags/contract-tag-select'
 import { DepartmentSection } from '@/components/contracts/department-section'
+import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
 import { setContractTag } from '@/lib/actions/tags'
@@ -124,15 +125,15 @@ export default async function ContractDetailPage({
   const currentAssigneeName = contract.current_assignee_id
     ? allProfilesById.get(contract.current_assignee_id)?.full_name ?? null
     : null
+  const accountOwnerName = contract.owner_id ? allProfilesById.get(contract.owner_id)?.full_name ?? null : null
   const hasPreviousResponsible = !!contract.previous_department
 
-  // Só o "dono" atual da conta (current_assignee_id) ou um admin pode
-  // mover a etapa — SEM exceção pra contrato sem dono ainda (removido
-  // por pedido explícito: só acompanhar/escrever até alguém do
-  // comercial transferir a ação pra você).
+  // "Dono da conta" (owner_id) é fixo/de longo prazo — diferente de
+  // "responsável agora" (current_assignee_id), que é só a tratativa
+  // pontual do momento e NÃO dá poder de mudar etapa.
   const currentProfile = await getCurrentProfile()
   const canChangeStage =
-    contract.current_assignee_id === currentProfile?.id || currentProfile?.role === 'admin'
+    contract.owner_id === currentProfile?.id || currentProfile?.role === 'admin'
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
@@ -179,6 +180,12 @@ export default async function ContractDetailPage({
               tags={allTags ?? []}
               currentTagId={currentTagId}
               action={setContractTag.bind(null, contract.id)}
+            />
+            <AccountOwnerBadge
+              contractId={contract.id}
+              ownerName={accountOwnerName}
+              isAdmin={currentProfile?.role === 'admin'}
+              users={(allProfiles ?? []).map((p) => ({ id: p.id, full_name: p.full_name }))}
             />
           </div>
           <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>

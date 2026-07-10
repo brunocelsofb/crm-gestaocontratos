@@ -78,7 +78,7 @@ export function StageBar({
     <div className="space-y-3">
       {!canChangeStage && (
         <p className="rounded-md bg-yellow-50 px-3 py-1.5 text-xs text-yellow-800">
-          Só o responsável atual por esta conta (ou um admin) pode mudar a etapa.
+          Só o dono da conta (ou um admin) pode mudar a etapa.
         </p>
       )}
       {/* Etapa do processo — livre para mover pra frente ou pra trás,
@@ -97,7 +97,7 @@ export function StageBar({
               onClick={() => handleMove(stage.id)}
               title={
                 !canChangeStage
-                  ? 'Só o responsável atual (ou admin) pode mudar a etapa'
+                  ? 'Só o dono da conta (ou admin) pode mudar a etapa'
                   : status !== 'open'
                     ? 'Este contrato já está encerrado'
                     : `Mover para "${stage.name}"`

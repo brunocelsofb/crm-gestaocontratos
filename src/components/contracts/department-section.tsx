@@ -112,7 +112,7 @@ export function DepartmentSection({
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-500">Responsável agora</p>
+          <p className="text-xs text-gray-500">Responsável pela tratativa atual (pontual)</p>
           <p className="text-base font-semibold text-gray-900">
             {departmentLabel(currentDepartment)}
             {currentAssigneeName && <span className="font-normal text-gray-500"> — {currentAssigneeName}</span>}

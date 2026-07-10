@@ -6,6 +6,38 @@ import { departmentLabel } from '@/lib/constants/departments'
 
 export type ActionState = { error?: string }
 
+// "Dono da conta" (Customer Success) é DIFERENTE de "responsável agora"
+// — é fixo, de longo prazo, e é quem (junto com admin) controla a etapa
+// do funil. Só admin pode reatribuir, porque é uma decisão mais séria
+// que uma transferência pontual de tratativa.
+export async function updateAccountOwner(contractId: string, formData: FormData): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'admin') return { error: 'Só administradores podem trocar o dono da conta.' }
+
+  const newOwnerId = formData.get('owner_id') as string
+  if (!newOwnerId) return { error: 'Selecione o novo dono da conta.' }
+
+  const { data: newOwner } = await supabase.from('profiles').select('full_name').eq('id', newOwnerId).maybeSingle()
+
+  await supabase.from('contracts').update({ owner_id: newOwnerId }).eq('id', contractId)
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'system',
+    content: `Dono da conta alterado para ${newOwner?.full_name ?? 'outra pessoa'}.`,
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  return {}
+}
+
 // Cria notificações pra quem precisa saber que algo chegou pra ele.
 // Se tem uma pessoa específica, notifica só ela; senão, notifica todo
 // mundo daquele departamento (evita spam geral quando já tem alguém

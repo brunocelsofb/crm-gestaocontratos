@@ -50,20 +50,21 @@ export async function moveContractStage(
     return { error: 'Este contrato não tem uma passagem de funil aberta no momento.' }
   }
 
-  // Só o responsável atual (dono da conta) ou um admin pode mudar a
-  // etapa — mesma regra aplicada na tela, reforçada aqui pra valer de
-  // verdade (a tela sozinha não é suficiente).
+  // Só o DONO DA CONTA (fixo, tipo Customer Success — owner_id) ou um
+  // admin pode mudar a etapa. Isso é diferente de current_assignee_id,
+  // que é só quem está tratando algo pontual no momento e não deveria
+  // controlar o funil.
   if (_depth === 0) {
     const [{ data: contractForPermCheck }, { data: profile }] = await Promise.all([
-      supabase.from('contracts').select('current_assignee_id').eq('id', contractId).maybeSingle(),
+      supabase.from('contracts').select('owner_id').eq('id', contractId).maybeSingle(),
       supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
     ])
 
-    const isOwner = contractForPermCheck?.current_assignee_id === user.id
+    const isOwner = contractForPermCheck?.owner_id === user.id
     const isAdmin = profile?.role === 'admin'
 
     if (!isOwner && !isAdmin) {
-      return { error: 'Só o responsável atual por esta conta (ou um admin) pode mudar a etapa.' }
+      return { error: 'Só o dono da conta (ou um admin) pode mudar a etapa.' }
     }
   }
 
