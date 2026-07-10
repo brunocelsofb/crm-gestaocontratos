@@ -31,12 +31,19 @@ export function DepartmentSection({
   const [returnError, setReturnError] = useState<string | null>(null)
 
   const peopleInDept = users.filter((u) => u.department === selectedDept)
+  const [showReturnNote, setShowReturnNote] = useState(false)
+  const [returnNote, setReturnNote] = useState('')
 
   function handleReturn() {
     setReturnError(null)
     startReturnTransition(async () => {
-      const result = await returnContract(contractId)
-      if (result.error) setReturnError(result.error)
+      const result = await returnContract(contractId, returnNote)
+      if (result.error) {
+        setReturnError(result.error)
+      } else {
+        setShowReturnNote(false)
+        setReturnNote('')
+      }
     })
   }
 
@@ -50,16 +57,43 @@ export function DepartmentSection({
             {currentAssigneeName && <span className="font-normal text-gray-500"> — {currentAssigneeName}</span>}
           </p>
         </div>
-        {hasPrevious && (
+        {hasPrevious && !showReturnNote && (
           <button
-            onClick={handleReturn}
-            disabled={isReturning}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            onClick={() => setShowReturnNote(true)}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            {isReturning ? 'Devolvendo...' : '↩ Devolver'}
+            ↩ Devolver
           </button>
         )}
       </div>
+
+      {showReturnNote && (
+        <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+          <label className="block text-[10px] text-gray-500">O que foi tratado? (aparece registrado no histórico)</label>
+          <textarea
+            value={returnNote}
+            onChange={(e) => setReturnNote(e.target.value)}
+            rows={2}
+            placeholder="Ex: Dimensionamento validado, sem restrições técnicas."
+            className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleReturn}
+              disabled={isReturning}
+              className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+            >
+              {isReturning ? 'Devolvendo...' : 'Confirmar devolução'}
+            </button>
+            <button
+              onClick={() => setShowReturnNote(false)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
       {returnError && <p className="mt-1 text-xs text-red-600">{returnError}</p>}
 
       <form action={formAction} className="mt-3 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-3">

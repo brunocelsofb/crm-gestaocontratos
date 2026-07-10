@@ -70,7 +70,9 @@ export async function transferContract(
 
 // "Devolver": manda de volta pra quem estava responsável ANTES da
 // última transferência — o "ele trata e retorna pra nós" de um clique só.
-export async function returnContract(contractId: string): Promise<ActionState> {
+// Aceita uma nota descrevendo o que foi tratado, pra ficar registrado
+// junto do pedido original (feito na hora de transferir).
+export async function returnContract(contractId: string, note: string): Promise<ActionState> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -112,7 +114,7 @@ export async function returnContract(contractId: string): Promise<ActionState> {
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
-    content: `Devolvido de ${fromLabel} para ${destinationText}.`,
+    content: `Devolvido de ${fromLabel} para ${destinationText}.${note ? ` Tratativa: ${note}` : ''}`,
   })
 
   revalidatePath(`/contracts/${contractId}`)
