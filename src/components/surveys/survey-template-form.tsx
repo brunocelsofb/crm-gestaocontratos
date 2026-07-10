@@ -14,7 +14,7 @@ const QUESTION_TYPES: { value: Question['type']; label: string }[] = [
   { value: 'rating', label: 'Nota (0 a 10)' },
 ]
 
-export function SurveyTemplateForm() {
+export function SurveyTemplateForm({ tags }: { tags: { id: string; name: string; color: string }[] }) {
   const [state, formAction, pending] = useActionState(createSurveyTemplate, initialState)
   const [questions, setQuestions] = useState<Question[]>([
     { id: crypto.randomUUID(), type: 'text', label: '' },
@@ -61,6 +61,21 @@ export function SurveyTemplateForm() {
           placeholder="Ex: Pesquisa de satisfação — Implantação"
           className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
         />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-700">Tag (opcional)</label>
+        <select
+          name="tag_id"
+          defaultValue=""
+          className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+        >
+          <option value="">Qualquer contrato (sem restrição)</option>
+          {tags.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-400">Se escolher uma tag, este formulário só aparece pra contratos marcados com ela.</p>
       </div>
 
       <div className="space-y-3">

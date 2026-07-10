@@ -1,15 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { SurveyTemplateForm } from '@/components/surveys/survey-template-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
-import { deleteSurveyTemplate } from '@/lib/actions/custom-surveys'
+import { deleteSurveyTemplate, duplicateSurveyTemplate } from '@/lib/actions/custom-surveys'
 import type { Question } from '@/lib/actions/custom-surveys'
 
 export default async function SurveysPage() {
   const supabase = await createClient()
-  const { data: templates } = await supabase
-    .from('survey_templates')
-    .select('id, name, questions, created_at')
-    .order('created_at', { ascending: false })
+  const [{ data: templates }, { data: tags }] = await Promise.all([
+    supabase.from('survey_templates').select('id, name, questions, tag_id, created_at').order('created_at', { ascending: false }),
+    supabase.from('tags').select('id, name, color').order('name'),
+  ])
+
+  const tagById = new Map((tags ?? []).map((t) => [t.id, t]))
 
   return (
     <div className="space-y-6">
@@ -20,21 +22,36 @@ export default async function SurveysPage() {
         </p>
       </div>
 
-      <SurveyTemplateForm />
+      <SurveyTemplateForm tags={tags ?? []} />
 
       <div className="space-y-2">
         {templates?.map((t) => {
           const questions = (t.questions ?? []) as Question[]
+          const tag = t.tag_id ? tagById.get(t.tag_id) : null
           return (
             <div key={t.id} className="rounded-lg border border-gray-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{t.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-900">{t.name}</p>
+                    {tag && (
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style={{ backgroundColor: tag.color }}>
+                        {tag.name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400">{questions.length} pergunta(s)</p>
                 </div>
-                <form action={deleteSurveyTemplate.bind(null, t.id)}>
-                  <ConfirmDeleteButton confirmMessage={`Excluir o formulário "${t.name}"?`} />
-                </form>
+                <div className="flex items-center gap-3">
+                  <form action={duplicateSurveyTemplate.bind(null, t.id)}>
+                    <button type="submit" className="text-xs text-brand-700 hover:underline">
+                      Duplicar
+                    </button>
+                  </form>
+                  <form action={deleteSurveyTemplate.bind(null, t.id)}>
+                    <ConfirmDeleteButton confirmMessage={`Excluir o formulário "${t.name}"?`} />
+                  </form>
+                </div>
               </div>
               <ul className="mt-2 space-y-1">
                 {questions.map((q) => (

@@ -441,3 +441,39 @@ create policy "survey_templates_delete" on contract_crm.survey_templates for del
 create policy "custom_surveys_select" on contract_crm.custom_surveys for select using (auth.role() = 'authenticated');
 create policy "custom_surveys_insert" on contract_crm.custom_surveys for insert with check (auth.role() = 'authenticated');
 
+
+
+-- ------------------------------------------------------------
+-- 17. TAGS (cor livre) para contratos, ex: linha de produto
+-- ------------------------------------------------------------
+create table contract_crm.tags (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  color text not null default '#6B7280',
+  created_at timestamptz not null default now()
+);
+
+create table contract_crm.contract_tags (
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  tag_id uuid not null references contract_crm.tags(id) on delete cascade,
+  primary key (contract_id, tag_id)
+);
+
+alter table contract_crm.survey_templates
+  add column tag_id uuid references contract_crm.tags(id);
+
+alter table contract_crm.tags enable row level security;
+alter table contract_crm.contract_tags enable row level security;
+
+create policy "tags_select" on contract_crm.tags for select using (auth.role() = 'authenticated');
+create policy "tags_insert" on contract_crm.tags for insert with check (auth.role() = 'authenticated');
+create policy "tags_update" on contract_crm.tags for update using (auth.role() = 'authenticated');
+create policy "tags_delete" on contract_crm.tags for delete using (auth.role() = 'authenticated');
+
+create policy "contract_tags_select" on contract_crm.contract_tags for select using (auth.role() = 'authenticated');
+create policy "contract_tags_insert" on contract_crm.contract_tags for insert with check (auth.role() = 'authenticated');
+create policy "contract_tags_delete" on contract_crm.contract_tags for delete using (auth.role() = 'authenticated');
+
+insert into contract_crm.tags (name, color) values
+  ('Engenharia Clínica', '#0EA5A5'),
+  ('Engenharia Hospitalar', '#7C5CFC');

@@ -6,6 +6,8 @@ import { NpsSection } from '@/components/nps/nps-section'
 import { FilesSection } from '@/components/contracts/files-section'
 import { CustomSurveysSection } from '@/components/surveys/custom-surveys-section'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
+import { ContractTagSelect } from '@/components/tags/contract-tag-select'
+import { setContractTag } from '@/lib/actions/tags'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -34,6 +36,8 @@ export default async function ContractDetailPage({
     { data: runs },
     { data: activitiesRaw },
     { data: contractFiles },
+    { data: allTags },
+    { data: currentContractTags },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -44,7 +48,11 @@ export default async function ContractDetailPage({
     supabase.from('pipeline_runs').select('*').eq('contract_id', id).order('started_at', { ascending: true }),
     supabase.from('activities').select('id, type, content, created_at, due_date, completed, user_id').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('contract_files').select('id, file_name, storage_path, file_size, mime_type, created_at').eq('contract_id', id).order('created_at', { ascending: false }),
+    supabase.from('tags').select('id, name, color').order('name'),
+    supabase.from('contract_tags').select('tag_id').eq('contract_id', id),
   ])
+
+  const currentTagId = currentContractTags?.[0]?.tag_id ?? null
 
   const openRun = runs?.find((r) => r.status === 'open')
   const lastRun = runs && runs.length > 0 ? runs[runs.length - 1] : undefined
@@ -108,6 +116,12 @@ export default async function ContractDetailPage({
             <h1 className="text-lg font-semibold text-gray-900">{contract.client_name}</h1>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{contract.title}</span>
             <ValidityBadge validUntil={contract.valid_until} />
+            <ContractTagSelect
+              key={currentTagId ?? 'none'}
+              tags={allTags ?? []}
+              currentTagId={currentTagId}
+              action={setContractTag.bind(null, contract.id)}
+            />
           </div>
           <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
           {linkedCompany && (

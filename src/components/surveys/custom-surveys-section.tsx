@@ -6,16 +6,24 @@ import { CopyLinkButton } from '@/components/nps/copy-link-button'
 export async function CustomSurveysSection({ contractId }: { contractId: string }) {
   const supabase = await createClient()
 
-  const [{ data: templates }, { data: sentSurveys }] = await Promise.all([
-    supabase.from('survey_templates').select('id, name').order('name'),
+  const [{ data: allTemplates }, { data: sentSurveys }, { data: contractTagRows }] = await Promise.all([
+    supabase.from('survey_templates').select('id, name, tag_id').order('name'),
     supabase
       .from('custom_surveys')
       .select('id, token, status, sent_at, answered_at, respondent_name, template_id')
       .eq('contract_id', contractId)
       .order('sent_at', { ascending: false }),
+    supabase.from('contract_tags').select('tag_id').eq('contract_id', contractId),
   ])
 
-  const templateNameById = new Map((templates ?? []).map((t) => [t.id, t.name]))
+  const contractTagId = contractTagRows?.[0]?.tag_id ?? null
+
+  // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato —
+  // é isso que garante que "Engenharia Clínica" não veja formulário de
+  // "Engenharia Hospitalar" e vice-versa.
+  const templates = (allTemplates ?? []).filter((t) => !t.tag_id || t.tag_id === contractTagId)
+
+  const templateNameById = new Map((allTemplates ?? []).map((t) => [t.id, t.name]))
 
   const headersList = await headers()
   const host = headersList.get('host') ?? 'localhost:3000'

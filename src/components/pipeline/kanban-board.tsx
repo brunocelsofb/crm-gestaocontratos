@@ -39,6 +39,7 @@ export type RunCard = {
   stageEnteredAt: string
   validUntil: string | null
   freshness: 'fresh' | 'warning' | 'stale'
+  tag: { id: string; name: string; color: string } | null
 }
 
 type Stage = {
@@ -112,6 +113,14 @@ function Card({ card, sla, showValidity, wonLabel, lostLabel }: { card: RunCard;
         {card.status === 'won' && <span className="shrink-0 rounded-full bg-positive-100 px-1.5 py-0.5 text-[9px] font-medium text-positive-700">{wonLabel}</span>}
         {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-1.5 py-0.5 text-[9px] font-medium text-negative-700">{lostLabel}</span>}
       </div>
+      {card.tag && (
+        <span
+          className="mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white"
+          style={{ backgroundColor: card.tag.color }}
+        >
+          {card.tag.name}
+        </span>
+      )}
       <p className="font-mono text-[10px] text-gray-400">{card.processNumber}</p>
       {showValidity && card.validUntil && (
         <div className="mt-1">

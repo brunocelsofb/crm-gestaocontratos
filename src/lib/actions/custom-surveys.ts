@@ -25,6 +25,7 @@ export async function createSurveyTemplate(
 
   const name = (formData.get('name') as string)?.trim()
   const questionsRaw = formData.get('questions') as string
+  const tag_id = (formData.get('tag_id') as string) || null
 
   if (!name) return { error: 'Nome do formulário é obrigatório.' }
 
@@ -42,6 +43,7 @@ export async function createSurveyTemplate(
   const { error } = await supabase.from('survey_templates').insert({
     name,
     questions,
+    tag_id,
     created_by: user.id,
   })
 
@@ -49,6 +51,31 @@ export async function createSurveyTemplate(
 
   revalidatePath('/surveys')
   return {}
+}
+
+export async function duplicateSurveyTemplate(templateId: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: original } = await supabase
+    .from('survey_templates')
+    .select('name, questions, tag_id')
+    .eq('id', templateId)
+    .single()
+
+  if (!original) return
+
+  await supabase.from('survey_templates').insert({
+    name: `${original.name} (cópia)`,
+    questions: original.questions,
+    tag_id: original.tag_id,
+    created_by: user.id,
+  })
+
+  revalidatePath('/surveys')
 }
 
 export async function deleteSurveyTemplate(templateId: string) {

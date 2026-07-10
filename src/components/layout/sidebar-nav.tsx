@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList, Tag } from 'lucide-react'
 
 const BASE_NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,6 +11,7 @@ const BASE_NAV_ITEMS = [
   { href: '/companies', label: 'Empresas', icon: Building2 },
   { href: '/nps-dashboard', label: 'NPS', icon: Smile },
   { href: '/surveys', label: 'Formulários', icon: ClipboardList },
+  { href: '/tags', label: 'Tags', icon: Tag },
   { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]
 

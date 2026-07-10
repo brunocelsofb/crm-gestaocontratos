@@ -39,17 +39,30 @@ export default async function PipelinePage({
   // PERFORMANCE: contratos e "última atividade" também não dependem uma
   // da outra (as duas só precisam da lista de contractIds), então saem
   // juntas também.
-  const [{ data: contractsData }, { data: latestActivityRows }] = await Promise.all([
+  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }] = await Promise.all([
     contractIds.length
       ? supabase.from('contracts').select('id, process_number, title, client_name, company_id, valid_until').in('id', contractIds)
       : Promise.resolve({ data: [] as { id: string; process_number: string; title: string; client_name: string; company_id: string | null; valid_until: string | null }[] }),
     contractIds.length
       ? supabase.from('activities').select('contract_id, created_at').in('contract_id', contractIds).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] as { contract_id: string; created_at: string }[] }),
+    contractIds.length
+      ? supabase.from('contract_tags').select('contract_id, tags(id, name, color)').in('contract_id', contractIds)
+      : Promise.resolve({ data: [] as { contract_id: string; tags: { id: string; name: string; color: string } | { id: string; name: string; color: string }[] | null }[] }),
   ])
 
   const contractById = new Map((contractsData ?? []).map((c) => [c.id, c]))
   const stageById = new Map((stages ?? []).map((s) => [s.id, s]))
+
+  // NOTA DE INCERTEZA: o embedding `tags(...)` através da tabela de
+  // ligação contract_tags pode vir como array (mesmo comportamento que
+  // já vimos antes em outros lugares) — trato os dois formatos possíveis
+  // aqui, em vez de assumir um só.
+  const tagByContract = new Map<string, { id: string; name: string; color: string }>()
+  for (const row of contractTagRows ?? []) {
+    const tagValue = Array.isArray(row.tags) ? row.tags[0] : row.tags
+    if (tagValue) tagByContract.set(row.contract_id, tagValue)
+  }
 
   // Como veio ordenado por created_at desc, a primeira ocorrência de cada
   // contract_id já é a atividade mais recente dele.
@@ -83,6 +96,7 @@ export default async function PipelinePage({
       stageEnteredAt: r.stage_entered_at,
       validUntil: contract?.valid_until ?? null,
       freshness: computeFreshness(r.contract_id, r.stage_entered_at, r.stage_id),
+      tag: tagByContract.get(r.contract_id) ?? null,
     }
   })
 
