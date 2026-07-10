@@ -488,6 +488,13 @@ alter table contract_crm.profiles
 alter table contract_crm.contracts
   add column current_department text default 'comercial';
 
+alter table contract_crm.contracts
+  add column current_assignee_id uuid references contract_crm.profiles(id);
+alter table contract_crm.contracts
+  add column previous_department text;
+alter table contract_crm.contracts
+  add column previous_assignee_id uuid references contract_crm.profiles(id);
+
 create table contract_crm.action_plan_items (
   id uuid primary key default gen_random_uuid(),
   contract_id uuid not null references contract_crm.contracts(id) on delete cascade,

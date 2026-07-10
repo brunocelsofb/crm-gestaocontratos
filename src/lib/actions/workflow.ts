@@ -21,26 +21,98 @@ export async function transferContract(
   if (!user) return { error: 'Usuário não autenticado.' }
 
   const toDepartment = formData.get('department') as string
+  const toAssigneeId = (formData.get('assignee_id') as string) || null
   const note = (formData.get('note') as string) || null
 
   if (!toDepartment) return { error: 'Selecione o departamento de destino.' }
 
   const { data: contract } = await supabase
     .from('contracts')
-    .select('current_department')
+    .select('current_department, current_assignee_id')
     .eq('id', contractId)
     .single()
 
   const fromLabel = departmentLabel(contract?.current_department ?? null)
   const toLabel = departmentLabel(toDepartment)
 
-  await supabase.from('contracts').update({ current_department: toDepartment }).eq('id', contractId)
+  let toAssigneeName: string | null = null
+  if (toAssigneeId) {
+    const { data: assignee } = await supabase.from('profiles').select('full_name').eq('id', toAssigneeId).maybeSingle()
+    toAssigneeName = assignee?.full_name ?? null
+  }
+
+  // Guarda o estado ANTERIOR antes de sobrescrever — é isso que permite
+  // o botão "Devolver" funcionar depois, sem precisar vasculhar histórico.
+  await supabase
+    .from('contracts')
+    .update({
+      current_department: toDepartment,
+      current_assignee_id: toAssigneeId,
+      previous_department: contract?.current_department ?? null,
+      previous_assignee_id: contract?.current_assignee_id ?? null,
+    })
+    .eq('id', contractId)
+
+  const destinationText = toAssigneeName ? `${toLabel} (${toAssigneeName})` : toLabel
 
   await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
-    content: `Transferido de ${fromLabel} para ${toLabel}.${note ? ` Nota: ${note}` : ''}`,
+    content: `Transferido de ${fromLabel} para ${destinationText}.${note ? ` Nota: ${note}` : ''}`,
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/pipeline')
+  revalidatePath('/contracts')
+  return {}
+}
+
+// "Devolver": manda de volta pra quem estava responsável ANTES da
+// última transferência — o "ele trata e retorna pra nós" de um clique só.
+export async function returnContract(contractId: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { data: contract } = await supabase
+    .from('contracts')
+    .select('current_department, current_assignee_id, previous_department, previous_assignee_id')
+    .eq('id', contractId)
+    .single()
+
+  if (!contract?.previous_department) {
+    return { error: 'Não há um responsável anterior registrado para devolver.' }
+  }
+
+  const fromLabel = departmentLabel(contract.current_department)
+  const toLabel = departmentLabel(contract.previous_department)
+
+  let toAssigneeName: string | null = null
+  if (contract.previous_assignee_id) {
+    const { data: assignee } = await supabase.from('profiles').select('full_name').eq('id', contract.previous_assignee_id).maybeSingle()
+    toAssigneeName = assignee?.full_name ?? null
+  }
+
+  await supabase
+    .from('contracts')
+    .update({
+      current_department: contract.previous_department,
+      current_assignee_id: contract.previous_assignee_id,
+      previous_department: contract.current_department,
+      previous_assignee_id: contract.current_assignee_id,
+    })
+    .eq('id', contractId)
+
+  const destinationText = toAssigneeName ? `${toLabel} (${toAssigneeName})` : toLabel
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'transfer',
+    content: `Devolvido de ${fromLabel} para ${destinationText}.`,
   })
 
   revalidatePath(`/contracts/${contractId}`)

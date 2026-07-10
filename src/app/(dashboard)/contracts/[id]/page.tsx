@@ -47,6 +47,7 @@ export default async function ContractDetailPage({
     { data: sentCustomSurveys },
     { data: actionPlanItems },
     { data: dimensioningReviews },
+    { data: allProfiles },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -64,6 +65,7 @@ export default async function ContractDetailPage({
     supabase.from('custom_surveys').select('id, token, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone, template_id, responses').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('action_plan_items').select('id, description, responsible_department, status, created_at, resolved_at').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('dimensioning_reviews').select('id, file_storage_path, file_name, sent_at, status, reviewed_at, review_notes').eq('contract_id', id).order('sent_at', { ascending: false }),
+    supabase.from('profiles').select('id, full_name, department'),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
@@ -116,6 +118,21 @@ export default async function ContractDetailPage({
     ...a,
     profiles: a.user_id ? { full_name: profileById.get(a.user_id) ?? '' } : null,
   }))
+
+  const allProfilesById = new Map((allProfiles ?? []).map((p) => [p.id, p]))
+  const currentAssigneeName = contract.current_assignee_id
+    ? allProfilesById.get(contract.current_assignee_id)?.full_name ?? null
+    : null
+  const hasPreviousResponsible = !!contract.previous_department
+
+  const transferLog = activities
+    .filter((a) => a.type === 'transfer')
+    .map((a) => ({
+      id: a.id,
+      content: a.content,
+      created_at: a.created_at,
+      user_name: a.profiles?.full_name ?? null,
+    }))
 
   // Dias por etapa, calculados apenas dentro da run aberta atual
   // (a barra de pipeline mostra só o funil em andamento no momento).
@@ -178,7 +195,14 @@ export default async function ContractDetailPage({
         </Link>
       </div>
 
-      <DepartmentSection contractId={contract.id} currentDepartment={contract.current_department} />
+      <DepartmentSection
+        contractId={contract.id}
+        currentDepartment={contract.current_department}
+        currentAssigneeName={currentAssigneeName}
+        hasPrevious={hasPreviousResponsible}
+        users={(allProfiles ?? []).filter((p) => p.department)}
+        transfers={transferLog}
+      />
 
       {displayRun && stages && stages.length > 0 ? (
         <StageBar
