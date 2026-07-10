@@ -477,3 +477,53 @@ create policy "contract_tags_delete" on contract_crm.contract_tags for delete us
 insert into contract_crm.tags (name, color) values
   ('Engenharia Clínica', '#0EA5A5'),
   ('Engenharia Hospitalar', '#7C5CFC');
+
+
+-- ------------------------------------------------------------
+-- 18. Departamentos, Plano de Ação, Aprovação de Dimensionamento
+-- ------------------------------------------------------------
+alter table contract_crm.profiles
+  add column department text;
+
+alter table contract_crm.contracts
+  add column current_department text default 'comercial';
+
+create table contract_crm.action_plan_items (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  description text not null,
+  responsible_department text,
+  status text not null default 'pending' check (status in ('pending', 'in_progress', 'done')),
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
+create index idx_action_plan_items_contract on contract_crm.action_plan_items(contract_id);
+
+create table contract_crm.dimensioning_reviews (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  file_storage_path text,
+  file_name text,
+  sent_by uuid references contract_crm.profiles(id),
+  sent_at timestamptz not null default now(),
+  status text not null default 'pending' check (status in ('pending', 'acknowledged_ok', 'acknowledged_disagree')),
+  reviewed_by uuid references contract_crm.profiles(id),
+  reviewed_at timestamptz,
+  review_notes text
+);
+
+create index idx_dimensioning_reviews_contract on contract_crm.dimensioning_reviews(contract_id);
+
+alter table contract_crm.action_plan_items enable row level security;
+alter table contract_crm.dimensioning_reviews enable row level security;
+
+create policy "action_plan_select" on contract_crm.action_plan_items for select using (auth.role() = 'authenticated');
+create policy "action_plan_insert" on contract_crm.action_plan_items for insert with check (auth.role() = 'authenticated');
+create policy "action_plan_update" on contract_crm.action_plan_items for update using (auth.role() = 'authenticated');
+create policy "action_plan_delete" on contract_crm.action_plan_items for delete using (auth.role() = 'authenticated');
+
+create policy "dimensioning_select" on contract_crm.dimensioning_reviews for select using (auth.role() = 'authenticated');
+create policy "dimensioning_insert" on contract_crm.dimensioning_reviews for insert with check (auth.role() = 'authenticated');
+create policy "dimensioning_update" on contract_crm.dimensioning_reviews for update using (auth.role() = 'authenticated');

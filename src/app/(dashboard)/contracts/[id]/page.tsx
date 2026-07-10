@@ -8,6 +8,9 @@ import { FilesSection } from '@/components/contracts/files-section'
 import { CustomSurveysSection } from '@/components/surveys/custom-surveys-section'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { ContractTagSelect } from '@/components/tags/contract-tag-select'
+import { DepartmentSection } from '@/components/contracts/department-section'
+import { ActionPlanSection } from '@/components/contracts/action-plan-section'
+import { DimensioningSection } from '@/components/contracts/dimensioning-section'
 import { setContractTag } from '@/lib/actions/tags'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -42,6 +45,8 @@ export default async function ContractDetailPage({
     { data: npsSurveys },
     { data: allSurveyTemplates },
     { data: sentCustomSurveys },
+    { data: actionPlanItems },
+    { data: dimensioningReviews },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -57,6 +62,8 @@ export default async function ContractDetailPage({
     supabase.from('nps_surveys').select('id, token, score, comment, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('survey_templates').select('id, name, tag_id, questions').order('name'),
     supabase.from('custom_surveys').select('id, token, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone, template_id, responses').eq('contract_id', id).order('sent_at', { ascending: false }),
+    supabase.from('action_plan_items').select('id, description, responsible_department, status, created_at, resolved_at').eq('contract_id', id).order('created_at', { ascending: false }),
+    supabase.from('dimensioning_reviews').select('id, file_storage_path, file_name, sent_at, status, reviewed_at, review_notes').eq('contract_id', id).order('sent_at', { ascending: false }),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
@@ -88,8 +95,8 @@ export default async function ContractDetailPage({
     { data: activityProfiles },
   ] = await Promise.all([
     pipelineIds.length
-      ? supabase.from('pipelines').select('id, name, won_label, lost_label').in('id', pipelineIds)
-      : Promise.resolve({ data: [] as { id: string; name: string; won_label: string; lost_label: string }[] }),
+      ? supabase.from('pipelines').select('id, name, won_label, lost_label, type').in('id', pipelineIds)
+      : Promise.resolve({ data: [] as { id: string; name: string; won_label: string; lost_label: string; type: string }[] }),
     displayRun
       ? supabase.from('stages').select('id, name, order_index, is_won, is_lost, sla_days, color').eq('pipeline_id', displayRun.pipeline_id).order('order_index')
       : Promise.resolve({ data: [] as { id: string; name: string; order_index: number; is_won: boolean; is_lost: boolean; sla_days: number | null; color: string | null }[] }),
@@ -103,6 +110,7 @@ export default async function ContractDetailPage({
 
   const pipelineById = new Map((pipelines ?? []).map((p) => [p.id, p]))
   const profileById = new Map((activityProfiles ?? []).map((p) => [p.id, p.full_name]))
+  const isCurrentlyInSalesPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'vendas' : false
 
   const activities = (activitiesRaw ?? []).map((a) => ({
     ...a,
@@ -169,6 +177,8 @@ export default async function ContractDetailPage({
           Editar
         </Link>
       </div>
+
+      <DepartmentSection contractId={contract.id} currentDepartment={contract.current_department} />
 
       {displayRun && stages && stages.length > 0 ? (
         <StageBar
@@ -249,6 +259,12 @@ export default async function ContractDetailPage({
             ))}
           </div>
         </div>
+      )}
+
+      <ActionPlanSection contractId={contract.id} items={actionPlanItems ?? []} />
+
+      {isCurrentlyInSalesPipeline && (
+        <DimensioningSection contractId={contract.id} reviews={dimensioningReviews ?? []} />
       )}
 
       <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />

@@ -227,6 +227,32 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
     if (!currentStage?.is_won) {
       return { error: 'A etapa atual não está habilitada para marcar sucesso. Ative "Ganho" nessa etapa em Funis e Etapas, ou mova o contrato para uma etapa habilitada.' }
     }
+
+    // TRAVA ESPECÍFICA DO FUNIL DE VENDAS: só pode marcar Ganho depois
+    // que o time técnico deu ciência do dimensionamento (status
+    // 'acknowledged_ok'). Isso NÃO se aplica a outros tipos de funil
+    // (Gestão de Contratos, Serviço Avulso), só a Vendas.
+    const { data: pipelineForGate } = await supabase
+      .from('pipelines')
+      .select('type')
+      .eq('id', run.pipeline_id)
+      .single()
+
+    if (pipelineForGate?.type === 'vendas') {
+      const { data: latestReview } = await supabase
+        .from('dimensioning_reviews')
+        .select('status')
+        .eq('contract_id', contractId)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!latestReview || latestReview.status !== 'acknowledged_ok') {
+        return {
+          error: 'O time técnico ainda não deu ciência do dimensionamento. Envie o dimensionamento para aprovação antes de marcar Ganho.',
+        }
+      }
+    }
   }
 
   if (outcome === 'lost') {

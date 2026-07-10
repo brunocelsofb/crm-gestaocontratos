@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<string, string> = {
   pipeline_change: 'Funil alterado',
   automation_triggered: 'Automação disparada',
   system: 'Evento do sistema',
+  transfer: 'Transferência entre times',
 }
 
 // Cores por categoria de evento, não por sequência — ver design system.
@@ -31,6 +32,7 @@ const TYPE_COLOR: Record<string, string> = {
   pipeline_change: 'bg-purple-100 text-purple-700',
   automation_triggered: 'bg-purple-100 text-purple-700',
   system: 'bg-gray-100 text-gray-600',
+  transfer: 'bg-orange-100 text-orange-700',
 }
 
 function relativeTime(iso: string) {

@@ -20,6 +20,7 @@ export async function createUserByAdmin(
   const fullName = (formData.get('full_name') as string)?.trim()
   const password = formData.get('password') as string
   const role = (formData.get('role') as string) === 'admin' ? 'admin' : 'member'
+  const department = (formData.get('department') as string) || null
 
   if (!email || !fullName || !password) {
     return { error: 'Preencha nome, e-mail e senha.' }
@@ -46,6 +47,7 @@ export async function createUserByAdmin(
     full_name: fullName,
     email,
     role,
+    department,
   })
 
   if (profileError) {
@@ -56,6 +58,17 @@ export async function createUserByAdmin(
 
   revalidatePath('/users')
   return {}
+}
+
+export async function updateUserDepartment(targetUserId: string, formData: FormData) {
+  const currentProfile = await getCurrentProfile()
+  if (currentProfile?.role !== 'admin') return
+
+  const department = (formData.get('department') as string) || null
+  const supabase = await createClient()
+  await supabase.from('profiles').update({ department }).eq('id', targetUserId)
+
+  revalidatePath('/users')
 }
 
 export async function updateUserRole(targetUserId: string, formData: FormData) {

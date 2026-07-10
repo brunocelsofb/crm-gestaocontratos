@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useEffect } from 'react'
 import { createUserByAdmin, type ActionState } from '@/lib/actions/users'
+import { DEPARTMENTS } from '@/lib/constants/departments'
 
 const initialState: ActionState = {}
 
@@ -55,6 +56,19 @@ export function NewUserForm() {
         >
           <option value="member">Membro</option>
           <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700">Departamento</label>
+        <select
+          name="department"
+          defaultValue=""
+          className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
+        >
+          <option value="">Sem departamento</option>
+          {DEPARTMENTS.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
         </select>
       </div>
 

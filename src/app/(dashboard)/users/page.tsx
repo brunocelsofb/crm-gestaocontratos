@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentProfile } from '@/lib/auth/role'
-import { updateUserRole } from '@/lib/actions/users'
+import { updateUserRole, updateUserDepartment } from '@/lib/actions/users'
 import { UserRoleSelect } from '@/components/users/user-role-select'
+import { UserDepartmentSelect } from '@/components/users/user-department-select'
 import { NewUserForm } from '@/components/users/new-user-form'
 
 export default async function UsersPage() {
@@ -17,7 +18,7 @@ export default async function UsersPage() {
   const supabase = await createClient()
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, created_at')
+    .select('id, full_name, email, role, department, created_at')
     .order('created_at')
 
   return (
@@ -25,7 +26,7 @@ export default async function UsersPage() {
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Usuários</h1>
         <p className="mt-0.5 text-sm text-gray-500">
-          Apenas administradores podem excluir registros (funis, etapas, contatos, empresas). Membros podem criar e editar normalmente.
+          Apenas administradores podem excluir registros (funis, etapas, contatos, empresas). O departamento define de qual time cada pessoa faz parte, usado nas transferências de oportunidade.
         </p>
       </div>
 
@@ -38,6 +39,7 @@ export default async function UsersPage() {
               <th className="px-4 py-3 text-left font-medium text-gray-500">Nome</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">E-mail</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Papel</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Departamento</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -53,6 +55,9 @@ export default async function UsersPage() {
                   ) : (
                     <UserRoleSelect defaultValue={p.role} action={updateUserRole.bind(null, p.id)} />
                   )}
+                </td>
+                <td className="px-4 py-3">
+                  <UserDepartmentSelect defaultValue={p.department} action={updateUserDepartment.bind(null, p.id)} />
                 </td>
               </tr>
             ))}
