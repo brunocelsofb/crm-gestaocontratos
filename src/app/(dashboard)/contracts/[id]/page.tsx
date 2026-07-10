@@ -126,14 +126,13 @@ export default async function ContractDetailPage({
     : null
   const hasPreviousResponsible = !!contract.previous_department
 
-  // Só quem é o "dono" atual da conta (current_assignee_id) ou um admin
-  // pode mover a etapa — se ninguém foi definido como responsável ainda,
-  // libera pra qualquer autenticado (não trava um contrato sem dono).
+  // Só o "dono" atual da conta (current_assignee_id) ou um admin pode
+  // mover a etapa — SEM exceção pra contrato sem dono ainda (removido
+  // por pedido explícito: só acompanhar/escrever até alguém do
+  // comercial transferir a ação pra você).
   const currentProfile = await getCurrentProfile()
   const canChangeStage =
-    !contract.current_assignee_id ||
-    contract.current_assignee_id === currentProfile?.id ||
-    currentProfile?.role === 'admin'
+    contract.current_assignee_id === currentProfile?.id || currentProfile?.role === 'admin'
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')

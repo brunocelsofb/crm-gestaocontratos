@@ -6,6 +6,30 @@ import { departmentLabel } from '@/lib/constants/departments'
 
 export type ActionState = { error?: string }
 
+// Cria notificações pra quem precisa saber que algo chegou pra ele.
+// Se tem uma pessoa específica, notifica só ela; senão, notifica todo
+// mundo daquele departamento (evita spam geral quando já tem alguém
+// específico escolhido).
+async function notifyRecipients(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  department: string,
+  assigneeId: string | null,
+  contractId: string,
+  message: string
+) {
+  if (assigneeId) {
+    await supabase.from('notifications').insert({ user_id: assigneeId, contract_id: contractId, message })
+    return
+  }
+
+  const { data: peopleInDept } = await supabase.from('profiles').select('id').eq('department', department)
+  if (peopleInDept && peopleInDept.length > 0) {
+    await supabase.from('notifications').insert(
+      peopleInDept.map((p) => ({ user_id: p.id, contract_id: contractId, message }))
+    )
+  }
+}
+
 // ------------------------------------------------------------
 // Transferência entre departamentos
 // ------------------------------------------------------------
@@ -78,6 +102,15 @@ export async function transferContract(
   // falha no LOG, mas avisamos (um log que falha em silêncio foi
   // exatamente o bug anterior).
   if (logError) return { error: `Transferido, mas falhou ao registrar no histórico: ${logError.message}` }
+
+  await notifyRecipients(
+    supabase,
+    toDepartment,
+    toAssigneeId,
+    contractId,
+    `${fromLabel} transferiu uma oportunidade para você${note ? `: "${note}"` : '.'}`
+  )
+
   return {}
 }
 
@@ -144,6 +177,15 @@ export async function returnContract(contractId: string, note: string, filePath:
   revalidatePath('/pipeline')
   revalidatePath('/contracts')
   if (logError) return { error: `Devolvido, mas falhou ao registrar no histórico: ${logError.message}` }
+
+  await notifyRecipients(
+    supabase,
+    contract.previous_department,
+    contract.previous_assignee_id,
+    contractId,
+    `${fromLabel} devolveu uma oportunidade para você${note ? `: "${note}"` : '.'}`
+  )
+
   return {}
 }
 
@@ -236,6 +278,9 @@ export async function sendDimensioningReview(
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
   if (logError) return { error: `Enviado, mas falhou ao registrar no histórico: ${logError.message}` }
+
+  await notifyRecipients(supabase, 'tecnico', null, contractId, 'Um dimensionamento foi enviado pra você dar ciência.')
+
   return {}
 }
 
@@ -277,5 +322,8 @@ export async function reviewDimensioning(
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
   if (logError) return { error: `Registrado, mas falhou ao gravar no histórico: ${logError.message}` }
+
+  await notifyRecipients(supabase, 'comercial', null, contractId, `Time técnico deu ciência do dimensionamento: ${label}.`)
+
   return {}
 }

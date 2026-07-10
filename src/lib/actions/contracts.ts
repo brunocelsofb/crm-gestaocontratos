@@ -153,6 +153,7 @@ export async function createContract(
       company_id: companyId,
       contact_id: contactId,
       owner_id: user.id,
+      current_assignee_id: user.id,
       valid_from: (formData.get('valid_from') as string) || null,
       valid_until: (formData.get('valid_until') as string) || null,
     })

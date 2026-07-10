@@ -535,3 +535,24 @@ create policy "action_plan_delete" on contract_crm.action_plan_items for delete 
 create policy "dimensioning_select" on contract_crm.dimensioning_reviews for select using (auth.role() = 'authenticated');
 create policy "dimensioning_insert" on contract_crm.dimensioning_reviews for insert with check (auth.role() = 'authenticated');
 create policy "dimensioning_update" on contract_crm.dimensioning_reviews for update using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 19. Notificações
+-- ------------------------------------------------------------
+create table contract_crm.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references contract_crm.profiles(id) on delete cascade,
+  contract_id uuid references contract_crm.contracts(id) on delete cascade,
+  message text not null,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index idx_notifications_user on contract_crm.notifications(user_id, read);
+
+alter table contract_crm.notifications enable row level security;
+
+create policy "notifications_select_own" on contract_crm.notifications for select using (auth.uid() = user_id);
+create policy "notifications_insert" on contract_crm.notifications for insert with check (auth.role() = 'authenticated');
+create policy "notifications_update_own" on contract_crm.notifications for update using (auth.uid() = user_id);

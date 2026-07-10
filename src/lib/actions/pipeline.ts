@@ -59,7 +59,7 @@ export async function moveContractStage(
       supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
     ])
 
-    const isOwner = !contractForPermCheck?.current_assignee_id || contractForPermCheck.current_assignee_id === user.id
+    const isOwner = contractForPermCheck?.current_assignee_id === user.id
     const isAdmin = profile?.role === 'admin'
 
     if (!isOwner && !isAdmin) {
