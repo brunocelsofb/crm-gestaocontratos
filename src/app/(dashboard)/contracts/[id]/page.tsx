@@ -253,8 +253,6 @@ export default async function ContractDetailPage({
 
       <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
 
-      <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />
-
       <CustomSurveysSection
         contractId={contract.id}
         templates={availableTemplates}
@@ -262,6 +260,8 @@ export default async function ContractDetailPage({
         sentSurveys={sentCustomSurveys ?? []}
         linkBase={linkBase}
       />
+
+      <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>
