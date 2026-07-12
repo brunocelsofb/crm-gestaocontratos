@@ -7,11 +7,12 @@ import { createSurveyTemplate, updateSurveyTemplate, type ActionState, type Ques
 const initialState: ActionState = {}
 
 const QUESTION_TYPES: { value: Question['type']; label: string }[] = [
+  { value: 'likert', label: 'Satisfação (Escala Likert, 1 a 5)' },
   { value: 'text', label: 'Texto curto' },
   { value: 'textarea', label: 'Texto longo' },
   { value: 'single_choice', label: 'Escolha única' },
   { value: 'multiple_choice', label: 'Múltipla escolha' },
-  { value: 'rating', label: 'Nota (0 a 10)' },
+  { value: 'rating', label: 'Nota livre (0 a 10)' },
 ]
 
 type InitialTemplate = {
@@ -142,6 +143,12 @@ export function SurveyTemplateForm({
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-700 focus:outline-none"
                 />
               </div>
+            )}
+
+            {q.type === 'likert' && (
+              <p className="mt-2 text-[11px] text-gray-400">
+                Escala fixa: Muito insatisfeito (1) · Insatisfeito (2) · Nem satisfeito, nem insatisfeito (3) · Satisfeito (4) · Muito satisfeito (5).
+              </p>
             )}
           </div>
         ))}

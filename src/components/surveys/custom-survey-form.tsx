@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { submitCustomSurveyResponse } from '@/lib/actions/custom-surveys'
 import type { Question } from '@/lib/actions/custom-surveys'
+import { LIKERT_OPTIONS } from '@/lib/utils/survey-score'
 
 export function CustomSurveyForm({ token, questions }: { token: string; questions: Question[] }) {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
@@ -123,6 +124,22 @@ export function CustomSurveyForm({ token, questions }: { token: string; question
                     onChange={() => toggleMultiple(q.id, opt)}
                   />
                   {opt}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {q.type === 'likert' && (
+            <div className="mt-1 space-y-1">
+              {LIKERT_OPTIONS.map((opt) => (
+                <label key={opt.label} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name={q.id}
+                    checked={answers[q.id] === opt.label}
+                    onChange={() => setAnswer(q.id, opt.label)}
+                  />
+                  {opt.label}
                 </label>
               ))}
             </div>

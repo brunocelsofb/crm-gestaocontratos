@@ -9,9 +9,8 @@ const BASE_NAV_ITEMS = [
   { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
   { href: '/contracts', label: 'Contratos', icon: FileText },
   { href: '/companies', label: 'Empresas', icon: Building2 },
-  { href: '/nps-dashboard', label: 'NPS', icon: Smile },
+  { href: '/surveys-dashboard', label: 'Pesquisas e NPS', icon: BarChart3 },
   { href: '/surveys', label: 'Formulários', icon: ClipboardList },
-  { href: '/surveys-dashboard', label: 'Dashboard de Pesquisas', icon: BarChart3 },
   { href: '/tags', label: 'Tags', icon: Tag },
   { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]

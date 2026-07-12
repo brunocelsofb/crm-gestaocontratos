@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export type Question = {
   id: string
-  type: 'text' | 'textarea' | 'single_choice' | 'multiple_choice' | 'rating'
+  type: 'text' | 'textarea' | 'single_choice' | 'multiple_choice' | 'rating' | 'likert'
   label: string
   options?: string[]
 }

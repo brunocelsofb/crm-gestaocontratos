@@ -106,7 +106,7 @@ export function CustomSurveysSection({
                     <span className="font-medium text-gray-900">{templateName}</span>
                     {score !== null && (
                       <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700">
-                        Nota {score}
+                        {score.scale === 'likert' ? 'Satisfação' : 'Nota'} {score.value}/{score.max}
                       </span>
                     )}
                   </div>
