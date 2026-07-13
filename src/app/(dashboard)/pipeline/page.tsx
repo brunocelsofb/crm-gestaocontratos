@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard, type RunCard } from '@/components/pipeline/kanban-board'
 import { PipelineSelect } from '@/components/pipeline/pipeline-select'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 const DEFAULT_SLA_DAYS = 7 // usado quando a etapa não tem SLA configurado
 
@@ -12,6 +13,7 @@ export default async function PipelinePage({
 }) {
   const { pipeline: pipelineIdParam } = await searchParams
   const supabase = await createClient()
+  const isAdmin = await isCurrentUserAdmin()
 
   const { data: pipelines } = await supabase
     .from('pipelines')
@@ -124,6 +126,7 @@ export default async function PipelinePage({
           showValidity={pipelineType === 'gestao_contratos'}
           wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
           lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
+          isAdmin={isAdmin}
         />
       ) : (
         <p className="text-sm text-gray-400">Nenhuma etapa cadastrada para este pipeline.</p>

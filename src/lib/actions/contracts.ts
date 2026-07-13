@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { contractSchema } from '@/lib/validations/contract'
 
 export type ActionState = {
@@ -284,4 +286,26 @@ export async function updateContract(
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/contracts')
   redirect(`/contracts/${contractId}`)
+}
+
+export type DeleteState = { error?: string }
+
+// "Chave mãe" de exclusão — só admin. Exclui de verdade (sem manter
+// histórico) — pedido explícito pra fase de testes. O banco já está
+// configurado com "on delete cascade" em tudo que referencia o
+// contrato (funil, atividades, arquivos, pesquisas, faturamento etc.),
+// então uma exclusão aqui limpa tudo relacionado de uma vez.
+export async function deleteContract(contractId: string, redirectTo?: string): Promise<DeleteState> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) return { error: 'Só administradores podem excluir contratos.' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('contracts').delete().eq('id', contractId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/pipeline')
+  revalidatePath('/contracts')
+  if (redirectTo) redirect(redirectTo)
+  return {}
 }

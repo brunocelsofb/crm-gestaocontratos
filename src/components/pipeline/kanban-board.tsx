@@ -24,7 +24,9 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { moveContractStage } from '@/lib/actions/pipeline'
+import { deleteContract } from '@/lib/actions/contracts'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
+import { Trash2 } from 'lucide-react'
 
 export type RunCard = {
   runId: string
@@ -164,18 +166,38 @@ function Column({ stage, cards, showValidity, wonLabel, lostLabel }: { stage: St
   )
 }
 
+const TRASH_ZONE_ID = '__trash__'
+
+function TrashDropzone() {
+  const { setNodeRef, isOver } = useDroppable({ id: TRASH_ZONE_ID })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-center gap-2 rounded-lg border-2 border-dashed p-3 text-sm transition-colors ${
+        isOver ? 'border-negative-500 bg-negative-100 text-negative-700' : 'border-gray-300 text-gray-400'
+      }`}
+    >
+      <Trash2 size={16} />
+      Arraste aqui para excluir permanentemente (admin)
+    </div>
+  )
+}
+
 export function KanbanBoard({
   stages,
   initialCards,
   showValidity,
   wonLabel,
   lostLabel,
+  isAdmin,
 }: {
   stages: Stage[]
   initialCards: RunCard[]
   showValidity: boolean
   wonLabel: string
   lostLabel: string
+  isAdmin: boolean
 }) {
   const [cards, setCards] = useState(initialCards)
 
@@ -201,9 +223,30 @@ export function KanbanBoard({
     const { active, over } = event
     if (!over) return
 
-    const newStageId = String(over.id)
     const card = active.data.current as RunCard | undefined
-    if (!card || card.stageId === newStageId || card.status !== 'open') return
+    if (!card) return
+
+    if (over.id === TRASH_ZONE_ID) {
+      if (!confirm(`Excluir "${card.clientName}" PARA SEMPRE? Isso apaga todo o histórico, arquivos e faturamento ligados a esse contrato. Não tem como desfazer.`)) {
+        return
+      }
+      // Remove da tela imediatamente (otimista) — se falhar, o próximo
+      // "Atualizar" traz de volta, já que revalidatePath só roda no
+      // servidor depois da resposta.
+      setCards((prev) => prev.filter((c) => c.runId !== card.runId))
+      setError(null)
+      startTransition(async () => {
+        const result = await deleteContract(card.contractId)
+        if (result?.error) {
+          setError(result.error)
+          setCards((prev) => [...prev, card])
+        }
+      })
+      return
+    }
+
+    const newStageId = String(over.id)
+    if (card.stageId === newStageId || card.status !== 'open') return
 
     const previousStageId = card.stageId
 
@@ -243,6 +286,7 @@ export function KanbanBoard({
         </label>
       </div>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        {isAdmin && <TrashDropzone />}
         <div className="flex gap-3 overflow-x-auto pb-2">
           {stages.map((stage) => (
             <Column

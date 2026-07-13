@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AddContactForm } from '@/components/companies/add-contact-form'
+import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
 import { deleteContact } from '@/lib/actions/companies'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
@@ -38,12 +39,15 @@ export default async function CompanyDetailPage({
           {company.trade_name && <p className="text-sm text-gray-500">{company.trade_name}</p>}
           {company.cnpj && <p className="mt-0.5 text-sm text-gray-500">CNPJ: {company.cnpj}</p>}
         </div>
-        <Link
-          href={`/companies/${company.id}/edit`}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Editar
-        </Link>
+        <div className="flex items-start gap-2">
+          <Link
+            href={`/companies/${company.id}/edit`}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Editar
+          </Link>
+          {isAdmin && <DeleteCompanyButton companyId={company.id} />}
+        </div>
       </div>
 
       {company.notes && (

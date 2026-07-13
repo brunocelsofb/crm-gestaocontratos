@@ -126,3 +126,31 @@ export async function deleteContact(contactId: string, companyId: string) {
   await supabase.from('contacts').delete().eq('id', contactId)
   revalidatePath(`/companies/${companyId}`)
 }
+
+export type DeleteState = { error?: string }
+
+// "Chave mãe" de exclusão — só admin, exclusão de verdade (sem manter
+// histórico), pedida explicitamente pra fase de testes. Ainda assim,
+// bloqueia se a empresa tiver contratos vinculados, pra não apagar dado
+// de contrato "de sob a mesa" sem querer — nesse caso, exclua os
+// contratos primeiro.
+export async function deleteCompany(companyId: string): Promise<DeleteState> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) return { error: 'Só administradores podem excluir empresas.' }
+
+  const supabase = createAdminClient()
+
+  const { count } = await supabase
+    .from('contracts')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+
+  if (count && count > 0) {
+    return { error: `Esta empresa tem ${count} contrato(s) vinculado(s). Exclua os contratos primeiro.` }
+  }
+
+  const { error } = await supabase.from('companies').delete().eq('id', companyId)
+  if (error) return { error: error.message }
+
+  redirect('/companies')
+}

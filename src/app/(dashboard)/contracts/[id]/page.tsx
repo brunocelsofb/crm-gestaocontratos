@@ -11,6 +11,7 @@ import { ContractTagSelect } from '@/components/tags/contract-tag-select'
 import { DepartmentSection } from '@/components/contracts/department-section'
 import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
 import { BillingSection } from '@/components/contracts/billing-section'
+import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
 import { setContractTag } from '@/lib/actions/tags'
@@ -207,12 +208,15 @@ export default async function ContractDetailPage({
             </p>
           )}
         </div>
-        <Link
-          href={`/contracts/${contract.id}/edit`}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Editar
-        </Link>
+        <div className="flex items-start gap-2">
+          <Link
+            href={`/contracts/${contract.id}/edit`}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Editar
+          </Link>
+          {currentProfile?.role === 'admin' && <DeleteContractButton contractId={contract.id} />}
+        </div>
       </div>
 
       {displayRun && stages && stages.length > 0 ? (
