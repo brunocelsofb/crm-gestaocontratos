@@ -10,6 +10,7 @@ import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { ContractTagSelect } from '@/components/tags/contract-tag-select'
 import { DepartmentSection } from '@/components/contracts/department-section'
 import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
+import { BillingSection } from '@/components/contracts/billing-section'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
 import { setContractTag } from '@/lib/actions/tags'
@@ -50,6 +51,7 @@ export default async function ContractDetailPage({
     { data: actionPlanItems },
     { data: dimensioningReviews },
     { data: allProfiles },
+    { data: billingRecords },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -68,6 +70,7 @@ export default async function ContractDetailPage({
     supabase.from('action_plan_items').select('id, description, responsible_department, status, created_at, resolved_at').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('dimensioning_reviews').select('id, file_storage_path, file_name, sent_at, status, reviewed_at, review_notes').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, department'),
+    supabase.from('billing_records').select('id, year, month, amount, file_storage_path, file_name, notes, confirmed_at').eq('contract_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
@@ -115,6 +118,7 @@ export default async function ContractDetailPage({
   const pipelineById = new Map((pipelines ?? []).map((p) => [p.id, p]))
   const profileById = new Map((activityProfiles ?? []).map((p) => [p.id, p.full_name]))
   const isCurrentlyInSalesPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'vendas' : false
+  const isCurrentlyInContractsPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'gestao_contratos' : false
 
   const activities = (activitiesRaw ?? []).map((a) => ({
     ...a,
@@ -306,6 +310,10 @@ export default async function ContractDetailPage({
 
       {isCurrentlyInSalesPipeline && (
         <DimensioningSection contractId={contract.id} reviews={dimensioningReviews ?? []} />
+      )}
+
+      {isCurrentlyInContractsPipeline && (
+        <BillingSection contractId={contract.id} billingType={contract.billing_type} records={billingRecords ?? []} />
       )}
 
       <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />

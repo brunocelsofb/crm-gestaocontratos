@@ -1,9 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { PipelineSelect } from '@/components/pipeline/pipeline-select'
 import { PeriodSelector } from '@/components/dashboard/period-selector'
-import { StageValueChart } from '@/components/dashboard/stage-value-chart'
 import { MetricCard } from '@/components/dashboard/metric-card'
-import { ChevronFunnel } from '@/components/dashboard/chevron-funnel'
+import { GoalVsBillingSection } from '@/components/dashboard/goal-vs-billing-section'
 import { getValidityStatus } from '@/lib/utils/validity'
 import { Wallet, TrendingUp, AlertTriangle, XCircle, UserX, Percent, Timer } from 'lucide-react'
 
@@ -21,9 +20,9 @@ function currentMonthRange() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pipeline?: string; from?: string; to?: string }>
+  searchParams: Promise<{ pipeline?: string; from?: string; to?: string; goalMonth?: string; goalYear?: string }>
 }) {
-  const { pipeline: pipelineIdParam, from: fromParam, to: toParam } = await searchParams
+  const { pipeline: pipelineIdParam, from: fromParam, to: toParam, goalMonth, goalYear } = await searchParams
   const supabase = await createClient()
 
   const { data: pipelines } = await supabase
@@ -51,16 +50,11 @@ export default async function DashboardPage({
   // explicação detalhada em commits anteriores — reduz bastante o tempo
   // de carregamento comparado a fazer uma de cada vez).
   const [
-    { data: stages },
     { data: openRuns },
     { data: wonInPeriod },
     { data: lostInPeriod },
-    { data: pipelineRunIds },
     { data: closedRuns },
   ] = await Promise.all([
-    selectedPipeline
-      ? supabase.from('stages').select('id, name, order_index, is_won, is_lost, sla_days, color').eq('pipeline_id', selectedPipeline).order('order_index')
-      : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
       ? supabase.from('pipeline_runs').select('stage_id, value, contract_id').eq('pipeline_id', selectedPipeline).eq('status', 'open')
       : Promise.resolve({ data: [] as never[] }),
@@ -69,9 +63,6 @@ export default async function DashboardPage({
       : Promise.resolve({ data: [] as never[] }),
     selectedPipeline
       ? supabase.from('pipeline_runs').select('id, value').eq('pipeline_id', selectedPipeline).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`)
-      : Promise.resolve({ data: [] as never[] }),
-    selectedPipeline
-      ? supabase.from('pipeline_runs').select('id').eq('pipeline_id', selectedPipeline)
       : Promise.resolve({ data: [] as never[] }),
     pipelineType === 'vendas' && selectedPipeline
       ? supabase.from('pipeline_runs').select('status, value, started_at, ended_at').eq('pipeline_id', selectedPipeline).in('status', ['won', 'lost'])
@@ -84,29 +75,17 @@ export default async function DashboardPage({
   // renovado" (vira churn) ou "Renovado". Vencido sozinho não tira do total.
   const totalOpen = (openRuns ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
 
-  const valueByStage = (stages ?? []).map((s) => ({
-    name: s.name,
-    color: s.color ?? '#1B556B',
-    value: (openRuns ?? [])
-      .filter((r) => r.stage_id === s.id)
-      .reduce((sum, r) => sum + Number(r.value || 0), 0),
-  }))
-
   const renewedValue = (wonInPeriod ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
   const churnValue = (lostInPeriod ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
   const churnCount = (lostInPeriod ?? []).length
 
   const previousRunIds = (wonInPeriod ?? []).map((r) => r.previous_run_id).filter((id): id is string => !!id)
-  const runIds = (pipelineRunIds ?? []).map((r) => r.id)
   const openContractIds = [...new Set((openRuns ?? []).map((r) => r.contract_id))]
 
-  const [{ data: previousRuns }, { data: historyRows }, { data: openContractsValidity }] = await Promise.all([
+  const [{ data: previousRuns }, { data: openContractsValidity }] = await Promise.all([
     previousRunIds.length
       ? supabase.from('pipeline_runs').select('id, value').in('id', previousRunIds)
       : Promise.resolve({ data: [] as { id: string; value: number }[] }),
-    runIds.length
-      ? supabase.from('stage_history').select('pipeline_run_id, stage_id').in('pipeline_run_id', runIds)
-      : Promise.resolve({ data: [] as { pipeline_run_id: string; stage_id: string }[] }),
     openContractIds.length
       ? supabase.from('contracts').select('id, valid_until').in('id', openContractIds)
       : Promise.resolve({ data: [] as { id: string; valid_until: string | null }[] }),
@@ -146,16 +125,6 @@ export default async function DashboardPage({
       expiredCount++
     }
   }
-
-  const funnelStages = (stages ?? []).map((s) => ({
-    id: s.id,
-    name: s.name,
-    isWon: s.is_won,
-    color: s.color ?? '#1B556B',
-    count: new Set(
-      (historyRows ?? []).filter((h) => h.stage_id === s.id).map((h) => h.pipeline_run_id)
-    ).size,
-  }))
 
   // Métricas específicas de pipeline de VENDAS
   const wonRuns = (closedRuns ?? []).filter((r) => r.status === 'won')
@@ -297,17 +266,13 @@ export default async function DashboardPage({
         )}
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-foreground">
-          {pipelines?.find((p) => p.id === selectedPipeline)?.name ?? 'Funil'}
-        </h2>
-        <ChevronFunnel stages={funnelStages} />
-      </div>
-
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-foreground">Valor em aberto por etapa</h2>
-        <StageValueChart data={valueByStage} />
-      </div>
+      {pipelineType === 'gestao_contratos' && (
+        <GoalVsBillingSection
+          selectedPipeline={selectedPipeline}
+          month={goalMonth ? Number(goalMonth) : new Date().getMonth() + 1}
+          year={goalYear ? Number(goalYear) : new Date().getFullYear()}
+        />
+      )}
     </div>
   )
 }

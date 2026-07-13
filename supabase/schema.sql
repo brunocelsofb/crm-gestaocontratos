@@ -556,3 +556,49 @@ alter table contract_crm.notifications enable row level security;
 create policy "notifications_select_own" on contract_crm.notifications for select using (auth.uid() = user_id);
 create policy "notifications_insert" on contract_crm.notifications for insert with check (auth.role() = 'authenticated');
 create policy "notifications_update_own" on contract_crm.notifications for update using (auth.uid() = user_id);
+
+
+-- ------------------------------------------------------------
+-- 20. Meta anual e Faturamento confirmado
+-- ------------------------------------------------------------
+alter table contract_crm.contracts
+  add column billing_type text not null default 'fixed' check (billing_type in ('fixed', 'metered'));
+
+create table contract_crm.monthly_goals (
+  id uuid primary key default gen_random_uuid(),
+  year integer not null,
+  month integer not null check (month between 1 and 12),
+  target_value numeric not null default 0,
+  updated_by uuid references contract_crm.profiles(id),
+  updated_at timestamptz not null default now(),
+  unique (year, month)
+);
+
+create table contract_crm.billing_records (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  year integer not null,
+  month integer not null check (month between 1 and 12),
+  amount numeric not null,
+  file_storage_path text,
+  file_name text,
+  notes text,
+  confirmed_by uuid references contract_crm.profiles(id),
+  confirmed_at timestamptz not null default now(),
+  unique (contract_id, year, month)
+);
+
+create index idx_billing_records_period on contract_crm.billing_records(year, month);
+create index idx_billing_records_contract on contract_crm.billing_records(contract_id);
+
+alter table contract_crm.monthly_goals enable row level security;
+alter table contract_crm.billing_records enable row level security;
+
+create policy "monthly_goals_select" on contract_crm.monthly_goals for select using (auth.role() = 'authenticated');
+create policy "monthly_goals_upsert" on contract_crm.monthly_goals for insert with check (auth.role() = 'authenticated');
+create policy "monthly_goals_update" on contract_crm.monthly_goals for update using (auth.role() = 'authenticated');
+
+create policy "billing_records_select" on contract_crm.billing_records for select using (auth.role() = 'authenticated');
+create policy "billing_records_insert" on contract_crm.billing_records for insert with check (auth.role() = 'authenticated');
+create policy "billing_records_update" on contract_crm.billing_records for update using (auth.role() = 'authenticated');
+create policy "billing_records_delete" on contract_crm.billing_records for delete using (auth.role() = 'authenticated');
