@@ -11,6 +11,7 @@ import { ContractTagSelect } from '@/components/tags/contract-tag-select'
 import { DepartmentSection } from '@/components/contracts/department-section'
 import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
 import { BillingSection } from '@/components/contracts/billing-section'
+import { RenewalValueSection } from '@/components/contracts/renewal-value-section'
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
@@ -239,6 +240,10 @@ export default async function ContractDetailPage({
         <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
           Este contrato não tem nenhuma passagem de funil em aberto no momento.
         </p>
+      )}
+
+      {isCurrentlyInContractsPipeline && displayRun && (
+        <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} />
       )}
 
       <DepartmentSection

@@ -529,6 +529,51 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 // definimos desde o início) — se você já iniciou uma nova rodada de
 // renovação depois de fechar essa, reabrir a antiga criaria duas runs
 // abertas ao mesmo tempo, o que o banco bloqueia (índice único).
+// Atualiza o VALOR do contrato pra esta passagem — separado de
+// propósito do faturamento mensal (BillingSection). São coisas
+// diferentes: isso aqui é o valor renegociado do contrato como um todo
+// (geralmente com reajuste de IPCA ou similar), o faturamento é o que
+// foi confirmado mês a mês pro financeiro. O faturamento NUNCA deve
+// alimentar isso automaticamente.
+export async function updateRunValue(contractId: string, newValue: number): Promise<MoveResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  if (Number.isNaN(newValue) || newValue < 0) {
+    return { error: 'Informe um valor válido.' }
+  }
+
+  const { data: run } = await supabase
+    .from('pipeline_runs')
+    .select('id, value')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (!run) return { error: 'Nenhuma passagem de funil aberta para este contrato.' }
+
+  const oldValue = Number(run.value) || 0
+  const { error } = await supabase.from('pipeline_runs').update({ value: newValue }).eq('id', run.id)
+  if (error) return { error: error.message }
+
+  const pctChange = oldValue > 0 ? Math.round(((newValue - oldValue) / oldValue) * 1000) / 10 : null
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    pipeline_run_id: run.id,
+    user_id: user.id,
+    type: 'system',
+    content: `Valor do contrato atualizado de R$ ${oldValue.toLocaleString('pt-BR')} para R$ ${newValue.toLocaleString('pt-BR')}${pctChange !== null ? ` (${pctChange >= 0 ? '+' : ''}${pctChange}%)` : ''}.`,
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/pipeline')
+  return { success: true }
+}
+
 export async function reopenRun(contractId: string): Promise<MoveResult> {
   const supabase = await createClient()
   const {
