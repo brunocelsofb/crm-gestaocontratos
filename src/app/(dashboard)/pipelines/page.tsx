@@ -3,7 +3,8 @@ import { NewPipelineForm } from '@/components/pipelines/new-pipeline-form'
 import { ConfirmDeleteButton } from '@/components/pipelines/confirm-delete-button'
 import { DeleteStageButton } from '@/components/pipelines/delete-stage-button'
 import { EditPipelineInfoForm } from '@/components/pipelines/edit-pipeline-info-form'
-import { createStage, updateStage, deleteStage, moveStage, deletePipeline, updatePipelineInfo } from '@/lib/actions/pipelines'
+import { createStage, updateStage, deleteStage, deletePipeline, updatePipelineInfo } from '@/lib/actions/pipelines'
+import { MoveStageButtons } from '@/components/pipelines/move-stage-buttons'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export default async function PipelinesPage() {
@@ -76,14 +77,7 @@ export default async function PipelinesPage() {
                     key={stage.id}
                     className="flex flex-wrap items-center gap-2 rounded-md border border-gray-100 bg-gray-50 p-2"
                   >
-                    <div className="flex flex-col gap-0.5">
-                      <form action={moveStage.bind(null, stage.id, 'up')}>
-                        <button type="submit" disabled={i === 0} className="block text-[10px] text-gray-400 hover:text-gray-700 disabled:opacity-20">▲</button>
-                      </form>
-                      <form action={moveStage.bind(null, stage.id, 'down')}>
-                        <button type="submit" disabled={i === stages.length - 1} className="block text-[10px] text-gray-400 hover:text-gray-700 disabled:opacity-20">▼</button>
-                      </form>
-                    </div>
+                    <MoveStageButtons stageId={stage.id} disableUp={i === 0} disableDown={i === stages.length - 1} />
 
                     <form
                       action={updateStage.bind(null, stage.id)}
