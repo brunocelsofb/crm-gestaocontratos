@@ -542,6 +542,18 @@ export async function updateRunValue(contractId: string, newValue: number): Prom
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
 
+  const [{ data: contractForOwner }, { data: profile }] = await Promise.all([
+    supabase.from('contracts').select('owner_id').eq('id', contractId).maybeSingle(),
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+  ])
+
+  const isOwner = contractForOwner?.owner_id === user.id
+  const isAdmin = profile?.role === 'admin'
+
+  if (!isOwner && !isAdmin) {
+    return { error: 'Só o dono da conta (ou um admin) pode definir o novo valor da renovação.' }
+  }
+
   if (Number.isNaN(newValue) || newValue < 0) {
     return { error: 'Informe um valor válido.' }
   }

@@ -74,6 +74,9 @@ export function BillingSection({
       formData.set('amount', amount)
       formData.set('notes', notes)
 
+      // confirmBilling faz UPSERT por (contrato, ano, mês) — reenviar pro
+      // mesmo mês/ano de um registro que já existe SOBRESCREVE ele, é
+      // assim que a edição funciona (sem precisar de uma action separada).
       const result = await confirmBilling(contractId, filePath, fileNameToSave, formData)
       if (result.error) {
         setError(result.error)
@@ -88,6 +91,14 @@ export function BillingSection({
     } finally {
       setBusy(false)
     }
+  }
+
+  function handleEdit(r: BillingRecord) {
+    setYear(r.year)
+    setMonth(r.month)
+    setAmount(String(r.amount))
+    setNotes(r.notes ?? '')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -105,7 +116,9 @@ export function BillingSection({
       </div>
 
       <div className="rounded-lg border border-dashed border-gray-300 bg-white p-3">
-        <p className="text-xs font-medium text-gray-700">Confirmar faturamento do mês</p>
+        <p className="text-xs font-medium text-gray-700">
+          {records.some((r) => r.year === year && r.month === month) ? 'Editando faturamento do mês (já existe um registro pra esse mês)' : 'Confirmar faturamento do mês'}
+        </p>
         {type === 'metered' && (
           <p className="mt-0.5 text-xs text-gray-400">Contrato sob medição — anexe o relatório com o valor apurado quando tiver.</p>
         )}
@@ -171,7 +184,12 @@ export function BillingSection({
               <span className="ml-2 text-gray-600">{fmt(r.amount)}</span>
               {r.file_name && <span className="ml-2 text-xs text-brand-700">📎 {r.file_name}</span>}
             </div>
-            <span className="text-xs text-gray-400">{new Date(r.confirmed_at).toLocaleDateString('pt-BR')}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">{new Date(r.confirmed_at).toLocaleDateString('pt-BR')}</span>
+              <button onClick={() => handleEdit(r)} className="text-xs text-brand-700 hover:underline">
+                Editar
+              </button>
+            </div>
           </div>
         ))}
         {records.length === 0 && <p className="text-sm text-gray-400">Nenhum faturamento confirmado ainda.</p>}

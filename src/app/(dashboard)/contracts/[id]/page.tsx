@@ -243,7 +243,7 @@ export default async function ContractDetailPage({
       )}
 
       {isCurrentlyInContractsPipeline && displayRun && (
-        <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} />
+        <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} canEdit={canChangeStage} />
       )}
 
       <DepartmentSection

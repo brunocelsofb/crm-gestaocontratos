@@ -7,7 +7,7 @@ function fmt(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 }
 
-export function RenewalValueSection({ contractId, currentValue }: { contractId: string; currentValue: number }) {
+export function RenewalValueSection({ contractId, currentValue, canEdit }: { contractId: string; currentValue: number; canEdit: boolean }) {
   const [editing, setEditing] = useState(false)
   const [newValue, setNewValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -38,13 +38,16 @@ export function RenewalValueSection({ contractId, currentValue }: { contractId: 
           <p className="text-xs text-gray-500">Valor do contrato (esta passagem)</p>
           <p className="text-lg font-semibold text-gray-900">{fmt(currentValue)}</p>
         </div>
-        {!editing && (
+        {!editing && canEdit && (
           <button
             onClick={() => setEditing(true)}
             className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
           >
             Definir novo valor da renovação
           </button>
+        )}
+        {!canEdit && (
+          <span className="text-xs text-gray-400">Só o dono da conta ou admin pode alterar</span>
         )}
       </div>
 

@@ -122,7 +122,7 @@ export default async function PipelinePage({
             href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
             className="whitespace-nowrap rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
           >
-            + Novo Contrato
+            + {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
           </Link>
         </div>
       </div>

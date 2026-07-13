@@ -76,7 +76,7 @@ export default function NewContractPage() {
   return (
     <div className="max-w-xl space-y-6">
       <div>
-        <h1 className="text-[17px] font-medium text-foreground">Novo Contrato</h1>
+        <h1 className="text-[17px] font-medium text-foreground">{pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}</h1>
         {pipelineName && (
           <p className="mt-0.5 text-xs text-foreground/50">Funil: {pipelineName}</p>
         )}
@@ -168,7 +168,7 @@ export default function NewContractPage() {
           disabled={pending}
           className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
         >
-          {pending ? 'Salvando...' : 'Salvar Contrato'}
+          {pending ? 'Salvando...' : pipelineType === 'vendas' ? 'Salvar Oportunidade' : 'Salvar Contrato'}
         </button>
       </form>
     </div>

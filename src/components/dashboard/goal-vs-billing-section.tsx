@@ -145,9 +145,19 @@ export async function GoalVsBillingSection({
       </div>
 
       <div className="mt-6">
-        <p className="mb-2 text-xs font-medium text-gray-500">
-          Contratos confirmados em {MONTH_NAMES[month - 1]}/{year} ({currentMonthRecords?.length ?? 0})
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-medium text-gray-500">
+            Contratos confirmados em {MONTH_NAMES[month - 1]}/{year} ({currentMonthRecords?.length ?? 0})
+          </p>
+          {currentMonthRecords && currentMonthRecords.length > 0 && (
+            <a
+              href={`/api/export/billing-report?year=${year}&month=${month}`}
+              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              📊 Exportar Excel (pro Financeiro)
+            </a>
+          )}
+        </div>
         <div className="space-y-1.5">
           {currentMonthRecords?.map((r) => {
             const contract = contractByIdForRecords.get(r.contract_id)
