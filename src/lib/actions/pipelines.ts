@@ -14,7 +14,9 @@ export async function createPipeline(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const supabase = await createClient()
+  // Cliente admin — mesmo motivo do updatePipelineInfo (tabela
+  // "pipelines" sem regra de UPDATE/INSERT completa no banco).
+  const supabase = createAdminClient()
   const name = (formData.get('name') as string)?.trim()
   const description = (formData.get('description') as string) || null
   const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
@@ -28,8 +30,15 @@ export async function createPipeline(
   return {}
 }
 
-export async function updatePipelineInfo(pipelineId: string, formData: FormData) {
-  const supabase = await createClient()
+export async function updatePipelineInfo(
+  pipelineId: string,
+  _prevState: { error?: string },
+  formData: FormData
+): Promise<{ error?: string }> {
+  // Cliente admin (service_role) — mesmo padrão que já corrigiu esse
+  // exato tipo de falha silenciosa em "stages" antes. A tabela
+  // "pipelines" também não tinha uma regra de UPDATE completa no banco.
+  const supabase = createAdminClient()
   const name = (formData.get('name') as string)?.trim()
   const description = (formData.get('description') as string) || null
   const typeRaw = formData.get('type') as string
@@ -41,9 +50,9 @@ export async function updatePipelineInfo(pipelineId: string, formData: FormData)
   const renewal_trigger_days = renewal_trigger_days_raw ? Number(renewal_trigger_days_raw) : null
   const renewal_target_stage_id = (formData.get('renewal_target_stage_id') as string) || null
 
-  if (!name) return // nome vazio não é salvo — mantém o anterior
+  if (!name) return { error: 'Nome do funil não pode ficar vazio.' }
 
-  await supabase
+  const { error } = await supabase
     .from('pipelines')
     .update({
       name,
@@ -56,7 +65,11 @@ export async function updatePipelineInfo(pipelineId: string, formData: FormData)
       renewal_target_stage_id,
     })
     .eq('id', pipelineId)
+
+  if (error) return { error: error.message }
+
   revalidatePath('/pipelines')
+  return {}
 }
 
 export async function deletePipeline(pipelineId: string) {

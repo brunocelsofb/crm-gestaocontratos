@@ -1,6 +1,9 @@
 'use client'
 
+import { useActionState } from 'react'
 import { SaveButton } from '@/components/ui/save-button'
+
+const initialState: { error?: string } = {}
 
 export function EditPipelineInfoForm({
   pipelineId,
@@ -27,10 +30,15 @@ export function EditPipelineInfoForm({
   renewalTriggerDays: number | null
   renewalTargetStageId: string | null
   stagesInThisPipeline: { id: string; name: string }[]
-  action: (formData: FormData) => void
+  action: (
+    prevState: { error?: string },
+    formData: FormData
+  ) => Promise<{ error?: string }>
 }) {
+  const [state, formAction] = useActionState(action, initialState)
+
   return (
-    <form action={action} className="flex flex-wrap items-end gap-2">
+    <form action={formAction} className="flex flex-wrap items-end gap-2">
       <div>
         <label className="block text-[10px] text-gray-500">Nome do funil</label>
         <input
@@ -114,6 +122,7 @@ export function EditPipelineInfoForm({
         </select>
       </div>
       <SaveButton />
+      {state.error && <span className="text-xs text-red-600">{state.error}</span>}
     </form>
   )
 }
