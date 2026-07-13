@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { moveStage } from '@/lib/actions/pipelines'
 
@@ -15,20 +15,22 @@ export function MoveStageButtons({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
 
   function handleMove(direction: 'up' | 'down') {
+    setError(null)
     startTransition(async () => {
-      await moveStage(stageId, direction)
-      // revalidatePath (chamado dentro de moveStage) às vezes não é
-      // suficiente sozinho pra atualizar a tela na hora — forçando
-      // router.refresh() aqui garante que a nova ordem apareça sem
-      // precisar sair e voltar na página.
+      const result = await moveStage(stageId, direction)
+      if (result.error) {
+        setError(result.error)
+        return
+      }
       router.refresh()
     })
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="relative flex flex-col gap-0.5">
       <button
         type="button"
         disabled={disableUp || isPending}
@@ -45,6 +47,11 @@ export function MoveStageButtons({
       >
         ▼
       </button>
+      {error && (
+        <p className="absolute left-4 top-0 z-10 w-40 rounded-md bg-red-50 p-1.5 text-[10px] text-red-600 shadow">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
