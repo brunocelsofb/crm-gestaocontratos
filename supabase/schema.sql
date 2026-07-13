@@ -493,6 +493,9 @@ alter table contract_crm.contracts
   add column current_department text default 'comercial';
 
 alter table contract_crm.contracts
+  add column auto_renewal boolean not null default false;
+
+alter table contract_crm.contracts
   add column current_assignee_id uuid references contract_crm.profiles(id);
 alter table contract_crm.contracts
   add column previous_department text;

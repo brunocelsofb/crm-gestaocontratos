@@ -192,6 +192,11 @@ export default async function ContractDetailPage({
               isAdmin={currentProfile?.role === 'admin'}
               users={(allProfiles ?? []).map((p) => ({ id: p.id, full_name: p.full_name }))}
             />
+            {contract.auto_renewal && (
+              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                🔄 Renovação automática
+              </span>
+            )}
           </div>
           <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
           {linkedCompany && (

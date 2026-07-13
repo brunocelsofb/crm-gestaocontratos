@@ -23,6 +23,7 @@ export function EditContractForm({
     hasOpenRun: boolean
     valid_from: string | null
     valid_until: string | null
+    auto_renewal: boolean
   }
 }) {
   const updateWithId = updateContract.bind(null, contractId)
@@ -96,7 +97,7 @@ export function EditContractForm({
         )}
       </div>
 
-      <ValidityPeriodInput defaultFrom={initial.valid_from} defaultUntil={initial.valid_until} />
+      <ValidityPeriodInput defaultFrom={initial.valid_from} defaultUntil={initial.valid_until} defaultAutoRenewal={initial.auto_renewal} />
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Descrição</label>

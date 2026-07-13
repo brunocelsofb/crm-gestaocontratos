@@ -158,6 +158,7 @@ export async function createContract(
       current_assignee_id: user.id,
       valid_from: (formData.get('valid_from') as string) || null,
       valid_until: (formData.get('valid_until') as string) || null,
+      auto_renewal: formData.get('auto_renewal') === 'on',
     })
     .select()
     .single()
@@ -237,6 +238,7 @@ export async function updateContract(
   const expected_close_date = (formData.get('expected_close_date') as string) || null
   const valid_from = (formData.get('valid_from') as string) || null
   const valid_until = (formData.get('valid_until') as string) || null
+  const auto_renewal = formData.get('auto_renewal') === 'on'
 
   if (!process_number?.trim()) {
     return { fieldErrors: { process_number: ['Número do processo é obrigatório'] } }
@@ -251,6 +253,7 @@ export async function updateContract(
       description,
       valid_from,
       valid_until,
+      auto_renewal,
       updated_at: new Date().toISOString(),
     })
     .eq('id', contractId)
