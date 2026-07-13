@@ -16,7 +16,12 @@ export default async function PipelinePage({
   const supabase = await createClient()
   const isAdmin = await isCurrentUserAdmin()
 
-  await checkAndTriggerRenewals()
+  // Roda "no fundo" (sem await) — antes isso travava o carregamento da
+  // tela toda vez que alguém visitava o Funil, mesmo quando não tinha
+  // nada pra mover. Se algo for movido agora, aparece na PRÓXIMA
+  // visita/atualização, não nesta — troca deliberada de "sempre
+  // atualizado na hora" por "tela rápida agora".
+  void checkAndTriggerRenewals()
 
   const { data: pipelines } = await supabase
     .from('pipelines')
@@ -124,6 +129,7 @@ export default async function PipelinePage({
 
       {stages && stages.length > 0 ? (
         <KanbanBoard
+          pipelineId={selectedPipeline as string}
           stages={stages}
           initialCards={cards}
           showValidity={pipelineType === 'gestao_contratos'}

@@ -25,6 +25,7 @@ import {
 } from '@dnd-kit/core'
 import { moveContractStage } from '@/lib/actions/pipeline'
 import { deleteContract } from '@/lib/actions/contracts'
+import { createClient } from '@/lib/supabase/client'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
 import { Trash2 } from 'lucide-react'
 
@@ -185,6 +186,7 @@ function TrashDropzone() {
 }
 
 export function KanbanBoard({
+  pipelineId,
   stages,
   initialCards,
   showValidity,
@@ -192,6 +194,7 @@ export function KanbanBoard({
   lostLabel,
   isAdmin,
 }: {
+  pipelineId: string
   stages: Stage[]
   initialCards: RunCard[]
   showValidity: boolean
@@ -208,6 +211,36 @@ export function KanbanBoard({
   useEffect(() => {
     setCards(initialCards)
   }, [initialCards])
+
+  const router = useRouter()
+
+  // Atualização em tempo real — quando algo muda em pipeline_runs deste
+  // funil (por exemplo, a automação de renovação movendo um contrato
+  // sozinha), a tela busca os dados novos automaticamente, sem precisar
+  // de F5 ou clicar em "Atualizar".
+  //
+  // NOTA DE INCERTEZA: mesmo caso do sino de notificação — se isso não
+  // atualizar sozinho, confira em Database → Replication →
+  // supabase_realtime se a tabela "pipeline_runs" está habilitada.
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`pipeline_runs:${pipelineId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'contract_crm', table: 'pipeline_runs', filter: `pipeline_id=eq.${pipelineId}` },
+        () => {
+          router.refresh()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [pipelineId, router])
+
   const [, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showClosed, setShowClosed] = useState(false)
