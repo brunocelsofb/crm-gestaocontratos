@@ -1,6 +1,7 @@
 'use client'
 
 export function EditPipelineInfoForm({
+  pipelineId,
   name,
   description,
   type,
@@ -8,8 +9,12 @@ export function EditPipelineInfoForm({
   lostLabel,
   wonTargetPipelineId,
   allPipelines,
+  renewalTriggerDays,
+  renewalTargetStageId,
+  stagesInThisPipeline,
   action,
 }: {
+  pipelineId: string
   name: string
   description: string | null
   type: string
@@ -17,6 +22,9 @@ export function EditPipelineInfoForm({
   lostLabel: string
   wonTargetPipelineId: string | null
   allPipelines: { id: string; name: string }[]
+  renewalTriggerDays: number | null
+  renewalTargetStageId: string | null
+  stagesInThisPipeline: { id: string; name: string }[]
   action: (formData: FormData) => void
 }) {
   return (
@@ -76,7 +84,30 @@ export function EditPipelineInfoForm({
         >
           <option value="">Nenhum (fica aqui mesmo)</option>
           {allPipelines.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+            <option key={p.id} value={p.id}>{p.name}{p.id === pipelineId ? ' (este mesmo funil — renovação)' : ''}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-[10px] text-gray-500">Iniciar renovação (dias antes do vencimento)</label>
+        <input
+          name="renewal_trigger_days"
+          type="number"
+          defaultValue={renewalTriggerDays ?? ''}
+          placeholder="Ex: 60"
+          className="w-24 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-[10px] text-gray-500">Mover automaticamente pra etapa</label>
+        <select
+          name="renewal_target_stage_id"
+          defaultValue={renewalTargetStageId ?? ''}
+          className="w-40 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        >
+          <option value="">Desativado</option>
+          {stagesInThisPipeline.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
       </div>

@@ -32,16 +32,29 @@ export async function updatePipelineInfo(pipelineId: string, formData: FormData)
   const supabase = await createClient()
   const name = (formData.get('name') as string)?.trim()
   const description = (formData.get('description') as string) || null
-  const type = (formData.get('type') as string) === 'vendas' ? 'vendas' : 'gestao_contratos'
+  const typeRaw = formData.get('type') as string
+  const type = typeRaw === 'vendas' || typeRaw === 'servico_avulso' ? typeRaw : 'gestao_contratos'
   const won_label = (formData.get('won_label') as string)?.trim() || 'Ganho'
   const lost_label = (formData.get('lost_label') as string)?.trim() || 'Perdido'
   const won_target_pipeline_id = (formData.get('won_target_pipeline_id') as string) || null
+  const renewal_trigger_days_raw = formData.get('renewal_trigger_days') as string
+  const renewal_trigger_days = renewal_trigger_days_raw ? Number(renewal_trigger_days_raw) : null
+  const renewal_target_stage_id = (formData.get('renewal_target_stage_id') as string) || null
 
   if (!name) return // nome vazio não é salvo — mantém o anterior
 
   await supabase
     .from('pipelines')
-    .update({ name, description, type, won_label, lost_label, won_target_pipeline_id })
+    .update({
+      name,
+      description,
+      type,
+      won_label,
+      lost_label,
+      won_target_pipeline_id,
+      renewal_trigger_days,
+      renewal_target_stage_id,
+    })
     .eq('id', pipelineId)
   revalidatePath('/pipelines')
 }

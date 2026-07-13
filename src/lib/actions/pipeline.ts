@@ -20,8 +20,96 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type MoveResult = { success?: true; error?: string }
+
+// Verifica todos os funis com automação de renovação configurada e move
+// automaticamente os contratos que entraram no prazo (ex: 60 dias antes
+// do vencimento) pra etapa de renovação designada. Roda sem checar
+// permissão de "dono da conta" — é o sistema movendo, não uma pessoa.
+//
+// NOTA DE INCERTEZA: hoje isso só é verificado quando alguém abre a
+// tela do Funil (chamado a partir de lá) — não é um agendamento de
+// verdade rodando sozinho em segundo plano o tempo todo. Se ninguém
+// abrir o CRM por vários dias, a automação só vai "pegar o atraso"
+// na próxima vez que alguém entrar. Um cron de verdade (rodando
+// mesmo sem ninguém usando o sistema) é possível de configurar depois
+// na Vercel, se for necessário.
+export async function checkAndTriggerRenewals() {
+  const supabase = createAdminClient()
+
+  const { data: pipelinesWithRenewal } = await supabase
+    .from('pipelines')
+    .select('id, renewal_trigger_days, renewal_target_stage_id')
+    .not('renewal_trigger_days', 'is', null)
+    .not('renewal_target_stage_id', 'is', null)
+
+  if (!pipelinesWithRenewal || pipelinesWithRenewal.length === 0) return
+
+  for (const pipeline of pipelinesWithRenewal) {
+    const { data: openRuns } = await supabase
+      .from('pipeline_runs')
+      .select('id, contract_id, stage_id')
+      .eq('pipeline_id', pipeline.id)
+      .eq('status', 'open')
+      .neq('stage_id', pipeline.renewal_target_stage_id as string)
+
+    if (!openRuns || openRuns.length === 0) continue
+
+    const contractIds = openRuns.map((r) => r.contract_id)
+    const { data: contracts } = await supabase
+      .from('contracts')
+      .select('id, valid_until')
+      .in('id', contractIds)
+      .not('valid_until', 'is', null)
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    for (const contract of contracts ?? []) {
+      const validUntil = new Date(contract.valid_until as string)
+      const daysUntilExpiry = Math.floor((validUntil.getTime() - today.getTime()) / 86_400_000)
+
+      if (daysUntilExpiry <= (pipeline.renewal_trigger_days as number)) {
+        const run = openRuns.find((r) => r.contract_id === contract.id)
+        if (!run) continue
+
+        const now = new Date().toISOString()
+
+        const { data: openHistory } = await supabase
+          .from('stage_history')
+          .select('id, entered_at')
+          .eq('pipeline_run_id', run.id)
+          .is('exited_at', null)
+          .maybeSingle()
+
+        if (openHistory) {
+          const durationSeconds = Math.round((Date.now() - new Date(openHistory.entered_at).getTime()) / 1000)
+          await supabase.from('stage_history').update({ exited_at: now, duration_seconds: durationSeconds }).eq('id', openHistory.id)
+        }
+
+        await supabase
+          .from('pipeline_runs')
+          .update({ stage_id: pipeline.renewal_target_stage_id, stage_entered_at: now })
+          .eq('id', run.id)
+
+        await supabase.from('stage_history').insert({
+          pipeline_run_id: run.id,
+          stage_id: pipeline.renewal_target_stage_id,
+          entered_at: now,
+        })
+
+        await supabase.from('activities').insert({
+          contract_id: contract.id,
+          pipeline_run_id: run.id,
+          type: 'automation_triggered',
+          content: `Movido automaticamente para renovação — contrato vence em ${daysUntilExpiry} dia(s) (limite configurado: ${pipeline.renewal_trigger_days} dias).`,
+        })
+      }
+    }
+  }
+}
 
 export async function moveContractStage(
   contractId: string,

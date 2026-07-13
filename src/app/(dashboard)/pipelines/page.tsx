@@ -12,7 +12,7 @@ export default async function PipelinesPage() {
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, description, is_default, type, won_label, lost_label, won_target_pipeline_id')
+    .select('id, name, description, is_default, type, won_label, lost_label, won_target_pipeline_id, renewal_trigger_days, renewal_target_stage_id')
     .order('name')
 
   const { data: allStages } = await supabase
@@ -45,6 +45,7 @@ export default async function PipelinesPage() {
                     )}
                   </div>
                   <EditPipelineInfoForm
+                    pipelineId={pipeline.id}
                     key={`${pipeline.id}:${pipeline.name}:${pipeline.type}:${pipeline.won_label}:${pipeline.lost_label}:${pipeline.won_target_pipeline_id ?? 'none'}`}
                     name={pipeline.name}
                     description={pipeline.description}
@@ -52,7 +53,10 @@ export default async function PipelinesPage() {
                     wonLabel={pipeline.won_label}
                     lostLabel={pipeline.lost_label}
                     wonTargetPipelineId={pipeline.won_target_pipeline_id}
-                    allPipelines={(pipelines ?? []).filter((p) => p.id !== pipeline.id)}
+                    allPipelines={pipelines ?? []}
+                    renewalTriggerDays={pipeline.renewal_trigger_days}
+                    renewalTargetStageId={pipeline.renewal_target_stage_id}
+                    stagesInThisPipeline={stages.map((s) => ({ id: s.id, name: s.name }))}
                     action={updatePipelineInfo.bind(null, pipeline.id)}
                   />
                 </div>
