@@ -40,10 +40,22 @@ export async function GoalVsBillingSection({
     months.push({ year: d.getFullYear(), month: d.getMonth() + 1 })
   }
 
-  const [{ data: goals }, { data: billing }] = await Promise.all([
+  const [{ data: goals }, { data: billing }, { data: currentMonthRecords }] = await Promise.all([
     supabase.from('monthly_goals').select('year, month, target_value'),
     supabase.from('billing_records').select('year, month, amount'),
+    supabase
+      .from('billing_records')
+      .select('id, contract_id, amount, notes, file_name, confirmed_at')
+      .eq('year', year)
+      .eq('month', month)
+      .order('confirmed_at', { ascending: false }),
   ])
+
+  const contractIds = [...new Set((currentMonthRecords ?? []).map((r) => r.contract_id))]
+  const { data: contractsForRecords } = contractIds.length
+    ? await supabase.from('contracts').select('id, client_name, process_number, billing_type').in('id', contractIds)
+    : { data: [] as { id: string; client_name: string; process_number: string; billing_type: string }[] }
+  const contractByIdForRecords = new Map((contractsForRecords ?? []).map((c) => [c.id, c]))
 
   const goalByKey = new Map((goals ?? []).map((g) => [`${g.year}-${g.month}`, g.target_value]))
   const billingByKey = new Map<string, number>()
@@ -130,6 +142,39 @@ export async function GoalVsBillingSection({
       <div className="mt-6">
         <p className="mb-2 text-xs font-medium text-gray-500">Últimos 6 meses</p>
         <BillingTrendChart data={trendData} />
+      </div>
+
+      <div className="mt-6">
+        <p className="mb-2 text-xs font-medium text-gray-500">
+          Contratos confirmados em {MONTH_NAMES[month - 1]}/{year} ({currentMonthRecords?.length ?? 0})
+        </p>
+        <div className="space-y-1.5">
+          {currentMonthRecords?.map((r) => {
+            const contract = contractByIdForRecords.get(r.contract_id)
+            return (
+              <Link
+                key={r.id}
+                href={contract ? `/contracts/${r.contract_id}` : '#'}
+                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+              >
+                <div>
+                  <span className="font-medium text-gray-900">{contract?.client_name ?? 'Contrato removido'}</span>
+                  {contract && <span className="ml-2 font-mono text-xs text-gray-400">{contract.process_number}</span>}
+                  {contract?.billing_type === 'metered' && (
+                    <span className="ml-2 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-800">Sob medição</span>
+                  )}
+                  {r.file_name && <span className="ml-2 text-xs text-brand-700">📎 {r.file_name}</span>}
+                </div>
+                <span className="font-medium text-gray-700">{fmt(Number(r.amount))}</span>
+              </Link>
+            )
+          })}
+          {(!currentMonthRecords || currentMonthRecords.length === 0) && (
+            <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-400">
+              Nenhum contrato com faturamento confirmado neste mês ainda.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

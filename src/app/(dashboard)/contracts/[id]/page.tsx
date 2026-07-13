@@ -280,32 +280,59 @@ export default async function ContractDetailPage({
         <div className="space-y-2">
           <h2 className="text-sm font-medium text-gray-900">Jornada entre funis</h2>
           <div className="space-y-2">
-            {runs.map((r) => (
-              <div key={r.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm">
-                <div>
-                  <span className="font-medium text-gray-900">{pipelineById.get(r.pipeline_id)?.name}</span>
-                  <span className="ml-2 text-gray-400">
-                    {new Date(r.started_at).toLocaleDateString('pt-BR')}
-                    {r.ended_at ? ` → ${new Date(r.ended_at).toLocaleDateString('pt-BR')}` : ' → em andamento'}
-                  </span>
+            {runs.map((r) => {
+              const previous = r.previous_run_id ? runs.find((x) => x.id === r.previous_run_id) : null
+              const currentValue = Number(r.value) || 0
+              const previousValue = previous ? Number(previous.value) || 0 : null
+              const pctChange =
+                previousValue !== null && previousValue > 0
+                  ? Math.round(((currentValue - previousValue) / previousValue) * 1000) / 10
+                  : null
+
+              return (
+                <div key={r.id} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-gray-900">{pipelineById.get(r.pipeline_id)?.name}</span>
+                      <span className="ml-2 text-gray-400">
+                        {new Date(r.started_at).toLocaleDateString('pt-BR')}
+                        {r.ended_at ? ` → ${new Date(r.ended_at).toLocaleDateString('pt-BR')}` : ' → em andamento'}
+                      </span>
+                    </div>
+                    <span
+                      className={
+                        r.status === 'won'
+                          ? 'text-emerald-600'
+                          : r.status === 'lost'
+                            ? 'text-red-600'
+                            : r.status === 'moved'
+                              ? 'text-gray-400'
+                              : 'text-blue-600'
+                      }
+                    >
+                      {(
+                        { open: 'Em andamento', won: 'Ganho', lost: 'Perdido', moved: 'Movido para outro funil' } as Record<string, string>
+                      )[r.status]}
+                    </span>
+                  </div>
+                  {currentValue > 0 && (
+                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                      <span>
+                        {previousValue !== null ? `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(previousValue)} → ` : ''}
+                        <span className="font-medium text-gray-700">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentValue)}
+                        </span>
+                      </span>
+                      {pctChange !== null && (
+                        <span className={pctChange >= 0 ? 'text-positive-700' : 'text-negative-700'}>
+                          ({pctChange >= 0 ? '+' : ''}{pctChange}%)
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <span
-                  className={
-                    r.status === 'won'
-                      ? 'text-emerald-600'
-                      : r.status === 'lost'
-                        ? 'text-red-600'
-                        : r.status === 'moved'
-                          ? 'text-gray-400'
-                          : 'text-blue-600'
-                  }
-                >
-                  {(
-                    { open: 'Em andamento', won: 'Ganho', lost: 'Perdido', moved: 'Movido para outro funil' } as Record<string, string>
-                  )[r.status]}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
