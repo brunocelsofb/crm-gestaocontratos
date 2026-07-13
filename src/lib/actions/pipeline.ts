@@ -362,9 +362,9 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 
     // TRAVA ESPECÍFICA DO FUNIL DE GESTÃO DE CONTRATOS: marcar sucesso
     // aqui normalmente significa "renovação concluída" — exige que a
-    // NOVA vigência (data final) já tenha sido preenchida antes,
-    // porque é isso que alimenta o histórico de renovação e a
-    // automação do próximo ciclo.
+    // vigência final seja uma data FUTURA (não só "preenchida", já que
+    // uma vigência antiga/vencida também conta como "preenchida" e não
+    // representa uma renovação de verdade).
     if (pipelineForGate?.type === 'gestao_contratos') {
       const { data: contractForValidity } = await supabase
         .from('contracts')
@@ -372,9 +372,17 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
         .eq('id', contractId)
         .maybeSingle()
 
+      const todayStr = new Date().toISOString().slice(0, 10)
+
       if (!contractForValidity?.valid_until) {
         return {
           error: 'Preencha a nova vigência (data final) do contrato antes de marcar sucesso — é ela que representa a renovação.',
+        }
+      }
+
+      if (contractForValidity.valid_until <= todayStr) {
+        return {
+          error: `A vigência está com data vencida ou é hoje (${new Date(contractForValidity.valid_until).toLocaleDateString('pt-BR')}). Atualize pra uma data futura antes de marcar sucesso — isso é o que confirma que a renovação foi feita de verdade.`,
         }
       }
     }
