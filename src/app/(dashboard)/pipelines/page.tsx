@@ -14,13 +14,19 @@ export default async function PipelinesPage() {
 
   const { data: pipelines } = await supabase
     .from('pipelines')
-    .select('id, name, description, is_default, type, won_label, lost_label, won_target_pipeline_id, renewal_trigger_days, renewal_target_stage_id')
+    .select('id, name, description, is_default, type, won_label, lost_label, won_target_pipeline_id, won_target_stage_id, renewal_trigger_days, renewal_target_stage_id')
     .order('name')
 
   const { data: allStages } = await supabase
     .from('stages')
     .select('id, pipeline_id, name, order_index, color, sla_days, is_won, is_lost')
     .order('order_index')
+
+  const allStagesByPipeline: Record<string, { id: string; name: string }[]> = {}
+  for (const s of allStages ?? []) {
+    if (!allStagesByPipeline[s.pipeline_id]) allStagesByPipeline[s.pipeline_id] = []
+    allStagesByPipeline[s.pipeline_id].push({ id: s.id, name: s.name })
+  }
 
   return (
     <div className="space-y-6">
@@ -48,14 +54,16 @@ export default async function PipelinesPage() {
                   </div>
                   <EditPipelineInfoForm
                     pipelineId={pipeline.id}
-                    key={`${pipeline.id}:${pipeline.name}:${pipeline.type}:${pipeline.won_label}:${pipeline.lost_label}:${pipeline.won_target_pipeline_id ?? 'none'}`}
+                    key={`${pipeline.id}:${pipeline.name}:${pipeline.type}:${pipeline.won_label}:${pipeline.lost_label}:${pipeline.won_target_pipeline_id ?? 'none'}:${pipeline.won_target_stage_id ?? 'none'}`}
                     name={pipeline.name}
                     description={pipeline.description}
                     type={pipeline.type}
                     wonLabel={pipeline.won_label}
                     lostLabel={pipeline.lost_label}
                     wonTargetPipelineId={pipeline.won_target_pipeline_id}
+                    wonTargetStageId={pipeline.won_target_stage_id}
                     allPipelines={pipelines ?? []}
+                    allStagesByPipeline={allStagesByPipeline}
                     renewalTriggerDays={pipeline.renewal_trigger_days}
                     renewalTargetStageId={pipeline.renewal_target_stage_id}
                     stagesInThisPipeline={stages.map((s) => ({ id: s.id, name: s.name }))}

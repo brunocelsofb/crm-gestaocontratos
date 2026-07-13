@@ -46,6 +46,7 @@ export async function updatePipelineInfo(
   const won_label = (formData.get('won_label') as string)?.trim() || 'Ganho'
   const lost_label = (formData.get('lost_label') as string)?.trim() || 'Perdido'
   const won_target_pipeline_id = (formData.get('won_target_pipeline_id') as string) || null
+  const won_target_stage_id = (formData.get('won_target_stage_id') as string) || null
   const renewal_trigger_days_raw = formData.get('renewal_trigger_days') as string
   const renewal_trigger_days = renewal_trigger_days_raw ? Number(renewal_trigger_days_raw) : null
   const renewal_target_stage_id = (formData.get('renewal_target_stage_id') as string) || null
@@ -61,6 +62,7 @@ export async function updatePipelineInfo(
       won_label,
       lost_label,
       won_target_pipeline_id,
+      won_target_stage_id,
       renewal_trigger_days,
       renewal_target_stage_id,
     })

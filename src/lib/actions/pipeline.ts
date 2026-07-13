@@ -359,6 +359,25 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
         }
       }
     }
+
+    // TRAVA ESPECÍFICA DO FUNIL DE GESTÃO DE CONTRATOS: marcar sucesso
+    // aqui normalmente significa "renovação concluída" — exige que a
+    // NOVA vigência (data final) já tenha sido preenchida antes,
+    // porque é isso que alimenta o histórico de renovação e a
+    // automação do próximo ciclo.
+    if (pipelineForGate?.type === 'gestao_contratos') {
+      const { data: contractForValidity } = await supabase
+        .from('contracts')
+        .select('valid_until')
+        .eq('id', contractId)
+        .maybeSingle()
+
+      if (!contractForValidity?.valid_until) {
+        return {
+          error: 'Preencha a nova vigência (data final) do contrato antes de marcar sucesso — é ela que representa a renovação.',
+        }
+      }
+    }
   }
 
   if (outcome === 'lost') {
@@ -400,7 +419,7 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 
   const { data: pipeline } = await supabase
     .from('pipelines')
-    .select('won_label, lost_label, won_target_pipeline_id')
+    .select('won_label, lost_label, won_target_pipeline_id, won_target_stage_id')
     .eq('id', run.pipeline_id)
     .single()
 
@@ -427,21 +446,39 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
       .eq('id', pipeline.won_target_pipeline_id)
       .single()
 
-    const { data: firstStage } = await supabase
-      .from('stages')
-      .select('id, name')
-      .eq('pipeline_id', pipeline.won_target_pipeline_id)
-      .order('order_index', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+    // Se uma etapa específica foi configurada ("won_target_stage_id"),
+    // usa ela — importante pra renovação: não faz sentido voltar pra
+    // "Implantação" de novo, e sim ir direto pra "Gestão de Contratos".
+    // Sem configuração, cai no comportamento antigo (primeira etapa).
+    let targetStage: { id: string; name: string } | null = null
 
-    if (firstStage) {
+    if (pipeline.won_target_stage_id) {
+      const { data: chosenStage } = await supabase
+        .from('stages')
+        .select('id, name')
+        .eq('id', pipeline.won_target_stage_id)
+        .maybeSingle()
+      targetStage = chosenStage
+    }
+
+    if (!targetStage) {
+      const { data: firstStage } = await supabase
+        .from('stages')
+        .select('id, name')
+        .eq('pipeline_id', pipeline.won_target_pipeline_id)
+        .order('order_index', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      targetStage = firstStage
+    }
+
+    if (targetStage) {
       const { data: newRun } = await supabase
         .from('pipeline_runs')
         .insert({
           contract_id: contractId,
           pipeline_id: pipeline.won_target_pipeline_id,
-          stage_id: firstStage.id,
+          stage_id: targetStage.id,
           stage_entered_at: now,
           previous_run_id: run.id,
           created_by: user.id,
@@ -452,7 +489,7 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
       if (newRun) {
         await supabase.from('stage_history').insert({
           pipeline_run_id: newRun.id,
-          stage_id: firstStage.id,
+          stage_id: targetStage.id,
           entered_at: now,
           changed_by: user.id,
         })
@@ -462,7 +499,7 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
           pipeline_run_id: newRun.id,
           user_id: user.id,
           type: 'pipeline_change',
-          content: `Movido automaticamente para "${targetPipeline?.name}", etapa "${firstStage.name}", após marcar "${label}" em outro funil.`,
+          content: `Movido automaticamente para "${targetPipeline?.name}", etapa "${targetStage.name}", após marcar "${label}" em outro funil.`,
           metadata: { from_run: run.id, to_run: newRun.id },
         })
       }

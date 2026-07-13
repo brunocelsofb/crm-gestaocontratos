@@ -38,6 +38,7 @@ create table contract_crm.pipelines (
   won_target_pipeline_id uuid references contract_crm.pipelines(id),
   renewal_trigger_days integer,
   renewal_target_stage_id uuid references contract_crm.stages(id) on delete set null,
+  won_target_stage_id uuid references contract_crm.stages(id) on delete set null,
   created_at timestamptz not null default now()
 );
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useState, useActionState } from 'react'
 import { SaveButton } from '@/components/ui/save-button'
 
 const initialState: { error?: string } = {}
@@ -13,7 +13,9 @@ export function EditPipelineInfoForm({
   wonLabel,
   lostLabel,
   wonTargetPipelineId,
+  wonTargetStageId,
   allPipelines,
+  allStagesByPipeline,
   renewalTriggerDays,
   renewalTargetStageId,
   stagesInThisPipeline,
@@ -26,7 +28,9 @@ export function EditPipelineInfoForm({
   wonLabel: string
   lostLabel: string
   wonTargetPipelineId: string | null
+  wonTargetStageId: string | null
   allPipelines: { id: string; name: string }[]
+  allStagesByPipeline: Record<string, { id: string; name: string }[]>
   renewalTriggerDays: number | null
   renewalTargetStageId: string | null
   stagesInThisPipeline: { id: string; name: string }[]
@@ -36,6 +40,8 @@ export function EditPipelineInfoForm({
   ) => Promise<{ error?: string }>
 }) {
   const [state, formAction] = useActionState(action, initialState)
+  const [selectedTargetPipeline, setSelectedTargetPipeline] = useState(wonTargetPipelineId ?? '')
+  const stagesForSelectedTarget = allStagesByPipeline[selectedTargetPipeline] ?? []
 
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-2">
@@ -90,6 +96,7 @@ export function EditPipelineInfoForm({
         <select
           name="won_target_pipeline_id"
           defaultValue={wonTargetPipelineId ?? ''}
+          onChange={(e) => setSelectedTargetPipeline(e.target.value)}
           className="w-40 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
         >
           <option value="">Nenhum (fica aqui mesmo)</option>
@@ -98,6 +105,21 @@ export function EditPipelineInfoForm({
           ))}
         </select>
       </div>
+      {selectedTargetPipeline && (
+        <div>
+          <label className="block text-[10px] text-gray-500">Em qual etapa desse funil</label>
+          <select
+            name="won_target_stage_id"
+            defaultValue={wonTargetStageId ?? ''}
+            className="w-40 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none"
+          >
+            <option value="">Primeira etapa (padrão)</option>
+            {stagesForSelectedTarget.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div>
         <label className="block text-[10px] text-gray-500">Iniciar renovação (dias antes do vencimento)</label>
         <input
