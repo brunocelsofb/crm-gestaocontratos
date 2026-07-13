@@ -1,5 +1,7 @@
 'use client'
 
+import { SaveButton } from '@/components/ui/save-button'
+
 export function EditPipelineInfoForm({
   pipelineId,
   name,
@@ -111,12 +113,7 @@ export function EditPipelineInfoForm({
           ))}
         </select>
       </div>
-      <button
-        type="submit"
-        className="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800"
-      >
-        Salvar
-      </button>
+      <SaveButton />
     </form>
   )
 }

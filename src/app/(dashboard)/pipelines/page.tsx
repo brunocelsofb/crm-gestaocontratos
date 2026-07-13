@@ -5,6 +5,7 @@ import { DeleteStageButton } from '@/components/pipelines/delete-stage-button'
 import { EditPipelineInfoForm } from '@/components/pipelines/edit-pipeline-info-form'
 import { createStage, updateStage, deleteStage, deletePipeline, updatePipelineInfo } from '@/lib/actions/pipelines'
 import { MoveStageButtons } from '@/components/pipelines/move-stage-buttons'
+import { SaveButton } from '@/components/ui/save-button'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export default async function PipelinesPage() {
@@ -111,12 +112,7 @@ export default async function PipelinesPage() {
                         Perdido
                       </label>
 
-                      <button
-                        type="submit"
-                        className="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800"
-                      >
-                        Salvar
-                      </button>
+                      <SaveButton />
                     </form>
 
                     {isAdmin && <DeleteStageButton stageId={stage.id} stageName={stage.name} />}
