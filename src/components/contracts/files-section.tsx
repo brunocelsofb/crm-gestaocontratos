@@ -11,6 +11,7 @@ import { useState, useRef } from 'react'
 import { Pencil, Check, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { registerContractFile, deleteContractFile, getFileDownloadUrl, renameContractFile } from '@/lib/actions/files'
+import { sanitizeStorageFileName } from '@/lib/utils/storage'
 
 type ContractFile = {
   id: string
@@ -62,7 +63,7 @@ export function FilesSection({ contractId, initialFiles }: { contractId: string;
 
     const supabase = createClient()
     // Caminho único por contrato + timestamp, pra evitar colisão de nomes
-    const storagePath = `${contractId}/${Date.now()}-${file.name}`
+    const storagePath = `${contractId}/${Date.now()}-${sanitizeStorageFileName(file.name)}`
 
     const { error: uploadError } = await supabase.storage
       .from('contract-files')

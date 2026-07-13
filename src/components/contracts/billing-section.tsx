@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { setBillingType, confirmBilling } from '@/lib/actions/billing'
+import { sanitizeStorageFileName } from '@/lib/utils/storage'
 
 type BillingRecord = {
   id: string
@@ -61,7 +62,7 @@ export function BillingSection({
       let fileNameToSave: string | null = null
       if (file) {
         const supabase = createClient()
-        const storagePath = `billing/${contractId}/${year}-${month}-${Date.now()}-${file.name}`
+        const storagePath = `billing/${contractId}/${year}-${month}-${Date.now()}-${sanitizeStorageFileName(file.name)}`
         const { error: uploadError } = await supabase.storage.from('contract-files').upload(storagePath, file)
         if (uploadError) throw new Error(`Falha no upload: ${uploadError.message}`)
         filePath = storagePath
