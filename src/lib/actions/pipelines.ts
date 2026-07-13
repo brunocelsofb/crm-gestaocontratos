@@ -167,15 +167,22 @@ export async function moveStage(stageId: string, direction: 'up' | 'down'): Prom
 
   if (!stage) return { error: 'Etapa não encontrada.' }
 
-  const { data: neighbor } = await supabase
+  // Constrói a consulta condicionalmente em vez de usar um valor
+  // "sentinela" gigante (tipo Number.MAX_SAFE_INTEGER) pra simular "sem
+  // limite" — esse valor estourava o tamanho máximo de um integer no
+  // Postgres e fazia a consulta inteira falhar silenciosamente pra
+  // direção "descer".
+  let neighborQuery = supabase
     .from('stages')
     .select('id, order_index')
     .eq('pipeline_id', stage.pipeline_id)
-    .order('order_index', { ascending: direction === 'up' ? false : true })
-    .lt('order_index', direction === 'up' ? stage.order_index : Number.MAX_SAFE_INTEGER)
-    .gt('order_index', direction === 'down' ? stage.order_index : -1)
-    .limit(1)
-    .maybeSingle()
+
+  neighborQuery =
+    direction === 'up'
+      ? neighborQuery.lt('order_index', stage.order_index).order('order_index', { ascending: false })
+      : neighborQuery.gt('order_index', stage.order_index).order('order_index', { ascending: true })
+
+  const { data: neighbor } = await neighborQuery.limit(1).maybeSingle()
 
   if (!neighbor) return { error: 'Não há etapa vizinha nessa direção.' }
 
