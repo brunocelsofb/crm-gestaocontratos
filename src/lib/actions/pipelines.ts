@@ -176,9 +176,15 @@ export async function moveStage(stageId: string, direction: 'up' | 'down') {
 
   if (!neighbor) return
 
-  // Troca as posições (swap simples de order_index entre os dois vizinhos)
-  await supabase.from('stages').update({ order_index: neighbor.order_index }).eq('id', stage.id)
+  // Troca via um valor TEMPORÁRIO — sem isso, as duas atualizações
+  // colidiam com a trava de unicidade (pipeline_id, order_index), já
+  // que por um instante as duas etapas ficariam com a mesma posição.
+  // Essa colisão fazia a primeira atualização falhar (sem eu checar o
+  // erro), e por isso a troca nunca acontecia de verdade.
+  const TEMP_INDEX = -999999
+  await supabase.from('stages').update({ order_index: TEMP_INDEX }).eq('id', stage.id)
   await supabase.from('stages').update({ order_index: stage.order_index }).eq('id', neighbor.id)
+  await supabase.from('stages').update({ order_index: neighbor.order_index }).eq('id', stage.id)
 
   revalidatePath('/pipelines')
 }
