@@ -11,9 +11,10 @@ import { useSearchParams } from 'next/navigation'
 import { createContract, type ActionState } from '@/lib/actions/contracts'
 import { createClient } from '@/lib/supabase/client'
 import { CompanyContactSection } from '@/components/contracts/company-contact-section'
+import { ValidityPeriodInput } from '@/components/contracts/validity-period-input'
 
 type Stage = { id: string; name: string }
-type Pipeline = { id: string; name: string; is_default: boolean }
+type Pipeline = { id: string; name: string; is_default: boolean; type: string }
 
 const initialState: ActionState = {}
 
@@ -25,6 +26,7 @@ export default function NewContractPage() {
 
   const [pipelineId, setPipelineId] = useState<string | null>(pipelineParam)
   const [pipelineName, setPipelineName] = useState<string>('')
+  const [pipelineType, setPipelineType] = useState<string>('gestao_contratos')
   const [stages, setStages] = useState<Stage[]>([])
 
   useEffect(() => {
@@ -36,18 +38,24 @@ export default function NewContractPage() {
       if (!resolvedPipelineId) {
         const { data: pipelines } = await supabase
           .from('pipelines')
-          .select('id, name, is_default')
+          .select('id, name, is_default, type')
           .order('name')
         const defaultPipeline = (pipelines as Pipeline[] | null)?.find((p) => p.is_default) ?? pipelines?.[0]
         resolvedPipelineId = defaultPipeline?.id ?? null
-        if (defaultPipeline) setPipelineName(defaultPipeline.name)
+        if (defaultPipeline) {
+          setPipelineName(defaultPipeline.name)
+          setPipelineType(defaultPipeline.type)
+        }
       } else {
         const { data: pipeline } = await supabase
           .from('pipelines')
-          .select('name')
+          .select('name, type')
           .eq('id', resolvedPipelineId)
           .single()
-        if (pipeline) setPipelineName(pipeline.name)
+        if (pipeline) {
+          setPipelineName(pipeline.name)
+          setPipelineType(pipeline.type)
+        }
       }
 
       setPipelineId(resolvedPipelineId)
@@ -131,33 +139,18 @@ export default function NewContractPage() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Data prevista de fechamento</label>
-          <input
-            name="expected_close_date"
-            type="date"
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-        </div>
+        {pipelineType !== 'gestao_contratos' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Data prevista de fechamento</label>
+            <input
+              name="expected_close_date"
+              type="date"
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+            />
+          </div>
+        )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Vigência — início</label>
-            <input
-              name="valid_from"
-              type="date"
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Vigência — fim</label>
-            <input
-              name="valid_until"
-              type="date"
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-            />
-          </div>
-        </div>
+        <ValidityPeriodInput />
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Descrição</label>

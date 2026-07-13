@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { EditContractForm } from '@/components/contracts/edit-contract-form'
@@ -20,16 +21,26 @@ export default async function EditContractPage({
 
   const { data: openRun } = await supabase
     .from('pipeline_runs')
-    .select('value, expected_close_date')
+    .select('value, expected_close_date, pipeline_id')
     .eq('contract_id', id)
     .eq('status', 'open')
     .maybeSingle()
 
+  let pipelineType = 'gestao_contratos'
+  if (openRun?.pipeline_id) {
+    const { data: pipeline } = await supabase.from('pipelines').select('type').eq('id', openRun.pipeline_id).maybeSingle()
+    if (pipeline) pipelineType = pipeline.type
+  }
+
   return (
     <div className="max-w-xl space-y-6">
+      <Link href={`/contracts/${id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
+        ← Voltar
+      </Link>
       <h1 className="text-[17px] font-medium text-foreground">Editar Contrato</h1>
       <EditContractForm
         contractId={id}
+        pipelineType={pipelineType}
         initial={{
           process_number: contract.process_number,
           title: contract.title,

@@ -2,14 +2,17 @@
 
 import { useActionState } from 'react'
 import { updateContract, type ActionState } from '@/lib/actions/contracts'
+import { ValidityPeriodInput } from '@/components/contracts/validity-period-input'
 
 const initialState: ActionState = {}
 
 export function EditContractForm({
   contractId,
+  pipelineType,
   initial,
 }: {
   contractId: string
+  pipelineType: string
   initial: {
     process_number: string
     title: string
@@ -79,38 +82,21 @@ export function EditContractForm({
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Data prevista de fechamento</label>
-          <input
-            name="expected_close_date"
-            type="date"
-            defaultValue={initial.expected_close_date ?? ''}
-            disabled={!initial.hasOpenRun}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
-          />
-        </div>
+        {pipelineType !== 'gestao_contratos' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Data prevista de fechamento</label>
+            <input
+              name="expected_close_date"
+              type="date"
+              defaultValue={initial.expected_close_date ?? ''}
+              disabled={!initial.hasOpenRun}
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+            />
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Vigência — início</label>
-          <input
-            name="valid_from"
-            type="date"
-            defaultValue={initial.valid_from ?? ''}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Vigência — fim</label>
-          <input
-            name="valid_until"
-            type="date"
-            defaultValue={initial.valid_until ?? ''}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-        </div>
-      </div>
+      <ValidityPeriodInput defaultFrom={initial.valid_from} defaultUntil={initial.valid_until} />
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Descrição</label>
