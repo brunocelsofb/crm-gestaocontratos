@@ -4,11 +4,21 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProposal, type ProposalItemInput } from '@/lib/actions/proposals'
 
+type CatalogItem = { id: string; name: string; category: string | null; type: string | null; characteristics: string | null; unit_value: number }
+
 function emptyItem(): ProposalItemInput {
   return { quantity: 1, category: '', item: '', characteristics: '', type: '', delivery_forecast: '', unit_value: 0, discount: 0 }
 }
 
-export function NewProposalForm({ contractId, onCancel }: { contractId: string; onCancel: () => void }) {
+export function NewProposalForm({
+  contractId,
+  catalogItems,
+  onCancel,
+}: {
+  contractId: string
+  catalogItems: CatalogItem[]
+  onCancel: () => void
+}) {
   const router = useRouter()
   const [currency, setCurrency] = useState('BRL')
   const [poNumber, setPoNumber] = useState('')
@@ -19,6 +29,18 @@ export function NewProposalForm({ contractId, onCancel }: { contractId: string; 
 
   function updateItem(i: number, patch: Partial<ProposalItemInput>) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
+  }
+
+  function applyCatalogItem(i: number, catalogId: string) {
+    const found = catalogItems.find((c) => c.id === catalogId)
+    if (!found) return
+    updateItem(i, {
+      item: found.name,
+      category: found.category ?? '',
+      type: found.type ?? '',
+      characteristics: found.characteristics ?? '',
+      unit_value: found.unit_value,
+    })
   }
 
   async function handleSubmit() {
@@ -40,49 +62,116 @@ export function NewProposalForm({ contractId, onCancel }: { contractId: string; 
   const total = items.reduce((sum, it) => sum + it.quantity * it.unit_value - it.discount, 0)
 
   return (
-    <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
-      <div className="flex flex-wrap items-end gap-2">
+    <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+      <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-[10px] text-gray-500">Moeda</label>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="mt-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+          <label className="block text-xs font-medium text-gray-600">Moeda</label>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
             <option value="BRL">BRL — Real</option>
             <option value="USD">USD — Dólar</option>
             <option value="EUR">EUR — Euro</option>
           </select>
         </div>
         <div>
-          <label className="block text-[10px] text-gray-500">Nº OC do cliente (opcional)</label>
-          <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="mt-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <label className="block text-xs font-medium text-gray-600">Nº OC do cliente (opcional)</label>
+          <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         <div>
-          <label className="block text-[10px] text-gray-500">Válida até</label>
-          <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="mt-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <label className="block text-xs font-medium text-gray-600">Válida até</label>
+          <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-700">Itens</p>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-700">Itens da proposta</p>
+          {catalogItems.length === 0 && (
+            <a href="/proposals/catalog" target="_blank" className="text-xs text-brand-700 hover:underline">
+              Cadastrar itens no catálogo ↗
+            </a>
+          )}
+        </div>
+
         {items.map((it, i) => (
-          <div key={i} className="grid grid-cols-8 gap-1.5 rounded-md bg-gray-50 p-2">
-            <input placeholder="Qtd" type="number" value={it.quantity} onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })} className="col-span-1 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <input placeholder="Categoria" value={it.category} onChange={(e) => updateItem(i, { category: e.target.value })} className="col-span-1 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <input placeholder="Item" value={it.item} onChange={(e) => updateItem(i, { item: e.target.value })} className="col-span-2 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <input placeholder="Tipo" value={it.type} onChange={(e) => updateItem(i, { type: e.target.value })} className="col-span-1 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <input placeholder="Vlr unit." type="number" value={it.unit_value} onChange={(e) => updateItem(i, { unit_value: Number(e.target.value) })} className="col-span-1 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <input placeholder="Desconto" type="number" value={it.discount} onChange={(e) => updateItem(i, { discount: Number(e.target.value) })} className="col-span-1 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <button onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))} className="col-span-1 text-xs text-negative-600 hover:underline">
-              Remover
-            </button>
-            <input placeholder="Características / escopo" value={it.characteristics} onChange={(e) => updateItem(i, { characteristics: e.target.value })} className="col-span-5 rounded border border-gray-300 px-1.5 py-1 text-xs" />
-            <input placeholder="Previsão de entrega" value={it.delivery_forecast} onChange={(e) => updateItem(i, { delivery_forecast: e.target.value })} className="col-span-3 rounded border border-gray-300 px-1.5 py-1 text-xs" />
+          <div key={i} className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500">Item {i + 1}</span>
+              {items.length > 1 && (
+                <button onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))} className="text-xs text-negative-600 hover:underline">
+                  Remover item
+                </button>
+              )}
+            </div>
+
+            {catalogItems.length > 0 && (
+              <div>
+                <label className="block text-[10px] text-gray-500">Escolher do catálogo (preenche os campos abaixo — você ainda pode editar)</label>
+                <select
+                  defaultValue=""
+                  onChange={(e) => e.target.value && applyCatalogItem(i, e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
+                >
+                  <option value="">Selecione um item do catálogo (opcional)...</option>
+                  {catalogItems.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-4 gap-2">
+              <div>
+                <label className="block text-[10px] text-gray-500">Quantidade</label>
+                <input type="number" value={it.quantity} onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500">Categoria</label>
+                <input value={it.category} onChange={(e) => updateItem(i, { category: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500">Tipo</label>
+                <input value={it.type} onChange={(e) => updateItem(i, { type: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500">Previsão de entrega</label>
+                <input value={it.delivery_forecast} onChange={(e) => updateItem(i, { delivery_forecast: e.target.value })} placeholder="Ex: 15 dias" className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-gray-500">Nome do item</label>
+              <input value={it.item} onChange={(e) => updateItem(i, { item: e.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-gray-500">Características / escopo</label>
+              <input value={it.characteristics} onChange={(e) => updateItem(i, { characteristics: e.target.value })} placeholder="Ex: escopo de manutenção e metrologia" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] text-gray-500">Valor unitário (R$)</label>
+                <input type="number" value={it.unit_value} onChange={(e) => updateItem(i, { unit_value: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500">Desconto (R$)</label>
+                <input type="number" value={it.discount} onChange={(e) => updateItem(i, { discount: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500">Subtotal</label>
+                <p className="mt-1 rounded-md bg-white px-2 py-1.5 text-sm font-medium text-gray-700">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(it.quantity * it.unit_value - it.discount)}
+                </p>
+              </div>
+            </div>
           </div>
         ))}
         <button onClick={() => setItems((prev) => [...prev, emptyItem()])} className="text-xs text-brand-700 hover:underline">
-          + Adicionar item
+          + Adicionar outro item
         </button>
       </div>
 
-      <p className="text-sm font-medium text-gray-700">Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(total)}</p>
+      <p className="text-sm font-semibold text-gray-900">Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(total)}</p>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 

@@ -25,7 +25,17 @@ const STATUS_STYLES: Record<string, string> = {
   declined_client: 'bg-negative-100 text-negative-700',
 }
 
-export function ProposalsSection({ contractId, proposals }: { contractId: string; proposals: Proposal[] }) {
+type CatalogItem = { id: string; name: string; category: string | null; type: string | null; characteristics: string | null; unit_value: number }
+
+export function ProposalsSection({
+  contractId,
+  proposals,
+  catalogItems,
+}: {
+  contractId: string
+  proposals: Proposal[]
+  catalogItems: CatalogItem[]
+}) {
   const [creating, setCreating] = useState(false)
 
   return (
@@ -39,7 +49,7 @@ export function ProposalsSection({ contractId, proposals }: { contractId: string
         )}
       </div>
 
-      {creating && <NewProposalForm contractId={contractId} onCancel={() => setCreating(false)} />}
+      {creating && <NewProposalForm contractId={contractId} catalogItems={catalogItems} onCancel={() => setCreating(false)} />}
 
       <div className="space-y-1.5">
         {proposals.map((p) => (

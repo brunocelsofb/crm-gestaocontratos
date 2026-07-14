@@ -731,3 +731,25 @@ create policy "proposal_files_insert" on storage.objects
   for insert with check (bucket_id = 'proposal-files' and auth.role() = 'authenticated');
 create policy "proposal_files_delete" on storage.objects
   for delete using (bucket_id = 'proposal-files' and auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 22. Catálogo de produtos/serviços (propostas)
+-- ------------------------------------------------------------
+create table contract_crm.proposal_catalog_items (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  category text,
+  type text,
+  characteristics text,
+  unit_value numeric not null default 0,
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now()
+);
+
+alter table contract_crm.proposal_catalog_items enable row level security;
+
+create policy "proposal_catalog_select" on contract_crm.proposal_catalog_items for select using (auth.role() = 'authenticated');
+create policy "proposal_catalog_insert" on contract_crm.proposal_catalog_items for insert with check (auth.role() = 'authenticated');
+create policy "proposal_catalog_update" on contract_crm.proposal_catalog_items for update using (auth.role() = 'authenticated');
+create policy "proposal_catalog_delete" on contract_crm.proposal_catalog_items for delete using (auth.role() = 'authenticated');

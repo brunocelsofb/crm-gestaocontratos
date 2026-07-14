@@ -13,6 +13,7 @@ const BASE_NAV_ITEMS = [
   { href: '/surveys', label: 'Formulários', icon: ClipboardList },
   { href: '/tags', label: 'Tags', icon: Tag },
   { href: '/proposals/templates', label: 'Modelos de Proposta', icon: FileText },
+  { href: '/proposals/catalog', label: 'Catálogo de Produtos', icon: FileText },
   { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]
 

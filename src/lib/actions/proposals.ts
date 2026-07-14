@@ -7,6 +7,48 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export type ActionState = { error?: string }
 
 // ------------------------------------------------------------
+// Catálogo de produtos/serviços — cadastra uma vez, escolhe na hora de
+// montar a proposta, em vez de digitar tudo do zero sempre.
+// ------------------------------------------------------------
+export async function createCatalogItem(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const name = (formData.get('name') as string)?.trim()
+  const category = (formData.get('category') as string) || null
+  const type = (formData.get('type') as string) || null
+  const characteristics = (formData.get('characteristics') as string) || null
+  const unit_value = Number(formData.get('unit_value')) || 0
+
+  if (!name) return { error: 'Nome do item é obrigatório.' }
+
+  const { error } = await supabase.from('proposal_catalog_items').insert({
+    name,
+    category,
+    type,
+    characteristics,
+    unit_value,
+    created_by: user.id,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/proposals/catalog')
+  return {}
+}
+
+export async function deleteCatalogItem(itemId: string) {
+  const supabase = createAdminClient()
+  await supabase.from('proposal_catalog_items').delete().eq('id', itemId)
+  revalidatePath('/proposals/catalog')
+}
+
+// ------------------------------------------------------------
 // Modelos de página (capas)
 // ------------------------------------------------------------
 export async function registerProposalTemplate(name: string, filePath: string, fileName: string, pageCount: number): Promise<ActionState> {
