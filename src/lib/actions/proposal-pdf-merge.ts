@@ -36,7 +36,7 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
 
   const { data: orgSettings } = await supabase
     .from('organization_settings')
-    .select('company_name, logo_storage_path, proposal_header_text, proposal_footer_text')
+    .select('company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -96,6 +96,7 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
             createdByEmail: createdByProfile?.email ?? null,
             headerText: orgSettings?.proposal_header_text ?? null,
             footerText: orgSettings?.proposal_footer_text ?? null,
+            brandColor: orgSettings?.proposal_brand_color ?? '#1B556B',
           },
           contentBlocks,
         })

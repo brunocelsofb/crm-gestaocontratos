@@ -55,6 +55,7 @@ type OrgInfo = {
   createdByEmail: string | null
   headerText: string | null
   footerText: string | null
+  brandColor: string
 }
 
 type ContentBlock = {
@@ -76,6 +77,15 @@ function fmtCurrency(v: number, currency: string) {
 function fmtDate(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('pt-BR')
+}
+
+// Converte "#1B556B" pro formato 0–1 que o pdf-lib espera.
+function hexToRgb01(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16) / 255
+  const g = parseInt(clean.slice(2, 4), 16) / 255
+  const b = parseInt(clean.slice(4, 6), 16) / 255
+  return [Number.isNaN(r) ? 0.11 : r, Number.isNaN(g) ? 0.33 : g, Number.isNaN(b) ? 0.42 : b]
 }
 
 export async function buildStandardProposalPage({
@@ -126,10 +136,14 @@ export async function buildStandardProposalPage({
     })
   }
 
-  // ---- Cabeçalho customizado (texto livre, definido nas configurações) ----
+  const brandRgb = hexToRgb01(org.brandColor)
+
+  // ---- Faixa colorida do cabeçalho (cor da marca, não só texto) ----
+  const headerBarHeight = org.headerText ? 26 : 0
   if (org.headerText) {
-    text(org.headerText, margin, y, { size: 8, color: [0.5, 0.5, 0.5] })
-    y -= 14
+    page.drawRectangle({ x: 0, y: pageHeight - headerBarHeight, width: pageWidth, height: headerBarHeight, color: rgb(...brandRgb) })
+    page.drawText(org.headerText, { x: margin, y: pageHeight - headerBarHeight + 8, size: 9, font: fontBold, color: rgb(1, 1, 1) })
+    y = pageHeight - headerBarHeight - margin + 10
   }
 
   // ---- Linha 1: data / validade — sigla da proposta ----
@@ -313,10 +327,12 @@ export async function buildStandardProposalPage({
     }
   }
 
-  // ---- Rodapé customizado, repetido em TODAS as páginas geradas ----
+  // ---- Rodapé customizado (faixa colorida), repetido em TODAS as páginas ----
   if (org.footerText) {
+    const footerBarHeight = 22
     for (const p of doc.getPages()) {
-      p.drawText(org.footerText, { x: margin, y: 20, size: 7, font, color: rgb(0.6, 0.6, 0.6) })
+      p.drawRectangle({ x: 0, y: 0, width: pageWidth, height: footerBarHeight, color: rgb(...brandRgb) })
+      p.drawText(org.footerText, { x: margin, y: 7, size: 7, font, color: rgb(1, 1, 1) })
     }
   }
 

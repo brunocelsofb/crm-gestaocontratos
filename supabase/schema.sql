@@ -335,6 +335,7 @@ create table contract_crm.organization_settings (
   logo_storage_path text,
   proposal_header_text text,
   proposal_footer_text text,
+  proposal_brand_color text default '#1B556B',
   updated_at timestamptz not null default now()
 );
 

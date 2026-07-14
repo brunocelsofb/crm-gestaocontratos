@@ -13,12 +13,14 @@ export function OrganizationSettingsForm({
   currentLogoPath,
   currentHeaderText,
   currentFooterText,
+  currentBrandColor,
 }: {
   currentName: string
   currentCompanyName: string
   currentLogoPath: string | null
   currentHeaderText: string
   currentFooterText: string
+  currentBrandColor: string
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
   const [logoPath, setLogoPath] = useState(currentLogoPath)
@@ -92,6 +94,19 @@ export function OrganizationSettingsForm({
           <p className="mt-1 text-xs text-gray-400">
             Usado na pergunta da pesquisa NPS e no PDF das propostas — é o nome da sua empresa, não do sistema.
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Cor da marca</label>
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              name="proposal_brand_color"
+              type="color"
+              defaultValue={currentBrandColor}
+              className="h-9 w-14 rounded border border-gray-300"
+            />
+            <span className="text-xs text-gray-400">Usada como faixa colorida no cabeçalho e rodapé do PDF das propostas.</span>
+          </div>
         </div>
 
         <div>
