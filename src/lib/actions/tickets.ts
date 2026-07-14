@@ -3,18 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { PRIORITY_SLA_DAYS, gravityForCategory, type PriorityTier } from '@/lib/utils/gut-matrix'
 
 export type ActionState = { error?: string }
-
-// SLA padrão por prioridade (em horas) — usado só pra calcular o prazo
-// no momento da criação. Se quiser deixar configurável depois, dá pra
-// mover isso pra organization_settings sem mudar o resto da lógica.
-const SLA_HOURS: Record<string, number> = {
-  urgente: 4,
-  alta: 24,
-  media: 48,
-  baixa: 120,
-}
 
 async function generateTicketNumber(): Promise<string> {
   const supabase = createAdminClient()
@@ -35,7 +26,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
 
   const subject = (formData.get('subject') as string)?.trim()
   const description = (formData.get('description') as string)?.trim()
-  const priority = (formData.get('priority') as string) || 'media'
+  const priority = ((formData.get('priority') as string) || 'pouco_critica') as PriorityTier
   const category = (formData.get('category') as string) || null
   const requester_name = (formData.get('requester_name') as string)?.trim()
   const requester_email = (formData.get('requester_email') as string)?.trim()
@@ -74,8 +65,9 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
   }
 
   const ticketNumber = await generateTicketNumber()
-  const slaHours = SLA_HOURS[priority] ?? SLA_HOURS.media
-  const slaDueAt = new Date(Date.now() + slaHours * 3600_000).toISOString()
+  const slaDays = PRIORITY_SLA_DAYS[priority] ?? PRIORITY_SLA_DAYS.pouco_critica
+  const slaDueAt = new Date(Date.now() + slaDays * 86_400_000).toISOString()
+  const gravity = gravityForCategory(category)
 
   const { data, error } = await supabase
     .from('tickets')
@@ -91,6 +83,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
       requester_cnpj,
       source,
       contract_id,
+      gravity,
       sla_due_at: slaDueAt,
     })
     .select('id, public_token')
@@ -149,13 +142,21 @@ export async function updateTicketStatus(ticketId: string, status: string): Prom
 
 export async function updateTicketPriority(ticketId: string, priority: string): Promise<ActionState> {
   const supabase = await createClient()
-  const slaHours = SLA_HOURS[priority] ?? SLA_HOURS.media
-  const slaDueAt = new Date(Date.now() + slaHours * 3600_000).toISOString()
+  const slaDays = PRIORITY_SLA_DAYS[priority as PriorityTier] ?? PRIORITY_SLA_DAYS.pouco_critica
+  const slaDueAt = new Date(Date.now() + slaDays * 86_400_000).toISOString()
 
   const { error } = await supabase
     .from('tickets')
     .update({ priority, sla_due_at: slaDueAt, updated_at: new Date().toISOString() })
     .eq('id', ticketId)
+  if (error) return { error: error.message }
+  revalidatePath(`/tickets/${ticketId}`)
+  return {}
+}
+
+export async function updateTicketTrend(ticketId: string, trend: number): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('tickets').update({ trend, updated_at: new Date().toISOString() }).eq('id', ticketId)
   if (error) return { error: error.message }
   revalidatePath(`/tickets/${ticketId}`)
   return {}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createTicket } from '@/lib/actions/tickets'
+import { PRIORITY_LABELS, GRAVITY_CATEGORIES } from '@/lib/utils/gut-matrix'
 
 export default function PublicSupportPage() {
   const [busy, setBusy] = useState(false)
@@ -67,6 +68,15 @@ export default function PublicSupportPage() {
             <p className="mt-0.5 text-xs text-gray-400">É o CNPJ da empresa que tem contrato com a gente — usamos pra já direcionar seu chamado certo.</p>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700">Sobre o que é o chamado? *</label>
+            <select name="category" required defaultValue="" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none">
+              <option value="" disabled>Selecione...</option>
+              {GRAVITY_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700">Assunto *</label>
             <input name="subject" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
           </div>
@@ -76,11 +86,11 @@ export default function PublicSupportPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Urgência *</label>
-            <select name="priority" required defaultValue="media" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none">
-              <option value="baixa">Baixa — pode esperar</option>
-              <option value="media">Média</option>
-              <option value="alta">Alta — está atrapalhando o trabalho</option>
-              <option value="urgente">Urgente — parou tudo</option>
+            <select name="priority" required defaultValue="pouco_critica" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none">
+              <option value="nao_critica">{PRIORITY_LABELS.nao_critica}</option>
+              <option value="pouco_critica">{PRIORITY_LABELS.pouco_critica} — pode esperar</option>
+              <option value="critica">{PRIORITY_LABELS.critica} — está atrapalhando o trabalho</option>
+              <option value="muito_critica">{PRIORITY_LABELS.muito_critica} — parou tudo</option>
             </select>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}

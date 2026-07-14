@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getSlaStatus, SLA_LABELS, SLA_STYLES } from '@/lib/utils/sla'
+import { PRIORITY_LABELS, PRIORITY_CRITICALITY_LABELS } from '@/lib/utils/gut-matrix'
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: 'Aberto',
@@ -11,12 +12,11 @@ const STATUS_LABELS: Record<string, string> = {
 }
 const STATUS_ORDER = ['aberto', 'em_andamento', 'aguardando_cliente', 'resolvido', 'fechado']
 
-const PRIORITY_LABELS: Record<string, string> = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' }
 const PRIORITY_STYLES: Record<string, string> = {
-  baixa: 'bg-gray-100 text-gray-600',
-  media: 'bg-blue-100 text-blue-700',
-  alta: 'bg-yellow-100 text-yellow-800',
-  urgente: 'bg-negative-100 text-negative-700',
+  nao_critica: 'bg-gray-100 text-gray-600',
+  pouco_critica: 'bg-blue-100 text-blue-700',
+  critica: 'bg-yellow-100 text-yellow-800',
+  muito_critica: 'bg-negative-100 text-negative-700',
 }
 
 export default async function TicketsPage({
@@ -97,7 +97,8 @@ export default async function TicketsPage({
                   </td>
                   <td className="px-4 py-3 text-gray-600">{t.requester_name}</td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${PRIORITY_STYLES[t.priority]}`}>{PRIORITY_LABELS[t.priority]}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${PRIORITY_STYLES[t.priority]}`}>{PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS]}</span>
+                    <div className="mt-0.5 text-[10px] text-gray-400">{PRIORITY_CRITICALITY_LABELS[t.priority as keyof typeof PRIORITY_CRITICALITY_LABELS]}</div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{STATUS_LABELS[t.status]}</td>
                   <td className="px-4 py-3">

@@ -94,6 +94,8 @@ export default async function TicketDetailPage({
         currentStatus={ticket.status}
         currentPriority={ticket.priority}
         currentAssignee={ticket.assigned_to}
+        currentGravity={ticket.gravity}
+        currentTrend={ticket.trend}
         users={allProfiles ?? []}
         isAdmin={isAdmin}
       />

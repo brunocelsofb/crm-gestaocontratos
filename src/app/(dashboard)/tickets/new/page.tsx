@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createTicket } from '@/lib/actions/tickets'
 import { ContractSearchSelect } from '@/components/tickets/contract-search-select'
+import { PRIORITY_LABELS, PRIORITY_SLA_DAYS, GRAVITY_CATEGORIES } from '@/lib/utils/gut-matrix'
 
 export default function NewTicketPage() {
   const router = useRouter()
@@ -56,6 +57,15 @@ export default function NewTicketPage() {
           <input name="requester_cnpj" required placeholder="00.000.000/0000-00" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         <div>
+          <label className="block text-xs font-medium text-gray-600">Sobre o que é o chamado? *</label>
+          <select name="category" required defaultValue="" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+            <option value="" disabled>Selecione...</option>
+            {GRAVITY_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-medium text-gray-600">Assunto *</label>
           <input name="subject" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
@@ -65,11 +75,11 @@ export default function NewTicketPage() {
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600">Prioridade *</label>
-          <select name="priority" required defaultValue="media" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
-            <option value="baixa">Baixa (5 dias)</option>
-            <option value="media">Média (48h)</option>
-            <option value="alta">Alta (24h)</option>
-            <option value="urgente">Urgente (4h)</option>
+          <select name="priority" required defaultValue="pouco_critica" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+            <option value="nao_critica">{PRIORITY_LABELS.nao_critica} ({PRIORITY_SLA_DAYS.nao_critica} dias)</option>
+            <option value="pouco_critica">{PRIORITY_LABELS.pouco_critica} ({PRIORITY_SLA_DAYS.pouco_critica} dias)</option>
+            <option value="critica">{PRIORITY_LABELS.critica} ({PRIORITY_SLA_DAYS.critica} dias)</option>
+            <option value="muito_critica">{PRIORITY_LABELS.muito_critica} ({PRIORITY_SLA_DAYS.muito_critica} dia)</option>
           </select>
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
