@@ -11,10 +11,14 @@ export function OrganizationSettingsForm({
   currentName,
   currentCompanyName,
   currentLogoPath,
+  currentHeaderText,
+  currentFooterText,
 }: {
   currentName: string
   currentCompanyName: string
   currentLogoPath: string | null
+  currentHeaderText: string
+  currentFooterText: string
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
   const [logoPath, setLogoPath] = useState(currentLogoPath)
@@ -88,6 +92,27 @@ export function OrganizationSettingsForm({
           <p className="mt-1 text-xs text-gray-400">
             Usado na pergunta da pesquisa NPS e no PDF das propostas — é o nome da sua empresa, não do sistema.
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Cabeçalho da proposta (opcional)</label>
+          <input
+            name="proposal_header_text"
+            defaultValue={currentHeaderText}
+            placeholder="Ex: www.orbisengenharia.com.br"
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Rodapé da proposta (opcional)</label>
+          <input
+            name="proposal_footer_text"
+            defaultValue={currentFooterText}
+            placeholder="Ex: ORBIS Gestão de Tecnologia em Saúde · (62) 0000-0000"
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-400">Cabeçalho e rodapé aparecem em todas as páginas de dados da proposta (não nas capas anexadas).</p>
         </div>
 
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}

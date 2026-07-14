@@ -23,6 +23,11 @@ export function NewProposalForm({
   const [currency, setCurrency] = useState('BRL')
   const [poNumber, setPoNumber] = useState('')
   const [validUntil, setValidUntil] = useState('')
+  const [discountType, setDiscountType] = useState<'' | 'percentage' | 'fixed'>('')
+  const [discountValue, setDiscountValue] = useState('0')
+  const [paymentTerms, setPaymentTerms] = useState('')
+  const [installments, setInstallments] = useState('1')
+  const [isRecurring, setIsRecurring] = useState(false)
   const [items, setItems] = useState<ProposalItemInput[]>([emptyItem()])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,7 +55,18 @@ export function NewProposalForm({
       return
     }
     setBusy(true)
-    const result = await createProposal(contractId, currency, poNumber || null, validUntil || null, items)
+    const result = await createProposal(
+      contractId,
+      currency,
+      poNumber || null,
+      validUntil || null,
+      items,
+      discountType || null,
+      Number(discountValue) || 0,
+      paymentTerms || null,
+      Number(installments) || 1,
+      isRecurring
+    )
     setBusy(false)
     if (result.error) {
       setError(result.error)
@@ -80,6 +96,37 @@ export function NewProposalForm({
           <label className="block text-xs font-medium text-gray-600">Válida até</label>
           <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Desconto</label>
+          <select value={discountType} onChange={(e) => setDiscountType(e.target.value as '' | 'percentage' | 'fixed')} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+            <option value="">Sem desconto</option>
+            <option value="percentage">Percentual (%)</option>
+            <option value="fixed">Valor fixo (R$)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Valor do desconto</label>
+          <input type="number" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} disabled={!discountType} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none disabled:bg-gray-100" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Parcelas</label>
+          <input type="number" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Tipo de receita</label>
+          <select value={isRecurring ? 'recurring' : 'unica'} onChange={(e) => setIsRecurring(e.target.value === 'recurring')} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+            <option value="unica">Receita única</option>
+            <option value="recurring">Recorrente (MRR)</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600">Condição de pagamento</label>
+        <input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="Ex: 30/60/90 dias, boleto bancário" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
       </div>
 
       <div className="space-y-3">

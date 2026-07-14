@@ -333,6 +333,8 @@ create table contract_crm.organization_settings (
   name text not null default 'Contract CRM',
   company_name text,
   logo_storage_path text,
+  proposal_header_text text,
+  proposal_footer_text text,
   updated_at timestamptz not null default now()
 );
 
@@ -644,6 +646,11 @@ create table contract_crm.proposals (
   token text unique,
   assigned_technical_approver_id uuid references contract_crm.profiles(id),
   assigned_commercial_approver_id uuid references contract_crm.profiles(id),
+  discount_type text check (discount_type in ('percentage', 'fixed')),
+  discount_value numeric not null default 0,
+  payment_terms text,
+  installments integer not null default 1,
+  is_recurring boolean not null default false,
   pdf_storage_path text,
   created_by uuid references contract_crm.profiles(id),
   created_at timestamptz not null default now(),
@@ -756,3 +763,26 @@ create policy "proposal_catalog_select" on contract_crm.proposal_catalog_items f
 create policy "proposal_catalog_insert" on contract_crm.proposal_catalog_items for insert with check (auth.role() = 'authenticated');
 create policy "proposal_catalog_update" on contract_crm.proposal_catalog_items for update using (auth.role() = 'authenticated');
 create policy "proposal_catalog_delete" on contract_crm.proposal_catalog_items for delete using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 23. Blocos de conteúdo extra da proposta (imagem/tabela)
+-- ------------------------------------------------------------
+create table contract_crm.proposal_content_blocks (
+  id uuid primary key default gen_random_uuid(),
+  proposal_id uuid not null references contract_crm.proposals(id) on delete cascade,
+  position integer not null default 0,
+  block_type text not null check (block_type in ('image', 'table', 'text')),
+  image_storage_path text,
+  table_data jsonb,
+  text_content text,
+  created_at timestamptz not null default now()
+);
+
+create index idx_proposal_content_blocks_proposal on contract_crm.proposal_content_blocks(proposal_id);
+
+alter table contract_crm.proposal_content_blocks enable row level security;
+
+create policy "proposal_content_blocks_select" on contract_crm.proposal_content_blocks for select using (auth.role() = 'authenticated');
+create policy "proposal_content_blocks_insert" on contract_crm.proposal_content_blocks for insert with check (auth.role() = 'authenticated');
+create policy "proposal_content_blocks_delete" on contract_crm.proposal_content_blocks for delete using (auth.role() = 'authenticated');

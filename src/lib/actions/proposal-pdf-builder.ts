@@ -53,6 +53,16 @@ type OrgInfo = {
   logoIsPng: boolean
   createdByName: string | null
   createdByEmail: string | null
+  headerText: string | null
+  footerText: string | null
+}
+
+type ContentBlock = {
+  block_type: string
+  image_storage_path: string | null
+  table_data: { rows: string[][] } | null
+  imageBytes?: Uint8Array | null
+  imageIsPng?: boolean
 }
 
 function fmtCurrency(v: number, currency: string) {
@@ -74,12 +84,20 @@ export async function buildStandardProposalPage({
   company,
   contact,
   org,
+  contentBlocks,
 }: {
-  proposal: ProposalRow
+  proposal: ProposalRow & {
+    discount_type: 'percentage' | 'fixed' | null
+    discount_value: number
+    payment_terms: string | null
+    installments: number
+    is_recurring: boolean
+  }
   items: ItemRow[]
   company: CompanyRow
   contact: ContactRow
   org: OrgInfo
+  contentBlocks: ContentBlock[]
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
@@ -108,6 +126,12 @@ export async function buildStandardProposalPage({
     })
   }
 
+  // ---- Cabeçalho customizado (texto livre, definido nas configurações) ----
+  if (org.headerText) {
+    text(org.headerText, margin, y, { size: 8, color: [0.5, 0.5, 0.5] })
+    y -= 14
+  }
+
   // ---- Linha 1: data / validade — sigla da proposta ----
   text(`${fmtDate(proposal.created_at)} - Validade: ${fmtDate(proposal.valid_until)}`, margin, y, { size: 9, color: [0.4, 0.4, 0.4] })
   text(`Proposta ${proposal.control_code}`, pageWidth - margin - 140, y, { size: 11, bold: true })
@@ -118,7 +142,7 @@ export async function buildStandardProposalPage({
   if (org.logoBytes) {
     try {
       const image = org.logoIsPng ? await doc.embedPng(org.logoBytes) : await doc.embedJpg(org.logoBytes)
-      const logoHeight = 40
+      const logoHeight = 72
       const logoWidth = (image.width / image.height) * logoHeight
       page.drawImage(image, { x: margin, y: y - logoHeight + 6, width: logoWidth, height: logoHeight })
       logoDrawn = true
@@ -228,6 +252,73 @@ export async function buildStandardProposalPage({
   y -= 8
   newPageIfNeeded(20)
   text(`TOTAL: ${fmtCurrency(total, proposal.currency)}`, colX.sub - 60, y, { size: 12, bold: true })
+  y -= 20
+
+  // ---- Desconto, condição de pagamento e parcelas ----
+  newPageIfNeeded(60)
+  if (proposal.discount_type) {
+    const discountLabel = proposal.discount_type === 'percentage' ? `${proposal.discount_value}%` : fmtCurrency(proposal.discount_value, proposal.currency)
+    text(`Desconto: ${discountLabel}`, margin, y, { size: 9 })
+    y -= 14
+  }
+  if (proposal.payment_terms) {
+    text(`Condição de pagamento: ${proposal.payment_terms}`, margin, y, { size: 9 })
+    y -= 14
+  }
+  const netTotal = proposal.discount_type === 'percentage'
+    ? total * (1 - proposal.discount_value / 100)
+    : proposal.discount_type === 'fixed'
+      ? total - proposal.discount_value
+      : total
+  if (proposal.is_recurring) {
+    text(`Receita recorrente (MRR): ${fmtCurrency(netTotal, proposal.currency)}/mês`, margin, y, { size: 9, bold: true })
+    y -= 14
+  } else if (proposal.installments > 1) {
+    text(`Parcelamento: ${proposal.installments}x de ${fmtCurrency(netTotal / proposal.installments, proposal.currency)}`, margin, y, { size: 9, bold: true })
+    y -= 14
+  } else {
+    text(`Pagamento único: ${fmtCurrency(netTotal, proposal.currency)}`, margin, y, { size: 9, bold: true })
+    y -= 14
+  }
+
+  // ---- Blocos de conteúdo extra (imagens e tabelas coladas pelo usuário) ----
+  for (const block of contentBlocks) {
+    if (block.block_type === 'image' && block.imageBytes) {
+      try {
+        const image = block.imageIsPng ? await doc.embedPng(block.imageBytes) : await doc.embedJpg(block.imageBytes)
+        const maxWidth = pageWidth - margin * 2
+        const scale = Math.min(1, maxWidth / image.width)
+        const imgWidth = image.width * scale
+        const imgHeight = image.height * scale
+        newPageIfNeeded(imgHeight + 16)
+        y -= imgHeight
+        page.drawImage(image, { x: margin, y, width: imgWidth, height: imgHeight })
+        y -= 16
+      } catch {
+        // Imagem que não carregou é pulada, não trava o resto do PDF.
+      }
+    } else if (block.block_type === 'table' && block.table_data) {
+      const rows = block.table_data.rows
+      const numCols = rows[0]?.length ?? 1
+      const colWidth = (pageWidth - margin * 2) / numCols
+      for (const row of rows) {
+        newPageIfNeeded(16)
+        row.forEach((cell, ci) => {
+          text(cell.slice(0, 30), margin + ci * colWidth, y, { size: 8 })
+        })
+        page.drawLine({ start: { x: margin, y: y - 4 }, end: { x: pageWidth - margin, y: y - 4 }, thickness: 0.3, color: rgb(0.85, 0.85, 0.85) })
+        y -= 16
+      }
+      y -= 8
+    }
+  }
+
+  // ---- Rodapé customizado, repetido em TODAS as páginas geradas ----
+  if (org.footerText) {
+    for (const p of doc.getPages()) {
+      p.drawText(org.footerText, { x: margin, y: 20, size: 7, font, color: rgb(0.6, 0.6, 0.6) })
+    }
+  }
 
   return doc.save()
 }

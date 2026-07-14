@@ -36,7 +36,7 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
 
   const { data: orgSettings } = await supabase
     .from('organization_settings')
-    .select('company_name, logo_storage_path')
+    .select('company_name, logo_storage_path, proposal_header_text, proposal_footer_text')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -53,6 +53,26 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
   const { data: createdByProfile } = proposal.created_by
     ? await supabase.from('profiles').select('full_name, email').eq('id', proposal.created_by).maybeSingle()
     : { data: null }
+
+  const { data: rawContentBlocks } = await supabase
+    .from('proposal_content_blocks')
+    .select('block_type, image_storage_path, table_data')
+    .eq('proposal_id', proposalId)
+    .order('position')
+
+  const contentBlocks = await Promise.all(
+    (rawContentBlocks ?? []).map(async (b) => {
+      if (b.block_type === 'image' && b.image_storage_path) {
+        const { data: imgFile } = await supabase.storage.from('proposal-files').download(b.image_storage_path)
+        return {
+          ...b,
+          imageBytes: imgFile ? new Uint8Array(await imgFile.arrayBuffer()) : null,
+          imageIsPng: b.image_storage_path.toLowerCase().endsWith('.png'),
+        }
+      }
+      return { ...b, imageBytes: null, imageIsPng: true }
+    })
+  )
 
   if (!pages || pages.length === 0) {
     return { error: 'Monte a ordem das páginas antes de visualizar (mesmo que só com a Proposta padrão).' }
@@ -74,7 +94,10 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
             logoIsPng,
             createdByName: createdByProfile?.full_name ?? null,
             createdByEmail: createdByProfile?.email ?? null,
+            headerText: orgSettings?.proposal_header_text ?? null,
+            footerText: orgSettings?.proposal_footer_text ?? null,
           },
+          contentBlocks,
         })
         const standardDoc = await PDFDocument.load(standardPageBytes)
         const copied = await mergedPdf.copyPages(standardDoc, standardDoc.getPageIndices())

@@ -6,6 +6,7 @@ import { ProposalPageOrderEditor } from '@/components/proposals/proposal-page-or
 import { ProposalApprovalPanel } from '@/components/proposals/proposal-approval-panel'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { NewVersionButton } from '@/components/proposals/new-version-button'
+import { ProposalContentBlocksEditor } from '@/components/proposals/proposal-content-blocks-editor'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Rascunho',
@@ -33,13 +34,14 @@ export default async function ProposalDetailPage({
   const { id: contractId, proposalId } = await params
   const supabase = await createClient()
 
-  const [{ data: proposal }, { data: items }, { data: pages }, { data: templates }, { data: approvals }, { data: allProfiles }] = await Promise.all([
+  const [{ data: proposal }, { data: items }, { data: pages }, { data: templates }, { data: approvals }, { data: allProfiles }, { data: contentBlocks }] = await Promise.all([
     supabase.from('proposals').select('*').eq('id', proposalId).maybeSingle(),
     supabase.from('proposal_items').select('*').eq('proposal_id', proposalId).order('position'),
     supabase.from('proposal_pages').select('template_id, is_standard_proposal').eq('proposal_id', proposalId).order('position'),
     supabase.from('proposal_templates').select('id, name'),
     supabase.from('proposal_approvals').select('*').eq('proposal_id', proposalId).order('decided_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, department'),
+    supabase.from('proposal_content_blocks').select('id, block_type, image_storage_path, table_data').eq('proposal_id', proposalId).order('position'),
   ])
 
   if (!proposal) notFound()
@@ -142,6 +144,38 @@ export default async function ProposalDetailPage({
         </div>
         <p className="text-right text-sm font-semibold text-gray-900">Total: {fmt(total, proposal.currency)}</p>
       </div>
+
+      <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white p-4 text-sm">
+        <div>
+          <p className="text-xs text-gray-500">Desconto</p>
+          <p className="font-medium text-gray-900">
+            {proposal.discount_type
+              ? proposal.discount_type === 'percentage'
+                ? `${proposal.discount_value}%`
+                : fmt(Number(proposal.discount_value), proposal.currency)
+              : 'Sem desconto'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Condição de pagamento</p>
+          <p className="font-medium text-gray-900">{proposal.payment_terms ?? '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Parcelas</p>
+          <p className="font-medium text-gray-900">{proposal.installments}x</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Tipo de receita</p>
+          <p className="font-medium text-gray-900">{proposal.is_recurring ? 'Recorrente (MRR)' : 'Receita única'}</p>
+        </div>
+      </div>
+
+      <ProposalContentBlocksEditor
+        proposalId={proposal.id}
+        contractId={contractId}
+        initialBlocks={contentBlocks ?? []}
+        canEdit={canEditPages}
+      />
 
       <ProposalApprovalPanel
         proposalId={proposal.id}
