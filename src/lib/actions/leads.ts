@@ -3,22 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { calculateLeadScore } from '@/lib/utils/lead-score'
 
 export type ActionState = { error?: string }
-
-// Pontuação automática simples — quanto mais completo e "intencional"
-// o lead, maior a pontuação. Dá pra refinar depois com regras mais
-// específicas, mas isso já ajuda a priorizar quem responde primeiro.
-function calculateLeadScore(fields: { email: string | null; phone: string | null; company_name: string | null; message: string | null; source: string | null }): number {
-  let score = 0
-  if (fields.email) score += 15
-  if (fields.phone) score += 15
-  if (fields.company_name) score += 20
-  if (fields.message && fields.message.length > 20) score += 20
-  if (fields.message && fields.message.length > 100) score += 10
-  if (fields.source === 'formulario') score += 10
-  return score
-}
 
 // Criação de lead — usado tanto pelo formulário PÚBLICO de captação
 // quanto pelo cadastro manual da equipe. Sem exigir login (o público
@@ -35,7 +22,7 @@ export async function createLead(formData: FormData): Promise<ActionState & { le
 
   if (!name) return { error: 'Nome é obrigatório.' }
 
-  const score = calculateLeadScore({ email, phone, company_name, message, source })
+  const { score } = calculateLeadScore({ email, phone, company_name, message, source })
 
   const { data, error } = await supabase
     .from('leads')

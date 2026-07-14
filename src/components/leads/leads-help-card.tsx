@@ -25,7 +25,7 @@ export function LeadsHelpCard() {
           <div>
             <p className="font-medium">Como a pontuação funciona</p>
             <p className="text-blue-800/80">
-              Automática, de 0 a 100 — soma pontos por completude e intenção: e-mail (+15), telefone (+15), empresa informada (+20), mensagem detalhada (+20 a +30), veio pelo formulário público (+10). Quanto maior, mais provável que valha a pena priorizar.
+              Baseada em sinais reais, não só em preencher campos: <strong>origem</strong> (indicação vale mais que anúncio), <strong>e-mail corporativo</strong> (vs pessoal), <strong>empresa parecer ser da área de saúde</strong> pelo nome (o público certo de vocês), telefone e mensagem com detalhe. Abre qualquer lead e tem um quadro &quot;Por que essa pontuação&quot; mostrando o cálculo exato.
             </p>
           </div>
           <div>

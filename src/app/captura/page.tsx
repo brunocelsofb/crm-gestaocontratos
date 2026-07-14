@@ -8,7 +8,7 @@ export default function PublicCapturePage() {
           <h1 className="text-xl font-semibold text-gray-900">Fale com a gente</h1>
           <p className="mt-1 text-sm text-gray-500">Preencha os dados abaixo e entraremos em contato.</p>
         </div>
-        <LeadCaptureForm source="formulario" />
+        <LeadCaptureForm />
       </div>
     </div>
   )

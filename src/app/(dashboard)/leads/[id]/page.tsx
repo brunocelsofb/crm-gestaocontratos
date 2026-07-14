@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { LeadActionsPanel } from '@/components/leads/lead-actions-panel'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
+import { calculateLeadScore } from '@/lib/utils/lead-score'
 
 export default async function LeadDetailPage({
   params,
@@ -21,6 +22,14 @@ export default async function LeadDetailPage({
 
   if (!lead) notFound()
 
+  const { breakdown } = calculateLeadScore({
+    email: lead.email,
+    phone: lead.phone,
+    company_name: lead.company_name,
+    message: lead.message,
+    source: lead.source,
+  })
+
   const profileById = new Map((allProfiles ?? []).map((p) => [p.id, p.full_name]))
 
   return (
@@ -31,10 +40,19 @@ export default async function LeadDetailPage({
 
       <div>
         <h1 className="text-lg font-semibold text-gray-900">{lead.name}</h1>
-        <p className="text-sm text-gray-500">
-          {lead.company_name ?? 'Sem empresa informada'} · Pontuação: <span className="font-semibold">{lead.score}</span>{' '}
-          <span className="text-xs text-gray-400">(quanto mais completo o cadastro, maior — veja em &quot;Como funciona&quot; na lista de Leads)</span>
-        </p>
+        <p className="text-sm text-gray-500">{lead.company_name ?? 'Sem empresa informada'} · Pontuação: <span className="font-semibold">{lead.score}</span></p>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <p className="text-xs font-medium text-gray-500">Por que essa pontuação</p>
+        <div className="mt-2 space-y-1">
+          {breakdown.map((b, i) => (
+            <div key={i} className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">{b.label}</span>
+              <span className="font-medium text-gray-900">+{b.points}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {lead.status === 'convertido' && lead.converted_contract_id && (

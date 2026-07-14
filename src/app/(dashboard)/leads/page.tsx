@@ -18,6 +18,16 @@ const STATUS_STYLES: Record<string, string> = {
   descartado: 'bg-gray-100 text-gray-500',
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  indicacao: 'Indicação',
+  evento: 'Evento',
+  formulario_site: 'Site',
+  ligacao: 'Ligação',
+  anuncio: 'Anúncio',
+  manual: 'Manual',
+  outro: 'Outro',
+}
+
 function scoreColor(score: number) {
   if (score >= 60) return 'text-positive-700'
   if (score >= 30) return 'text-yellow-700'
@@ -103,7 +113,7 @@ export default async function LeadsPage({
                   <div className="text-xs text-gray-400">{lead.email ?? lead.phone ?? '—'}</div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{lead.company_name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-500">{lead.source ?? 'manual'}</td>
+                <td className="px-4 py-3 text-gray-500">{SOURCE_LABELS[lead.source ?? ''] ?? lead.source ?? 'manual'}</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[lead.status]}`}>
                     {STATUS_LABELS[lead.status]}

@@ -5,11 +5,9 @@ import { useRouter } from 'next/navigation'
 import { createLead } from '@/lib/actions/leads'
 
 export function LeadCaptureForm({
-  source,
   onSuccess,
   redirectAfter,
 }: {
-  source: 'formulario' | 'manual'
   onSuccess?: () => void
   redirectAfter?: (leadId: string) => string
 }) {
@@ -21,7 +19,6 @@ export function LeadCaptureForm({
   async function handleSubmit(formData: FormData) {
     setBusy(true)
     setError(null)
-    formData.set('source', source)
     const result = await createLead(formData)
     setBusy(false)
 
@@ -65,6 +62,17 @@ export function LeadCaptureForm({
       <div>
         <label className="block text-sm font-medium text-gray-700">Empresa</label>
         <input name="company_name" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Como você conheceu a ORBIS?</label>
+        <select name="source" defaultValue="formulario_site" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none">
+          <option value="indicacao">Indicação de alguém</option>
+          <option value="evento">Evento / congresso</option>
+          <option value="formulario_site">Site / busca na internet</option>
+          <option value="ligacao">Ligação</option>
+          <option value="anuncio">Anúncio</option>
+          <option value="outro">Outro</option>
+        </select>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Como podemos ajudar?</label>

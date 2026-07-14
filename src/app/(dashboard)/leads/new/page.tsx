@@ -8,7 +8,7 @@ export default function NewLeadPage() {
         ← Voltar
       </Link>
       <h1 className="text-[17px] font-medium text-foreground">Novo Lead</h1>
-      <LeadCaptureForm source="manual" redirectAfter={(leadId) => `/leads/${leadId}`} />
+      <LeadCaptureForm redirectAfter={(leadId) => `/leads/${leadId}`} />
     </div>
   )
 }
