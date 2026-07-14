@@ -352,6 +352,12 @@ export default async function ContractDetailPage({
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-3">
+                  <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>
+                  <NoteForm contractId={contract.id} />
+                  <Timeline activities={activities} />
+                </div>
               </div>
             ),
           },
@@ -415,16 +421,6 @@ export default async function ContractDetailPage({
             id: 'arquivos',
             label: 'Arquivos',
             content: <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />,
-          },
-          {
-            id: 'historico',
-            label: 'Histórico',
-            content: (
-              <div className="space-y-3">
-                <NoteForm contractId={contract.id} />
-                <Timeline activities={activities} />
-              </div>
-            ),
           },
         ]}
       />
