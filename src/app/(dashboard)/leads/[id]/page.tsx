@@ -31,7 +31,10 @@ export default async function LeadDetailPage({
 
       <div>
         <h1 className="text-lg font-semibold text-gray-900">{lead.name}</h1>
-        <p className="text-sm text-gray-500">{lead.company_name ?? 'Sem empresa informada'} · Pontuação: <span className="font-semibold">{lead.score}</span></p>
+        <p className="text-sm text-gray-500">
+          {lead.company_name ?? 'Sem empresa informada'} · Pontuação: <span className="font-semibold">{lead.score}</span>{' '}
+          <span className="text-xs text-gray-400">(quanto mais completo o cadastro, maior — veja em &quot;Como funciona&quot; na lista de Leads)</span>
+        </p>
       </div>
 
       {lead.status === 'convertido' && lead.converted_contract_id && (

@@ -12,6 +12,8 @@ const TOOL_LABELS: Record<string, string> = {
   move_contract_stage: 'Mover etapa do contrato',
 }
 
+const STORAGE_KEY = 'assistant_button_position'
+
 export function AssistantPanel() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -22,6 +24,57 @@ export function AssistantPanel() {
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Posição do botão flutuante — arrastável e lembrada entre sessões
+  // (guardada no navegador, não no banco — é só uma preferência visual
+  // de tela, não precisa sincronizar entre dispositivos).
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const dragInfo = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) setPosition(JSON.parse(saved))
+    } catch {
+      // sem problema se não conseguir ler — só usa a posição padrão
+    }
+  }, [])
+
+  function handleDragStart(e: React.MouseEvent) {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    dragInfo.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top, moved: false }
+    document.addEventListener('mousemove', handleDragMove)
+    document.addEventListener('mouseup', handleDragEnd)
+  }
+
+  function handleDragMove(e: MouseEvent) {
+    if (!dragInfo.current) return
+    const dx = e.clientX - dragInfo.current.startX
+    const dy = e.clientY - dragInfo.current.startY
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragInfo.current.moved = true
+    const newX = Math.min(Math.max(dragInfo.current.origX + dx, 8), window.innerWidth - 56)
+    const newY = Math.min(Math.max(dragInfo.current.origY + dy, 8), window.innerHeight - 56)
+    setPosition({ x: newX, y: newY })
+  }
+
+  function handleDragEnd() {
+    document.removeEventListener('mousemove', handleDragMove)
+    document.removeEventListener('mouseup', handleDragEnd)
+    if (position) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(position))
+      } catch {
+        // se não conseguir salvar, só não lembra da próxima vez — sem problema
+      }
+    }
+    // Se não moveu de verdade, foi um clique — abre/fecha o painel.
+    if (dragInfo.current && !dragInfo.current.moved) {
+      setOpen((v) => !v)
+    }
+    dragInfo.current = null
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -107,15 +160,28 @@ export function AssistantPanel() {
   return (
     <>
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-brand-700 text-xl text-white shadow-lg hover:bg-brand-800"
-        title="Assistente de IA"
+        ref={buttonRef}
+        onMouseDown={handleDragStart}
+        style={
+          position
+            ? { position: 'fixed', left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
+            : { position: 'fixed', right: 20, bottom: 20 }
+        }
+        className="z-40 flex h-12 w-12 cursor-grab items-center justify-center rounded-full bg-brand-700 text-xl text-white shadow-lg hover:bg-brand-800 active:cursor-grabbing"
+        title="Assistente de IA — clique pra abrir, arraste pra mover"
       >
         🤖
       </button>
 
       {open && (
-        <div className="fixed bottom-20 right-5 z-40 flex h-[520px] w-96 flex-col rounded-xl border border-gray-200 bg-white shadow-2xl">
+        <div
+          style={
+            position
+              ? { position: 'fixed', left: Math.min(position.x, window.innerWidth - 384 - 8), top: Math.max(position.y - 536, 8) }
+              : { position: 'fixed', right: 20, bottom: 80 }
+          }
+          className="z-40 flex h-[520px] w-96 flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
+        >
           <div className="flex items-center justify-between rounded-t-xl bg-brand-700 px-4 py-3">
             <p className="text-sm font-medium text-white">🤖 Assistente do CRM</p>
             <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white">✕</button>

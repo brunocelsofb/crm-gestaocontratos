@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { LeadsHelpCard } from '@/components/leads/leads-help-card'
 
 const STATUS_LABELS: Record<string, string> = {
   novo: 'Novo',
@@ -59,6 +60,8 @@ export default async function LeadsPage({
           </Link>
         </div>
       </div>
+
+      <LeadsHelpCard />
 
       <div className="flex flex-wrap gap-2">
         <Link
