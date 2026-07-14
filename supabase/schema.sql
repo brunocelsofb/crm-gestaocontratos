@@ -828,3 +828,48 @@ alter table contract_crm.assistant_usage_log enable row level security;
 
 create policy "assistant_usage_log_select" on contract_crm.assistant_usage_log for select using (auth.role() = 'authenticated');
 create policy "assistant_usage_log_insert" on contract_crm.assistant_usage_log for insert with check (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 26. Leads & Captação
+-- ------------------------------------------------------------
+create table contract_crm.leads (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text,
+  phone text,
+  company_name text,
+  message text,
+  source text default 'manual',
+  status text not null default 'novo' check (status in ('novo', 'em_qualificacao', 'qualificado', 'descartado', 'convertido')),
+  score integer not null default 0,
+  assigned_to uuid references contract_crm.profiles(id),
+  converted_contract_id uuid references contract_crm.contracts(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_leads_status on contract_crm.leads(status);
+create index idx_leads_score on contract_crm.leads(score desc);
+
+create table contract_crm.lead_activities (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references contract_crm.leads(id) on delete cascade,
+  user_id uuid references contract_crm.profiles(id),
+  type text not null default 'note' check (type in ('note', 'system')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index idx_lead_activities_lead on contract_crm.lead_activities(lead_id);
+
+alter table contract_crm.leads enable row level security;
+alter table contract_crm.lead_activities enable row level security;
+
+create policy "leads_select" on contract_crm.leads for select using (auth.role() = 'authenticated');
+create policy "leads_insert_public" on contract_crm.leads for insert with check (true);
+create policy "leads_update" on contract_crm.leads for update using (auth.role() = 'authenticated');
+create policy "leads_delete" on contract_crm.leads for delete using (auth.role() = 'authenticated');
+
+create policy "lead_activities_select" on contract_crm.lead_activities for select using (auth.role() = 'authenticated');
+create policy "lead_activities_insert" on contract_crm.lead_activities for insert with check (auth.role() = 'authenticated');

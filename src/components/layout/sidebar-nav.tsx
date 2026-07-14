@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList, Tag, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList, Tag, BarChart3, Target } from 'lucide-react'
 
 const BASE_NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
+  { href: '/leads', label: 'Leads', icon: Target },
   { href: '/contracts', label: 'Contratos', icon: FileText },
   { href: '/companies', label: 'Empresas', icon: Building2 },
   { href: '/surveys-dashboard', label: 'Pesquisas e NPS', icon: BarChart3 },
