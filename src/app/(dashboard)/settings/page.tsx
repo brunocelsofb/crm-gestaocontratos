@@ -10,7 +10,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name')
+    .select('name, company_name, logo_storage_path')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -23,6 +23,7 @@ export default async function SettingsPage() {
       <OrganizationSettingsForm
         currentName={settings?.name ?? 'Contract CRM'}
         currentCompanyName={settings?.company_name ?? ''}
+        currentLogoPath={settings?.logo_storage_path ?? null}
       />
     </div>
   )

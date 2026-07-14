@@ -1,12 +1,11 @@
 // Constrói a página de dados da proposta (a "Proposta padrão") usando
-// pdf-lib — texto e tabela desenhados diretamente, não é um template
-// visual bonito ainda, é a estrutura de dados correta. Dá pra evoluir o
-// layout depois sem mexer na lógica de mesclagem.
+// pdf-lib. Layout em duas colunas pra ficar mais perto do modelo de
+// referência (logo + dados da contratada em cima, "Dados da pessoa" e
+// "Dados da empresa" do CLIENTE lado a lado, embaixo).
 //
 // NOTA DE INCERTEZA: nunca gerei e abri um PDF de verdade produzido por
 // esse código — a API do pdf-lib usada aqui é a que eu conheço, mas
-// confirme o resultado visual (texto cortado, sobreposição, etc.) e me
-// avise o que precisar de ajuste.
+// confirme o resultado visual e me avise o que precisar de ajuste.
 
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
@@ -48,6 +47,14 @@ type ContactRow = {
   address: string | null
 } | null
 
+type OrgInfo = {
+  companyName: string | null
+  logoBytes: Uint8Array | null
+  logoIsPng: boolean
+  createdByName: string | null
+  createdByEmail: string | null
+}
+
 function fmtCurrency(v: number, currency: string) {
   try {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(v)
@@ -66,11 +73,13 @@ export async function buildStandardProposalPage({
   items,
   company,
   contact,
+  org,
 }: {
   proposal: ProposalRow
   items: ItemRow[]
   company: CompanyRow
   contact: ContactRow
+  org: OrgInfo
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
@@ -89,81 +98,127 @@ export async function buildStandardProposalPage({
     }
   }
 
-  function drawText(text: string, opts: { size?: number; bold?: boolean; color?: [number, number, number]; x?: number } = {}) {
-    const size = opts.size ?? 10
-    newPageIfNeeded(size + 6)
-    page.drawText(text || '—', {
-      x: opts.x ?? margin,
-      y,
-      size,
+  function text(str: string, x: number, yPos: number, opts: { size?: number; bold?: boolean; color?: [number, number, number] } = {}) {
+    page.drawText(str || '—', {
+      x,
+      y: yPos,
+      size: opts.size ?? 9,
       font: opts.bold ? fontBold : font,
-      color: opts.color ? rgb(...opts.color) : rgb(0.1, 0.1, 0.1),
+      color: opts.color ? rgb(...opts.color) : rgb(0.15, 0.15, 0.15),
     })
-    y -= size + 6
   }
 
-  function drawSectionTitle(title: string) {
-    y -= 6
-    newPageIfNeeded(20)
-    page.drawRectangle({ x: margin, y: y - 2, width: pageWidth - margin * 2, height: 16, color: rgb(0.11, 0.33, 0.42) })
-    page.drawText(title, { x: margin + 6, y: y + 2, size: 10, font: fontBold, color: rgb(1, 1, 1) })
-    y -= 22
+  // ---- Linha 1: data / validade — sigla da proposta ----
+  text(`${fmtDate(proposal.created_at)} - Validade: ${fmtDate(proposal.valid_until)}`, margin, y, { size: 9, color: [0.4, 0.4, 0.4] })
+  text(`Proposta ${proposal.control_code}`, pageWidth - margin - 140, y, { size: 11, bold: true })
+  y -= 24
+
+  // ---- Cabeçalho: logo + empresa contratada | contato interno ----
+  let logoDrawn = false
+  if (org.logoBytes) {
+    try {
+      const image = org.logoIsPng ? await doc.embedPng(org.logoBytes) : await doc.embedJpg(org.logoBytes)
+      const logoHeight = 40
+      const logoWidth = (image.width / image.height) * logoHeight
+      page.drawImage(image, { x: margin, y: y - logoHeight + 6, width: logoWidth, height: logoHeight })
+      logoDrawn = true
+    } catch {
+      // Se o logo não carregar (formato inesperado), segue sem ele —
+      // não quebra a geração do PDF por causa disso.
+    }
   }
 
-  drawText('PROPOSTA COMERCIAL', { size: 18, bold: true })
-  drawText(`${proposal.control_code} · versão ${proposal.version}`, { size: 10, color: [0.4, 0.4, 0.4] })
-  y -= 8
+  const headerTextX = logoDrawn ? margin + 90 : margin
+  text(org.companyName ?? 'Empresa', headerTextX, y, { size: 13, bold: true })
+  y -= 26
 
-  drawSectionTitle('Dados da Proposta')
-  drawText(`Moeda: ${proposal.currency}`)
-  drawText(`Data de criação: ${fmtDate(proposal.created_at)}`)
-  drawText(`Data de validade: ${fmtDate(proposal.valid_until)}`)
-  drawText(`Nº OC do cliente: ${proposal.client_po_number ?? '—'}`)
+  text('Contato', pageWidth - margin - 140, y + 26, { size: 11, bold: true })
+  if (org.createdByName) {
+    text(org.createdByName, pageWidth - margin - 140, y + 10, { size: 9 })
+    text(org.createdByEmail ?? '', pageWidth - margin - 140, y - 2, { size: 8, color: [0.4, 0.4, 0.4] })
+  }
 
-  drawSectionTitle('Dados da Empresa')
-  drawText(`Nome: ${company?.name ?? '—'}${company?.trade_name ? ` (${company.trade_name})` : ''}`)
-  drawText(`Razão Social: ${company?.legal_name ?? company?.name ?? '—'}`)
-  drawText(`CNPJ: ${company?.cnpj ?? '—'}`)
-  drawText(`E-mail NF: ${company?.nf_email ?? '—'}`)
-  drawText(`Endereço: ${company?.address ?? '—'}`)
+  y -= 4
+  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) })
+  y -= 24
 
-  drawSectionTitle('Dados do Contato')
-  drawText(`Nome: ${contact?.name ?? '—'}`)
-  drawText(`CPF: ${contact?.cpf ?? '—'}`)
-  drawText(`E-mail: ${contact?.email ?? '—'}`)
-  drawText(`Telefone: ${contact?.phone ?? '—'}`)
-  drawText(`Endereço: ${contact?.address ?? '—'}`)
+  // ---- Duas caixas lado a lado: Dados da pessoa | Dados da empresa (cliente) ----
+  const boxWidth = (pageWidth - margin * 2 - 16) / 2
+  const boxHeight = 110
+  const boxTop = y
 
-  drawSectionTitle('Produtos / Serviços')
+  page.drawRectangle({ x: margin, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 1 })
+  page.drawRectangle({ x: margin + boxWidth + 16, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 1 })
+
+  let ly = boxTop - 16
+  text('Dados da pessoa', margin + 8, ly, { size: 9, bold: true, color: [0.4, 0.4, 0.4] })
+  ly -= 16
+  text(contact?.name ?? '—', margin + 8, ly, { size: 9, bold: true })
+  ly -= 14
+  text(`CPF: ${contact?.cpf ?? '—'}`, margin + 8, ly, { size: 8 })
+  ly -= 12
+  text(`E-mail: ${contact?.email ?? '—'}`, margin + 8, ly, { size: 8 })
+  ly -= 12
+  text(`Telefone: ${contact?.phone ?? '—'}`, margin + 8, ly, { size: 8 })
+  ly -= 12
+  text(`Endereço: ${(contact?.address ?? '—').slice(0, 45)}`, margin + 8, ly, { size: 8 })
+
+  let ry = boxTop - 16
+  const rx = margin + boxWidth + 16 + 8
+  text('Dados da empresa', rx, ry, { size: 9, bold: true, color: [0.4, 0.4, 0.4] })
+  ry -= 16
+  text(`Razão social: ${(company?.legal_name ?? company?.name ?? '—').slice(0, 42)}`, rx, ry, { size: 8, bold: true })
+  ry -= 14
+  text(`Nome fantasia: ${company?.trade_name ?? '—'}`, rx, ry, { size: 8 })
+  ry -= 12
+  text(`CNPJ: ${company?.cnpj ?? '—'}`, rx, ry, { size: 8 })
+  ry -= 12
+  text(`E-mail NF: ${company?.nf_email ?? '—'}`, rx, ry, { size: 8 })
+  ry -= 12
+  text(`Endereço: ${(company?.address ?? '—').slice(0, 45)}`, rx, ry, { size: 8 })
+
+  y = boxTop - boxHeight - 24
+
+  // ---- Dados da proposta ----
+  newPageIfNeeded(60)
+  text('Dados da Proposta', margin, y, { size: 10, bold: true })
+  y -= 16
+  text(`Moeda: ${proposal.currency}   ·   Nº OC do cliente: ${proposal.client_po_number ?? '—'}`, margin, y, { size: 8 })
+  y -= 24
+
+  // ---- Tabela de itens ----
+  newPageIfNeeded(40)
+  text('Produtos / Serviços', margin, y, { size: 10, bold: true })
+  y -= 18
 
   const colX = { qty: margin, cat: margin + 35, item: margin + 100, type: margin + 240, unit: margin + 300, disc: margin + 370, sub: margin + 440 }
-  newPageIfNeeded(20)
-  page.drawText('Qtd', { x: colX.qty, y, size: 8, font: fontBold })
-  page.drawText('Categoria', { x: colX.cat, y, size: 8, font: fontBold })
-  page.drawText('Item', { x: colX.item, y, size: 8, font: fontBold })
-  page.drawText('Tipo', { x: colX.type, y, size: 8, font: fontBold })
-  page.drawText('Vlr. Unit.', { x: colX.unit, y, size: 8, font: fontBold })
-  page.drawText('Desc.', { x: colX.disc, y, size: 8, font: fontBold })
-  page.drawText('Subtotal', { x: colX.sub, y, size: 8, font: fontBold })
+  newPageIfNeeded(16)
+  text('Qtd', colX.qty, y, { size: 8, bold: true })
+  text('Categoria', colX.cat, y, { size: 8, bold: true })
+  text('Item', colX.item, y, { size: 8, bold: true })
+  text('Tipo', colX.type, y, { size: 8, bold: true })
+  text('Vlr. Unit.', colX.unit, y, { size: 8, bold: true })
+  text('Desc.', colX.disc, y, { size: 8, bold: true })
+  text('Subtotal', colX.sub, y, { size: 8, bold: true })
   y -= 14
 
   let total = 0
   for (const it of items) {
     newPageIfNeeded(28)
-    page.drawText(String(it.quantity), { x: colX.qty, y, size: 8, font })
-    page.drawText((it.category ?? '—').slice(0, 12), { x: colX.cat, y, size: 8, font })
-    page.drawText(it.item.slice(0, 28), { x: colX.item, y, size: 8, font })
-    page.drawText((it.type ?? '—').slice(0, 10), { x: colX.type, y, size: 8, font })
-    page.drawText(fmtCurrency(it.unit_value, proposal.currency), { x: colX.unit, y, size: 8, font })
-    page.drawText(fmtCurrency(it.discount, proposal.currency), { x: colX.disc, y, size: 8, font })
-    page.drawText(fmtCurrency(it.subtotal, proposal.currency), { x: colX.sub, y, size: 8, font })
+    text(String(it.quantity), colX.qty, y, { size: 8 })
+    text((it.category ?? '—').slice(0, 12), colX.cat, y, { size: 8 })
+    text(it.item.slice(0, 28), colX.item, y, { size: 8 })
+    text((it.type ?? '—').slice(0, 10), colX.type, y, { size: 8 })
+    text(fmtCurrency(it.unit_value, proposal.currency), colX.unit, y, { size: 8 })
+    text(fmtCurrency(it.discount, proposal.currency), colX.disc, y, { size: 8 })
+    text(fmtCurrency(it.subtotal, proposal.currency), colX.sub, y, { size: 8 })
     y -= 12
     if (it.characteristics) {
-      page.drawText(`  ${it.characteristics.slice(0, 90)}`, { x: colX.item, y, size: 7, font, color: rgb(0.4, 0.4, 0.4) })
+      text(`  ${it.characteristics.slice(0, 90)}`, colX.item, y, { size: 7, color: [0.45, 0.45, 0.45] })
       y -= 10
     }
     if (it.delivery_forecast) {
-      page.drawText(`  Previsão de entrega: ${it.delivery_forecast}`, { x: colX.item, y, size: 7, font, color: rgb(0.4, 0.4, 0.4) })
+      text(`  Previsão de entrega: ${it.delivery_forecast}`, colX.item, y, { size: 7, color: [0.45, 0.45, 0.45] })
       y -= 10
     }
     y -= 4
@@ -172,7 +227,7 @@ export async function buildStandardProposalPage({
 
   y -= 8
   newPageIfNeeded(20)
-  page.drawText(`TOTAL: ${fmtCurrency(total, proposal.currency)}`, { x: colX.sub - 60, y, size: 12, font: fontBold })
+  text(`TOTAL: ${fmtCurrency(total, proposal.currency)}`, colX.sub - 60, y, { size: 12, bold: true })
 
   return doc.save()
 }

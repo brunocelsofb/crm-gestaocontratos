@@ -332,6 +332,7 @@ create table contract_crm.organization_settings (
   id text primary key default 'default',
   name text not null default 'Contract CRM',
   company_name text,
+  logo_storage_path text,
   updated_at timestamptz not null default now()
 );
 
@@ -641,6 +642,8 @@ create table contract_crm.proposals (
   client_po_number text,
   valid_until date,
   token text unique,
+  assigned_technical_approver_id uuid references contract_crm.profiles(id),
+  assigned_commercial_approver_id uuid references contract_crm.profiles(id),
   pdf_storage_path text,
   created_by uuid references contract_crm.profiles(id),
   created_at timestamptz not null default now(),

@@ -179,34 +179,119 @@ export async function deleteProposal(proposalId: string, contractId: string) {
   revalidatePath(`/contracts/${contractId}`)
 }
 
-// ------------------------------------------------------------
-// Envio pra aprovação técnica (sai de rascunho)
-// ------------------------------------------------------------
-export async function submitForTechnicalApproval(proposalId: string, contractId: string): Promise<ActionState> {
+// Cria uma NOVA VERSÃO da proposta, copiando os itens da anterior (pra
+// editar a partir daí) — usado quando o cliente negocia e pede ajuste,
+// ou quando é declinada e precisa de uma versão nova.
+export async function createProposalVersion(
+  originalProposalId: string,
+  contractId: string
+): Promise<{ error?: string; proposalId?: string }> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
 
-  await supabase.from('proposals').update({ status: 'pending_technical', updated_at: new Date().toISOString() }).eq('id', proposalId)
+  const { data: original } = await supabase.from('proposals').select('*').eq('id', originalProposalId).single()
+  if (!original) return { error: 'Proposta original não encontrada.' }
 
-  const { data: profilesInDept } = await supabase.from('profiles').select('id').eq('department', 'tecnico')
-  if (profilesInDept) {
-    await supabase.from('notifications').insert(
-      profilesInDept.map((p) => ({
-        user_id: p.id,
-        contract_id: contractId,
-        message: 'Uma proposta comercial precisa de pré-aprovação técnica.',
+  const { data: originalItems } = await supabase.from('proposal_items').select('*').eq('proposal_id', originalProposalId).order('position')
+  const { data: originalPages } = await supabase.from('proposal_pages').select('*').eq('proposal_id', originalProposalId).order('position')
+
+  const controlCode = `${original.control_code.split('-v')[0]}-v${original.version + 1}`
+
+  const { data: newProposal, error } = await supabase
+    .from('proposals')
+    .insert({
+      contract_id: contractId,
+      control_code: controlCode,
+      version: original.version + 1,
+      currency: original.currency,
+      client_po_number: original.client_po_number,
+      valid_until: original.valid_until,
+      created_by: user.id,
+    })
+    .select()
+    .single()
+
+  if (error || !newProposal) return { error: error?.message ?? 'Falha ao criar nova versão.' }
+
+  if (originalItems && originalItems.length > 0) {
+    await supabase.from('proposal_items').insert(
+      originalItems.map((it) => ({
+        proposal_id: newProposal.id,
+        position: it.position,
+        quantity: it.quantity,
+        category: it.category,
+        item: it.item,
+        characteristics: it.characteristics,
+        type: it.type,
+        delivery_forecast: it.delivery_forecast,
+        unit_value: it.unit_value,
+        discount: it.discount,
+        subtotal: it.subtotal,
       }))
     )
+  }
+
+  if (originalPages && originalPages.length > 0) {
+    await supabase.from('proposal_pages').insert(
+      originalPages.map((p) => ({
+        proposal_id: newProposal.id,
+        position: p.position,
+        template_id: p.template_id,
+        is_standard_proposal: p.is_standard_proposal,
+      }))
+    )
+  } else {
+    await supabase.from('proposal_pages').insert({ proposal_id: newProposal.id, position: 0, is_standard_proposal: true })
   }
 
   await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'system',
-    content: 'Proposta enviada para pré-aprovação técnica.',
+    content: `Nova versão da proposta criada: ${controlCode} (baseada em ${original.control_code}).`,
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  return { proposalId: newProposal.id }
+}
+
+// ------------------------------------------------------------
+// Envio pra aprovação técnica (sai de rascunho)
+// ------------------------------------------------------------
+export async function submitForTechnicalApproval(
+  proposalId: string,
+  contractId: string,
+  technicalApproverId: string
+): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+  if (!technicalApproverId) return { error: 'Escolha quem vai fazer a pré-aprovação técnica.' }
+
+  await supabase
+    .from('proposals')
+    .update({ status: 'pending_technical', assigned_technical_approver_id: technicalApproverId, updated_at: new Date().toISOString() })
+    .eq('id', proposalId)
+
+  // Notifica SÓ a pessoa escolhida — não o departamento inteiro.
+  await supabase.from('notifications').insert({
+    user_id: technicalApproverId,
+    contract_id: contractId,
+    message: 'Uma proposta comercial foi designada pra sua pré-aprovação técnica.',
+  })
+
+  const { data: approver } = await supabase.from('profiles').select('full_name').eq('id', technicalApproverId).maybeSingle()
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'system',
+    content: `Proposta enviada para pré-aprovação técnica de ${approver?.full_name ?? 'alguém'}.`,
   })
 
   revalidatePath(`/contracts/${contractId}`)
@@ -221,7 +306,8 @@ export async function decideInternalApproval(
   contractId: string,
   stage: 'technical' | 'commercial',
   decision: 'approved' | 'declined',
-  comment: string
+  comment: string,
+  nextApproverId?: string
 ): Promise<ActionState> {
   const supabase = await createClient()
   const {
@@ -231,6 +317,26 @@ export async function decideInternalApproval(
 
   if (!comment.trim()) {
     return { error: 'O comentário é obrigatório pra aprovar ou declinar.' }
+  }
+
+  // Só quem foi DESIGNADO pra essa etapa (ou admin) pode decidir — é
+  // isso que garante que o aprovador é escolhido, não "quem chegar
+  // primeiro" no departamento inteiro.
+  const [{ data: proposalForCheck }, { data: profile }] = await Promise.all([
+    supabase.from('proposals').select('assigned_technical_approver_id, assigned_commercial_approver_id').eq('id', proposalId).single(),
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+  ])
+
+  const assignedId = stage === 'technical' ? proposalForCheck?.assigned_technical_approver_id : proposalForCheck?.assigned_commercial_approver_id
+  const isAssigned = assignedId === user.id
+  const isAdmin = profile?.role === 'admin'
+
+  if (!isAssigned && !isAdmin) {
+    return { error: 'Só a pessoa designada pra essa aprovação (ou um admin) pode decidir.' }
+  }
+
+  if (stage === 'technical' && decision === 'approved' && !nextApproverId) {
+    return { error: 'Escolha quem vai fazer a aprovação comercial.' }
   }
 
   const { error: approvalError } = await supabase.from('proposal_approvals').insert({
@@ -258,21 +364,19 @@ export async function decideInternalApproval(
     return {}
   }
 
-  // Aprovado: técnico → passa pro comercial; comercial → gera o PDF e
-  // abre pro cliente.
+  // Aprovado: técnico → passa pro comercial ESCOLHIDO; comercial → gera
+  // o PDF e abre pro cliente.
   if (stage === 'technical') {
-    await supabase.from('proposals').update({ status: 'pending_commercial', updated_at: new Date().toISOString() }).eq('id', proposalId)
+    await supabase
+      .from('proposals')
+      .update({ status: 'pending_commercial', assigned_commercial_approver_id: nextApproverId, updated_at: new Date().toISOString() })
+      .eq('id', proposalId)
 
-    const { data: commercialProfiles } = await supabase.from('profiles').select('id').eq('department', 'comercial')
-    if (commercialProfiles) {
-      await supabase.from('notifications').insert(
-        commercialProfiles.map((p) => ({
-          user_id: p.id,
-          contract_id: contractId,
-          message: 'Uma proposta comercial teve ciência técnica — aguardando sua aprovação.',
-        }))
-      )
-    }
+    await supabase.from('notifications').insert({
+      user_id: nextApproverId!,
+      contract_id: contractId,
+      message: 'Uma proposta teve ciência técnica — foi designada pra sua aprovação comercial.',
+    })
   } else {
     const result = await generateProposalPdf(proposalId, contractId)
     if (result.error) return { error: result.error }
@@ -319,7 +423,7 @@ export async function generateProposalPdf(proposalId: string, contractId: string
   await supabase.from('activities').insert({
     contract_id: contractId,
     type: 'system',
-    content: `PDF da proposta ${proposal.control_code} gerado e link enviado pro cliente.`,
+    content: `PDF da proposta ${proposal.control_code} gerado. Link de aprovação disponível — copie e envie pro cliente.`,
   })
 
   return {}

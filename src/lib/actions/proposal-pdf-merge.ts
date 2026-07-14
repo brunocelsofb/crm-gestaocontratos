@@ -34,6 +34,26 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
     ? await supabase.from('contacts').select('*').eq('id', contract.contact_id).maybeSingle()
     : { data: null }
 
+  const { data: orgSettings } = await supabase
+    .from('organization_settings')
+    .select('company_name, logo_storage_path')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  let logoBytes: Uint8Array | null = null
+  let logoIsPng = true
+  if (orgSettings?.logo_storage_path) {
+    const { data: logoFile } = await supabase.storage.from('proposal-files').download(orgSettings.logo_storage_path)
+    if (logoFile) {
+      logoBytes = new Uint8Array(await logoFile.arrayBuffer())
+      logoIsPng = orgSettings.logo_storage_path.toLowerCase().endsWith('.png')
+    }
+  }
+
+  const { data: createdByProfile } = proposal.created_by
+    ? await supabase.from('profiles').select('full_name, email').eq('id', proposal.created_by).maybeSingle()
+    : { data: null }
+
   if (!pages || pages.length === 0) {
     return { error: 'Monte a ordem das páginas antes de visualizar (mesmo que só com a Proposta padrão).' }
   }
@@ -48,6 +68,13 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
           items: items ?? [],
           company,
           contact,
+          org: {
+            companyName: orgSettings?.company_name ?? null,
+            logoBytes,
+            logoIsPng,
+            createdByName: createdByProfile?.full_name ?? null,
+            createdByEmail: createdByProfile?.email ?? null,
+          },
         })
         const standardDoc = await PDFDocument.load(standardPageBytes)
         const copied = await mergedPdf.copyPages(standardDoc, standardDoc.getPageIndices())
