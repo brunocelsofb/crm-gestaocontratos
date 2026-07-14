@@ -34,17 +34,44 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
   const supabase = await createClient()
 
   const subject = (formData.get('subject') as string)?.trim()
-  const description = (formData.get('description') as string)?.trim() || null
+  const description = (formData.get('description') as string)?.trim()
   const priority = (formData.get('priority') as string) || 'media'
   const category = (formData.get('category') as string) || null
   const requester_name = (formData.get('requester_name') as string)?.trim()
-  const requester_email = (formData.get('requester_email') as string)?.trim() || null
-  const requester_phone = (formData.get('requester_phone') as string)?.trim() || null
+  const requester_email = (formData.get('requester_email') as string)?.trim()
+  const requester_phone = (formData.get('requester_phone') as string)?.trim()
+  const requester_cnpj = ((formData.get('requester_cnpj') as string) || '').replace(/\D/g, '')
   const source = (formData.get('source') as string) || 'manual'
-  const contract_id = (formData.get('contract_id') as string) || null
+  let contract_id = (formData.get('contract_id') as string) || null
 
+  // Todos esses campos são obrigatórios — checados aqui de novo mesmo
+  // que o front já valide, porque só o front nunca é confiável sozinho.
+  if (!requester_name || requester_name.trim().split(/\s+/).length < 2) {
+    return { error: 'Informe nome e sobrenome do solicitante.' }
+  }
+  if (!requester_email) return { error: 'E-mail é obrigatório.' }
+  if (!requester_phone) return { error: 'Telefone é obrigatório.' }
   if (!subject) return { error: 'Assunto é obrigatório.' }
-  if (!requester_name) return { error: 'Nome é obrigatório.' }
+  if (!description) return { error: 'Descreva o problema.' }
+  if (!requester_cnpj || requester_cnpj.length !== 14) return { error: 'Informe um CNPJ válido (o vinculado ao contrato).' }
+
+  // Suporte é só pra CLIENTE — contrato de gestão ou serviço avulso.
+  // Se não veio um contrato já escolhido (caso do formulário público),
+  // tenta achar pelo CNPJ automaticamente.
+  if (!contract_id) {
+    const adminClient = createAdminClient()
+    const { data: company } = await adminClient.from('companies').select('id').eq('cnpj', requester_cnpj).maybeSingle()
+
+    if (company) {
+      const { data: matchingContracts } = await adminClient.from('contracts').select('id').eq('company_id', company.id)
+      if (matchingContracts && matchingContracts.length === 1) {
+        contract_id = matchingContracts[0].id
+      }
+      // Se achou 0 ou mais de 1 contrato pra esse CNPJ, deixa sem
+      // vincular — a equipe resolve na triagem (tela do ticket mostra
+      // o aviso e o CNPJ informado pra facilitar).
+    }
+  }
 
   const ticketNumber = await generateTicketNumber()
   const slaHours = SLA_HOURS[priority] ?? SLA_HOURS.media
@@ -61,6 +88,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
       requester_name,
       requester_email,
       requester_phone,
+      requester_cnpj,
       source,
       contract_id,
       sla_due_at: slaDueAt,
@@ -198,6 +226,21 @@ export async function deleteTicket(ticketId: string) {
 export async function searchContractsForTicket(query: string): Promise<{ id: string; client_name: string; process_number: string }[]> {
   if (!query || query.length < 2) return []
   const supabase = await createClient()
+
+  const cleanedForCnpj = query.replace(/\D/g, '')
+  if (cleanedForCnpj.length >= 8) {
+    // Parece um CNPJ (ou pedaço dele) — busca pela empresa primeiro.
+    const { data: companies } = await supabase.from('companies').select('id').ilike('cnpj', `%${cleanedForCnpj}%`)
+    if (companies && companies.length > 0) {
+      const { data: byCompany } = await supabase
+        .from('contracts')
+        .select('id, client_name, process_number')
+        .in('company_id', companies.map((c) => c.id))
+        .limit(8)
+      if (byCompany && byCompany.length > 0) return byCompany
+    }
+  }
+
   const { data } = await supabase
     .from('contracts')
     .select('id, client_name, process_number')

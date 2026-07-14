@@ -40,24 +40,32 @@ export default function NewTicketPage() {
           initialValue={prefilledContractId && prefilledClientName ? { id: prefilledContractId, client_name: prefilledClientName, process_number: '' } : undefined}
         />
         <div>
-          <label className="block text-xs font-medium text-gray-600">Nome do solicitante</label>
-          <input name="requester_name" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <label className="block text-xs font-medium text-gray-600">Nome e sobrenome do solicitante *</label>
+          <input name="requester_name" required pattern=".*\S+\s+\S+.*" title="Informe nome e sobrenome" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600">E-mail</label>
-          <input name="requester_email" type="email" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <label className="block text-xs font-medium text-gray-600">E-mail *</label>
+          <input name="requester_email" type="email" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600">Assunto</label>
+          <label className="block text-xs font-medium text-gray-600">Telefone *</label>
+          <input name="requester_phone" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600">CNPJ vinculado ao contrato *</label>
+          <input name="requester_cnpj" required placeholder="00.000.000/0000-00" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Assunto *</label>
           <input name="subject" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600">Descrição</label>
-          <textarea name="description" rows={3} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <label className="block text-xs font-medium text-gray-600">Descreva o problema *</label>
+          <textarea name="description" required rows={3} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600">Prioridade</label>
-          <select name="priority" defaultValue="media" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+          <label className="block text-xs font-medium text-gray-600">Prioridade *</label>
+          <select name="priority" required defaultValue="media" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
             <option value="baixa">Baixa (5 dias)</option>
             <option value="media">Média (48h)</option>
             <option value="alta">Alta (24h)</option>

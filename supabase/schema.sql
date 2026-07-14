@@ -891,6 +891,7 @@ create table contract_crm.tickets (
   requester_name text not null,
   requester_email text,
   requester_phone text,
+  requester_cnpj text,
   assigned_to uuid references contract_crm.profiles(id),
   source text default 'manual',
   sla_due_at timestamptz,

@@ -12,10 +12,12 @@ export function TicketContractLink({
   ticketId,
   linkedContractId,
   linkedContractName,
+  requesterCnpj,
 }: {
   ticketId: string
   linkedContractId: string | null
   linkedContractName: string | null
+  requesterCnpj?: string | null
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(!linkedContractId)
@@ -55,6 +57,9 @@ export function TicketContractLink({
       <p className="text-xs font-medium text-yellow-900">
         {linkedContractId ? 'Trocar o contrato vinculado' : '⚠️ Este ticket ainda não está vinculado a nenhum contrato — todo ticket precisa estar ligado a um cliente.'}
       </p>
+      {!linkedContractId && requesterCnpj && (
+        <p className="mt-1 text-xs text-yellow-700">CNPJ informado pelo solicitante: <strong>{requesterCnpj}</strong> — não achamos automaticamente (0 ou mais de 1 contrato pra esse CNPJ). Busque abaixo.</p>
+      )}
       <div className="mt-2">
         <ContractSearchSelect name="_unused" onSelect={setPicked} />
       </div>

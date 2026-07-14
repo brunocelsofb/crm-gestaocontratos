@@ -55,6 +55,7 @@ export default async function TicketDetailPage({
         ticketId={ticket.id}
         linkedContractId={ticket.contract_id}
         linkedContractName={linkedContract?.client_name ?? null}
+        requesterCnpj={ticket.requester_cnpj}
       />
 
       <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
