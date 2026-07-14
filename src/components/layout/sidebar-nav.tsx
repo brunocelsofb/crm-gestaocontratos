@@ -12,6 +12,7 @@ const BASE_NAV_ITEMS = [
   { href: '/surveys-dashboard', label: 'Pesquisas e NPS', icon: BarChart3 },
   { href: '/surveys', label: 'Formulários', icon: ClipboardList },
   { href: '/tags', label: 'Tags', icon: Tag },
+  { href: '/proposals/templates', label: 'Modelos de Proposta', icon: FileText },
   { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]
 

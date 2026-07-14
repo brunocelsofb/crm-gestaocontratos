@@ -12,6 +12,7 @@ import { DepartmentSection } from '@/components/contracts/department-section'
 import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
 import { BillingSection } from '@/components/contracts/billing-section'
 import { RenewalValueSection } from '@/components/contracts/renewal-value-section'
+import { ProposalsSection } from '@/components/proposals/proposals-section'
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
@@ -54,6 +55,7 @@ export default async function ContractDetailPage({
     { data: dimensioningReviews },
     { data: allProfiles },
     { data: billingRecords },
+    { data: proposals },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
@@ -73,6 +75,7 @@ export default async function ContractDetailPage({
     supabase.from('dimensioning_reviews').select('id, file_storage_path, file_name, sent_at, status, reviewed_at, review_notes').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, department'),
     supabase.from('billing_records').select('id, year, month, amount, file_storage_path, file_name, notes, confirmed_at').eq('contract_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
+    supabase.from('proposals').select('id, control_code, status, version, created_at').eq('contract_id', id).order('created_at', { ascending: false }),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
@@ -348,6 +351,8 @@ export default async function ContractDetailPage({
       )}
 
       <ActionPlanSection contractId={contract.id} items={actionPlanItems ?? []} />
+
+      <ProposalsSection contractId={contract.id} proposals={proposals ?? []} />
 
       {isCurrentlyInSalesPipeline && (
         <DimensioningSection contractId={contract.id} reviews={dimensioningReviews ?? []} />

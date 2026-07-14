@@ -276,6 +276,9 @@ create table contract_crm.companies (
   trade_name text,
   cnpj text,
   notes text,
+  legal_name text,
+  nf_email text,
+  address text,
   owner_id uuid references contract_crm.profiles(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -291,6 +294,8 @@ create table contract_crm.contacts (
   email text,
   phone text,
   is_primary boolean not null default false,
+  cpf text,
+  address text,
   created_at timestamptz not null default now()
 );
 
@@ -608,3 +613,121 @@ create policy "billing_records_select" on contract_crm.billing_records for selec
 create policy "billing_records_insert" on contract_crm.billing_records for insert with check (auth.role() = 'authenticated');
 create policy "billing_records_update" on contract_crm.billing_records for update using (auth.role() = 'authenticated');
 create policy "billing_records_delete" on contract_crm.billing_records for delete using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 21. Módulo de Propostas Comerciais
+-- ------------------------------------------------------------
+create table contract_crm.proposal_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  file_storage_path text not null,
+  file_name text not null,
+  page_count integer not null default 1,
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now()
+);
+
+create table contract_crm.proposals (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  control_code text not null unique,
+  version integer not null default 1,
+  status text not null default 'draft' check (status in (
+    'draft', 'pending_technical', 'pending_commercial',
+    'declined_internal', 'pending_client', 'approved', 'declined_client'
+  )),
+  currency text not null default 'BRL',
+  client_po_number text,
+  valid_until date,
+  token text unique,
+  pdf_storage_path text,
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_proposals_contract on contract_crm.proposals(contract_id);
+create index idx_proposals_token on contract_crm.proposals(token);
+
+create table contract_crm.proposal_pages (
+  id uuid primary key default gen_random_uuid(),
+  proposal_id uuid not null references contract_crm.proposals(id) on delete cascade,
+  position integer not null,
+  template_id uuid references contract_crm.proposal_templates(id),
+  is_standard_proposal boolean not null default false
+);
+
+create index idx_proposal_pages_proposal on contract_crm.proposal_pages(proposal_id);
+
+create table contract_crm.proposal_items (
+  id uuid primary key default gen_random_uuid(),
+  proposal_id uuid not null references contract_crm.proposals(id) on delete cascade,
+  position integer not null default 0,
+  quantity numeric not null default 1,
+  category text,
+  item text not null,
+  characteristics text,
+  type text,
+  delivery_forecast text,
+  unit_value numeric not null default 0,
+  discount numeric not null default 0,
+  subtotal numeric not null default 0
+);
+
+create index idx_proposal_items_proposal on contract_crm.proposal_items(proposal_id);
+
+create table contract_crm.proposal_approvals (
+  id uuid primary key default gen_random_uuid(),
+  proposal_id uuid not null references contract_crm.proposals(id) on delete cascade,
+  stage text not null check (stage in ('technical', 'commercial', 'client')),
+  decision text not null check (decision in ('approved', 'declined')),
+  comment text not null,
+  decided_by uuid references contract_crm.profiles(id),
+  signer_name text,
+  signer_email text,
+  signer_role text,
+  signer_phone text,
+  signer_cpf text,
+  decided_at timestamptz not null default now()
+);
+
+create index idx_proposal_approvals_proposal on contract_crm.proposal_approvals(proposal_id);
+
+alter table contract_crm.proposal_templates enable row level security;
+alter table contract_crm.proposals enable row level security;
+alter table contract_crm.proposal_pages enable row level security;
+alter table contract_crm.proposal_items enable row level security;
+alter table contract_crm.proposal_approvals enable row level security;
+
+create policy "proposal_templates_select" on contract_crm.proposal_templates for select using (auth.role() = 'authenticated');
+create policy "proposal_templates_insert" on contract_crm.proposal_templates for insert with check (auth.role() = 'authenticated');
+create policy "proposal_templates_delete" on contract_crm.proposal_templates for delete using (auth.role() = 'authenticated');
+
+create policy "proposals_select" on contract_crm.proposals for select using (auth.role() = 'authenticated');
+create policy "proposals_insert" on contract_crm.proposals for insert with check (auth.role() = 'authenticated');
+create policy "proposals_update" on contract_crm.proposals for update using (auth.role() = 'authenticated');
+create policy "proposals_delete" on contract_crm.proposals for delete using (auth.role() = 'authenticated');
+
+create policy "proposal_pages_select" on contract_crm.proposal_pages for select using (auth.role() = 'authenticated');
+create policy "proposal_pages_insert" on contract_crm.proposal_pages for insert with check (auth.role() = 'authenticated');
+create policy "proposal_pages_delete" on contract_crm.proposal_pages for delete using (auth.role() = 'authenticated');
+
+create policy "proposal_items_select" on contract_crm.proposal_items for select using (auth.role() = 'authenticated');
+create policy "proposal_items_insert" on contract_crm.proposal_items for insert with check (auth.role() = 'authenticated');
+create policy "proposal_items_update" on contract_crm.proposal_items for update using (auth.role() = 'authenticated');
+create policy "proposal_items_delete" on contract_crm.proposal_items for delete using (auth.role() = 'authenticated');
+
+create policy "proposal_approvals_select" on contract_crm.proposal_approvals for select using (auth.role() = 'authenticated');
+create policy "proposal_approvals_insert" on contract_crm.proposal_approvals for insert with check (auth.role() = 'authenticated');
+
+insert into storage.buckets (id, name, public)
+values ('proposal-files', 'proposal-files', false)
+on conflict (id) do nothing;
+
+create policy "proposal_files_select" on storage.objects
+  for select using (bucket_id = 'proposal-files' and auth.role() = 'authenticated');
+create policy "proposal_files_insert" on storage.objects
+  for insert with check (bucket_id = 'proposal-files' and auth.role() = 'authenticated');
+create policy "proposal_files_delete" on storage.objects
+  for delete using (bucket_id = 'proposal-files' and auth.role() = 'authenticated');
