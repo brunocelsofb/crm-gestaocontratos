@@ -873,3 +873,57 @@ create policy "leads_delete" on contract_crm.leads for delete using (auth.role()
 
 create policy "lead_activities_select" on contract_crm.lead_activities for select using (auth.role() = 'authenticated');
 create policy "lead_activities_insert" on contract_crm.lead_activities for insert with check (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 27. Atendimento & Tickets
+-- ------------------------------------------------------------
+create table contract_crm.tickets (
+  id uuid primary key default gen_random_uuid(),
+  ticket_number text not null unique,
+  subject text not null,
+  description text,
+  status text not null default 'aberto' check (status in ('aberto', 'em_andamento', 'aguardando_cliente', 'resolvido', 'fechado')),
+  priority text not null default 'media' check (priority in ('baixa', 'media', 'alta', 'urgente')),
+  category text,
+  contract_id uuid references contract_crm.contracts(id) on delete set null,
+  company_id uuid references contract_crm.companies(id) on delete set null,
+  requester_name text not null,
+  requester_email text,
+  requester_phone text,
+  assigned_to uuid references contract_crm.profiles(id),
+  source text default 'manual',
+  sla_due_at timestamptz,
+  resolved_at timestamptz,
+  public_token text unique default gen_random_uuid()::text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_tickets_status on contract_crm.tickets(status);
+create index idx_tickets_sla on contract_crm.tickets(sla_due_at);
+create index idx_tickets_contract on contract_crm.tickets(contract_id);
+
+create table contract_crm.ticket_messages (
+  id uuid primary key default gen_random_uuid(),
+  ticket_id uuid not null references contract_crm.tickets(id) on delete cascade,
+  author_type text not null check (author_type in ('interno', 'cliente')),
+  author_id uuid references contract_crm.profiles(id),
+  author_name text not null,
+  message text not null,
+  is_internal_note boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index idx_ticket_messages_ticket on contract_crm.ticket_messages(ticket_id);
+
+alter table contract_crm.tickets enable row level security;
+alter table contract_crm.ticket_messages enable row level security;
+
+create policy "tickets_select" on contract_crm.tickets for select using (auth.role() = 'authenticated');
+create policy "tickets_insert_public" on contract_crm.tickets for insert with check (true);
+create policy "tickets_update" on contract_crm.tickets for update using (auth.role() = 'authenticated');
+create policy "tickets_delete" on contract_crm.tickets for delete using (auth.role() = 'authenticated');
+
+create policy "ticket_messages_select" on contract_crm.ticket_messages for select using (auth.role() = 'authenticated');
+create policy "ticket_messages_insert" on contract_crm.ticket_messages for insert with check (true);
