@@ -10,7 +10,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color')
+    .select('name, company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -27,6 +27,7 @@ export default async function SettingsPage() {
         currentHeaderText={settings?.proposal_header_text ?? ''}
         currentFooterText={settings?.proposal_footer_text ?? ''}
         currentBrandColor={settings?.proposal_brand_color ?? '#1B556B'}
+        currentAssistantBudget={settings?.assistant_monthly_budget_usd ?? 10}
       />
     </div>
   )

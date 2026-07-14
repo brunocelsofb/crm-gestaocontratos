@@ -336,6 +336,7 @@ create table contract_crm.organization_settings (
   proposal_header_text text,
   proposal_footer_text text,
   proposal_brand_color text default '#1B556B',
+  assistant_monthly_budget_usd numeric default 10,
   updated_at timestamptz not null default now()
 );
 
@@ -808,3 +809,22 @@ alter table contract_crm.assistant_action_log enable row level security;
 
 create policy "assistant_action_log_select" on contract_crm.assistant_action_log for select using (auth.role() = 'authenticated');
 create policy "assistant_action_log_insert" on contract_crm.assistant_action_log for insert with check (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 25. Consumo de tokens do Assistente de IA
+-- ------------------------------------------------------------
+create table contract_crm.assistant_usage_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references contract_crm.profiles(id),
+  input_tokens integer not null default 0,
+  output_tokens integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index idx_assistant_usage_log_created on contract_crm.assistant_usage_log(created_at);
+
+alter table contract_crm.assistant_usage_log enable row level security;
+
+create policy "assistant_usage_log_select" on contract_crm.assistant_usage_log for select using (auth.role() = 'authenticated');
+create policy "assistant_usage_log_insert" on contract_crm.assistant_usage_log for insert with check (auth.role() = 'authenticated');

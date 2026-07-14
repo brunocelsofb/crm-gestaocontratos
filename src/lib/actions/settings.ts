@@ -36,12 +36,22 @@ export async function updateOrganizationSettings(
   const proposal_header_text = (formData.get('proposal_header_text') as string)?.trim() || null
   const proposal_footer_text = (formData.get('proposal_footer_text') as string)?.trim() || null
   const proposal_brand_color = (formData.get('proposal_brand_color') as string)?.trim() || '#1B556B'
+  const assistantBudgetRaw = formData.get('assistant_monthly_budget_usd') as string
+  const assistant_monthly_budget_usd = assistantBudgetRaw ? Number(assistantBudgetRaw) : 10
   if (!name) return { error: 'Nome é obrigatório.' }
 
   const supabase = await createClient()
   const { error } = await supabase
     .from('organization_settings')
-    .update({ name, company_name, proposal_header_text, proposal_footer_text, proposal_brand_color, updated_at: new Date().toISOString() })
+    .update({
+      name,
+      company_name,
+      proposal_header_text,
+      proposal_footer_text,
+      proposal_brand_color,
+      assistant_monthly_budget_usd,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', 'default')
 
   if (error) return { error: error.message }

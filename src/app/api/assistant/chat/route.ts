@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { ALL_TOOLS, WRITE_TOOL_NAMES } from '@/lib/ai/assistant-tools'
 import { executeReadTool } from '@/lib/ai/read-tools'
+import { checkBudgetAvailable, logAssistantUsage } from '@/lib/ai/budget'
 
 // NOTA DE INCERTEZA: a API do SDK @anthropic-ai/sdk usada aqui é a que
 // eu conheço, mas nunca rodei isso de verdade neste ambiente — se algo
@@ -30,11 +32,23 @@ export async function POST(request: Request) {
 
   if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
+  // Trava de custo: só admin usa o assistente, mesmo se alguém tentar
+  // chamar a rota direto (a tela já esconde o botão, mas isso sozinho
+  // não é suficiente).
+  if (!(await isCurrentUserAdmin())) {
+    return NextResponse.json({ error: 'Só administradores podem usar o Assistente de IA.' }, { status: 403 })
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { error: 'ANTHROPIC_API_KEY não configurada no servidor. Peça pro admin configurar isso na Vercel.' },
       { status: 500 }
     )
+  }
+
+  const budgetCheck = await checkBudgetAvailable()
+  if (!budgetCheck.ok) {
+    return NextResponse.json({ error: budgetCheck.message }, { status: 402 })
   }
 
   const { messages } = await request.json()
@@ -56,6 +70,7 @@ export async function POST(request: Request) {
     })
 
     conversation.push({ role: 'assistant', content: response.content })
+    await logAssistantUsage(user.id, response.usage.input_tokens, response.usage.output_tokens)
 
     if (response.stop_reason !== 'tool_use') {
       const textBlock = response.content.find((b) => b.type === 'text')

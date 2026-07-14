@@ -14,6 +14,7 @@ export function OrganizationSettingsForm({
   currentHeaderText,
   currentFooterText,
   currentBrandColor,
+  currentAssistantBudget,
 }: {
   currentName: string
   currentCompanyName: string
@@ -21,6 +22,7 @@ export function OrganizationSettingsForm({
   currentHeaderText: string
   currentFooterText: string
   currentBrandColor: string
+  currentAssistantBudget: number
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
   const [logoPath, setLogoPath] = useState(currentLogoPath)
@@ -138,6 +140,37 @@ export function OrganizationSettingsForm({
           className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
         >
           {pending ? 'Salvando...' : 'Salvar'}
+        </button>
+      </form>
+
+      <form action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
+        <input type="hidden" name="name" value={currentName} />
+        <input type="hidden" name="company_name" value={currentCompanyName} />
+        <input type="hidden" name="proposal_header_text" value={currentHeaderText} />
+        <input type="hidden" name="proposal_footer_text" value={currentFooterText} />
+        <input type="hidden" name="proposal_brand_color" value={currentBrandColor} />
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Assistente de IA (US$)</label>
+          <input
+            name="assistant_monthly_budget_usd"
+            type="number"
+            min="0"
+            step="1"
+            defaultValue={currentAssistantBudget}
+            className="mt-1 w-32 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Quando o gasto estimado do mês passar disso, o assistente para de responder até o mês seguinte (ou até você aumentar o valor aqui).
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+        >
+          {pending ? 'Salvando...' : 'Salvar orçamento'}
         </button>
       </form>
     </div>

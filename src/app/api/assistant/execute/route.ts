@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { ALL_TOOLS } from '@/lib/ai/assistant-tools'
 import { executeWriteTool } from '@/lib/ai/write-tools'
+import { checkBudgetAvailable, logAssistantUsage } from '@/lib/ai/budget'
 
 const SYSTEM_PROMPT = `Você é o Assistente de IA do CRM da ORBIS. Confirme brevemente o resultado da ação em português, de forma direta.`
 
@@ -13,6 +15,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!(await isCurrentUserAdmin())) {
+    return NextResponse.json({ error: 'Só administradores podem usar o Assistente de IA.' }, { status: 403 })
+  }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY não configurada.' }, { status: 500 })
   }
@@ -46,6 +51,13 @@ export async function POST(request: Request) {
     },
   ]
 
+  const budgetCheck = await checkBudgetAvailable()
+  if (!budgetCheck.ok) {
+    // A ação já foi confirmada e executada — só pula a etapa de gerar
+    // uma frase de confirmação bonitinha via IA, pra não gastar mais.
+    return NextResponse.json({ messages: conversation, finalText: result.error ? `Falhou: ${result.error}` : result.summary })
+  }
+
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-5',
@@ -54,6 +66,8 @@ export async function POST(request: Request) {
     tools: ALL_TOOLS as unknown as Anthropic.Tool[],
     messages: conversation,
   })
+
+  await logAssistantUsage(user.id, response.usage.input_tokens, response.usage.output_tokens)
 
   conversation.push({ role: 'assistant', content: response.content })
   const textBlock = response.content.find((b) => b.type === 'text')
