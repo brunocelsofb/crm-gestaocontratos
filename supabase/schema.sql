@@ -787,3 +787,24 @@ alter table contract_crm.proposal_content_blocks enable row level security;
 create policy "proposal_content_blocks_select" on contract_crm.proposal_content_blocks for select using (auth.role() = 'authenticated');
 create policy "proposal_content_blocks_insert" on contract_crm.proposal_content_blocks for insert with check (auth.role() = 'authenticated');
 create policy "proposal_content_blocks_delete" on contract_crm.proposal_content_blocks for delete using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 24. Log de ações do Assistente de IA
+-- ------------------------------------------------------------
+create table contract_crm.assistant_action_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references contract_crm.profiles(id),
+  tool_name text not null,
+  tool_input jsonb not null,
+  result_summary text,
+  contract_id uuid references contract_crm.contracts(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index idx_assistant_action_log_user on contract_crm.assistant_action_log(user_id, created_at desc);
+
+alter table contract_crm.assistant_action_log enable row level security;
+
+create policy "assistant_action_log_select" on contract_crm.assistant_action_log for select using (auth.role() = 'authenticated');
+create policy "assistant_action_log_insert" on contract_crm.assistant_action_log for insert with check (auth.role() = 'authenticated');
