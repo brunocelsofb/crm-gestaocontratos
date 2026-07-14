@@ -6,6 +6,7 @@ import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { TicketActionsPanel } from '@/components/tickets/ticket-actions-panel'
 import { getSlaStatus, SLA_LABELS, SLA_STYLES } from '@/lib/utils/sla'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
+import { TicketContractLink } from '@/components/tickets/ticket-contract-link'
 
 export default async function TicketDetailPage({
   params,
@@ -23,6 +24,10 @@ export default async function TicketDetailPage({
   ])
 
   if (!ticket) notFound()
+
+  const { data: linkedContract } = ticket.contract_id
+    ? await supabase.from('contracts').select('client_name').eq('id', ticket.contract_id).maybeSingle()
+    : { data: null }
 
   const headersList = await headers()
   const host = headersList.get('host') ?? 'localhost:3000'
@@ -45,6 +50,12 @@ export default async function TicketDetailPage({
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${SLA_STYLES[sla]}`}>{SLA_LABELS[sla]}</span>
       </div>
+
+      <TicketContractLink
+        ticketId={ticket.id}
+        linkedContractId={ticket.contract_id}
+        linkedContractName={linkedContract?.client_name ?? null}
+      />
 
       <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
         <p className="text-xs font-medium text-blue-800">Link público (o solicitante acompanha por aqui, sem login)</p>

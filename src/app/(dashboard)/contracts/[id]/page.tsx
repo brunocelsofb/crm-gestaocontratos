@@ -13,6 +13,7 @@ import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
 import { BillingSection } from '@/components/contracts/billing-section'
 import { RenewalValueSection } from '@/components/contracts/renewal-value-section'
 import { ProposalsSection } from '@/components/proposals/proposals-section'
+import { ContractTicketsSection } from '@/components/tickets/contract-tickets-section'
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
@@ -421,6 +422,11 @@ export default async function ContractDetailPage({
             id: 'arquivos',
             label: 'Arquivos',
             content: <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />,
+          },
+          {
+            id: 'atendimento',
+            label: 'Atendimento',
+            content: <ContractTicketsSection contractId={contract.id} clientName={contract.client_name} />,
           },
         ]}
       />

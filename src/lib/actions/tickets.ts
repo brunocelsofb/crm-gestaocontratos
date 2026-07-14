@@ -41,6 +41,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
   const requester_email = (formData.get('requester_email') as string)?.trim() || null
   const requester_phone = (formData.get('requester_phone') as string)?.trim() || null
   const source = (formData.get('source') as string) || 'manual'
+  const contract_id = (formData.get('contract_id') as string) || null
 
   if (!subject) return { error: 'Assunto é obrigatório.' }
   if (!requester_name) return { error: 'Nome é obrigatório.' }
@@ -61,6 +62,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
       requester_email,
       requester_phone,
       source,
+      contract_id,
       sla_due_at: slaDueAt,
     })
     .select('id, public_token')
@@ -77,11 +79,10 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
     })
   }
 
-  // Avisa o time de atendimento/suporte — reaproveita o departamento
-  // "qualidade" pra isso (é o que mais se aproxima de suporte hoje);
-  // ajuste se vocês criarem um departamento próprio de atendimento.
+  // Avisa o time COMERCIAL — é onde o atendimento fica, segundo a
+  // estrutura de vocês.
   const adminClient = createAdminClient()
-  const { data: supportProfiles } = await adminClient.from('profiles').select('id').eq('department', 'qualidade')
+  const { data: supportProfiles } = await adminClient.from('profiles').select('id').eq('department', 'comercial')
   if (supportProfiles && supportProfiles.length > 0) {
     await adminClient.from('notifications').insert(
       supportProfiles.map((p) => ({ user_id: p.id, message: `Novo ticket ${ticketNumber}: ${subject} (prioridade ${priority}).` }))
@@ -89,7 +90,21 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
   }
 
   revalidatePath('/tickets')
+  if (contract_id) revalidatePath(`/contracts/${contract_id}`)
   return { ticketId: data.id, publicToken: data.public_token }
+}
+
+// Vincula (ou corrige) o contrato de um ticket já existente — usado
+// principalmente pra tickets que chegaram pelo formulário público, onde
+// a pessoa não escolhe o contrato na hora (só descreve a empresa) e
+// alguém da equipe vincula depois de triar.
+export async function linkTicketToContract(ticketId: string, contractId: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('tickets').update({ contract_id: contractId, updated_at: new Date().toISOString() }).eq('id', ticketId)
+  if (error) return { error: error.message }
+  revalidatePath(`/tickets/${ticketId}`)
+  revalidatePath(`/contracts/${contractId}`)
+  return {}
 }
 
 export async function updateTicketStatus(ticketId: string, status: string): Promise<ActionState> {
@@ -178,4 +193,15 @@ export async function deleteTicket(ticketId: string) {
   const supabase = createAdminClient()
   await supabase.from('tickets').delete().eq('id', ticketId)
   revalidatePath('/tickets')
+}
+
+export async function searchContractsForTicket(query: string): Promise<{ id: string; client_name: string; process_number: string }[]> {
+  if (!query || query.length < 2) return []
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('contracts')
+    .select('id, client_name, process_number')
+    .or(`client_name.ilike.%${query}%,process_number.ilike.%${query}%`)
+    .limit(8)
+  return data ?? []
 }

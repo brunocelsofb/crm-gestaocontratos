@@ -2,11 +2,15 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createTicket } from '@/lib/actions/tickets'
+import { ContractSearchSelect } from '@/components/tickets/contract-search-select'
 
 export default function NewTicketPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const prefilledContractId = searchParams.get('contract_id')
+  const prefilledClientName = searchParams.get('client_name')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,6 +34,11 @@ export default function NewTicketPage() {
       </Link>
       <h1 className="text-[17px] font-medium text-foreground">Novo Ticket</h1>
       <form action={handleSubmit} className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+        <ContractSearchSelect
+          name="contract_id"
+          required
+          initialValue={prefilledContractId && prefilledClientName ? { id: prefilledContractId, client_name: prefilledClientName, process_number: '' } : undefined}
+        />
         <div>
           <label className="block text-xs font-medium text-gray-600">Nome do solicitante</label>
           <input name="requester_name" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
