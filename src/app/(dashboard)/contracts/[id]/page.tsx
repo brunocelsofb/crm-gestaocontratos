@@ -16,6 +16,7 @@ import { ProposalsSection } from '@/components/proposals/proposals-section'
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
+import { ContractTabs } from '@/components/contracts/contract-tabs'
 import { setContractTag } from '@/lib/actions/tags'
 import { getCurrentProfile } from '@/lib/auth/role'
 import { notFound } from 'next/navigation'
@@ -247,140 +248,186 @@ export default async function ContractDetailPage({
         </p>
       )}
 
-      {isCurrentlyInContractsPipeline && displayRun && (
-        <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} canEdit={canChangeStage} />
-      )}
+      <ContractTabs
+        tabs={[
+          {
+            id: 'visao-geral',
+            label: 'Visão Geral',
+            content: (
+              <div className="space-y-6">
+                {isCurrentlyInContractsPipeline && displayRun && (
+                  <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} canEdit={canChangeStage} />
+                )}
 
-      <DepartmentSection
-        contractId={contract.id}
-        currentDepartment={contract.current_department}
-        currentAssigneeName={currentAssigneeName}
-        hasPrevious={hasPreviousResponsible}
-        users={(allProfiles ?? []).filter((p) => p.department)}
-        transfers={transferLog}
-      />
-
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-xs text-gray-500">Valor (run atual)</p>
-          <p className="text-sm font-medium text-gray-900">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
-          </p>
-        </div>
-        <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-xs text-gray-500">Vigência do contrato</p>
-          <p className="text-sm font-medium text-gray-900">
-            {contract.valid_until
-              ? `${contract.valid_from ? new Date(contract.valid_from).toLocaleDateString('pt-BR') : '?'} → ${new Date(contract.valid_until).toLocaleDateString('pt-BR')}`
-              : 'Não informado'}
-          </p>
-        </div>
-        <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-xs text-gray-500">Previsão de fechamento</p>
-          <p className="text-sm font-medium text-gray-900">
-            {displayRun?.expected_close_date
-              ? new Date(displayRun.expected_close_date).toLocaleDateString('pt-BR')
-              : 'Não informado'}
-          </p>
-        </div>
-        <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-xs text-gray-500">Aberto desde</p>
-          <p className="text-sm font-medium text-gray-900">
-            {new Date(contract.created_at).toLocaleDateString('pt-BR')}
-          </p>
-        </div>
-      </div>
-
-      {runs && runs.length > 1 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-gray-900">Jornada entre funis</h2>
-          <div className="space-y-2">
-            {runs.map((r) => {
-              const previous = r.previous_run_id ? runs.find((x) => x.id === r.previous_run_id) : null
-              const currentValue = Number(r.value) || 0
-              const previousValue = previous ? Number(previous.value) || 0 : null
-              const pctChange =
-                previousValue !== null && previousValue > 0
-                  ? Math.round(((currentValue - previousValue) / previousValue) * 1000) / 10
-                  : null
-
-              return (
-                <div key={r.id} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-medium text-gray-900">{pipelineById.get(r.pipeline_id)?.name}</span>
-                      <span className="ml-2 text-gray-400">
-                        {new Date(r.started_at).toLocaleDateString('pt-BR')}
-                        {r.ended_at ? ` → ${new Date(r.ended_at).toLocaleDateString('pt-BR')}` : ' → em andamento'}
-                      </span>
-                    </div>
-                    <span
-                      className={
-                        r.status === 'won'
-                          ? 'text-emerald-600'
-                          : r.status === 'lost'
-                            ? 'text-red-600'
-                            : r.status === 'moved'
-                              ? 'text-gray-400'
-                              : 'text-blue-600'
-                      }
-                    >
-                      {(
-                        { open: 'Em andamento', won: 'Ganho', lost: 'Perdido', moved: 'Movido para outro funil' } as Record<string, string>
-                      )[r.status]}
-                    </span>
+                <div className={`grid gap-4 ${isCurrentlyInContractsPipeline ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Valor (run atual)</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
+                    </p>
                   </div>
-                  {currentValue > 0 && (
-                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                      <span>
-                        {previousValue !== null ? `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(previousValue)} → ` : ''}
-                        <span className="font-medium text-gray-700">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentValue)}
-                        </span>
-                      </span>
-                      {pctChange !== null && (
-                        <span className={pctChange >= 0 ? 'text-positive-700' : 'text-negative-700'}>
-                          ({pctChange >= 0 ? '+' : ''}{pctChange}%)
-                        </span>
-                      )}
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Vigência do contrato</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {contract.valid_until
+                        ? `${contract.valid_from ? new Date(contract.valid_from).toLocaleDateString('pt-BR') : '?'} → ${new Date(contract.valid_until).toLocaleDateString('pt-BR')}`
+                        : 'Não informado'}
+                    </p>
+                  </div>
+                  {!isCurrentlyInContractsPipeline && (
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs text-gray-500">Previsão de fechamento</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {displayRun?.expected_close_date
+                          ? new Date(displayRun.expected_close_date).toLocaleDateString('pt-BR')
+                          : 'Não informado'}
+                      </p>
                     </div>
                   )}
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Aberto desde</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {new Date(contract.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
-      <ActionPlanSection contractId={contract.id} items={actionPlanItems ?? []} />
+                {runs && runs.length > 1 && (
+                  <div className="space-y-2">
+                    <h2 className="text-sm font-medium text-gray-900">Jornada entre funis</h2>
+                    <div className="space-y-2">
+                      {runs.map((r) => {
+                        const previous = r.previous_run_id ? runs.find((x) => x.id === r.previous_run_id) : null
+                        const currentValue = Number(r.value) || 0
+                        const previousValue = previous ? Number(previous.value) || 0 : null
+                        const pctChange =
+                          previousValue !== null && previousValue > 0
+                            ? Math.round(((currentValue - previousValue) / previousValue) * 1000) / 10
+                            : null
 
-      <ProposalsSection contractId={contract.id} proposals={proposals ?? []} catalogItems={catalogItems ?? []} />
-
-      {isCurrentlyInSalesPipeline && (
-        <DimensioningSection contractId={contract.id} reviews={dimensioningReviews ?? []} />
-      )}
-
-      {isCurrentlyInContractsPipeline && (
-        <BillingSection contractId={contract.id} billingType={contract.billing_type} records={billingRecords ?? []} />
-      )}
-
-      <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
-
-      <CustomSurveysSection
-        contractId={contract.id}
-        templates={availableTemplates}
-        allTemplates={allSurveyTemplates ?? []}
-        sentSurveys={sentCustomSurveys ?? []}
-        linkBase={linkBase}
+                        return (
+                          <div key={r.id} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-medium text-gray-900">{pipelineById.get(r.pipeline_id)?.name}</span>
+                                <span className="ml-2 text-gray-400">
+                                  {new Date(r.started_at).toLocaleDateString('pt-BR')}
+                                  {r.ended_at ? ` → ${new Date(r.ended_at).toLocaleDateString('pt-BR')}` : ' → em andamento'}
+                                </span>
+                              </div>
+                              <span
+                                className={
+                                  r.status === 'won'
+                                    ? 'text-emerald-600'
+                                    : r.status === 'lost'
+                                      ? 'text-red-600'
+                                      : r.status === 'moved'
+                                        ? 'text-gray-400'
+                                        : 'text-blue-600'
+                                }
+                              >
+                                {(
+                                  { open: 'Em andamento', won: 'Ganho', lost: 'Perdido', moved: 'Movido para outro funil' } as Record<string, string>
+                                )[r.status]}
+                              </span>
+                            </div>
+                            {currentValue > 0 && (
+                              <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                <span>
+                                  {previousValue !== null ? `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(previousValue)} → ` : ''}
+                                  <span className="font-medium text-gray-700">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentValue)}
+                                  </span>
+                                </span>
+                                {pctChange !== null && (
+                                  <span className={pctChange >= 0 ? 'text-positive-700' : 'text-negative-700'}>
+                                    ({pctChange >= 0 ? '+' : ''}{pctChange}%)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          {
+            id: 'responsavel',
+            label: 'Responsável & Transferências',
+            content: (
+              <DepartmentSection
+                contractId={contract.id}
+                currentDepartment={contract.current_department}
+                currentAssigneeName={currentAssigneeName}
+                hasPrevious={hasPreviousResponsible}
+                users={(allProfiles ?? []).filter((p) => p.department)}
+                transfers={transferLog}
+              />
+            ),
+          },
+          {
+            id: 'plano-de-acao',
+            label: 'Plano de Ação',
+            content: <ActionPlanSection contractId={contract.id} items={actionPlanItems ?? []} />,
+          },
+          {
+            id: 'propostas',
+            label: 'Propostas',
+            content: (
+              <div className="space-y-6">
+                <ProposalsSection contractId={contract.id} proposals={proposals ?? []} catalogItems={catalogItems ?? []} />
+                {isCurrentlyInSalesPipeline && (
+                  <DimensioningSection contractId={contract.id} reviews={dimensioningReviews ?? []} />
+                )}
+              </div>
+            ),
+          },
+          ...(isCurrentlyInContractsPipeline
+            ? [
+                {
+                  id: 'faturamento',
+                  label: 'Faturamento',
+                  content: <BillingSection contractId={contract.id} billingType={contract.billing_type} records={billingRecords ?? []} />,
+                },
+              ]
+            : []),
+          {
+            id: 'pesquisas',
+            label: 'Pesquisas & NPS',
+            content: (
+              <div className="space-y-6">
+                <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
+                <CustomSurveysSection
+                  contractId={contract.id}
+                  templates={availableTemplates}
+                  allTemplates={allSurveyTemplates ?? []}
+                  sentSurveys={sentCustomSurveys ?? []}
+                  linkBase={linkBase}
+                />
+              </div>
+            ),
+          },
+          {
+            id: 'arquivos',
+            label: 'Arquivos',
+            content: <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />,
+          },
+          {
+            id: 'historico',
+            label: 'Histórico',
+            content: (
+              <div className="space-y-3">
+                <NoteForm contractId={contract.id} />
+                <Timeline activities={activities} />
+              </div>
+            ),
+          },
+        ]}
       />
-
-      <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />
-
-      <div className="space-y-3">
-        <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>
-        <NoteForm contractId={contract.id} />
-        <Timeline activities={activities} />
-      </div>
     </div>
   )
 }
