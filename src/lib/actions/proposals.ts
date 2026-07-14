@@ -245,98 +245,42 @@ export async function decideInternalApproval(
 // ordem configurada — e abre o link público pro cliente.
 // ------------------------------------------------------------
 export async function generateProposalPdf(proposalId: string, contractId: string): Promise<ActionState> {
-  const { PDFDocument } = await import('pdf-lib')
-  const { buildStandardProposalPage } = await import('./proposal-pdf-builder')
-
+  const { buildMergedProposalBytes } = await import('./proposal-pdf-merge')
   const supabase = createAdminClient()
 
-  const { data: proposal } = await supabase.from('proposals').select('*').eq('id', proposalId).single()
+  const { data: proposal } = await supabase.from('proposals').select('control_code, version').eq('id', proposalId).single()
   if (!proposal) return { error: 'Proposta não encontrada.' }
 
-  const { data: pages } = await supabase
-    .from('proposal_pages')
-    .select('position, template_id, is_standard_proposal')
-    .eq('proposal_id', proposalId)
-    .order('position')
+  const { bytes, error: buildError } = await buildMergedProposalBytes(proposalId)
+  if (buildError || !bytes) return { error: buildError ?? 'Falha ao gerar PDF.' }
 
-  const { data: items } = await supabase
-    .from('proposal_items')
-    .select('*')
-    .eq('proposal_id', proposalId)
-    .order('position')
+  const finalPath = `generated/${proposalId}-v${proposal.version}-${Date.now()}.pdf`
 
-  const { data: contract } = await supabase.from('contracts').select('*').eq('id', proposal.contract_id).single()
-  const { data: company } = contract?.company_id
-    ? await supabase.from('companies').select('*').eq('id', contract.company_id).maybeSingle()
-    : { data: null }
-  const { data: contact } = contract?.contact_id
-    ? await supabase.from('contacts').select('*').eq('id', contract.contact_id).maybeSingle()
-    : { data: null }
+  const { error: uploadError } = await supabase.storage
+    .from('proposal-files')
+    .upload(finalPath, bytes, { contentType: 'application/pdf' })
 
-  try {
-    const mergedPdf = await PDFDocument.create()
+  if (uploadError) return { error: `Falha ao salvar PDF: ${uploadError.message}` }
 
-    for (const page of pages ?? []) {
-      if (page.is_standard_proposal) {
-        const standardPageBytes = await buildStandardProposalPage({
-          proposal,
-          items: items ?? [],
-          company,
-          contact,
-        })
-        const standardDoc = await PDFDocument.load(standardPageBytes)
-        const copied = await mergedPdf.copyPages(standardDoc, standardDoc.getPageIndices())
-        copied.forEach((p) => mergedPdf.addPage(p))
-      } else if (page.template_id) {
-        const { data: template } = await supabase
-          .from('proposal_templates')
-          .select('file_storage_path')
-          .eq('id', page.template_id)
-          .maybeSingle()
+  const token = crypto.randomUUID()
 
-        if (template) {
-          const { data: fileData } = await supabase.storage.from('proposal-files').download(template.file_storage_path)
-          if (fileData) {
-            const templateBytes = new Uint8Array(await fileData.arrayBuffer())
-            const templateDoc = await PDFDocument.load(templateBytes)
-            const copied = await mergedPdf.copyPages(templateDoc, templateDoc.getPageIndices())
-            copied.forEach((p) => mergedPdf.addPage(p))
-          }
-        }
-      }
-    }
-
-    const finalBytes = await mergedPdf.save()
-    const finalPath = `generated/${proposalId}-v${proposal.version}-${Date.now()}.pdf`
-
-    const { error: uploadError } = await supabase.storage
-      .from('proposal-files')
-      .upload(finalPath, finalBytes, { contentType: 'application/pdf' })
-
-    if (uploadError) return { error: `Falha ao salvar PDF: ${uploadError.message}` }
-
-    const token = crypto.randomUUID()
-
-    await supabase
-      .from('proposals')
-      .update({
-        status: 'pending_client',
-        pdf_storage_path: finalPath,
-        token,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', proposalId)
-
-    await supabase.from('activities').insert({
-      contract_id: contractId,
-      type: 'system',
-      content: `PDF da proposta ${proposal.control_code} gerado e link enviado pro cliente.`,
+  await supabase
+    .from('proposals')
+    .update({
+      status: 'pending_client',
+      pdf_storage_path: finalPath,
+      token,
+      updated_at: new Date().toISOString(),
     })
+    .eq('id', proposalId)
 
-    return {}
-  } catch (e) {
-    return { error: e instanceof Error ? `Falha ao gerar PDF: ${e.message}` : 'Falha ao gerar PDF.' }
-  }
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    type: 'system',
+    content: `PDF da proposta ${proposal.control_code} gerado e link enviado pro cliente.`,
+  })
+
+  return {}
 }
 
 // ------------------------------------------------------------

@@ -59,15 +59,24 @@ export default async function ProposalDetailPage({
           <h1 className="text-lg font-semibold text-gray-900">{proposal.control_code}</h1>
           <p className="text-sm text-gray-500">Versão {proposal.version} · {STATUS_LABELS[proposal.status]}</p>
         </div>
-        {proposal.pdf_storage_path && (
+        <div className="flex gap-2">
           <a
-            href={`/api/proposals/${proposal.id}/pdf`}
+            href={`/api/proposals/${proposal.id}/preview`}
             target="_blank"
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-md border border-brand-700 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100"
           >
-            📄 Ver PDF
+            🔍 Pré-visualizar PDF
           </a>
-        )}
+          {proposal.pdf_storage_path && (
+            <a
+              href={`/api/proposals/${proposal.id}/pdf`}
+              target="_blank"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              📄 Ver PDF enviado ao cliente
+            </a>
+          )}
+        </div>
       </div>
 
       {proposal.token && proposal.status === 'pending_client' && (
