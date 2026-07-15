@@ -317,8 +317,14 @@ export async function moveContractStage(
         const account = await getValidAccessToken(contractForEmail.owner_id)
 
         if (account) {
+          const { data: ownerProfile } = await supabase.from('profiles').select('email_signature').eq('id', contractForEmail.owner_id).maybeSingle()
+          const signatureHtml = ownerProfile?.email_signature ? `<br><br>${ownerProfile.email_signature}` : ''
+          const trackingToken = crypto.randomUUID()
+          const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
+          const bodyWithExtras = `${filled.body}${signatureHtml}<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+
           try {
-            const result = await sendGmailMessage({ accessToken: account.accessToken, to: filled.toEmail, subject: filled.subject, htmlBody: filled.body })
+            const result = await sendGmailMessage({ accessToken: account.accessToken, to: filled.toEmail, subject: filled.subject, htmlBody: bodyWithExtras })
             await supabase.from('contract_emails').insert({
               contract_id: contractId,
               sent_by: contractForEmail.owner_id,
@@ -330,6 +336,7 @@ export async function moveContractStage(
               triggered_automatically: true,
               gmail_message_id: result.messageId,
               status: 'enviado',
+              tracking_token: trackingToken,
             })
             await supabase.from('activities').insert({
               contract_id: contractId,

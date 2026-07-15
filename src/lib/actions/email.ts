@@ -27,6 +27,35 @@ export async function disconnectEmailAccount(): Promise<ActionState> {
 
   await supabase.from('email_accounts').delete().eq('user_id', user.id)
   revalidatePath('/settings')
+  revalidatePath('/minha-conta')
+  return {}
+}
+
+// ------------------------------------------------------------
+// Assinatura de e-mail — pessoal, cada usuário tem a sua, anexada
+// automaticamente no fim de todo e-mail que a pessoa enviar.
+// ------------------------------------------------------------
+export async function getEmailSignature(): Promise<string> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return ''
+
+  const { data } = await supabase.from('profiles').select('email_signature').eq('id', user.id).maybeSingle()
+  return data?.email_signature ?? ''
+}
+
+export async function updateEmailSignature(signature: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { error } = await supabase.from('profiles').update({ email_signature: signature }).eq('id', user.id)
+  if (error) return { error: error.message }
+  revalidatePath('/minha-conta')
   return {}
 }
 
@@ -88,8 +117,17 @@ export async function sendContractEmail(
     return { error: 'Você ainda não conectou seu Gmail. Vá em Configurações → E-mail e conecte antes de enviar.' }
   }
 
+  const { data: profile } = await supabase.from('profiles').select('email_signature').eq('id', user.id).maybeSingle()
+  const signatureHtml = profile?.email_signature ? `<br><br>${profile.email_signature}` : ''
+
+  // Cria o registro ANTES de enviar, pra já ter o token do pixel de
+  // rastreamento de abertura embutido no corpo do e-mail.
+  const trackingToken = crypto.randomUUID()
+  const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
+  const bodyWithExtras = `${body}${signatureHtml}<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+
   try {
-    const result = await sendGmailMessage({ accessToken: account.accessToken, to: toEmail, subject, htmlBody: body })
+    const result = await sendGmailMessage({ accessToken: account.accessToken, to: toEmail, subject, htmlBody: bodyWithExtras })
 
     await supabase.from('contract_emails').insert({
       contract_id: contractId,
@@ -102,6 +140,7 @@ export async function sendContractEmail(
       triggered_automatically: false,
       gmail_message_id: result.messageId,
       status: 'enviado',
+      tracking_token: trackingToken,
     })
 
     await supabase.from('activities').insert({

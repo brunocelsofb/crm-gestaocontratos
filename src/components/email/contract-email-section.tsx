@@ -3,9 +3,21 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { sendContractEmail, buildEmailFromTemplate } from '@/lib/actions/email'
+import { ExpandableRow } from '@/components/surveys/expandable-row'
 
 type Template = { id: string; name: string }
-type EmailLog = { id: string; from_email: string; to_email: string; subject: string; sent_at: string; status: string; triggered_automatically: boolean; error_message: string | null }
+type EmailLog = {
+  id: string
+  from_email: string
+  to_email: string
+  subject: string
+  body: string
+  sent_at: string
+  status: string
+  triggered_automatically: boolean
+  error_message: string | null
+  opened_at: string | null
+}
 
 export function ContractEmailSection({
   contractId,
@@ -97,19 +109,38 @@ export function ContractEmailSection({
       <div className="space-y-1.5">
         <p className="text-xs font-medium text-gray-500">Histórico de e-mails</p>
         {emailLog.map((e) => (
-          <div key={e.id} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-gray-900">{e.subject}</span>
-              <span className={`text-xs ${e.status === 'enviado' ? 'text-positive-700' : 'text-negative-700'}`}>
-                {e.status === 'enviado' ? '✓ Enviado' : '✗ Falhou'}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500">
-              De {e.from_email} pra {e.to_email} · {new Date(e.sent_at).toLocaleString('pt-BR')}
-              {e.triggered_automatically && ' · Automático'}
-            </p>
-            {e.error_message && <p className="mt-0.5 text-xs text-red-600">{e.error_message}</p>}
-          </div>
+          <ExpandableRow
+            key={e.id}
+            summary={
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-medium text-gray-900">{e.subject}</span>
+                  <p className="text-xs text-gray-500">
+                    Pra {e.to_email} · {new Date(e.sent_at).toLocaleString('pt-BR')}
+                    {e.triggered_automatically && ' · Automático'}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 text-xs">
+                  {e.status === 'enviado' ? (
+                    e.opened_at ? (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700" title="Rastreamento por pixel — pode não ser 100% exato (alguns clientes de e-mail bloqueiam imagens, o Gmail às vezes pré-carrega antes da pessoa ver de verdade)">
+                        👁️ Visualizado
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-500">Não visualizado</span>
+                    )
+                  ) : (
+                    <span className="rounded-full bg-negative-100 px-2 py-0.5 text-negative-700">✗ Falhou</span>
+                  )}
+                </div>
+              </div>
+            }
+          >
+            <p className="text-xs text-gray-400">De {e.from_email}</p>
+            {e.opened_at && <p className="text-xs text-purple-600">Visualizado em {new Date(e.opened_at).toLocaleString('pt-BR')}</p>}
+            {e.error_message && <p className="text-xs text-red-600">{e.error_message}</p>}
+            <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700" dangerouslySetInnerHTML={{ __html: e.body }} />
+          </ExpandableRow>
         ))}
         {emailLog.length === 0 && <p className="text-sm text-gray-400">Nenhum e-mail enviado ainda por essa conta.</p>}
       </div>

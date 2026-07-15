@@ -1041,3 +1041,11 @@ create policy "email_templates_delete" on contract_crm.email_templates for delet
 
 create policy "contract_emails_select" on contract_crm.contract_emails for select using (auth.role() = 'authenticated');
 create policy "contract_emails_insert" on contract_crm.contract_emails for insert with check (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 30. Extras do módulo de E-mail: assinatura e rastreamento de abertura
+-- ------------------------------------------------------------
+alter table contract_crm.profiles add column email_signature text;
+alter table contract_crm.contract_emails add column tracking_token text unique default gen_random_uuid()::text;
+alter table contract_crm.contract_emails add column opened_at timestamptz;

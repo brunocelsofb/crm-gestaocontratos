@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation'
-import { Suspense } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentProfile } from '@/lib/auth/role'
 import { OrganizationSettingsForm } from '@/components/settings/organization-settings-form'
 import { NumberingSettingsForm } from '@/components/settings/numbering-settings-form'
-import { EmailConnectionSettings } from '@/components/settings/email-connection-settings'
-import { getConnectedEmailAccount } from '@/lib/actions/email'
 
 export default async function SettingsPage() {
   const profile = await getCurrentProfile()
@@ -17,8 +15,6 @@ export default async function SettingsPage() {
     .select('name, company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix')
     .eq('id', 'default')
     .maybeSingle()
-
-  const connectedAccount = await getConnectedEmailAccount()
 
   return (
     <div className="space-y-6">
@@ -39,9 +35,10 @@ export default async function SettingsPage() {
         currentTicketPrefix={settings?.ticket_number_prefix ?? 'TICKET'}
         currentProposalPrefix={settings?.proposal_number_prefix ?? 'PROP'}
       />
-      <Suspense fallback={null}>
-        <EmailConnectionSettings connectedEmail={connectedAccount?.email ?? null} connectedAt={connectedAccount?.connectedAt ?? null} />
-      </Suspense>
+      <p className="text-xs text-gray-400">
+        Conectar seu Gmail e configurar sua assinatura de e-mail agora fica em{' '}
+        <Link href="/minha-conta" className="text-brand-700 hover:underline">Minha Conta</Link> — é pessoal, não de organização.
+      </p>
     </div>
   )
 }
