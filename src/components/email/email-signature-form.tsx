@@ -1,9 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { Bold, Italic, Strikethrough } from 'lucide-react'
 import { updateEmailSignature } from '@/lib/actions/email'
 import { createClient } from '@/lib/supabase/client'
 import { sanitizeStorageFileName } from '@/lib/utils/storage'
+
+const FONT_FAMILIES = ['Arial', 'Verdana', 'Georgia', 'Times New Roman', 'Courier New', 'Trebuchet MS', 'Tahoma']
+const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32]
 
 export function EmailSignatureForm({ currentSignature }: { currentSignature: string }) {
   const [busy, setBusy] = useState(false)
@@ -12,17 +16,67 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
   const [uploadError, setUploadError] = useState<string | null>(null)
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const savedRangeRef = useRef<Range | null>(null)
 
   useEffect(() => {
     if (editorRef.current) editorRef.current.innerHTML = currentSignature || ''
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Muda o tamanho de TODO o conteúdo da assinatura — texto (inclusive
-  // o que já veio com tamanho fixo embutido, tipo colado do Gmail) E
-  // imagens/logo, que precisam de um tratamento separado (não é
-  // font-size, é largura de verdade).
-  function resizeSignature(multiplier: number) {
+  // Guarda onde estava selecionado no editor — os <select> da barra de
+  // ferramentas tiram o foco do editor quando clicados, então sem isso
+  // a seleção de texto se perderia antes de aplicar a formatação.
+  function saveSelection() {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange()
+    }
+  }
+
+  function restoreSelection() {
+    const sel = window.getSelection()
+    if (sel && savedRangeRef.current) {
+      sel.removeAllRanges()
+      sel.addRange(savedRangeRef.current)
+    }
+  }
+
+  // Envolve o texto selecionado num <span> com o estilo desejado — mais
+  // confiável que o antigo document.execCommand('fontSize', ...), que
+  // só tem 7 tamanhos fixos e não deixa escolher em pixel/ponto.
+  function wrapSelection(applyStyle: (style: CSSStyleDeclaration) => void) {
+    restoreSelection()
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return
+    const range = sel.getRangeAt(0)
+    const span = document.createElement('span')
+    applyStyle(span.style)
+    span.appendChild(range.extractContents())
+    range.insertNode(span)
+    sel.removeAllRanges()
+    const newRange = document.createRange()
+    newRange.selectNodeContents(span)
+    sel.addRange(newRange)
+    savedRangeRef.current = newRange.cloneRange()
+  }
+
+  function applyFontSize(px: string) {
+    wrapSelection((style) => (style.fontSize = `${px}px`))
+  }
+
+  function applyFontFamily(font: string) {
+    wrapSelection((style) => (style.fontFamily = font))
+  }
+
+  function applyInlineFormat(command: 'bold' | 'italic' | 'strikeThrough') {
+    restoreSelection()
+    editorRef.current?.focus()
+    document.execCommand(command)
+  }
+
+  // Aumentar/diminuir tudo de uma vez (texto E imagem) continua
+  // disponível, além do controle fino por seleção acima.
+  function resizeAll(multiplier: number) {
     const root = editorRef.current
     if (!root) return
 
@@ -30,15 +84,11 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
     for (const el of textElements) {
       const computed = window.getComputedStyle(el)
       const currentSize = parseFloat(el.style.fontSize || computed.fontSize || '14')
-      const newSize = Math.max(8, Math.round(currentSize * multiplier))
-      el.style.fontSize = `${newSize}px`
+      el.style.fontSize = `${Math.max(8, Math.round(currentSize * multiplier))}px`
     }
 
     const images = root.querySelectorAll<HTMLImageElement>('img')
     for (const img of images) {
-      // Usa a largura JÁ RENDERIZADA como base (não o atributo/estilo
-      // cru), porque muitas imagens só têm max-width definido, e o
-      // tamanho real na tela é o que importa pra escalar direito.
       const currentWidth = img.getBoundingClientRect().width || img.naturalWidth || 150
       const newWidth = Math.max(20, Math.round(currentWidth * multiplier))
       img.style.width = `${newWidth}px`
@@ -84,14 +134,50 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
     <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-6">
       <h3 className="text-sm font-medium text-gray-900">✍️ Assinatura de e-mail</h3>
       <p className="text-xs text-gray-400">
-        Anexada automaticamente no fim de todo e-mail que você enviar pelo CRM. Cole sua assinatura já pronta, ou suba uma imagem/logo. Se o texto colado vier pequeno, use os botões de tamanho abaixo.
+        Anexada automaticamente no fim de todo e-mail que você enviar pelo CRM. Selecione um trecho do texto pra aplicar fonte, tamanho, negrito, itálico ou tachado — igual num editor de texto comum.
       </p>
+
+      {/* Barra de ferramentas */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 p-1.5">
+        <select
+          onMouseDown={saveSelection}
+          onChange={(e) => applyFontFamily(e.target.value)}
+          defaultValue=""
+          className="rounded border border-gray-300 bg-white px-1.5 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        >
+          <option value="" disabled>Fonte</option>
+          {FONT_FAMILIES.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
+        </select>
+        <select
+          onMouseDown={saveSelection}
+          onChange={(e) => applyFontSize(e.target.value)}
+          defaultValue=""
+          className="rounded border border-gray-300 bg-white px-1.5 py-1 text-xs focus:border-brand-700 focus:outline-none"
+        >
+          <option value="" disabled>Tamanho</option>
+          {FONT_SIZES.map((s) => <option key={s} value={s}>{s}px</option>)}
+        </select>
+        <div className="mx-1 h-5 w-px bg-gray-300" />
+        <button type="button" onMouseDown={saveSelection} onClick={() => applyInlineFormat('bold')} title="Negrito" className="rounded border border-gray-300 bg-white p-1.5 hover:bg-gray-100">
+          <Bold size={13} />
+        </button>
+        <button type="button" onMouseDown={saveSelection} onClick={() => applyInlineFormat('italic')} title="Itálico" className="rounded border border-gray-300 bg-white p-1.5 hover:bg-gray-100">
+          <Italic size={13} />
+        </button>
+        <button type="button" onMouseDown={saveSelection} onClick={() => applyInlineFormat('strikeThrough')} title="Tachado" className="rounded border border-gray-300 bg-white p-1.5 hover:bg-gray-100">
+          <Strikethrough size={13} />
+        </button>
+      </div>
+
       <div
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
+        onMouseUp={saveSelection}
+        onKeyUp={saveSelection}
         className="min-h-[120px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
       />
+
       <div className="flex flex-wrap items-center gap-2">
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="text-xs" />
         <button
@@ -103,13 +189,9 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
           {uploadingImage ? 'Enviando...' : '+ Inserir imagem/logo'}
         </button>
         <span className="mx-1 text-gray-300">|</span>
-        <span className="text-xs text-gray-500">Tamanho (texto e imagem):</span>
-        <button type="button" onClick={() => resizeSignature(0.87)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
-          A−
-        </button>
-        <button type="button" onClick={() => resizeSignature(1.15)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
-          A+
-        </button>
+        <span className="text-xs text-gray-500">Aumentar/diminuir tudo:</span>
+        <button type="button" onClick={() => resizeAll(0.87)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">A−</button>
+        <button type="button" onClick={() => resizeAll(1.15)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">A+</button>
       </div>
       {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
       <button onClick={handleSave} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
