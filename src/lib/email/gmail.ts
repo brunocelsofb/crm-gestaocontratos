@@ -100,6 +100,7 @@ export async function sendGmailMessage({
   to,
   cc,
   bcc,
+  replyTo,
   subject,
   htmlBody,
 }: {
@@ -107,6 +108,7 @@ export async function sendGmailMessage({
   to: string
   cc?: string
   bcc?: string
+  replyTo?: string
   subject: string
   htmlBody: string
 }): Promise<{ messageId: string }> {
@@ -114,6 +116,7 @@ export async function sendGmailMessage({
     `To: ${to}`,
     cc ? `Cc: ${cc}` : null,
     bcc ? `Bcc: ${bcc}` : null,
+    replyTo ? `Reply-To: ${replyTo}` : null,
     `Subject: =?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`,
     'Content-Type: text/html; charset="UTF-8"',
     'MIME-Version: 1.0',

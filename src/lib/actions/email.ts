@@ -170,6 +170,16 @@ export async function sendContractEmail(
 
   const { data: profile } = await supabase.from('profiles').select('email_signature').eq('id', user.id).maybeSingle()
 
+  // Reply-To pro endereço exclusivo da conta — é ISSO que faz a
+  // resposta do cliente cair automaticamente no CRM (não é CC nem
+  // CCO, que não seguem numa resposta).
+  const { data: contractForReply } = await supabase.from('contracts').select('inbound_email_code').eq('id', contractId).maybeSingle()
+  const { data: orgSettings } = await supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle()
+  const replyTo =
+    orgSettings?.inbound_email_domain && contractForReply?.inbound_email_code
+      ? `${contractForReply.inbound_email_code}@${orgSettings.inbound_email_domain}`
+      : undefined
+
   // Cria o registro ANTES de enviar, pra já ter o token do pixel de
   // rastreamento de abertura embutido no corpo do e-mail.
   const trackingToken = crypto.randomUUID()
@@ -178,7 +188,7 @@ export async function sendContractEmail(
   const bodyWithExtras = wrapEmailHtml(body, profile?.email_signature ?? null, trackingPixelHtml)
 
   try {
-    const result = await sendEmailForUser(user.id, toEmail, subject, bodyWithExtras, { cc: ccEmail ?? undefined, bcc: bccEmail ?? undefined })
+    const result = await sendEmailForUser(user.id, toEmail, subject, bodyWithExtras, { cc: ccEmail ?? undefined, bcc: bccEmail ?? undefined, replyTo })
 
     await supabase.from('contract_emails').insert({
       contract_id: contractId,

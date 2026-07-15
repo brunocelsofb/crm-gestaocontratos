@@ -41,8 +41,8 @@ export function ContractEmailSection({
   const router = useRouter()
   const [toEmail, setToEmail] = useState(defaultToEmail ?? '')
   const [ccEmail, setCcEmail] = useState('')
-  const [bccEmail, setBccEmail] = useState(inboundEmailAddress ?? '')
-  const [showCcBcc, setShowCcBcc] = useState(!!inboundEmailAddress)
+  const [bccEmail, setBccEmail] = useState('')
+  const [showCcBcc, setShowCcBcc] = useState(false)
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [templateId, setTemplateId] = useState('')
@@ -117,6 +117,17 @@ export function ContractEmailSection({
             </select>
           </div>
         )}
+        {inboundEmailAddress ? (
+          <div>
+            <label className="block text-xs text-gray-500">Responder a (automático)</label>
+            <input readOnly value={inboundEmailAddress} className="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-500" />
+            <p className="mt-0.5 text-xs text-purple-600">Quando o cliente clicar em &quot;Responder&quot;, a resposta cai automaticamente aqui na conta.</p>
+          </div>
+        ) : (
+          <p className="rounded-md bg-yellow-50 px-2.5 py-1.5 text-xs text-yellow-700">
+            Lastro de resposta ainda não está ativo pra essa conta — a resposta do cliente vai direto pra sua caixa pessoal, não pro CRM.
+          </p>
+        )}
         <div>
           <label className="block text-xs text-gray-500">Para</label>
           <input value={toEmail} onChange={(e) => setToEmail(e.target.value)} type="email" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
@@ -135,9 +146,6 @@ export function ContractEmailSection({
             <div>
               <label className="block text-xs text-gray-500">Cco (cópia oculta)</label>
               <input value={bccEmail} onChange={(e) => setBccEmail(e.target.value)} type="email" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
-              {inboundEmailAddress && (
-                <p className="mt-0.5 text-xs text-purple-600">Pré-preenchido com o endereço exclusivo da conta, pra esse e-mail também ficar no histórico. Pode remover se não quiser.</p>
-              )}
             </div>
           </>
         )}

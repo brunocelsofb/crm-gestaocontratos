@@ -39,6 +39,7 @@ export async function sendSmtpMessage({
   to,
   cc,
   bcc,
+  replyTo,
   subject,
   htmlBody,
 }: {
@@ -47,6 +48,7 @@ export async function sendSmtpMessage({
   to: string
   cc?: string
   bcc?: string
+  replyTo?: string
   subject: string
   htmlBody: string
 }): Promise<{ messageId: string }> {
@@ -62,6 +64,7 @@ export async function sendSmtpMessage({
     to,
     cc: cc || undefined,
     bcc: bcc || undefined,
+    replyTo: replyTo || undefined,
     subject,
     html: htmlBody,
   })
