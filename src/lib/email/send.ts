@@ -26,7 +26,8 @@ export async function sendEmailForUser(
   userId: string,
   to: string,
   subject: string,
-  htmlBody: string
+  htmlBody: string,
+  options?: { cc?: string; bcc?: string }
 ): Promise<{ messageId: string; fromEmail: string }> {
   const supabase = createAdminClient()
   const { data: account } = await supabase.from('email_accounts').select('*').eq('user_id', userId).maybeSingle()
@@ -46,6 +47,8 @@ export async function sendEmailForUser(
       },
       fromEmail: account.email,
       to,
+      cc: options?.cc,
+      bcc: options?.bcc,
       subject,
       htmlBody,
     })
@@ -54,6 +57,6 @@ export async function sendEmailForUser(
 
   const oauthAccount = await getValidAccessToken(userId)
   if (!oauthAccount) throw new Error('Conta Gmail não conectada ou token inválido.')
-  const result = await sendGmailMessage({ accessToken: oauthAccount.accessToken, to, subject, htmlBody })
+  const result = await sendGmailMessage({ accessToken: oauthAccount.accessToken, to, cc: options?.cc, bcc: options?.bcc, subject, htmlBody })
   return { messageId: result.messageId, fromEmail: oauthAccount.fromEmail }
 }

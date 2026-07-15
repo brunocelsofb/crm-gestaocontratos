@@ -177,7 +177,7 @@ export default async function ContractDetailPage({
 
   const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }] = await Promise.all([
     supabase.from('email_templates').select('id, name').order('name'),
-    supabase.from('contract_emails').select('id, from_email, to_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
+    supabase.from('contract_emails').select('id, from_email, to_email, cc_email, bcc_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
     getConnectedEmailAccount(),
     supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle(),
   ])

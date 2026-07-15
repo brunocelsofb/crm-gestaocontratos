@@ -37,12 +37,16 @@ export async function sendSmtpMessage({
   config,
   fromEmail,
   to,
+  cc,
+  bcc,
   subject,
   htmlBody,
 }: {
   config: { host: string; port: number; username: string; password: string; secure: boolean }
   fromEmail: string
   to: string
+  cc?: string
+  bcc?: string
   subject: string
   htmlBody: string
 }): Promise<{ messageId: string }> {
@@ -56,6 +60,8 @@ export async function sendSmtpMessage({
   const info = await transporter.sendMail({
     from: fromEmail,
     to,
+    cc: cc || undefined,
+    bcc: bcc || undefined,
     subject,
     html: htmlBody,
   })

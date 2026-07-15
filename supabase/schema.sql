@@ -1031,6 +1031,8 @@ create table contract_crm.contract_emails (
   gmail_message_id text,
   status text not null default 'enviado' check (status in ('enviado', 'falhou')),
   direction text not null default 'enviado' check (direction in ('enviado', 'recebido')),
+  cc_email text,
+  bcc_email text,
   error_message text,
   sent_at timestamptz not null default now()
 );

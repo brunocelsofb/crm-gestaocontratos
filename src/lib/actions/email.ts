@@ -151,7 +151,9 @@ export async function sendContractEmail(
   toEmail: string,
   subject: string,
   body: string,
-  templateId: string | null
+  templateId: string | null,
+  ccEmail: string | null,
+  bccEmail: string | null
 ): Promise<ActionState> {
   const supabase = await createClient()
   const {
@@ -176,13 +178,15 @@ export async function sendContractEmail(
   const bodyWithExtras = wrapEmailHtml(body, profile?.email_signature ?? null, trackingPixelHtml)
 
   try {
-    const result = await sendEmailForUser(user.id, toEmail, subject, bodyWithExtras)
+    const result = await sendEmailForUser(user.id, toEmail, subject, bodyWithExtras, { cc: ccEmail ?? undefined, bcc: bccEmail ?? undefined })
 
     await supabase.from('contract_emails').insert({
       contract_id: contractId,
       sent_by: user.id,
       from_email: result.fromEmail,
       to_email: toEmail,
+      cc_email: ccEmail,
+      bcc_email: bccEmail,
       subject,
       body,
       template_id: templateId,

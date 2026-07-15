@@ -11,6 +11,8 @@ type EmailLog = {
   id: string
   from_email: string
   to_email: string
+  cc_email: string | null
+  bcc_email: string | null
   subject: string
   body: string
   sent_at: string
@@ -38,6 +40,9 @@ export function ContractEmailSection({
 }) {
   const router = useRouter()
   const [toEmail, setToEmail] = useState(defaultToEmail ?? '')
+  const [ccEmail, setCcEmail] = useState('')
+  const [bccEmail, setBccEmail] = useState(inboundEmailAddress ?? '')
+  const [showCcBcc, setShowCcBcc] = useState(!!inboundEmailAddress)
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [templateId, setTemplateId] = useState('')
@@ -64,7 +69,7 @@ export function ContractEmailSection({
   async function handleSend() {
     setBusy(true)
     setError(null)
-    const result = await sendContractEmail(contractId, toEmail, subject, body, templateId || null)
+    const result = await sendContractEmail(contractId, toEmail, subject, body, templateId || null, ccEmail || null, bccEmail || null)
     setBusy(false)
     if (result.error) {
       setError(result.error)
@@ -115,7 +120,27 @@ export function ContractEmailSection({
         <div>
           <label className="block text-xs text-gray-500">Para</label>
           <input value={toEmail} onChange={(e) => setToEmail(e.target.value)} type="email" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          {!showCcBcc && (
+            <button type="button" onClick={() => setShowCcBcc(true)} className="mt-1 text-xs text-brand-700 hover:underline">
+              + Cc/Cco
+            </button>
+          )}
         </div>
+        {showCcBcc && (
+          <>
+            <div>
+              <label className="block text-xs text-gray-500">Cc</label>
+              <input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} type="email" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500">Cco (cópia oculta)</label>
+              <input value={bccEmail} onChange={(e) => setBccEmail(e.target.value)} type="email" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+              {inboundEmailAddress && (
+                <p className="mt-0.5 text-xs text-purple-600">Pré-preenchido com o endereço exclusivo da conta, pra esse e-mail também ficar no histórico. Pode remover se não quiser.</p>
+              )}
+            </div>
+          </>
+        )}
         <div>
           <label className="block text-xs text-gray-500">Assunto</label>
           <input value={subject} onChange={(e) => setSubject(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
@@ -180,6 +205,8 @@ export function ContractEmailSection({
             }
           >
             <p className="text-xs text-gray-400">De {e.from_email}</p>
+            {e.cc_email && <p className="text-xs text-gray-400">Cc: {e.cc_email}</p>}
+            {e.bcc_email && <p className="text-xs text-gray-400">Cco: {e.bcc_email}</p>}
             {e.opened_at && <p className="text-xs text-purple-600">Visualizado em {new Date(e.opened_at).toLocaleString('pt-BR')}</p>}
             {e.error_message && <p className="text-xs text-red-600">{e.error_message}</p>}
             <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700" dangerouslySetInnerHTML={{ __html: e.body }} />

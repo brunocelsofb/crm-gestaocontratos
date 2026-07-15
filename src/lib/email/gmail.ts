@@ -98,22 +98,30 @@ export async function getValidAccessToken(userId: string): Promise<{ accessToken
 export async function sendGmailMessage({
   accessToken,
   to,
+  cc,
+  bcc,
   subject,
   htmlBody,
 }: {
   accessToken: string
   to: string
+  cc?: string
+  bcc?: string
   subject: string
   htmlBody: string
 }): Promise<{ messageId: string }> {
   const mimeMessage = [
     `To: ${to}`,
+    cc ? `Cc: ${cc}` : null,
+    bcc ? `Bcc: ${bcc}` : null,
     `Subject: =?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`,
     'Content-Type: text/html; charset="UTF-8"',
     'MIME-Version: 1.0',
     '',
     htmlBody,
-  ].join('\r\n')
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\r\n')
 
   const encodedMessage = Buffer.from(mimeMessage)
     .toString('base64')
