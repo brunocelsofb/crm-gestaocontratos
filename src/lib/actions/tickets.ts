@@ -167,16 +167,9 @@ export async function updateTicketStatus(ticketId: string, status: string): Prom
 
   const { data: ticket } = await supabase
     .from('tickets')
-    .select('ticket_number, subject, contract_id, satisfaction_token')
+    .select('ticket_number, subject, contract_id')
     .eq('id', ticketId)
     .maybeSingle()
-
-  // Ao FINALIZAR (fechado) de verdade, gera o link da pesquisa rápida
-  // de satisfação — só uma vez, não sobrescreve se já existir (ex: se
-  // reabrir e fechar de novo).
-  if (status === 'fechado' && !ticket?.satisfaction_token) {
-    update.satisfaction_token = crypto.randomUUID()
-  }
 
   const { error } = await supabase.from('tickets').update(update).eq('id', ticketId)
   if (error) return { error: error.message }
@@ -288,7 +281,7 @@ export async function deleteTicket(ticketId: string) {
 export async function submitTicketSatisfaction(token: string, rating: number, comment: string): Promise<ActionState> {
   const supabase = createAdminClient()
 
-  const { data: ticket } = await supabase.from('tickets').select('id, satisfaction_responded_at').eq('satisfaction_token', token).maybeSingle()
+  const { data: ticket } = await supabase.from('tickets').select('id, satisfaction_responded_at').eq('public_token', token).maybeSingle()
   if (!ticket) return { error: 'Link inválido.' }
   if (ticket.satisfaction_responded_at) return { error: 'Essa pesquisa já foi respondida.' }
 

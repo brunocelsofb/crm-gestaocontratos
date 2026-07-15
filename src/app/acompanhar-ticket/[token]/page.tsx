@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PublicTicketReplyForm } from '@/components/tickets/public-ticket-reply-form'
+import { TicketSatisfactionForm } from '@/components/tickets/ticket-satisfaction-form'
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: 'Aberto',
@@ -19,7 +20,7 @@ export default async function PublicTicketTrackingPage({
 
   const { data: ticket } = await supabase
     .from('tickets')
-    .select('id, ticket_number, subject, status, priority, created_at')
+    .select('id, ticket_number, subject, status, priority, created_at, satisfaction_responded_at, satisfaction_rating')
     .eq('public_token', token)
     .maybeSingle()
 
@@ -39,6 +40,8 @@ export default async function PublicTicketTrackingPage({
     .eq('ticket_id', ticket.id)
     .eq('is_internal_note', false)
     .order('created_at', { ascending: true })
+
+  const isFinalized = ticket.status === 'fechado'
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
@@ -64,7 +67,20 @@ export default async function PublicTicketTrackingPage({
           ))}
         </div>
 
-        <PublicTicketReplyForm token={token} />
+        {/* A pesquisa aparece automaticamente aqui, no MESMO link que o
+            cliente já está usando pra acompanhar o chamado — nada de
+            mandar um segundo link separado, que ele pode nem abrir. */}
+        {isFinalized ? (
+          ticket.satisfaction_responded_at ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center text-sm text-gray-500">
+              Obrigado pela avaliação que você já enviou (nota {ticket.satisfaction_rating}/5)!
+            </div>
+          ) : (
+            <TicketSatisfactionForm token={token} />
+          )
+        ) : (
+          <PublicTicketReplyForm token={token} />
+        )}
       </div>
     </div>
   )

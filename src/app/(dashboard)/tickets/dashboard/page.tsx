@@ -32,7 +32,7 @@ export default async function TicketsDashboardPage({
 
   const { data: tickets } = await supabase
     .from('tickets')
-    .select('id, status, priority, category, assigned_to, sla_due_at, resolved_at, created_at, satisfaction_rating, satisfaction_responded_at')
+    .select('id, ticket_number, subject, status, priority, category, assigned_to, sla_due_at, resolved_at, created_at, satisfaction_rating, satisfaction_comment, satisfaction_responded_at')
     .gte('created_at', `${from}T00:00:00`)
     .lte('created_at', `${to}T23:59:59`)
 
@@ -53,6 +53,9 @@ export default async function TicketsDashboardPage({
 
   const satisfactionRatings = (tickets ?? []).filter((t) => t.satisfaction_responded_at).map((t) => t.satisfaction_rating as number)
   const avgSatisfaction = satisfactionRatings.length > 0 ? satisfactionRatings.reduce((a, b) => a + b, 0) / satisfactionRatings.length : null
+  const satisfactionResponses = (tickets ?? [])
+    .filter((t) => t.satisfaction_responded_at)
+    .sort((a, b) => new Date(b.satisfaction_responded_at!).getTime() - new Date(a.satisfaction_responded_at!).getTime())
 
   const categoryCounts = new Map<string, number>()
   for (const t of tickets ?? []) {
@@ -161,6 +164,39 @@ export default async function TicketsDashboardPage({
             </div>
           )
         })}
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-medium text-foreground">
+          Avaliações de satisfação recebidas ({satisfactionResponses.length})
+        </h2>
+        <div className="space-y-1.5">
+          {satisfactionResponses.map((t) => (
+            <Link
+              key={t.id}
+              href={`/tickets/${t.id}`}
+              className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+            >
+              <div>
+                <span className="font-medium text-gray-900">{t.subject}</span>
+                <span className="ml-2 text-xs text-gray-400">{t.ticket_number}</span>
+                {t.satisfaction_comment && <p className="mt-0.5 text-xs text-gray-600">&ldquo;{t.satisfaction_comment}&rdquo;</p>}
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  (t.satisfaction_rating ?? 0) >= 4 ? 'bg-positive-100 text-positive-700' : (t.satisfaction_rating ?? 0) === 3 ? 'bg-yellow-100 text-yellow-800' : 'bg-negative-100 text-negative-700'
+                }`}
+              >
+                {t.satisfaction_rating}/5
+              </span>
+            </Link>
+          ))}
+          {satisfactionResponses.length === 0 && (
+            <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-400">
+              Nenhuma avaliação recebida ainda neste período.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
