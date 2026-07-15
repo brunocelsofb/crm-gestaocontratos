@@ -172,13 +172,22 @@ export async function sendContractEmail(
 
   // Reply-To pro endereço exclusivo da conta — é ISSO que faz a
   // resposta do cliente cair automaticamente no CRM (não é CC nem
-  // CCO, que não seguem numa resposta).
+  // CCO, que não seguem numa resposta). Inclui TAMBÉM o e-mail real de
+  // quem mandou, separado por vírgula — sem isso, a resposta ia SÓ
+  // pro endereço de rastreamento, sumindo da caixa pessoal de quem
+  // enviou (Reply-To substitui, não soma, então precisa listar os dois).
   const { data: contractForReply } = await supabase.from('contracts').select('inbound_email_code').eq('id', contractId).maybeSingle()
   const { data: orgSettings } = await supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle()
-  const replyTo =
+  const trackingAddress =
     orgSettings?.inbound_email_domain && contractForReply?.inbound_email_code
       ? `${contractForReply.inbound_email_code}@${orgSettings.inbound_email_domain}`
-      : undefined
+      : null
+  const { data: senderAccount } = await supabase.from('email_accounts').select('email').eq('user_id', user.id).maybeSingle()
+  const replyTo = trackingAddress
+    ? senderAccount?.email
+      ? `${senderAccount.email}, ${trackingAddress}`
+      : trackingAddress
+    : undefined
 
   // Cria o registro ANTES de enviar, pra já ter o token do pixel de
   // rastreamento de abertura embutido no corpo do e-mail.

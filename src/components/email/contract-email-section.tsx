@@ -121,7 +121,7 @@ export function ContractEmailSection({
           <div>
             <label className="block text-xs text-gray-500">Responder a (automático)</label>
             <input readOnly value={inboundEmailAddress} className="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-500" />
-            <p className="mt-0.5 text-xs text-purple-600">Quando o cliente clicar em &quot;Responder&quot;, a resposta cai automaticamente aqui na conta.</p>
+            <p className="mt-0.5 text-xs text-purple-600">Quando o cliente clicar em &quot;Responder&quot;, a resposta cai no CRM E na sua caixa pessoal (os dois endereços recebem).</p>
           </div>
         ) : (
           <p className="rounded-md bg-yellow-50 px-2.5 py-1.5 text-xs text-yellow-700">

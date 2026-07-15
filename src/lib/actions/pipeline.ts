@@ -320,10 +320,11 @@ export async function moveContractStage(
           const { data: ownerProfile } = await supabase.from('profiles').select('email_signature').eq('id', contractForEmail.owner_id).maybeSingle()
           const { data: contractCodeRow } = await supabase.from('contracts').select('inbound_email_code').eq('id', contractId).maybeSingle()
           const { data: orgSettingsRow } = await supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle()
-          const replyTo =
+          const trackingAddress =
             orgSettingsRow?.inbound_email_domain && contractCodeRow?.inbound_email_code
               ? `${contractCodeRow.inbound_email_code}@${orgSettingsRow.inbound_email_domain}`
-              : undefined
+              : null
+          const replyTo = trackingAddress ? `${accountInfo.fromEmail}, ${trackingAddress}` : undefined
           const trackingToken = crypto.randomUUID()
           const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
           const trackingPixelHtml = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
