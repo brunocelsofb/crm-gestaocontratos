@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateTicketStatus, updateTicketPriority, updateTicketTrend, assignTicket, addTicketMessage, deleteTicket } from '@/lib/actions/tickets'
-import { PRIORITY_LABELS, PRIORITY_CRITICALITY_LABELS, PRIORITY_SLA_DAYS, PRIORITY_TO_URGENCY, calculateGutIndex } from '@/lib/utils/gut-matrix'
+import { updateTicketStatus, updateTicketPriority, assignTicket, addTicketMessage, deleteTicket } from '@/lib/actions/tickets'
+import { PRIORITY_LABELS, PRIORITY_SLA_DAYS } from '@/lib/utils/gut-matrix'
 
 type UserOption = { id: string; full_name: string }
 
@@ -20,21 +20,12 @@ const PRIORITY_OPTIONS = [
   { value: 'critica', label: `${PRIORITY_LABELS.critica} (${PRIORITY_SLA_DAYS.critica}d)` },
   { value: 'muito_critica', label: `${PRIORITY_LABELS.muito_critica} (${PRIORITY_SLA_DAYS.muito_critica}d)` },
 ]
-const TREND_OPTIONS = [
-  { value: 1, label: '1 — Não irá mudar' },
-  { value: 2, label: '2 — Irá piorar a longo prazo' },
-  { value: 3, label: '3 — Irá piorar em médio prazo' },
-  { value: 4, label: '4 — Irá piorar em curto prazo' },
-  { value: 5, label: '5 — Irá piorar rapidamente' },
-]
 
 export function TicketActionsPanel({
   ticketId,
   currentStatus,
   currentPriority,
   currentAssignee,
-  currentGravity,
-  currentTrend,
   users,
   isAdmin,
 }: {
@@ -42,8 +33,6 @@ export function TicketActionsPanel({
   currentStatus: string
   currentPriority: string
   currentAssignee: string | null
-  currentGravity: number | null
-  currentTrend: number | null
   users: UserOption[]
   isAdmin: boolean
 }) {
@@ -64,14 +53,6 @@ export function TicketActionsPanel({
   function handlePriorityChange(priority: string) {
     startTransition(async () => {
       const result = await updateTicketPriority(ticketId, priority)
-      if (result.error) setError(result.error)
-      else router.refresh()
-    })
-  }
-
-  function handleTrendChange(trend: number) {
-    startTransition(async () => {
-      const result = await updateTicketTrend(ticketId, trend)
       if (result.error) setError(result.error)
       else router.refresh()
     })
@@ -108,35 +89,6 @@ export function TicketActionsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <p className="text-xs font-medium text-gray-500">Matriz GUT (interno — não aparece pro cliente)</p>
-        <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
-          <div>
-            <p className="text-[10px] text-gray-400">Gravidade (categoria)</p>
-            <p className="font-medium text-gray-900">{currentGravity ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-400">Urgência (nível escolhido)</p>
-            <p className="font-medium text-gray-900">{PRIORITY_TO_URGENCY[currentPriority as keyof typeof PRIORITY_TO_URGENCY]}</p>
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-400">Tendência (ajustar)</label>
-            <select
-              value={currentTrend ?? 3}
-              onChange={(e) => handleTrendChange(Number(e.target.value))}
-              disabled={isPending}
-              className="mt-0.5 w-full rounded-md border border-gray-300 px-1.5 py-1 text-xs focus:border-brand-700 focus:outline-none"
-            >
-              {TREND_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-        </div>
-        <p className="mt-2 text-sm">
-          Índice GUT: <span className="font-semibold text-gray-900">{calculateGutIndex(currentGravity, PRIORITY_TO_URGENCY[currentPriority as keyof typeof PRIORITY_TO_URGENCY], currentTrend) ?? '—'}</span>
-          <span className="ml-2 text-xs text-gray-400">({PRIORITY_CRITICALITY_LABELS[currentPriority as keyof typeof PRIORITY_CRITICALITY_LABELS]} · SLA {PRIORITY_SLA_DAYS[currentPriority as keyof typeof PRIORITY_SLA_DAYS]} dia(s))</span>
-        </p>
-      </div>
-
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-4">
         <div>
           <label className="block text-[10px] text-gray-500">Status</label>

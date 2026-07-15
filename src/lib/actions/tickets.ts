@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { PRIORITY_SLA_DAYS, gravityForCategory, type PriorityTier } from '@/lib/utils/gut-matrix'
+import { PRIORITY_SLA_DAYS, type PriorityTier } from '@/lib/utils/gut-matrix'
 
 export type ActionState = { error?: string }
 
@@ -69,7 +69,6 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
   const ticketNumber = await generateTicketNumber()
   const slaDays = PRIORITY_SLA_DAYS[priority] ?? PRIORITY_SLA_DAYS.pouco_critica
   const slaDueAt = new Date(Date.now() + slaDays * 86_400_000).toISOString()
-  const gravity = gravityForCategory(category)
 
   const { data, error } = await supabase
     .from('tickets')
@@ -85,7 +84,6 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
       requester_cnpj,
       source,
       contract_id,
-      gravity,
       sla_due_at: slaDueAt,
     })
     .select('id, public_token')

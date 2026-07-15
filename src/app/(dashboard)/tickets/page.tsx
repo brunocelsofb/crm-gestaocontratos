@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getSlaStatus, SLA_LABELS, SLA_STYLES } from '@/lib/utils/sla'
-import { PRIORITY_LABELS, PRIORITY_CRITICALITY_LABELS } from '@/lib/utils/gut-matrix'
+import { PRIORITY_LABELS } from '@/lib/utils/gut-matrix'
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: 'Aberto',
@@ -29,8 +29,14 @@ export default async function TicketsPage({
 
   const { data: tickets } = await supabase
     .from('tickets')
-    .select('id, ticket_number, subject, status, priority, requester_name, sla_due_at, resolved_at, created_at')
+    .select('id, ticket_number, subject, status, priority, requester_name, contract_id, sla_due_at, resolved_at, created_at')
     .order('created_at', { ascending: false })
+
+  const contractIds = [...new Set((tickets ?? []).map((t) => t.contract_id).filter((id): id is string => !!id))]
+  const { data: linkedContracts } = contractIds.length
+    ? await supabase.from('contracts').select('id, client_name').in('id', contractIds)
+    : { data: [] as { id: string; client_name: string }[] }
+  const contractNameById = new Map((linkedContracts ?? []).map((c) => [c.id, c.client_name]))
 
   const filtered = statusFilter ? (tickets ?? []).filter((t) => t.status === statusFilter) : tickets ?? []
 
@@ -77,6 +83,7 @@ export default async function TicketsPage({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Ticket</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Conta</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Solicitante</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Prioridade</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
@@ -95,10 +102,18 @@ export default async function TicketsPage({
                     </Link>
                     <div className="text-xs text-gray-400">{t.ticket_number}</div>
                   </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {t.contract_id ? (
+                      <Link href={`/contracts/${t.contract_id}`} className="text-brand-700 hover:underline">
+                        {contractNameById.get(t.contract_id) ?? '—'}
+                      </Link>
+                    ) : (
+                      <span className="text-yellow-700">⚠️ Sem vínculo</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{t.requester_name}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${PRIORITY_STYLES[t.priority]}`}>{PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS]}</span>
-                    <div className="mt-0.5 text-[10px] text-gray-400">{PRIORITY_CRITICALITY_LABELS[t.priority as keyof typeof PRIORITY_CRITICALITY_LABELS]}</div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{STATUS_LABELS[t.status]}</td>
                   <td className="px-4 py-3">
@@ -110,7 +125,7 @@ export default async function TicketsPage({
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nenhum ticket nessa categoria.</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhum ticket nessa categoria.</td>
               </tr>
             )}
           </tbody>
