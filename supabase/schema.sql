@@ -195,9 +195,13 @@ create index idx_activities_created_at on contract_crm.activities(created_at des
 create table contract_crm.automation_rules (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  trigger_type text not null default 'stage_entry' check (trigger_type in ('stage_entry', 'days_without_progress', 'outcome_won', 'outcome_lost')),
+  trigger_type text not null default 'stage_entry' check (trigger_type in (
+    'stage_entry', 'days_without_progress', 'outcome_won', 'outcome_lost',
+    'tag_added', 'tag_removed', 'days_before_expiration', 'ticket_linked'
+  )),
   trigger_stage_id uuid references contract_crm.stages(id),
   trigger_pipeline_id uuid references contract_crm.pipelines(id),
+  trigger_tag_id uuid references contract_crm.tags(id) on delete cascade,
   days_threshold integer,
   action_type text not null check (action_type in ('move_to_pipeline', 'move_to_stage', 'create_task', 'send_email', 'notify_user')),
   target_pipeline_id uuid references contract_crm.pipelines(id),
@@ -1030,6 +1034,7 @@ create table contract_crm.email_templates (
   name text not null,
   subject text not null,
   body text not null,
+  context text not null default 'contract' check (context in ('contract', 'ticket')),
   trigger_stage_id uuid references contract_crm.stages(id) on delete set null,
   created_by uuid references contract_crm.profiles(id),
   created_at timestamptz not null default now()

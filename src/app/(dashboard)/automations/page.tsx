@@ -4,12 +4,13 @@ import { AutomationsManager } from '@/components/automations/automations-manager
 export default async function AutomationsPage() {
   const supabase = await createClient()
 
-  const [{ data: rules }, { data: pipelines }, { data: stages }, { data: templates }, { data: users }] = await Promise.all([
+  const [{ data: rules }, { data: pipelines }, { data: stages }, { data: templates }, { data: users }, { data: tags }] = await Promise.all([
     supabase.from('automation_rules').select('*').order('created_at', { ascending: false }),
     supabase.from('pipelines').select('id, name, type, won_label, lost_label').order('name'),
     supabase.from('stages').select('id, name, pipeline_id').order('order_index'),
-    supabase.from('email_templates').select('id, name').order('name'),
+    supabase.from('email_templates').select('id, name, context').order('name'),
     supabase.from('profiles').select('id, full_name').order('full_name'),
+    supabase.from('tags').select('id, name, color').order('name'),
   ])
 
   return (
@@ -20,7 +21,7 @@ export default async function AutomationsPage() {
           Configure regras do tipo &quot;quando X acontecer, faça Y&quot; — sem precisar de ninguém fazendo isso na mão.
         </p>
       </div>
-      <AutomationsManager initialRules={rules ?? []} pipelines={pipelines ?? []} stages={stages ?? []} templates={templates ?? []} users={users ?? []} />
+      <AutomationsManager initialRules={rules ?? []} pipelines={pipelines ?? []} stages={stages ?? []} templates={templates ?? []} users={users ?? []} tags={tags ?? []} />
     </div>
   )
 }

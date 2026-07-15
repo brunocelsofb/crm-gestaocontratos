@@ -5,14 +5,16 @@ import { createAutomationRule, toggleAutomationRule, deleteAutomationRule } from
 
 type Pipeline = { id: string; name: string; type: string; won_label: string; lost_label: string }
 type Stage = { id: string; name: string; pipeline_id: string }
-type Template = { id: string; name: string }
+type Template = { id: string; name: string; context?: string }
 type UserOption = { id: string; full_name: string }
+type Tag = { id: string; name: string; color: string }
 type Rule = {
   id: string
   name: string
   trigger_type: string
   trigger_stage_id: string | null
   trigger_pipeline_id: string | null
+  trigger_tag_id: string | null
   days_threshold: number | null
   action_type: string
   target_stage_id: string | null
@@ -31,23 +33,42 @@ const ACTION_LABELS: Record<string, string> = {
   notify_user: 'Notificar alguém',
 }
 
+const TRIGGER_LABELS: Record<string, string> = {
+  stage_entry: 'Entrar numa etapa',
+  days_without_progress: 'Ficar parado X dias numa etapa',
+  outcome_won: 'Marcar sucesso (Ganho ou Renovado)',
+  outcome_lost: 'Marcar perda (Perdido ou Não renovado)',
+  tag_added: 'Incluir uma tag',
+  tag_removed: 'Retirar uma tag',
+  days_before_expiration: 'Faltar X dias pro vencimento',
+  ticket_linked: 'Ticket de atendimento vinculado a uma conta',
+}
+
 export function AutomationsManager({
   initialRules,
   pipelines,
   stages,
   templates,
   users,
+  tags,
 }: {
   initialRules: Rule[]
   pipelines: Pipeline[]
   stages: Stage[]
   templates: Template[]
   users: UserOption[]
+  tags: Tag[]
 }) {
   const [triggerType, setTriggerType] = useState('stage_entry')
   const [actionType, setActionType] = useState('move_to_stage')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const isOutcomeTrigger = triggerType === 'outcome_won' || triggerType === 'outcome_lost'
+  const isTagTrigger = triggerType === 'tag_added' || triggerType === 'tag_removed'
+  const isExpirationTrigger = triggerType === 'days_before_expiration'
+  const isTicketTrigger = triggerType === 'ticket_linked'
+  const relevantTemplates = isTicketTrigger ? templates.filter((t) => t.context === 'ticket') : templates.filter((t) => t.context !== 'ticket')
 
   function stageLabel(stageId: string | null) {
     if (!stageId) return '—'
@@ -63,6 +84,15 @@ export function AutomationsManager({
       const label = r.trigger_type === 'outcome_won' ? pipeline?.won_label ?? 'Ganho' : pipeline?.lost_label ?? 'Perdido'
       return `marcar "${label}" em ${pipeline?.name ?? '?'}`
     }
+    if (r.trigger_type === 'tag_added' || r.trigger_type === 'tag_removed') {
+      const tag = tags.find((t) => t.id === r.trigger_tag_id)
+      return `${r.trigger_type === 'tag_added' ? 'incluir' : 'retirar'} a tag "${tag?.name ?? '?'}"`
+    }
+    if (r.trigger_type === 'days_before_expiration') {
+      const pipeline = pipelines.find((p) => p.id === r.trigger_pipeline_id)
+      return `faltar ${r.days_threshold} dias pro vencimento${pipeline ? ` (${pipeline.name})` : ''}`
+    }
+    if (r.trigger_type === 'ticket_linked') return 'um ticket ser vinculado a uma conta'
     if (r.trigger_type === 'days_without_progress') return `parado ${r.days_threshold} dias em ${stageLabel(r.trigger_stage_id)}`
     return `entrar em ${stageLabel(r.trigger_stage_id)}`
   }
@@ -94,7 +124,7 @@ export function AutomationsManager({
 
         <div>
           <label className="block text-xs text-gray-500">Nome</label>
-          <input name="name" required placeholder="Ex: Avisar se parado 5 dias em Negociação" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <input name="name" required placeholder="Ex: Avisar renovação 60 dias antes" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
 
         <div className="rounded-md bg-gray-50 p-3">
@@ -103,26 +133,49 @@ export function AutomationsManager({
             <div>
               <label className="block text-xs text-gray-500">Gatilho</label>
               <select name="trigger_type" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
-                <option value="stage_entry">Entrar numa etapa</option>
-                <option value="days_without_progress">Ficar parado X dias numa etapa</option>
-                <option value="outcome_won">Marcar sucesso (Ganho ou Renovado)</option>
-                <option value="outcome_lost">Marcar perda (Perdido ou Não renovado)</option>
+                {Object.entries(TRIGGER_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
 
-            {(triggerType === 'outcome_won' || triggerType === 'outcome_lost') ? (
+            {isOutcomeTrigger && (
               <div>
                 <label className="block text-xs text-gray-500">Funil</label>
                 <select name="trigger_pipeline_id" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
                   <option value="">Selecione...</option>
                   {pipelines.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({triggerType === 'outcome_won' ? p.won_label : p.lost_label})
-                    </option>
+                    <option key={p.id} value={p.id}>{p.name} ({triggerType === 'outcome_won' ? p.won_label : p.lost_label})</option>
                   ))}
                 </select>
               </div>
-            ) : (
+            )}
+
+            {isTagTrigger && (
+              <div>
+                <label className="block text-xs text-gray-500">Qual tag</label>
+                <select name="trigger_tag_id" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+                  <option value="">Selecione...</option>
+                  {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {isExpirationTrigger && (
+              <>
+                <div>
+                  <label className="block text-xs text-gray-500">Quantos dias antes</label>
+                  <input name="days_threshold" type="number" min="1" placeholder="Ex: 60" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500">Funil (opcional — filtra só esse)</label>
+                  <select name="trigger_pipeline_id" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+                    <option value="">Qualquer funil</option>
+                    {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {!isOutcomeTrigger && !isTagTrigger && !isExpirationTrigger && !isTicketTrigger && (
               <div>
                 <label className="block text-xs text-gray-500">Etapa</label>
                 <select name="trigger_stage_id" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
@@ -143,10 +196,8 @@ export function AutomationsManager({
               </div>
             )}
           </div>
-          {(triggerType === 'outcome_won' || triggerType === 'outcome_lost') && (
-            <p className="mt-2 text-xs text-gray-400">
-              O rótulo que aparece pra equipe muda conforme o funil (Vendas mostra &quot;Ganho&quot;/&quot;Perdido&quot;, Gestão de Contratos mostra &quot;Renovado&quot;/&quot;Não renovado&quot;) — mas é o mesmo tipo de evento por trás.
-            </p>
+          {isTicketTrigger && (
+            <p className="mt-2 text-xs text-gray-400">Dispara toda vez que um ticket de atendimento é vinculado a uma conta (na criação ou depois) — a ação disponível aqui é só &quot;Enviar e-mail&quot;, direto pro solicitante do ticket.</p>
           )}
         </div>
 
@@ -156,7 +207,9 @@ export function AutomationsManager({
             <div>
               <label className="block text-xs text-gray-500">Ação</label>
               <select name="action_type" value={actionType} onChange={(e) => setActionType(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
-                {Object.entries(ACTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                {Object.entries(ACTION_LABELS)
+                  .filter(([value]) => !isTicketTrigger || value === 'send_email')
+                  .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
 
@@ -183,12 +236,12 @@ export function AutomationsManager({
 
             {actionType === 'send_email' && (
               <div>
-                <label className="block text-xs text-gray-500">Template de e-mail</label>
+                <label className="block text-xs text-gray-500">Template de e-mail {isTicketTrigger ? '(de atendimento)' : '(de contrato)'}</label>
                 <select name="email_template_id" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
                   <option value="">Selecione...</option>
-                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {relevantTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-                {templates.length === 0 && <p className="mt-1 text-xs text-yellow-700">Nenhum template criado ainda — crie um em Templates de E-mail primeiro.</p>}
+                {relevantTemplates.length === 0 && <p className="mt-1 text-xs text-yellow-700">Nenhum template desse tipo criado ainda — crie em Templates de E-mail primeiro.</p>}
               </div>
             )}
 

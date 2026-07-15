@@ -121,11 +121,12 @@ export async function createEmailTemplate(_prevState: ActionState, formData: For
   const name = (formData.get('name') as string)?.trim()
   const subject = (formData.get('subject') as string)?.trim()
   const body = (formData.get('body') as string)?.trim()
+  const context = (formData.get('context') as string) || 'contract'
   const trigger_stage_id = (formData.get('trigger_stage_id') as string) || null
 
   if (!name || !subject || !body) return { error: 'Preencha nome, assunto e corpo do e-mail.' }
 
-  const { error } = await supabase.from('email_templates').insert({ name, subject, body, trigger_stage_id, created_by: user.id })
+  const { error } = await supabase.from('email_templates').insert({ name, subject, body, context, trigger_stage_id, created_by: user.id })
   if (error) return { error: error.message }
 
   revalidatePath('/email-templates')
@@ -341,5 +342,107 @@ export async function sendAutomatedTemplateEmail(contractId: string, templateId:
       status: 'falhou',
       error_message: e instanceof Error ? e.message : 'Falha desconhecida.',
     })
+  }
+}
+
+// ------------------------------------------------------------
+// Templates no CONTEXTO DE TICKET — variáveis diferentes das de
+// contrato ({{ticket_numero}}, {{ticket_assunto}}, {{solicitante}}),
+// usado quando a automação é disparada pelo módulo de Atendimento.
+// ------------------------------------------------------------
+export async function buildTicketEmailFromTemplate(
+  templateId: string,
+  ticketId: string
+): Promise<{ subject: string; body: string; toEmail: string | null } | null> {
+  const supabase = createAdminClient()
+
+  const { data: template } = await supabase.from('email_templates').select('subject, body').eq('id', templateId).maybeSingle()
+  if (!template) return null
+
+  const { data: ticket } = await supabase.from('tickets').select('ticket_number, subject, requester_name, requester_email').eq('id', ticketId).maybeSingle()
+  if (!ticket) return null
+
+  const vars = {
+    ticket_numero: ticket.ticket_number,
+    ticket_assunto: ticket.subject,
+    solicitante: ticket.requester_name,
+  }
+
+  return {
+    subject: fillTemplateVariables(template.subject, vars),
+    body: fillTemplateVariables(template.body, vars),
+    toEmail: ticket.requester_email,
+  }
+}
+
+// Envio automático de e-mail de ticket — quem manda é o RESPONSÁVEL
+// do ticket, se já tiver e tiver Gmail/SMTP conectado; senão, cai pro
+// primeiro usuário do time Comercial que tiver conectado (é o time
+// que cuida do atendimento, por padrão de vocês). Se ninguém tiver
+// conectado, só não envia.
+export async function sendAutomatedTicketTemplateEmail(ticketId: string, templateId: string): Promise<void> {
+  const supabase = createAdminClient()
+
+  const { data: ticket } = await supabase.from('tickets').select('assigned_to, contract_id').eq('id', ticketId).maybeSingle()
+  if (!ticket) return
+
+  let senderId: string | null = null
+  if (ticket.assigned_to) {
+    const account = await getEmailAccountInfo(ticket.assigned_to)
+    if (account) senderId = ticket.assigned_to
+  }
+  if (!senderId) {
+    const { data: comercialProfiles } = await supabase.from('profiles').select('id').eq('department', 'comercial')
+    for (const p of comercialProfiles ?? []) {
+      const account = await getEmailAccountInfo(p.id)
+      if (account) {
+        senderId = p.id
+        break
+      }
+    }
+  }
+  if (!senderId) return
+
+  const filled = await buildTicketEmailFromTemplate(templateId, ticketId)
+  if (!filled?.toEmail) return
+
+  const { data: senderProfile } = await supabase.from('profiles').select('email_signature').eq('id', senderId).maybeSingle()
+  const bodyWithSignature = wrapEmailHtml(filled.body, senderProfile?.email_signature ?? null, '')
+
+  try {
+    const result = await sendEmailForUser(senderId, filled.toEmail, filled.subject, bodyWithSignature)
+
+    await supabase.from('ticket_messages').insert({
+      ticket_id: ticketId,
+      author_type: 'interno',
+      author_id: senderId,
+      author_name: 'Automação',
+      message: `E-mail automático enviado: "${filled.subject}".`,
+      is_internal_note: false,
+    })
+
+    if (ticket.contract_id) {
+      await supabase.from('contract_emails').insert({
+        contract_id: ticket.contract_id,
+        sent_by: senderId,
+        from_email: result.fromEmail,
+        to_email: filled.toEmail,
+        subject: filled.subject,
+        body: filled.body,
+        template_id: templateId,
+        triggered_automatically: true,
+        gmail_message_id: result.messageId,
+        status: 'enviado',
+      })
+      await supabase.from('activities').insert({
+        contract_id: ticket.contract_id,
+        type: 'email',
+        content: `E-mail automático de ticket enviado pra ${filled.toEmail}: "${filled.subject}".`,
+        metadata: { kind: 'sent', subject: filled.subject, from_email: result.fromEmail, to_email: filled.toEmail, body: filled.body },
+      })
+    }
+  } catch {
+    // Falha no envio automático de ticket não deve travar o resto do
+    // fluxo (vincular o ticket já aconteceu, o e-mail é um extra).
   }
 }

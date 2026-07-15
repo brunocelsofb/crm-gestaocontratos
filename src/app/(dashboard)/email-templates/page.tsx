@@ -5,7 +5,7 @@ export default async function EmailTemplatesPage() {
   const supabase = await createClient()
 
   const [{ data: templates }, { data: pipelines }, { data: stages }] = await Promise.all([
-    supabase.from('email_templates').select('id, name, subject, body, trigger_stage_id').order('name'),
+    supabase.from('email_templates').select('id, name, subject, body, trigger_stage_id, context').order('name'),
     supabase.from('pipelines').select('id, name').order('name'),
     supabase.from('stages').select('id, name, pipeline_id').order('order_index'),
   ])

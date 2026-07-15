@@ -14,6 +14,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
   const trigger_type = formData.get('trigger_type') as string
   const trigger_stage_id = (formData.get('trigger_stage_id') as string) || null
   const trigger_pipeline_id = (formData.get('trigger_pipeline_id') as string) || null
+  const trigger_tag_id = (formData.get('trigger_tag_id') as string) || null
   const days_threshold = formData.get('days_threshold') ? Number(formData.get('days_threshold')) : null
   const action_type = formData.get('action_type') as string
   const target_stage_id = (formData.get('target_stage_id') as string) || null
@@ -24,11 +25,20 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
   const notify_message = (formData.get('notify_message') as string) || null
 
   const isOutcomeTrigger = trigger_type === 'outcome_won' || trigger_type === 'outcome_lost'
+  const isTagTrigger = trigger_type === 'tag_added' || trigger_type === 'tag_removed'
+  const isExpirationTrigger = trigger_type === 'days_before_expiration'
+  const isTicketTrigger = trigger_type === 'ticket_linked'
+  const isStageBasedTrigger = !isOutcomeTrigger && !isTagTrigger && !isExpirationTrigger && !isTicketTrigger
 
   if (!name) return { error: 'Dê um nome pra automação.' }
   if (isOutcomeTrigger && !trigger_pipeline_id) return { error: 'Escolha o funil do gatilho.' }
-  if (!isOutcomeTrigger && !trigger_stage_id) return { error: 'Escolha a etapa do gatilho.' }
-  if (trigger_type === 'days_without_progress' && !days_threshold) return { error: 'Informe quantos dias parado até disparar.' }
+  if (isTagTrigger && !trigger_tag_id) return { error: 'Escolha a tag do gatilho.' }
+  if (isStageBasedTrigger && !trigger_stage_id) return { error: 'Escolha a etapa do gatilho.' }
+  if ((trigger_type === 'days_without_progress' || isExpirationTrigger) && !days_threshold) {
+    return { error: 'Informe quantos dias até disparar.' }
+  }
+
+  if (isTicketTrigger && action_type !== 'send_email') return { error: 'Esse gatilho só funciona com a ação "Enviar e-mail".' }
 
   if (action_type === 'move_to_stage' && !target_stage_id) return { error: 'Escolha a etapa de destino.' }
   if (action_type === 'create_task' && !task_content) return { error: 'Descreva a tarefa a ser criada.' }
@@ -41,6 +51,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
     trigger_type,
     trigger_stage_id,
     trigger_pipeline_id,
+    trigger_tag_id,
     days_threshold,
     action_type,
     target_stage_id,
@@ -132,6 +143,55 @@ export async function deleteAutomationRule(ruleId: string) {
 // (Ganho/Perdido ou Renovado/Não renovado, dependendo do pipeline).
 // Diferente das outras, essa é por PIPELINE inteiro, não por etapa.
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// Dispara automação de TICKET VINCULADO a uma conta — chamada tanto
+// na criação (se já nasce vinculado) quanto no vínculo manual depois.
+// ------------------------------------------------------------
+// ------------------------------------------------------------
+// Dispara automação de TAG incluída/removida — chamada de dentro de
+// setContractTag, tanto pra tag nova quanto pra tag que saiu.
+// ------------------------------------------------------------
+export async function checkAndTriggerTagAutomations(
+  contractId: string,
+  tagId: string,
+  kind: 'tag_added' | 'tag_removed'
+): Promise<void> {
+  const supabase = createAdminClient()
+
+  const { data: rules } = await supabase
+    .from('automation_rules')
+    .select('*')
+    .eq('trigger_type', kind)
+    .eq('trigger_tag_id', tagId)
+    .eq('is_active', true)
+
+  const { data: run } = await supabase.from('pipeline_runs').select('id').eq('contract_id', contractId).eq('status', 'open').maybeSingle()
+
+  for (const rule of rules ?? []) {
+    await executeAutomationAction(rule, contractId, run?.id ?? null)
+  }
+}
+
+export async function checkAndTriggerTicketLinkedAutomations(ticketId: string): Promise<void> {
+  const supabase = createAdminClient()
+
+  const { data: rules } = await supabase
+    .from('automation_rules')
+    .select('*')
+    .eq('trigger_type', 'ticket_linked')
+    .eq('is_active', true)
+
+  for (const rule of rules ?? []) {
+    if (rule.action_type === 'send_email' && rule.email_template_id) {
+      const { sendAutomatedTicketTemplateEmail } = await import('./email')
+      await sendAutomatedTicketTemplateEmail(ticketId, rule.email_template_id)
+    }
+    // Outras ações (notificar, tarefa) não fazem muito sentido nesse
+    // gatilho específico por enquanto — fica reservado pra "enviar
+    // e-mail", que é o caso de uso pedido.
+  }
+}
+
 export async function checkAndTriggerOutcomeAutomations(
   contractId: string,
   pipelineId: string,
@@ -219,6 +279,71 @@ export async function checkAndTriggerTimeBasedAutomations(): Promise<{ checked: 
         pipeline_run_id: run.id,
         type: 'automation_triggered',
         content: `Automação "${rule.name}" disparada — contrato parado há ${daysStuck} dias na etapa.`,
+        metadata: { rule_id: rule.id },
+      })
+
+      triggered++
+    }
+  }
+
+  return { checked: rules?.length ?? 0, triggered }
+}
+
+// ------------------------------------------------------------
+// Verificação de "dias antes do vencimento" — também chamada pelo
+// cron diário. Olha a vigência (valid_until) de cada contrato e
+// dispara quando faltar exatamente o número de dias configurado.
+// ------------------------------------------------------------
+export async function checkAndTriggerExpirationAutomations(): Promise<{ checked: number; triggered: number }> {
+  const supabase = createAdminClient()
+
+  const { data: rules } = await supabase
+    .from('automation_rules')
+    .select('*')
+    .eq('trigger_type', 'days_before_expiration')
+    .eq('is_active', true)
+
+  let triggered = 0
+
+  for (const rule of rules ?? []) {
+    if (!rule.days_threshold) continue
+
+    const targetDate = new Date()
+    targetDate.setDate(targetDate.getDate() + rule.days_threshold)
+    const targetDateStr = targetDate.toISOString().slice(0, 10)
+
+    const { data: expiringContracts } = await supabase.from('contracts').select('id, valid_until').eq('valid_until', targetDateStr)
+
+    for (const contract of expiringContracts ?? []) {
+      // Se a regra tem um funil configurado, só considera contratos
+      // que estão ATUALMENTE nesse funil.
+      if (rule.trigger_pipeline_id) {
+        const { data: run } = await supabase
+          .from('pipeline_runs')
+          .select('id, pipeline_id')
+          .eq('contract_id', contract.id)
+          .eq('status', 'open')
+          .maybeSingle()
+        if (!run || run.pipeline_id !== rule.trigger_pipeline_id) continue
+      }
+
+      const { data: existingTrigger } = await supabase
+        .from('automation_rule_triggers')
+        .select('id')
+        .eq('rule_id', rule.id)
+        .eq('contract_id', contract.id)
+        .maybeSingle()
+      if (existingTrigger) continue
+
+      await supabase.from('automation_rule_triggers').insert({ rule_id: rule.id, contract_id: contract.id })
+
+      const { data: run } = await supabase.from('pipeline_runs').select('id').eq('contract_id', contract.id).eq('status', 'open').maybeSingle()
+      await executeAutomationAction(rule, contract.id, run?.id ?? null)
+
+      await supabase.from('activities').insert({
+        contract_id: contract.id,
+        type: 'automation_triggered',
+        content: `Automação "${rule.name}" disparada — vencimento em ${rule.days_threshold} dias.`,
         metadata: { rule_id: rule.id },
       })
 

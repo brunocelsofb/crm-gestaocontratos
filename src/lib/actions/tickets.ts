@@ -136,6 +136,9 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
       type: 'system',
       content: `Ticket de atendimento aberto: ${data.ticket_number} — "${subject}".`,
     })
+
+    const { checkAndTriggerTicketLinkedAutomations } = await import('./automations')
+    await checkAndTriggerTicketLinkedAutomations(data.id)
   }
 
   revalidatePath('/tickets')
@@ -166,6 +169,9 @@ export async function linkTicketToContract(ticketId: string, contractId: string)
     type: 'system',
     content: `Ticket de atendimento vinculado: ${ticket?.ticket_number ?? ''} — "${ticket?.subject ?? ''}".`,
   })
+
+  const { checkAndTriggerTicketLinkedAutomations } = await import('./automations')
+  await checkAndTriggerTicketLinkedAutomations(ticketId)
 
   revalidatePath(`/tickets/${ticketId}`)
   revalidatePath(`/contracts/${contractId}`)

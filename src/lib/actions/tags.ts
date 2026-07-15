@@ -36,12 +36,25 @@ export async function setContractTag(contractId: string, formData: FormData) {
   const supabase = await createClient()
   const tagId = (formData.get('tag_id') as string) || null
 
+  // Descobre a tag ANTERIOR antes de remover, pra poder disparar a
+  // automação de "tag removida" com o id certo.
+  const { data: previousTags } = await supabase.from('contract_tags').select('tag_id').eq('contract_id', contractId)
+  const previousTagIds = (previousTags ?? []).map((t) => t.tag_id)
+
   // Modelo simples por enquanto: um contrato tem no máximo uma tag de
   // produto por vez — remove a anterior antes de adicionar a nova.
   await supabase.from('contract_tags').delete().eq('contract_id', contractId)
 
   if (tagId) {
     await supabase.from('contract_tags').insert({ contract_id: contractId, tag_id: tagId })
+  }
+
+  const { checkAndTriggerTagAutomations } = await import('./automations')
+  for (const removedTagId of previousTagIds) {
+    if (removedTagId !== tagId) await checkAndTriggerTagAutomations(contractId, removedTagId, 'tag_removed')
+  }
+  if (tagId && !previousTagIds.includes(tagId)) {
+    await checkAndTriggerTagAutomations(contractId, tagId, 'tag_added')
   }
 
   revalidatePath(`/contracts/${contractId}`)
