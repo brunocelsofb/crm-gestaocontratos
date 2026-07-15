@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { sendContractEmail, buildEmailFromTemplate } from '@/lib/actions/email'
+import { sendContractEmail, buildEmailFromTemplate, getEmailSignature } from '@/lib/actions/email'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
 
 type Template = { id: string; name: string }
@@ -39,6 +39,12 @@ export function ContractEmailSection({
   const [templateId, setTemplateId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [signature, setSignature] = useState<string | null>(null)
+  const [signatureExpanded, setSignatureExpanded] = useState(false)
+
+  useEffect(() => {
+    getEmailSignature().then((s) => setSignature(s || null))
+  }, [])
 
   async function handleTemplateChange(id: string) {
     setTemplateId(id)
@@ -100,6 +106,25 @@ export function ContractEmailSection({
           <label className="block text-xs text-gray-500">Mensagem</label>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
+
+        {signature && (
+          <button
+            type="button"
+            onClick={() => setSignatureExpanded((v) => !v)}
+            className="w-full rounded-md border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-left text-xs text-gray-500 hover:bg-gray-100"
+          >
+            ✍️ Sua assinatura será incluída automaticamente {signatureExpanded ? '— clique pra recolher ▲' : '— clique pra ver como fica ▼'}
+            {signatureExpanded && (
+              <div className="mt-2 border-t border-gray-200 pt-2 text-sm text-gray-700" dangerouslySetInnerHTML={{ __html: signature }} />
+            )}
+          </button>
+        )}
+        {!signature && (
+          <p className="text-xs text-yellow-700">
+            Você ainda não configurou uma assinatura — <a href="/minha-conta" className="underline">configure em Minha Conta</a> se quiser que apareça automaticamente.
+          </p>
+        )}
+
         {error && <p className="text-xs text-red-600">{error}</p>}
         <button onClick={handleSend} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
           {busy ? 'Enviando...' : 'Enviar'}
