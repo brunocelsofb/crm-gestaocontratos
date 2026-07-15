@@ -313,10 +313,10 @@ export async function moveContractStage(
       const filled = await buildEmailFromTemplate(emailTemplate.id, contractId)
 
       if (filled?.toEmail) {
-        const { getValidAccessToken, sendGmailMessage } = await import('@/lib/email/gmail')
-        const account = await getValidAccessToken(contractForEmail.owner_id)
+        const { getEmailAccountInfo, sendEmailForUser } = await import('@/lib/email/send')
+        const accountInfo = await getEmailAccountInfo(contractForEmail.owner_id)
 
-        if (account) {
+        if (accountInfo) {
           const { data: ownerProfile } = await supabase.from('profiles').select('email_signature').eq('id', contractForEmail.owner_id).maybeSingle()
           const signatureHtml = ownerProfile?.email_signature ? `<br><br>${ownerProfile.email_signature}` : ''
           const trackingToken = crypto.randomUUID()
@@ -324,11 +324,11 @@ export async function moveContractStage(
           const bodyWithExtras = `${filled.body}${signatureHtml}<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
 
           try {
-            const result = await sendGmailMessage({ accessToken: account.accessToken, to: filled.toEmail, subject: filled.subject, htmlBody: bodyWithExtras })
+            const result = await sendEmailForUser(contractForEmail.owner_id, filled.toEmail, filled.subject, bodyWithExtras)
             await supabase.from('contract_emails').insert({
               contract_id: contractId,
               sent_by: contractForEmail.owner_id,
-              from_email: account.fromEmail,
+              from_email: result.fromEmail,
               to_email: filled.toEmail,
               subject: filled.subject,
               body: filled.body,
@@ -347,7 +347,7 @@ export async function moveContractStage(
             await supabase.from('contract_emails').insert({
               contract_id: contractId,
               sent_by: contractForEmail.owner_id,
-              from_email: account.fromEmail,
+              from_email: accountInfo.fromEmail,
               to_email: filled.toEmail,
               subject: filled.subject,
               body: filled.body,

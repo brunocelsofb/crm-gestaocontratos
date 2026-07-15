@@ -3,19 +3,68 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getValidAccessToken, sendGmailMessage } from '@/lib/email/gmail'
+import { sendEmailForUser, getEmailAccountInfo } from '@/lib/email/send'
+import { verifySmtpConnection } from '@/lib/email/smtp'
 
 export type ActionState = { error?: string }
 
-export async function getConnectedEmailAccount(): Promise<{ email: string; connectedAt: string } | null> {
+export async function getConnectedEmailAccount(): Promise<{ email: string; connectedAt: string; connectionType: string } | null> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await supabase.from('email_accounts').select('email, connected_at').eq('user_id', user.id).maybeSingle()
-  return data ? { email: data.email, connectedAt: data.connected_at } : null
+  const { data } = await supabase.from('email_accounts').select('email, connected_at, connection_type').eq('user_id', user.id).maybeSingle()
+  return data ? { email: data.email, connectedAt: data.connected_at, connectionType: data.connection_type } : null
+}
+
+// ------------------------------------------------------------
+// Conexão via SMTP — alternativa ao Gmail, pra quem usa outro
+// provedor de e-mail (Outlook, corporativo próprio, etc).
+// ------------------------------------------------------------
+export async function connectSmtpAccount(formData: FormData): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const email = (formData.get('email') as string)?.trim()
+  const host = (formData.get('smtp_host') as string)?.trim()
+  const port = Number(formData.get('smtp_port'))
+  const username = (formData.get('smtp_username') as string)?.trim()
+  const password = (formData.get('smtp_password') as string)
+  const secure = formData.get('smtp_secure') === 'on'
+
+  if (!email || !host || !port || !username || !password) {
+    return { error: 'Preencha todos os campos (e-mail, servidor, porta, usuário e senha).' }
+  }
+
+  // Testa a conexão ANTES de salvar — evita salvar uma configuração
+  // que não funciona e só descobrir isso na hora de mandar de verdade.
+  const verify = await verifySmtpConnection({ host, port, username, password, secure })
+  if (!verify.ok) return { error: `Não consegui conectar: ${verify.error}` }
+
+  const adminClient = createAdminClient()
+  const { error } = await adminClient.from('email_accounts').upsert(
+    {
+      user_id: user.id,
+      email,
+      connection_type: 'smtp',
+      smtp_host: host,
+      smtp_port: port,
+      smtp_username: username,
+      smtp_password: password,
+      smtp_secure: secure,
+      connected_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  )
+  if (error) return { error: error.message }
+
+  revalidatePath('/minha-conta')
+  return {}
 }
 
 export async function disconnectEmailAccount(): Promise<ActionState> {
@@ -112,9 +161,9 @@ export async function sendContractEmail(
 
   if (!toEmail) return { error: 'Informe o e-mail do destinatário.' }
 
-  const account = await getValidAccessToken(user.id)
-  if (!account) {
-    return { error: 'Você ainda não conectou seu Gmail. Vá em Configurações → E-mail e conecte antes de enviar.' }
+  const accountInfo = await getEmailAccountInfo(user.id)
+  if (!accountInfo) {
+    return { error: 'Você ainda não conectou nenhum e-mail (Gmail ou SMTP). Vá em Minha Conta e conecte antes de enviar.' }
   }
 
   const { data: profile } = await supabase.from('profiles').select('email_signature').eq('id', user.id).maybeSingle()
@@ -127,12 +176,12 @@ export async function sendContractEmail(
   const bodyWithExtras = `${body}${signatureHtml}<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
 
   try {
-    const result = await sendGmailMessage({ accessToken: account.accessToken, to: toEmail, subject, htmlBody: bodyWithExtras })
+    const result = await sendEmailForUser(user.id, toEmail, subject, bodyWithExtras)
 
     await supabase.from('contract_emails').insert({
       contract_id: contractId,
       sent_by: user.id,
-      from_email: account.fromEmail,
+      from_email: result.fromEmail,
       to_email: toEmail,
       subject,
       body,
@@ -154,7 +203,7 @@ export async function sendContractEmail(
     await supabase.from('contract_emails').insert({
       contract_id: contractId,
       sent_by: user.id,
-      from_email: account.fromEmail,
+      from_email: accountInfo.fromEmail,
       to_email: toEmail,
       subject,
       body,

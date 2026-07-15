@@ -24,7 +24,11 @@ export default async function MyAccountPage() {
       </div>
 
       <Suspense fallback={null}>
-        <EmailConnectionSettings connectedEmail={connectedAccount?.email ?? null} connectedAt={connectedAccount?.connectedAt ?? null} />
+        <EmailConnectionSettings
+          connectedEmail={connectedAccount?.email ?? null}
+          connectedAt={connectedAccount?.connectedAt ?? null}
+          connectionType={connectedAccount?.connectionType ?? null}
+        />
       </Suspense>
 
       <EmailSignatureForm currentSignature={signature} />

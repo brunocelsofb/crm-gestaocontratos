@@ -993,9 +993,15 @@ create table contract_crm.email_accounts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references contract_crm.profiles(id) on delete cascade unique,
   email text not null,
-  access_token text not null,
-  refresh_token text not null,
-  token_expiry timestamptz not null,
+  connection_type text not null default 'oauth_google' check (connection_type in ('oauth_google', 'smtp')),
+  access_token text,
+  refresh_token text,
+  token_expiry timestamptz,
+  smtp_host text,
+  smtp_port integer,
+  smtp_username text,
+  smtp_password text,
+  smtp_secure boolean not null default true,
   connected_at timestamptz not null default now()
 );
 
