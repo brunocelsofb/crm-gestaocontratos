@@ -218,8 +218,9 @@ export async function sendContractEmail(
     await supabase.from('activities').insert({
       contract_id: contractId,
       user_id: user.id,
-      type: 'system',
+      type: 'email',
       content: `E-mail enviado pra ${toEmail}: "${subject}".`,
+      metadata: { kind: 'sent', subject, from_email: result.fromEmail, to_email: toEmail, body },
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Falha ao enviar e-mail.'

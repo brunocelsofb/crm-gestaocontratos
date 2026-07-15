@@ -347,8 +347,9 @@ export async function moveContractStage(
             })
             await supabase.from('activities').insert({
               contract_id: contractId,
-              type: 'system',
+              type: 'email',
               content: `E-mail automático enviado pra ${filled.toEmail}: "${filled.subject}".`,
+              metadata: { kind: 'sent', subject: filled.subject, from_email: result.fromEmail, to_email: filled.toEmail, body: filled.body },
             })
           } catch (e) {
             await supabase.from('contract_emails').insert({

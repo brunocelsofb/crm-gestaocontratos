@@ -74,8 +74,9 @@ export async function POST(request: Request) {
 
   await supabase.from('activities').insert({
     contract_id: contract.id,
-    type: 'system',
+    type: 'email',
     content: direction === 'recebido' ? `E-mail recebido de ${sender}: "${subject}".` : `Cópia de e-mail enviado por fora do CRM registrada: "${subject}".`,
+    metadata: { kind: direction === 'recebido' ? 'received' : 'sent', subject, from_email: sender, to_email: recipient, body: bodyHtml },
   })
 
   return NextResponse.json({ ok: true, matched: true })

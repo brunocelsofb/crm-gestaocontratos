@@ -16,9 +16,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   const { token } = await params
   const supabase = createAdminClient()
 
-  const { data: email } = await supabase.from('contract_emails').select('id, opened_at').eq('tracking_token', token).maybeSingle()
+  const { data: email } = await supabase.from('contract_emails').select('id, contract_id, opened_at, subject, to_email').eq('tracking_token', token).maybeSingle()
   if (email && !email.opened_at) {
     await supabase.from('contract_emails').update({ opened_at: new Date().toISOString() }).eq('id', email.id)
+
+    await supabase.from('activities').insert({
+      contract_id: email.contract_id,
+      type: 'email',
+      content: `O e-mail "${email.subject}" foi visualizado por ${email.to_email}.`,
+      metadata: { kind: 'opened', subject: email.subject, to_email: email.to_email },
+    })
   }
 
   return new NextResponse(TRANSPARENT_PIXEL, {
