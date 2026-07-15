@@ -21,6 +21,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendAutomatedTemplateEmail } from '@/lib/actions/email'
 
 export type MoveResult = { success?: true; error?: string }
 
@@ -267,11 +268,13 @@ export async function moveContractStage(
     })
   }
 
-  // Verifica automação vinculada à nova etapa
+  // Verifica automação vinculada à nova etapa (só as de gatilho
+  // "entrar na etapa" — as de "dias parado" rodam pelo cron, não aqui)
   const { data: rule } = await supabase
     .from('automation_rules')
     .select('*')
     .eq('trigger_stage_id', newStage.id)
+    .eq('trigger_type', 'stage_entry')
     .eq('is_active', true)
     .maybeSingle()
 
@@ -292,82 +295,33 @@ export async function moveContractStage(
         type: 'task',
         content: rule.task_content,
       })
+    } else if (rule.action_type === 'notify_user' && rule.notify_user_id) {
+      await supabase.from('notifications').insert({
+        user_id: rule.notify_user_id,
+        message: rule.notify_message || `Automação "${rule.name}" disparada num contrato.`,
+      })
+      await supabase.from('activities').insert({
+        contract_id: contractId,
+        pipeline_run_id: activeRunId,
+        type: 'automation_triggered',
+        content: `Automação "${rule.name}" disparada — notificação enviada.`,
+        metadata: { rule_id: rule.id },
+      })
+    } else if (rule.action_type === 'send_email' && rule.email_template_id) {
+      await sendAutomatedTemplateEmail(contractId, rule.email_template_id)
     }
   }
 
-  // Automação de e-mail: se tiver um template configurado pra disparar
-  // nessa etapa, envia sozinho — usando o Gmail do DONO DA CONTA. Se o
-  // dono não tiver conectado o Gmail, só não envia — não trava o resto
-  // da automação por causa disso.
+  // Automação de e-mail configurada DIRETO no template (atalho rápido,
+  // continua funcionando em paralelo às regras de Automações acima).
   const { data: emailTemplate } = await supabase
     .from('email_templates')
-    .select('id, subject, body')
+    .select('id')
     .eq('trigger_stage_id', newStageId)
     .maybeSingle()
 
   if (emailTemplate) {
-    const { data: contractForEmail } = await supabase.from('contracts').select('owner_id, contact_id').eq('id', contractId).maybeSingle()
-
-    if (contractForEmail?.owner_id) {
-      const { buildEmailFromTemplate } = await import('./email')
-      const filled = await buildEmailFromTemplate(emailTemplate.id, contractId)
-
-      if (filled?.toEmail) {
-        const { getEmailAccountInfo, sendEmailForUser, wrapEmailHtml } = await import('@/lib/email/send')
-        const accountInfo = await getEmailAccountInfo(contractForEmail.owner_id)
-
-        if (accountInfo) {
-          const { data: ownerProfile } = await supabase.from('profiles').select('email_signature').eq('id', contractForEmail.owner_id).maybeSingle()
-          const { data: contractCodeRow } = await supabase.from('contracts').select('inbound_email_code').eq('id', contractId).maybeSingle()
-          const { data: orgSettingsRow } = await supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle()
-          const trackingAddress =
-            orgSettingsRow?.inbound_email_domain && contractCodeRow?.inbound_email_code
-              ? `${contractCodeRow.inbound_email_code}@${orgSettingsRow.inbound_email_domain}`
-              : null
-          const replyTo = trackingAddress ? `${accountInfo.fromEmail}, ${trackingAddress}` : undefined
-          const trackingToken = crypto.randomUUID()
-          const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
-          const trackingPixelHtml = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
-          const bodyWithExtras = wrapEmailHtml(filled.body, ownerProfile?.email_signature ?? null, trackingPixelHtml)
-
-          try {
-            const result = await sendEmailForUser(contractForEmail.owner_id, filled.toEmail, filled.subject, bodyWithExtras, { replyTo })
-            await supabase.from('contract_emails').insert({
-              contract_id: contractId,
-              sent_by: contractForEmail.owner_id,
-              from_email: result.fromEmail,
-              to_email: filled.toEmail,
-              subject: filled.subject,
-              body: filled.body,
-              template_id: emailTemplate.id,
-              triggered_automatically: true,
-              gmail_message_id: result.messageId,
-              status: 'enviado',
-              tracking_token: trackingToken,
-            })
-            await supabase.from('activities').insert({
-              contract_id: contractId,
-              type: 'email',
-              content: `E-mail automático enviado pra ${filled.toEmail}: "${filled.subject}".`,
-              metadata: { kind: 'sent', subject: filled.subject, from_email: result.fromEmail, to_email: filled.toEmail, body: filled.body },
-            })
-          } catch (e) {
-            await supabase.from('contract_emails').insert({
-              contract_id: contractId,
-              sent_by: contractForEmail.owner_id,
-              from_email: accountInfo.fromEmail,
-              to_email: filled.toEmail,
-              subject: filled.subject,
-              body: filled.body,
-              template_id: emailTemplate.id,
-              triggered_automatically: true,
-              status: 'falhou',
-              error_message: e instanceof Error ? e.message : 'Falha desconhecida.',
-            })
-          }
-        }
-      }
-    }
+    await sendAutomatedTemplateEmail(contractId, emailTemplate.id)
   }
 
   revalidatePath(`/contracts/${contractId}`)

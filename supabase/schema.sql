@@ -195,14 +195,30 @@ create index idx_activities_created_at on contract_crm.activities(created_at des
 create table contract_crm.automation_rules (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  trigger_stage_id uuid not null references contract_crm.stages(id),
-  action_type text not null check (action_type in ('move_to_pipeline', 'move_to_stage', 'create_task')),
+  trigger_type text not null default 'stage_entry' check (trigger_type in ('stage_entry', 'days_without_progress')),
+  trigger_stage_id uuid references contract_crm.stages(id),
+  days_threshold integer,
+  action_type text not null check (action_type in ('move_to_pipeline', 'move_to_stage', 'create_task', 'send_email', 'notify_user')),
   target_pipeline_id uuid references contract_crm.pipelines(id),
   target_stage_id uuid references contract_crm.stages(id),
   task_content text,
+  email_template_id uuid references contract_crm.email_templates(id) on delete set null,
+  notify_user_id uuid references contract_crm.profiles(id),
+  notify_message text,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+create table contract_crm.automation_rule_triggers (
+  id uuid primary key default gen_random_uuid(),
+  rule_id uuid not null references contract_crm.automation_rules(id) on delete cascade,
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  triggered_at timestamptz not null default now(),
+  unique (rule_id, contract_id)
+);
+
+alter table contract_crm.automation_rule_triggers enable row level security;
+create policy "automation_rule_triggers_all" on contract_crm.automation_rule_triggers for all using (auth.role() = 'authenticated');
 
 
 -- ------------------------------------------------------------

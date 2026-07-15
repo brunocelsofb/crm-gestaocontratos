@@ -1,0 +1,144 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
+
+export type ActionState = { error?: string }
+
+export async function createAutomationRule(formData: FormData): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem criar automações.' }
+
+  const name = (formData.get('name') as string)?.trim()
+  const trigger_type = formData.get('trigger_type') as string
+  const trigger_stage_id = (formData.get('trigger_stage_id') as string) || null
+  const days_threshold = formData.get('days_threshold') ? Number(formData.get('days_threshold')) : null
+  const action_type = formData.get('action_type') as string
+  const target_stage_id = (formData.get('target_stage_id') as string) || null
+  const target_pipeline_id = (formData.get('target_pipeline_id') as string) || null
+  const task_content = (formData.get('task_content') as string) || null
+  const email_template_id = (formData.get('email_template_id') as string) || null
+  const notify_user_id = (formData.get('notify_user_id') as string) || null
+  const notify_message = (formData.get('notify_message') as string) || null
+
+  if (!name) return { error: 'Dê um nome pra automação.' }
+  if (!trigger_stage_id) return { error: 'Escolha a etapa do gatilho.' }
+  if (trigger_type === 'days_without_progress' && !days_threshold) return { error: 'Informe quantos dias parado até disparar.' }
+
+  if (action_type === 'move_to_stage' && !target_stage_id) return { error: 'Escolha a etapa de destino.' }
+  if (action_type === 'create_task' && !task_content) return { error: 'Descreva a tarefa a ser criada.' }
+  if (action_type === 'send_email' && !email_template_id) return { error: 'Escolha o template de e-mail.' }
+  if (action_type === 'notify_user' && !notify_user_id) return { error: 'Escolha quem deve ser notificado.' }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('automation_rules').insert({
+    name,
+    trigger_type,
+    trigger_stage_id,
+    days_threshold,
+    action_type,
+    target_stage_id,
+    target_pipeline_id,
+    task_content,
+    email_template_id,
+    notify_user_id,
+    notify_message,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/automations')
+  return {}
+}
+
+export async function toggleAutomationRule(ruleId: string, isActive: boolean): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
+  const supabase = await createClient()
+  const { error } = await supabase.from('automation_rules').update({ is_active: isActive }).eq('id', ruleId)
+  if (error) return { error: error.message }
+  revalidatePath('/automations')
+  return {}
+}
+
+export async function deleteAutomationRule(ruleId: string) {
+  const supabase = createAdminClient()
+  await supabase.from('automation_rules').delete().eq('id', ruleId)
+  revalidatePath('/automations')
+}
+
+// ------------------------------------------------------------
+// Verificação por tempo — chamada pelo cron diário. Olha cada regra
+// "dias sem avançar", acha contratos parados na etapa monitorada há
+// tempo demais, e dispara a ação — só UMA vez por contrato/regra (por
+// isso a tabela automation_rule_triggers), senão disparava de novo
+// todo dia enquanto o contrato continuasse parado ali.
+// ------------------------------------------------------------
+export async function checkAndTriggerTimeBasedAutomations(): Promise<{ checked: number; triggered: number }> {
+  const supabase = createAdminClient()
+
+  const { data: rules } = await supabase
+    .from('automation_rules')
+    .select('*')
+    .eq('trigger_type', 'days_without_progress')
+    .eq('is_active', true)
+
+  let triggered = 0
+
+  for (const rule of rules ?? []) {
+    if (!rule.trigger_stage_id || !rule.days_threshold) continue
+
+    const { data: stuckRuns } = await supabase
+      .from('pipeline_runs')
+      .select('id, contract_id, stage_entered_at')
+      .eq('stage_id', rule.trigger_stage_id)
+      .eq('status', 'open')
+
+    for (const run of stuckRuns ?? []) {
+      const daysStuck = Math.floor((Date.now() - new Date(run.stage_entered_at).getTime()) / 86_400_000)
+      if (daysStuck < rule.days_threshold) continue
+
+      // Já disparou antes pra esse contrato+regra? Não dispara de novo.
+      const { data: existingTrigger } = await supabase
+        .from('automation_rule_triggers')
+        .select('id')
+        .eq('rule_id', rule.id)
+        .eq('contract_id', run.contract_id)
+        .maybeSingle()
+      if (existingTrigger) continue
+
+      await supabase.from('automation_rule_triggers').insert({ rule_id: rule.id, contract_id: run.contract_id })
+
+      if ((rule.action_type === 'move_to_stage' || rule.action_type === 'move_to_pipeline') && rule.target_stage_id) {
+        const { moveContractStage } = await import('./pipeline')
+        await moveContractStage(run.contract_id, rule.target_stage_id)
+      } else if (rule.action_type === 'create_task' && rule.task_content) {
+        await supabase.from('activities').insert({
+          contract_id: run.contract_id,
+          pipeline_run_id: run.id,
+          type: 'task',
+          content: rule.task_content,
+        })
+      } else if (rule.action_type === 'notify_user' && rule.notify_user_id) {
+        await supabase.from('notifications').insert({
+          user_id: rule.notify_user_id,
+          message: rule.notify_message || `Automação "${rule.name}": um contrato está parado há ${daysStuck} dias.`,
+        })
+      } else if (rule.action_type === 'send_email' && rule.email_template_id) {
+        const { sendAutomatedTemplateEmail } = await import('./email')
+        await sendAutomatedTemplateEmail(run.contract_id, rule.email_template_id)
+      }
+
+      await supabase.from('activities').insert({
+        contract_id: run.contract_id,
+        pipeline_run_id: run.id,
+        type: 'automation_triggered',
+        content: `Automação "${rule.name}" disparada — contrato parado há ${daysStuck} dias na etapa.`,
+        metadata: { rule_id: rule.id },
+      })
+
+      triggered++
+    }
+  }
+
+  return { checked: rules?.length ?? 0, triggered }
+}

@@ -274,3 +274,72 @@ export async function buildEmailFromTemplate(
     toEmail: contact?.email ?? null,
   }
 }
+
+// ------------------------------------------------------------
+// Envio automático de e-mail por template — reutilizada tanto pela
+// automação "e-mail por etapa" (configurada direto no template) quanto
+// pelas regras de automação mais amplas (Automações → ação "Enviar
+// e-mail"). Usa o Gmail/SMTP do DONO DA CONTA; se ele não tiver
+// conectado, só não envia — não trava o resto da automação.
+// ------------------------------------------------------------
+export async function sendAutomatedTemplateEmail(contractId: string, templateId: string): Promise<void> {
+  const supabase = createAdminClient()
+
+  const { data: contract } = await supabase.from('contracts').select('owner_id').eq('id', contractId).maybeSingle()
+  if (!contract?.owner_id) return
+
+  const filled = await buildEmailFromTemplate(templateId, contractId)
+  if (!filled?.toEmail) return
+
+  const accountInfo = await getEmailAccountInfo(contract.owner_id)
+  if (!accountInfo) return
+
+  const { data: ownerProfile } = await supabase.from('profiles').select('email_signature').eq('id', contract.owner_id).maybeSingle()
+  const { data: contractCodeRow } = await supabase.from('contracts').select('inbound_email_code').eq('id', contractId).maybeSingle()
+  const { data: orgSettingsRow } = await supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle()
+  const trackingAddress =
+    orgSettingsRow?.inbound_email_domain && contractCodeRow?.inbound_email_code
+      ? `${contractCodeRow.inbound_email_code}@${orgSettingsRow.inbound_email_domain}`
+      : null
+  const replyTo = trackingAddress ? `${accountInfo.fromEmail}, ${trackingAddress}` : undefined
+  const trackingToken = crypto.randomUUID()
+  const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
+  const trackingPixelHtml = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+  const bodyWithExtras = wrapEmailHtml(filled.body, ownerProfile?.email_signature ?? null, trackingPixelHtml)
+
+  try {
+    const result = await sendEmailForUser(contract.owner_id, filled.toEmail, filled.subject, bodyWithExtras, { replyTo })
+    await supabase.from('contract_emails').insert({
+      contract_id: contractId,
+      sent_by: contract.owner_id,
+      from_email: result.fromEmail,
+      to_email: filled.toEmail,
+      subject: filled.subject,
+      body: filled.body,
+      template_id: templateId,
+      triggered_automatically: true,
+      gmail_message_id: result.messageId,
+      status: 'enviado',
+      tracking_token: trackingToken,
+    })
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      type: 'email',
+      content: `E-mail automático enviado pra ${filled.toEmail}: "${filled.subject}".`,
+      metadata: { kind: 'sent', subject: filled.subject, from_email: result.fromEmail, to_email: filled.toEmail, body: filled.body },
+    })
+  } catch (e) {
+    await supabase.from('contract_emails').insert({
+      contract_id: contractId,
+      sent_by: contract.owner_id,
+      from_email: accountInfo.fromEmail,
+      to_email: filled.toEmail,
+      subject: filled.subject,
+      body: filled.body,
+      template_id: templateId,
+      triggered_automatically: true,
+      status: 'falhou',
+      error_message: e instanceof Error ? e.message : 'Falha desconhecida.',
+    })
+  }
+}
