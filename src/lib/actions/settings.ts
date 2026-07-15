@@ -59,3 +59,42 @@ export async function updateOrganizationSettings(
   revalidatePath('/', 'layout')
   return {}
 }
+
+// ------------------------------------------------------------
+// Numeração de ticket/protocolo e proposta — configurável, atômica
+// (usa sequência do banco, sem risco de número repetido).
+// ------------------------------------------------------------
+export async function updateNumberingPrefixes(formData: FormData): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
+
+  const ticket_number_prefix = (formData.get('ticket_number_prefix') as string)?.trim() || 'TICKET'
+  const proposal_number_prefix = (formData.get('proposal_number_prefix') as string)?.trim() || 'PROP'
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('organization_settings')
+    .update({ ticket_number_prefix, proposal_number_prefix, updated_at: new Date().toISOString() })
+    .eq('id', 'default')
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
+}
+
+export async function setNextTicketNumber(nextNumber: number): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('set_next_ticket_protocol', { new_start: nextNumber })
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
+}
+
+export async function setNextProposalNumber(nextNumber: number): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('set_next_proposal_protocol', { new_start: nextNumber })
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
+}

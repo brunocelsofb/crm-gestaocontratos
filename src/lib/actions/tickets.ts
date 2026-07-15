@@ -9,14 +9,16 @@ export type ActionState = { error?: string }
 
 async function generateTicketNumber(): Promise<string> {
   const supabase = createAdminClient()
-  const year = new Date().getFullYear()
-  const { count } = await supabase
-    .from('tickets')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', `${year}-01-01`)
-    .lt('created_at', `${year + 1}-01-01`)
-  const next = (count ?? 0) + 1
-  return `TICKET-${year}-${String(next).padStart(4, '0')}`
+
+  // nextval é atômico — dois tickets criados ao mesmo tempo NUNCA saem
+  // com o mesmo número, diferente de contar registros (que tinha essa
+  // brecha). Também não reinicia por ano — cresce direto, como pedido.
+  const { data: seqValue } = await supabase.rpc('next_ticket_protocol')
+
+  const { data: settings } = await supabase.from('organization_settings').select('ticket_number_prefix').eq('id', 'default').maybeSingle()
+  const prefix = settings?.ticket_number_prefix || 'TICKET'
+
+  return `${prefix}-${String(seqValue).padStart(6, '0')}`
 }
 
 // Criação de ticket — usada tanto pelo formulário público de suporte
@@ -110,6 +112,17 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
     )
   }
 
+  // Lastro: se o ticket já nasce vinculado a um contrato (escolhido na
+  // criação, ou achado sozinho pelo CNPJ), fica registrado na conta
+  // desde o início — não só quando é vinculado depois.
+  if (contract_id) {
+    await supabase.from('activities').insert({
+      contract_id,
+      type: 'system',
+      content: `Ticket de atendimento aberto: ${ticketNumber} — "${subject}".`,
+    })
+  }
+
   revalidatePath('/tickets')
   if (contract_id) revalidatePath(`/contracts/${contract_id}`)
   return { ticketId: data.id, publicToken: data.public_token }
@@ -121,8 +134,24 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
 // alguém da equipe vincula depois de triar.
 export async function linkTicketToContract(ticketId: string, contractId: string): Promise<ActionState> {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: ticket } = await supabase.from('tickets').select('ticket_number, subject').eq('id', ticketId).maybeSingle()
+
   const { error } = await supabase.from('tickets').update({ contract_id: contractId, updated_at: new Date().toISOString() }).eq('id', ticketId)
   if (error) return { error: error.message }
+
+  // Lastro: fica registrado no histórico da CONTA que esse atendimento
+  // foi vinculado a ela.
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user?.id ?? null,
+    type: 'system',
+    content: `Ticket de atendimento vinculado: ${ticket?.ticket_number ?? ''} — "${ticket?.subject ?? ''}".`,
+  })
+
   revalidatePath(`/tickets/${ticketId}`)
   revalidatePath(`/contracts/${contractId}`)
   return {}
@@ -130,13 +159,32 @@ export async function linkTicketToContract(ticketId: string, contractId: string)
 
 export async function updateTicketStatus(ticketId: string, status: string): Promise<ActionState> {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
   if (status === 'resolvido' || status === 'fechado') update.resolved_at = new Date().toISOString()
 
+  const { data: ticket } = await supabase.from('tickets').select('ticket_number, subject, contract_id').eq('id', ticketId).maybeSingle()
+
   const { error } = await supabase.from('tickets').update(update).eq('id', ticketId)
   if (error) return { error: error.message }
+
+  // Lastro: quando o atendimento é finalizado (resolvido/fechado),
+  // também fica registrado na conta — não só no ticket.
+  if ((status === 'resolvido' || status === 'fechado') && ticket?.contract_id) {
+    await supabase.from('activities').insert({
+      contract_id: ticket.contract_id,
+      user_id: user?.id ?? null,
+      type: 'system',
+      content: `Ticket de atendimento ${status === 'resolvido' ? 'resolvido' : 'fechado'}: ${ticket.ticket_number} — "${ticket.subject}".`,
+    })
+  }
+
   revalidatePath('/tickets')
   revalidatePath(`/tickets/${ticketId}`)
+  if (ticket?.contract_id) revalidatePath(`/contracts/${ticket.contract_id}`)
   return {}
 }
 

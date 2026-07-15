@@ -337,6 +337,8 @@ create table contract_crm.organization_settings (
   proposal_footer_text text,
   proposal_brand_color text default '#1B556B',
   assistant_monthly_budget_usd numeric default 10,
+  ticket_number_prefix text default 'TICKET',
+  proposal_number_prefix text default 'PROP',
   updated_at timestamptz not null default now()
 );
 
@@ -930,3 +932,48 @@ create policy "tickets_delete" on contract_crm.tickets for delete using (auth.ro
 
 create policy "ticket_messages_select" on contract_crm.ticket_messages for select using (auth.role() = 'authenticated');
 create policy "ticket_messages_insert" on contract_crm.ticket_messages for insert with check (true);
+
+
+-- ------------------------------------------------------------
+-- 28. Numeração sequencial (protocolo de ticket e proposta)
+-- ------------------------------------------------------------
+create sequence contract_crm.ticket_protocol_seq;
+create sequence contract_crm.proposal_protocol_seq;
+
+create or replace function contract_crm.next_ticket_protocol()
+returns bigint
+language sql
+security definer
+as $$
+  select nextval('contract_crm.ticket_protocol_seq');
+$$;
+
+create or replace function contract_crm.next_proposal_protocol()
+returns bigint
+language sql
+security definer
+as $$
+  select nextval('contract_crm.proposal_protocol_seq');
+$$;
+
+grant execute on function contract_crm.next_ticket_protocol() to authenticated, anon;
+grant execute on function contract_crm.next_proposal_protocol() to authenticated, anon;
+
+create or replace function contract_crm.set_next_ticket_protocol(new_start bigint)
+returns void
+language sql
+security definer
+as $$
+  select setval('contract_crm.ticket_protocol_seq', new_start, false);
+$$;
+
+create or replace function contract_crm.set_next_proposal_protocol(new_start bigint)
+returns void
+language sql
+security definer
+as $$
+  select setval('contract_crm.proposal_protocol_seq', new_start, false);
+$$;
+
+grant execute on function contract_crm.set_next_ticket_protocol(bigint) to authenticated;
+grant execute on function contract_crm.set_next_proposal_protocol(bigint) to authenticated;

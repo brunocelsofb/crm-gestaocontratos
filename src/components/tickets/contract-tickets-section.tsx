@@ -14,7 +14,7 @@ export async function ContractTicketsSection({ contractId, clientName }: { contr
   const supabase = await createClient()
   const { data: tickets } = await supabase
     .from('tickets')
-    .select('id, ticket_number, subject, status, priority, sla_due_at, resolved_at, created_at')
+    .select('id, ticket_number, subject, status, priority, requester_name, sla_due_at, resolved_at, created_at')
     .eq('contract_id', contractId)
     .order('created_at', { ascending: false })
 
@@ -42,6 +42,7 @@ export async function ContractTicketsSection({ contractId, clientName }: { contr
               <div>
                 <span className="font-medium text-gray-900">{t.subject}</span>
                 <span className="ml-2 text-xs text-gray-400">{t.ticket_number} · {STATUS_LABELS[t.status]}</span>
+                <p className="mt-0.5 text-xs text-gray-500">Solicitante: <span className="font-medium">{t.requester_name}</span></p>
               </div>
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SLA_STYLES[sla]}`}>{SLA_LABELS[sla]}</span>
             </Link>

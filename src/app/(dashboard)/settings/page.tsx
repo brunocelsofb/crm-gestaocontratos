@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentProfile } from '@/lib/auth/role'
 import { OrganizationSettingsForm } from '@/components/settings/organization-settings-form'
+import { NumberingSettingsForm } from '@/components/settings/numbering-settings-form'
 
 export default async function SettingsPage() {
   const profile = await getCurrentProfile()
@@ -10,7 +11,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd')
+    .select('name, company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -28,6 +29,10 @@ export default async function SettingsPage() {
         currentFooterText={settings?.proposal_footer_text ?? ''}
         currentBrandColor={settings?.proposal_brand_color ?? '#1B556B'}
         currentAssistantBudget={settings?.assistant_monthly_budget_usd ?? 10}
+      />
+      <NumberingSettingsForm
+        currentTicketPrefix={settings?.ticket_number_prefix ?? 'TICKET'}
+        currentProposalPrefix={settings?.proposal_number_prefix ?? 'PROP'}
       />
     </div>
   )
