@@ -13,13 +13,27 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Carrega o conteúdo salvo (com formatação) só uma vez, na primeira
-  // renderização — depois disso o contentEditable cuida do próprio
-  // estado, sem re-renderizar em cima do que a pessoa está digitando.
   useEffect(() => {
     if (editorRef.current) editorRef.current.innerHTML = currentSignature || ''
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Muda o tamanho de TODO o conteúdo da assinatura — inclusive texto
+  // que já veio com tamanho fixo de fora (ex: colado do Gmail), que
+  // não muda só herdando de um estilo externo. Passa por cada
+  // elemento e ajusta (ou define, se ainda não tiver) o font-size.
+  function resizeSignature(multiplier: number) {
+    const root = editorRef.current
+    if (!root) return
+
+    const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
+    for (const el of elements) {
+      const computed = window.getComputedStyle(el)
+      const currentSize = parseFloat(el.style.fontSize || computed.fontSize || '14')
+      const newSize = Math.max(8, Math.round(currentSize * multiplier))
+      el.style.fontSize = `${newSize}px`
+    }
+  }
 
   async function handleImageUpload() {
     const file = fileInputRef.current?.files?.[0]
@@ -37,11 +51,7 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
       return
     }
 
-    // URL pública de verdade — precisa carregar mesmo pra quem abre o
-    // e-mail fora do CRM, sem estar logado.
     const publicUrl = `${window.location.origin}/api/email-assets/${storagePath}`
-
-    // Insere a imagem no ponto onde o cursor estava no editor.
     editorRef.current?.focus()
     document.execCommand('insertHTML', false, `<img src="${publicUrl}" style="max-width:300px;display:block" />`)
 
@@ -62,7 +72,7 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
     <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-6">
       <h3 className="text-sm font-medium text-gray-900">✍️ Assinatura de e-mail</h3>
       <p className="text-xs text-gray-400">
-        Anexada automaticamente no fim de todo e-mail que você enviar pelo CRM. Cole sua assinatura já pronta (mantém formatação, cores e links), ou use o botão abaixo pra subir uma imagem/logo direto.
+        Anexada automaticamente no fim de todo e-mail que você enviar pelo CRM. Cole sua assinatura já pronta, ou suba uma imagem/logo. Se o texto colado vier pequeno, use os botões de tamanho abaixo.
       </p>
       <div
         ref={editorRef}
@@ -70,7 +80,7 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
         suppressContentEditableWarning
         className="min-h-[120px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
       />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="text-xs" />
         <button
           type="button"
@@ -79,6 +89,14 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
           className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
           {uploadingImage ? 'Enviando...' : '+ Inserir imagem/logo'}
+        </button>
+        <span className="mx-1 text-gray-300">|</span>
+        <span className="text-xs text-gray-500">Tamanho do texto:</span>
+        <button type="button" onClick={() => resizeSignature(0.87)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          A−
+        </button>
+        <button type="button" onClick={() => resizeSignature(1.15)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          A+
         </button>
       </div>
       {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
