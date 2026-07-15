@@ -313,15 +313,15 @@ export async function moveContractStage(
       const filled = await buildEmailFromTemplate(emailTemplate.id, contractId)
 
       if (filled?.toEmail) {
-        const { getEmailAccountInfo, sendEmailForUser } = await import('@/lib/email/send')
+        const { getEmailAccountInfo, sendEmailForUser, wrapEmailHtml } = await import('@/lib/email/send')
         const accountInfo = await getEmailAccountInfo(contractForEmail.owner_id)
 
         if (accountInfo) {
           const { data: ownerProfile } = await supabase.from('profiles').select('email_signature').eq('id', contractForEmail.owner_id).maybeSingle()
-          const signatureHtml = ownerProfile?.email_signature ? `<br><br>${ownerProfile.email_signature}` : ''
           const trackingToken = crypto.randomUUID()
           const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
-          const bodyWithExtras = `${filled.body}${signatureHtml}<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+          const trackingPixelHtml = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+          const bodyWithExtras = wrapEmailHtml(filled.body, ownerProfile?.email_signature ?? null, trackingPixelHtml)
 
           try {
             const result = await sendEmailForUser(contractForEmail.owner_id, filled.toEmail, filled.subject, bodyWithExtras)

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendEmailForUser, getEmailAccountInfo } from '@/lib/email/send'
+import { sendEmailForUser, getEmailAccountInfo, wrapEmailHtml } from '@/lib/email/send'
 import { verifySmtpConnection } from '@/lib/email/smtp'
 
 export type ActionState = { error?: string }
@@ -167,13 +167,13 @@ export async function sendContractEmail(
   }
 
   const { data: profile } = await supabase.from('profiles').select('email_signature').eq('id', user.id).maybeSingle()
-  const signatureHtml = profile?.email_signature ? `<br><br>${profile.email_signature}` : ''
 
   // Cria o registro ANTES de enviar, pra já ter o token do pixel de
   // rastreamento de abertura embutido no corpo do e-mail.
   const trackingToken = crypto.randomUUID()
   const trackingPixelUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-track/${trackingToken}`
-  const bodyWithExtras = `${body}${signatureHtml}<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+  const trackingPixelHtml = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+  const bodyWithExtras = wrapEmailHtml(body, profile?.email_signature ?? null, trackingPixelHtml)
 
   try {
     const result = await sendEmailForUser(user.id, toEmail, subject, bodyWithExtras)
