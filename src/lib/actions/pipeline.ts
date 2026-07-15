@@ -295,6 +295,66 @@ export async function moveContractStage(
     }
   }
 
+  // Automação de e-mail: se tiver um template configurado pra disparar
+  // nessa etapa, envia sozinho — usando o Gmail do DONO DA CONTA. Se o
+  // dono não tiver conectado o Gmail, só não envia — não trava o resto
+  // da automação por causa disso.
+  const { data: emailTemplate } = await supabase
+    .from('email_templates')
+    .select('id, subject, body')
+    .eq('trigger_stage_id', newStageId)
+    .maybeSingle()
+
+  if (emailTemplate) {
+    const { data: contractForEmail } = await supabase.from('contracts').select('owner_id, contact_id').eq('id', contractId).maybeSingle()
+
+    if (contractForEmail?.owner_id) {
+      const { buildEmailFromTemplate } = await import('./email')
+      const filled = await buildEmailFromTemplate(emailTemplate.id, contractId)
+
+      if (filled?.toEmail) {
+        const { getValidAccessToken, sendGmailMessage } = await import('@/lib/email/gmail')
+        const account = await getValidAccessToken(contractForEmail.owner_id)
+
+        if (account) {
+          try {
+            const result = await sendGmailMessage({ accessToken: account.accessToken, to: filled.toEmail, subject: filled.subject, htmlBody: filled.body })
+            await supabase.from('contract_emails').insert({
+              contract_id: contractId,
+              sent_by: contractForEmail.owner_id,
+              from_email: account.fromEmail,
+              to_email: filled.toEmail,
+              subject: filled.subject,
+              body: filled.body,
+              template_id: emailTemplate.id,
+              triggered_automatically: true,
+              gmail_message_id: result.messageId,
+              status: 'enviado',
+            })
+            await supabase.from('activities').insert({
+              contract_id: contractId,
+              type: 'system',
+              content: `E-mail automático enviado pra ${filled.toEmail}: "${filled.subject}".`,
+            })
+          } catch (e) {
+            await supabase.from('contract_emails').insert({
+              contract_id: contractId,
+              sent_by: contractForEmail.owner_id,
+              from_email: account.fromEmail,
+              to_email: filled.toEmail,
+              subject: filled.subject,
+              body: filled.body,
+              template_id: emailTemplate.id,
+              triggered_automatically: true,
+              status: 'falhou',
+              error_message: e instanceof Error ? e.message : 'Falha desconhecida.',
+            })
+          }
+        }
+      }
+    }
+  }
+
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
   revalidatePath('/contracts')

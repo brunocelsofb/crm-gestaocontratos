@@ -14,6 +14,8 @@ import { BillingSection } from '@/components/contracts/billing-section'
 import { RenewalValueSection } from '@/components/contracts/renewal-value-section'
 import { ProposalsSection } from '@/components/proposals/proposals-section'
 import { ContractTicketsSection } from '@/components/tickets/contract-tickets-section'
+import { ContractEmailSection } from '@/components/email/contract-email-section'
+import { getConnectedEmailAccount } from '@/lib/actions/email'
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
@@ -172,6 +174,12 @@ export default async function ContractDetailPage({
     const isOverdue = stage.sla_days !== null && days > stage.sla_days
     return { stageId: stage.id, days, isOverdue }
   })
+
+  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount] = await Promise.all([
+    supabase.from('email_templates').select('id, name').order('name'),
+    supabase.from('contract_emails').select('id, from_email, to_email, subject, sent_at, status, triggered_automatically, error_message').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
+    getConnectedEmailAccount(),
+  ])
 
   return (
     <div className="space-y-6">
@@ -427,6 +435,19 @@ export default async function ContractDetailPage({
             id: 'atendimento',
             label: 'Atendimento',
             content: <ContractTicketsSection contractId={contract.id} clientName={contract.client_name} />,
+          },
+          {
+            id: 'email',
+            label: 'E-mail',
+            content: (
+              <ContractEmailSection
+                contractId={contract.id}
+                hasGmailConnected={!!connectedEmailAccount}
+                templates={emailTemplates ?? []}
+                defaultToEmail={linkedContact?.email ?? null}
+                emailLog={contractEmails ?? []}
+              />
+            ),
           },
         ]}
       />

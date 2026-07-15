@@ -984,3 +984,60 @@ $$;
 
 grant execute on function contract_crm.set_next_ticket_protocol(bigint) to authenticated;
 grant execute on function contract_crm.set_next_proposal_protocol(bigint) to authenticated;
+
+
+-- ------------------------------------------------------------
+-- 29. Módulo de E-mail (Gmail)
+-- ------------------------------------------------------------
+create table contract_crm.email_accounts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references contract_crm.profiles(id) on delete cascade unique,
+  email text not null,
+  access_token text not null,
+  refresh_token text not null,
+  token_expiry timestamptz not null,
+  connected_at timestamptz not null default now()
+);
+
+create table contract_crm.email_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  subject text not null,
+  body text not null,
+  trigger_stage_id uuid references contract_crm.stages(id) on delete set null,
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now()
+);
+
+create table contract_crm.contract_emails (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  sent_by uuid references contract_crm.profiles(id),
+  from_email text not null,
+  to_email text not null,
+  subject text not null,
+  body text not null,
+  template_id uuid references contract_crm.email_templates(id) on delete set null,
+  triggered_automatically boolean not null default false,
+  gmail_message_id text,
+  status text not null default 'enviado' check (status in ('enviado', 'falhou')),
+  error_message text,
+  sent_at timestamptz not null default now()
+);
+
+create index idx_contract_emails_contract on contract_crm.contract_emails(contract_id);
+
+alter table contract_crm.email_accounts enable row level security;
+alter table contract_crm.email_templates enable row level security;
+alter table contract_crm.contract_emails enable row level security;
+
+create policy "email_accounts_select_own" on contract_crm.email_accounts for select using (auth.uid() = user_id);
+create policy "email_accounts_all_own" on contract_crm.email_accounts for all using (auth.uid() = user_id);
+
+create policy "email_templates_select" on contract_crm.email_templates for select using (auth.role() = 'authenticated');
+create policy "email_templates_insert" on contract_crm.email_templates for insert with check (auth.role() = 'authenticated');
+create policy "email_templates_update" on contract_crm.email_templates for update using (auth.role() = 'authenticated');
+create policy "email_templates_delete" on contract_crm.email_templates for delete using (auth.role() = 'authenticated');
+
+create policy "contract_emails_select" on contract_crm.contract_emails for select using (auth.role() = 'authenticated');
+create policy "contract_emails_insert" on contract_crm.contract_emails for insert with check (auth.role() = 'authenticated');
