@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { sendContractEmail, buildEmailFromTemplate, getEmailSignature } from '@/lib/actions/email'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
+import { CopyLinkButton } from '@/components/nps/copy-link-button'
 
 type Template = { id: string; name: string }
 type EmailLog = {
@@ -17,6 +18,7 @@ type EmailLog = {
   triggered_automatically: boolean
   error_message: string | null
   opened_at: string | null
+  direction: string
 }
 
 export function ContractEmailSection({
@@ -25,12 +27,14 @@ export function ContractEmailSection({
   templates,
   defaultToEmail,
   emailLog,
+  inboundEmailAddress,
 }: {
   contractId: string
   hasGmailConnected: boolean
   templates: Template[]
   defaultToEmail: string | null
   emailLog: EmailLog[]
+  inboundEmailAddress: string | null
 }) {
   const router = useRouter()
   const [toEmail, setToEmail] = useState(defaultToEmail ?? '')
@@ -83,6 +87,20 @@ export function ContractEmailSection({
 
   return (
     <div className="space-y-4">
+      {inboundEmailAddress ? (
+        <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
+          <p className="text-xs font-medium text-purple-800">📥 Endereço exclusivo desta conta (lastro de e-mails de fora do CRM)</p>
+          <p className="mt-0.5 text-xs text-purple-700">Coloque este endereço em cópia oculta (CCO/BCC) em qualquer e-mail sobre essa oportunidade — fica registrado aqui automaticamente.</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <input readOnly value={inboundEmailAddress} className="flex-1 truncate rounded-md border border-purple-200 bg-white px-2 py-1 font-mono text-xs text-purple-700" />
+            <CopyLinkButton link={inboundEmailAddress} />
+          </div>
+        </div>
+      ) : (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-400">
+          Lastro de e-mails de fora do CRM ainda não está ativo — falta configurar um domínio de recebimento em Configurações.
+        </p>
+      )}
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-sm font-medium text-gray-900">Enviar e-mail</p>
         {templates.length > 0 && (
@@ -139,9 +157,9 @@ export function ContractEmailSection({
             summary={
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <span className="font-medium text-gray-900">{e.subject}</span>
+                  <span className="font-medium text-gray-900">{e.direction === 'recebido' ? '📥' : '📤'} {e.subject}</span>
                   <p className="text-xs text-gray-500">
-                    Pra {e.to_email} · {new Date(e.sent_at).toLocaleString('pt-BR')}
+                    {e.direction === 'recebido' ? `De ${e.from_email}` : `Pra ${e.to_email}`} · {new Date(e.sent_at).toLocaleString('pt-BR')}
                     {e.triggered_automatically && ' · Automático'}
                   </p>
                 </div>

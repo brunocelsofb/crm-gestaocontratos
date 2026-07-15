@@ -98,6 +98,7 @@ create table contract_crm.contracts (
   id uuid primary key default gen_random_uuid(),
   process_number text not null unique,
   title text not null,
+  inbound_email_code text unique default encode(gen_random_bytes(16), 'hex'),
   client_name text not null,
   description text,
   owner_id uuid not null references contract_crm.profiles(id),
@@ -339,6 +340,8 @@ create table contract_crm.organization_settings (
   assistant_monthly_budget_usd numeric default 10,
   ticket_number_prefix text default 'TICKET',
   proposal_number_prefix text default 'PROP',
+  inbound_email_domain text,
+  mailgun_webhook_signing_key text,
   updated_at timestamptz not null default now()
 );
 
@@ -1027,6 +1030,7 @@ create table contract_crm.contract_emails (
   triggered_automatically boolean not null default false,
   gmail_message_id text,
   status text not null default 'enviado' check (status in ('enviado', 'falhou')),
+  direction text not null default 'enviado' check (direction in ('enviado', 'recebido')),
   error_message text,
   sent_at timestamptz not null default now()
 );

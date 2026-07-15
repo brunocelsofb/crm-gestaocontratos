@@ -64,6 +64,29 @@ export async function updateOrganizationSettings(
 // Numeração de ticket/protocolo e proposta — configurável, atômica
 // (usa sequência do banco, sem risco de número repetido).
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// Domínio de recebimento de e-mail — base pro lastro bidirecional
+// (resposta do cliente / e-mail mandado por fora do CRM). Fica
+// configurável por organização desde já, pensando em multi-empresa no
+// futuro (não fixo em código).
+// ------------------------------------------------------------
+export async function updateInboundEmailSettings(formData: FormData): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
+
+  const inbound_email_domain = (formData.get('inbound_email_domain') as string)?.trim() || null
+  const mailgun_webhook_signing_key = (formData.get('mailgun_webhook_signing_key') as string)?.trim() || null
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('organization_settings')
+    .update({ inbound_email_domain, mailgun_webhook_signing_key, updated_at: new Date().toISOString() })
+    .eq('id', 'default')
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
+}
+
 export async function updateNumberingPrefixes(formData: FormData): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
 

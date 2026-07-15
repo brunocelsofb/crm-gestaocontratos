@@ -175,11 +175,17 @@ export default async function ContractDetailPage({
     return { stageId: stage.id, days, isOverdue }
   })
 
-  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount] = await Promise.all([
+  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }] = await Promise.all([
     supabase.from('email_templates').select('id, name').order('name'),
-    supabase.from('contract_emails').select('id, from_email, to_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
+    supabase.from('contract_emails').select('id, from_email, to_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
     getConnectedEmailAccount(),
+    supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle(),
   ])
+
+  const inboundEmailAddress =
+    orgEmailSettings?.inbound_email_domain && contract.inbound_email_code
+      ? `${contract.inbound_email_code}@${orgEmailSettings.inbound_email_domain}`
+      : null
 
   return (
     <div className="space-y-6">
@@ -446,6 +452,7 @@ export default async function ContractDetailPage({
                 templates={emailTemplates ?? []}
                 defaultToEmail={linkedContact?.email ?? null}
                 emailLog={contractEmails ?? []}
+                inboundEmailAddress={inboundEmailAddress}
               />
             ),
           },
