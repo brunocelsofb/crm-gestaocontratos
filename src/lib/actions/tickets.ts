@@ -270,6 +270,90 @@ export async function deleteTicket(ticketId: string) {
   revalidatePath('/tickets')
 }
 
+// ------------------------------------------------------------
+// Transferir/devolver entre áreas — mesma lógica já usada nos
+// contratos: apuração e resposta interna acontecem transferindo o
+// ticket pra área responsável, com nota obrigatória. O histórico fica
+// gravado tanto no ticket quanto na conta (lastro nos dois lugares).
+// ------------------------------------------------------------
+export async function transferTicket(ticketId: string, toDepartment: string, note: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+  if (!note.trim()) return { error: 'Descreva o que precisa ser apurado antes de transferir.' }
+
+  const { data: profile } = await supabase.from('profiles').select('full_name, department').eq('id', user.id).maybeSingle()
+  const { data: ticketRow } = await supabase.from('tickets').select('ticket_number, contract_id, current_department').eq('id', ticketId).maybeSingle()
+
+  const { error } = await supabase
+    .from('tickets')
+    .update({ current_department: toDepartment, previous_department: ticketRow?.current_department ?? null, updated_at: new Date().toISOString() })
+    .eq('id', ticketId)
+  if (error) return { error: error.message }
+
+  await supabase.from('ticket_messages').insert({
+    ticket_id: ticketId,
+    author_type: 'interno',
+    author_id: user.id,
+    author_name: profile?.full_name ?? 'Equipe',
+    message: `Transferido pra apuração da área "${toDepartment}". ${note}`,
+    is_internal_note: true,
+  })
+
+  if (ticketRow?.contract_id) {
+    await supabase.from('activities').insert({
+      contract_id: ticketRow.contract_id,
+      user_id: user.id,
+      type: 'system',
+      content: `Ticket ${ticketRow.ticket_number} transferido pra área "${toDepartment}" pra apuração.`,
+    })
+  }
+
+  revalidatePath(`/tickets/${ticketId}`)
+  return {}
+}
+
+export async function returnTicket(ticketId: string, note: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+  if (!note.trim()) return { error: 'Descreva o que foi apurado antes de devolver.' }
+
+  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+  const { data: ticketRow } = await supabase.from('tickets').select('ticket_number, contract_id, previous_department').eq('id', ticketId).maybeSingle()
+
+  const { error } = await supabase
+    .from('tickets')
+    .update({ current_department: ticketRow?.previous_department ?? null, previous_department: null, updated_at: new Date().toISOString() })
+    .eq('id', ticketId)
+  if (error) return { error: error.message }
+
+  await supabase.from('ticket_messages').insert({
+    ticket_id: ticketId,
+    author_type: 'interno',
+    author_id: user.id,
+    author_name: profile?.full_name ?? 'Equipe',
+    message: `Apuração concluída, devolvido. ${note}`,
+    is_internal_note: true,
+  })
+
+  if (ticketRow?.contract_id) {
+    await supabase.from('activities').insert({
+      contract_id: ticketRow.contract_id,
+      user_id: user.id,
+      type: 'system',
+      content: `Ticket ${ticketRow.ticket_number} devolvido após apuração.`,
+    })
+  }
+
+  revalidatePath(`/tickets/${ticketId}`)
+  return {}
+}
+
 export async function searchContractsForTicket(query: string): Promise<{ id: string; client_name: string; process_number: string }[]> {
   if (!query || query.length < 2) return []
   const supabase = await createClient()

@@ -7,6 +7,7 @@ import { TicketActionsPanel } from '@/components/tickets/ticket-actions-panel'
 import { getSlaStatus, SLA_LABELS, SLA_STYLES } from '@/lib/utils/sla'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { TicketContractLink } from '@/components/tickets/ticket-contract-link'
+import { TicketDepartmentSection } from '@/components/tickets/ticket-department-section'
 
 export default async function TicketDetailPage({
   params,
@@ -57,6 +58,21 @@ export default async function TicketDetailPage({
         linkedContractName={linkedContract?.client_name ?? null}
         requesterCnpj={ticket.requester_cnpj}
       />
+
+      <TicketDepartmentSection
+        ticketId={ticket.id}
+        currentDepartment={ticket.current_department}
+        hasPrevious={!!ticket.previous_department}
+      />
+
+      {ticket.contract_id && (
+        <p className="text-xs text-gray-500">
+          Se esse atendimento precisar de uma ação estruturada (não só apuração pontual), registre no{' '}
+          <Link href={`/contracts/${ticket.contract_id}`} className="text-brand-700 hover:underline">
+            Plano de Ação do contrato vinculado
+          </Link>.
+        </p>
+      )}
 
       <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
         <p className="text-xs font-medium text-blue-800">Link público (o solicitante acompanha por aqui, sem login)</p>
