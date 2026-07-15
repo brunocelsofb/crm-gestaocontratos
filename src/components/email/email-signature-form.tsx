@@ -18,20 +18,32 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Muda o tamanho de TODO o conteúdo da assinatura — inclusive texto
-  // que já veio com tamanho fixo de fora (ex: colado do Gmail), que
-  // não muda só herdando de um estilo externo. Passa por cada
-  // elemento e ajusta (ou define, se ainda não tiver) o font-size.
+  // Muda o tamanho de TODO o conteúdo da assinatura — texto (inclusive
+  // o que já veio com tamanho fixo embutido, tipo colado do Gmail) E
+  // imagens/logo, que precisam de um tratamento separado (não é
+  // font-size, é largura de verdade).
   function resizeSignature(multiplier: number) {
     const root = editorRef.current
     if (!root) return
 
-    const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
-    for (const el of elements) {
+    const textElements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*:not(img)'))]
+    for (const el of textElements) {
       const computed = window.getComputedStyle(el)
       const currentSize = parseFloat(el.style.fontSize || computed.fontSize || '14')
       const newSize = Math.max(8, Math.round(currentSize * multiplier))
       el.style.fontSize = `${newSize}px`
+    }
+
+    const images = root.querySelectorAll<HTMLImageElement>('img')
+    for (const img of images) {
+      // Usa a largura JÁ RENDERIZADA como base (não o atributo/estilo
+      // cru), porque muitas imagens só têm max-width definido, e o
+      // tamanho real na tela é o que importa pra escalar direito.
+      const currentWidth = img.getBoundingClientRect().width || img.naturalWidth || 150
+      const newWidth = Math.max(20, Math.round(currentWidth * multiplier))
+      img.style.width = `${newWidth}px`
+      img.style.maxWidth = `${newWidth}px`
+      img.style.height = 'auto'
     }
   }
 
@@ -91,7 +103,7 @@ export function EmailSignatureForm({ currentSignature }: { currentSignature: str
           {uploadingImage ? 'Enviando...' : '+ Inserir imagem/logo'}
         </button>
         <span className="mx-1 text-gray-300">|</span>
-        <span className="text-xs text-gray-500">Tamanho do texto:</span>
+        <span className="text-xs text-gray-500">Tamanho (texto e imagem):</span>
         <button type="button" onClick={() => resizeSignature(0.87)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
           A−
         </button>
