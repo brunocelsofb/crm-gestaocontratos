@@ -82,15 +82,14 @@ export async function deleteProposalTemplate(templateId: string) {
 // ------------------------------------------------------------
 async function generateControlCode(): Promise<string> {
   const supabase = createAdminClient()
+  const year = new Date().getFullYear()
 
-  // nextval é atômico — sem risco de duas propostas saírem com o mesmo
-  // número quando criadas ao mesmo tempo, e não reinicia por ano.
-  const { data: seqValue } = await supabase.rpc('next_proposal_protocol')
+  const { data: seqValue } = await supabase.rpc('next_proposal_number_for_year', { p_year: year })
 
   const { data: settings } = await supabase.from('organization_settings').select('proposal_number_prefix').eq('id', 'default').maybeSingle()
   const prefix = settings?.proposal_number_prefix || 'PROP'
 
-  return `${prefix}-${String(seqValue).padStart(6, '0')}`
+  return `${prefix}-${year}-${String(seqValue).padStart(4, '0')}`
 }
 
 export type ProposalItemInput = {

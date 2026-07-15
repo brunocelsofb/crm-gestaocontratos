@@ -84,7 +84,8 @@ export async function updateNumberingPrefixes(formData: FormData): Promise<Actio
 export async function setNextTicketNumber(nextNumber: number): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
   const supabase = await createClient()
-  const { error } = await supabase.rpc('set_next_ticket_protocol', { new_start: nextNumber })
+  const year = new Date().getFullYear()
+  const { error } = await supabase.rpc('set_next_ticket_number_for_year', { p_year: year, new_start: nextNumber })
   if (error) return { error: error.message }
   revalidatePath('/settings')
   return {}
@@ -93,7 +94,8 @@ export async function setNextTicketNumber(nextNumber: number): Promise<ActionSta
 export async function setNextProposalNumber(nextNumber: number): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
   const supabase = await createClient()
-  const { error } = await supabase.rpc('set_next_proposal_protocol', { new_start: nextNumber })
+  const year = new Date().getFullYear()
+  const { error } = await supabase.rpc('set_next_proposal_number_for_year', { p_year: year, new_start: nextNumber })
   if (error) return { error: error.message }
   revalidatePath('/settings')
   return {}

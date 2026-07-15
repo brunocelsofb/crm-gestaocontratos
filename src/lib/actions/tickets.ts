@@ -10,16 +10,17 @@ export type ActionState = { error?: string }
 
 async function generateTicketNumber(): Promise<string> {
   const supabase = createAdminClient()
+  const year = new Date().getFullYear()
 
-  // nextval é atômico — dois tickets criados ao mesmo tempo NUNCA saem
-  // com o mesmo número, diferente de contar registros (que tinha essa
-  // brecha). Também não reinicia por ano — cresce direto, como pedido.
-  const { data: seqValue } = await supabase.rpc('next_ticket_protocol')
+  // O incremento em si é atômico (UPDATE...RETURNING trava a linha do
+  // ano) — diferente da versão original que contava registros, aqui
+  // não tem brecha de dois tickets saírem com o mesmo número.
+  const { data: seqValue } = await supabase.rpc('next_ticket_number_for_year', { p_year: year })
 
   const { data: settings } = await supabase.from('organization_settings').select('ticket_number_prefix').eq('id', 'default').maybeSingle()
   const prefix = settings?.ticket_number_prefix || 'TICKET'
 
-  return `${prefix}-${String(seqValue).padStart(6, '0')}`
+  return `${prefix}-${year}-${String(seqValue).padStart(4, '0')}`
 }
 
 // Criação de ticket — usada tanto pelo formulário público de suporte

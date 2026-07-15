@@ -53,7 +53,7 @@ export function NumberingSettingsForm({
       <div>
         <h3 className="text-sm font-medium text-gray-900">Numeração de ticket (protocolo) e proposta</h3>
         <p className="mt-0.5 text-xs text-gray-400">
-          O número cresce sozinho, sem risco de repetir mesmo se dois forem criados ao mesmo tempo — é gerado direto pelo banco de dados, não contado depois.
+          O número segue o formato PREFIXO-ANO-0000 (ex: TICKET-2026-0001) — o ano é adicionado automaticamente, <strong>não inclua o ano no prefixo abaixo</strong>. Reinicia em 0001 a cada ano novo, sem risco de repetir mesmo com dois criados ao mesmo tempo.
         </p>
       </div>
 
@@ -76,7 +76,7 @@ export function NumberingSettingsForm({
 
       <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
         <div>
-          <label className="block text-xs font-medium text-gray-600">Definir o próximo número de ticket</label>
+          <label className="block text-xs font-medium text-gray-600">Definir o próximo número de ticket (ano atual)</label>
           <div className="mt-1 flex gap-1.5">
             <input type="number" min="1" value={nextTicket} onChange={(e) => setNextTicket(e.target.value)} placeholder="Ex: 1000" className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
             <button onClick={handleSetNextTicket} disabled={busy} className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
@@ -85,7 +85,7 @@ export function NumberingSettingsForm({
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600">Definir o próximo número de proposta</label>
+          <label className="block text-xs font-medium text-gray-600">Definir o próximo número de proposta (ano atual)</label>
           <div className="mt-1 flex gap-1.5">
             <input type="number" min="1" value={nextProposal} onChange={(e) => setNextProposal(e.target.value)} placeholder="Ex: 1000" className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
             <button onClick={handleSetNextProposal} disabled={busy} className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
