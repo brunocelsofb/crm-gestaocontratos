@@ -4,6 +4,7 @@ import { PeriodSelector } from '@/components/dashboard/period-selector'
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { TicketBreakdownChart } from '@/components/tickets/ticket-breakdown-chart'
 import { TicketTrendChart } from '@/components/tickets/ticket-trend-chart'
+import { ExpandableRow } from '@/components/surveys/expandable-row'
 import { PRIORITY_LABELS, GRAVITY_CATEGORIES } from '@/lib/utils/gut-matrix'
 import { Ticket, CheckCircle2, Clock, ShieldCheck, Star } from 'lucide-react'
 
@@ -32,7 +33,7 @@ export default async function TicketsDashboardPage({
 
   const { data: tickets } = await supabase
     .from('tickets')
-    .select('id, ticket_number, subject, status, priority, category, assigned_to, sla_due_at, resolved_at, created_at, satisfaction_rating, satisfaction_comment, satisfaction_responded_at')
+    .select('id, ticket_number, subject, status, priority, category, assigned_to, contract_id, sla_due_at, resolved_at, created_at, satisfaction_rating, satisfaction_comment, satisfaction_responded_at')
     .gte('created_at', `${from}T00:00:00`)
     .lte('created_at', `${to}T23:59:59`)
 
@@ -56,6 +57,12 @@ export default async function TicketsDashboardPage({
   const satisfactionResponses = (tickets ?? [])
     .filter((t) => t.satisfaction_responded_at)
     .sort((a, b) => new Date(b.satisfaction_responded_at!).getTime() - new Date(a.satisfaction_responded_at!).getTime())
+
+  const satisfactionContractIds = [...new Set(satisfactionResponses.map((t) => t.contract_id).filter((id): id is string => !!id))]
+  const { data: satisfactionContracts } = satisfactionContractIds.length
+    ? await supabase.from('contracts').select('id, client_name').in('id', satisfactionContractIds)
+    : { data: [] as { id: string; client_name: string }[] }
+  const contractNameById = new Map((satisfactionContracts ?? []).map((c) => [c.id, c.client_name]))
 
   const categoryCounts = new Map<string, number>()
   for (const t of tickets ?? []) {
@@ -172,24 +179,32 @@ export default async function TicketsDashboardPage({
         </h2>
         <div className="space-y-1.5">
           {satisfactionResponses.map((t) => (
-            <Link
+            <ExpandableRow
               key={t.id}
-              href={`/tickets/${t.id}`}
-              className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+              summary={
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="font-medium text-gray-900">{t.contract_id ? contractNameById.get(t.contract_id) ?? '—' : 'Sem conta vinculada'}</span>
+                    <span className="ml-2 text-xs text-gray-400">{t.ticket_number} · {t.subject}</span>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      (t.satisfaction_rating ?? 0) >= 4 ? 'bg-positive-100 text-positive-700' : (t.satisfaction_rating ?? 0) === 3 ? 'bg-yellow-100 text-yellow-800' : 'bg-negative-100 text-negative-700'
+                    }`}
+                  >
+                    {t.satisfaction_rating}/5
+                  </span>
+                </div>
+              }
             >
-              <div>
-                <span className="font-medium text-gray-900">{t.subject}</span>
-                <span className="ml-2 text-xs text-gray-400">{t.ticket_number}</span>
-                {t.satisfaction_comment && <p className="mt-0.5 text-xs text-gray-600">&ldquo;{t.satisfaction_comment}&rdquo;</p>}
-              </div>
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                  (t.satisfaction_rating ?? 0) >= 4 ? 'bg-positive-100 text-positive-700' : (t.satisfaction_rating ?? 0) === 3 ? 'bg-yellow-100 text-yellow-800' : 'bg-negative-100 text-negative-700'
-                }`}
-              >
-                {t.satisfaction_rating}/5
-              </span>
-            </Link>
+              {t.satisfaction_comment && <p className="text-sm text-gray-600">&ldquo;{t.satisfaction_comment}&rdquo;</p>}
+              <p className="text-xs text-gray-400">
+                Avaliado em {new Date(t.satisfaction_responded_at!).toLocaleDateString('pt-BR')}
+              </p>
+              <Link href={`/tickets/${t.id}`} className="inline-block text-xs text-brand-700 hover:underline">
+                Ver ticket →
+              </Link>
+            </ExpandableRow>
           ))}
           {satisfactionResponses.length === 0 && (
             <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-400">

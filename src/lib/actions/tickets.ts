@@ -270,7 +270,7 @@ export async function addPublicTicketReply(token: string, authorName: string, me
   const supabase = createAdminClient()
   if (!message.trim()) return { error: 'Escreva algo antes de enviar.' }
 
-  const { data: ticket } = await supabase.from('tickets').select('id').eq('public_token', token).maybeSingle()
+  const { data: ticket } = await supabase.from('tickets').select('id, ticket_number, contract_id, status').eq('public_token', token).maybeSingle()
   if (!ticket) return { error: 'Link inválido.' }
 
   const { error } = await supabase.from('ticket_messages').insert({
@@ -281,7 +281,19 @@ export async function addPublicTicketReply(token: string, authorName: string, me
   })
   if (error) return { error: error.message }
 
+  const wasFinalized = ticket.status === 'resolvido' || ticket.status === 'fechado'
   await supabase.from('tickets').update({ status: 'aberto', updated_at: new Date().toISOString() }).eq('id', ticket.id)
+
+  // Lastro: se o cliente reabriu um atendimento que já tinha sido
+  // dado como resolvido/fechado, isso também fica registrado na conta.
+  if (wasFinalized && ticket.contract_id) {
+    await supabase.from('activities').insert({
+      contract_id: ticket.contract_id,
+      type: 'system',
+      content: `Ticket de atendimento ${ticket.ticket_number} reaberto pelo cliente.`,
+    })
+  }
+
   return {}
 }
 
