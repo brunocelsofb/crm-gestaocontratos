@@ -58,6 +58,9 @@ export default async function TicketsPage({
           <p className="mt-0.5 text-sm text-gray-500">Ordenado por urgência do prazo (SLA vencido primeiro).</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/tickets/dashboard" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            📊 Dashboard
+          </Link>
           <a href="/suporte" target="_blank" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
             🔗 Ver formulário público
           </a>
