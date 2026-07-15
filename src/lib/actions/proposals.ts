@@ -124,27 +124,40 @@ export async function createProposal(
 
   if (items.length === 0) return { error: 'Adicione pelo menos um item à proposta.' }
 
-  const controlCode = await generateControlCode()
+  // Tenta algumas vezes se o código colidir (sequência fora de
+  // sincronia) — pega o próximo disponível sozinho, sem travar.
+  let proposal: { id: string; control_code: string } | null = null
+  let lastError: { code?: string; message: string } | null = null
 
-  const { data: proposal, error } = await supabase
-    .from('proposals')
-    .insert({
-      contract_id: contractId,
-      control_code: controlCode,
-      currency,
-      client_po_number: clientPoNumber,
-      valid_until: validUntil,
-      discount_type: discountType,
-      discount_value: discountValue,
-      payment_terms: paymentTerms,
-      installments,
-      is_recurring: isRecurring,
-      created_by: user.id,
-    })
-    .select()
-    .single()
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const controlCode = await generateControlCode()
+    const result = await supabase
+      .from('proposals')
+      .insert({
+        contract_id: contractId,
+        control_code: controlCode,
+        currency,
+        client_po_number: clientPoNumber,
+        valid_until: validUntil,
+        discount_type: discountType,
+        discount_value: discountValue,
+        payment_terms: paymentTerms,
+        installments,
+        is_recurring: isRecurring,
+        created_by: user.id,
+      })
+      .select('id, control_code')
+      .single()
 
-  if (error || !proposal) return { error: error?.message ?? 'Falha ao criar proposta.' }
+    if (!result.error) {
+      proposal = result.data
+      break
+    }
+    lastError = result.error
+    if (result.error.code !== '23505') break
+  }
+
+  if (!proposal) return { error: lastError?.message ?? 'Falha ao criar proposta depois de várias tentativas.' }
 
   const itemRows = items.map((it, i) => ({
     proposal_id: proposal.id,
@@ -175,7 +188,7 @@ export async function createProposal(
     contract_id: contractId,
     user_id: user.id,
     type: 'system',
-    content: `Proposta ${controlCode} criada (rascunho).`,
+    content: `Proposta ${proposal.control_code} criada (rascunho).`,
   })
 
   revalidatePath(`/contracts/${contractId}`)

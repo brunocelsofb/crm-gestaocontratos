@@ -67,30 +67,45 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
     }
   }
 
-  const ticketNumber = await generateTicketNumber()
   const slaDays = PRIORITY_SLA_DAYS[priority] ?? PRIORITY_SLA_DAYS.pouco_critica
   const slaDueAt = new Date(Date.now() + slaDays * 86_400_000).toISOString()
 
-  const { data, error } = await supabase
-    .from('tickets')
-    .insert({
-      ticket_number: ticketNumber,
-      subject,
-      description,
-      priority,
-      category,
-      requester_name,
-      requester_email,
-      requester_phone,
-      requester_cnpj,
-      source,
-      contract_id,
-      sla_due_at: slaDueAt,
-    })
-    .select('id, public_token')
-    .single()
+  // Tenta algumas vezes se o número colidir (ex: sequência ficou "pra
+  // trás" por causa de tickets de teste excluídos) — em vez de travar,
+  // pega o próximo número disponível sozinho.
+  let data: { id: string; public_token: string; ticket_number: string } | null = null
+  let lastError: { code?: string; message: string } | null = null
 
-  if (error) return { error: error.message }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const ticketNumber = await generateTicketNumber()
+    const result = await supabase
+      .from('tickets')
+      .insert({
+        ticket_number: ticketNumber,
+        subject,
+        description,
+        priority,
+        category,
+        requester_name,
+        requester_email,
+        requester_phone,
+        requester_cnpj,
+        source,
+        contract_id,
+        sla_due_at: slaDueAt,
+      })
+      .select('id, public_token, ticket_number')
+      .single()
+
+    if (!result.error) {
+      data = result.data
+      break
+    }
+    lastError = result.error
+    if (result.error.code !== '23505') break // erro diferente de "já existe" — não adianta tentar de novo
+  }
+
+  if (!data) return { error: lastError?.message ?? 'Falha ao criar o ticket depois de várias tentativas.' }
 
   if (description) {
     await supabase.from('ticket_messages').insert({
@@ -107,7 +122,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
   const { data: supportProfiles } = await adminClient.from('profiles').select('id').eq('department', 'comercial')
   if (supportProfiles && supportProfiles.length > 0) {
     await adminClient.from('notifications').insert(
-      supportProfiles.map((p) => ({ user_id: p.id, message: `Novo ticket ${ticketNumber}: ${subject} (prioridade ${priority}).` }))
+      supportProfiles.map((p) => ({ user_id: p.id, message: `Novo ticket ${data.ticket_number}: ${subject} (prioridade ${priority}).` }))
     )
   }
 
@@ -118,7 +133,7 @@ export async function createTicket(formData: FormData): Promise<ActionState & { 
     await supabase.from('activities').insert({
       contract_id,
       type: 'system',
-      content: `Ticket de atendimento aberto: ${ticketNumber} — "${subject}".`,
+      content: `Ticket de atendimento aberto: ${data.ticket_number} — "${subject}".`,
     })
   }
 
