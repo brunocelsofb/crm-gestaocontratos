@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/dashboard/metric-card'
 import { TicketBreakdownChart } from '@/components/tickets/ticket-breakdown-chart'
 import { TicketTrendChart } from '@/components/tickets/ticket-trend-chart'
 import { PRIORITY_LABELS, GRAVITY_CATEGORIES } from '@/lib/utils/gut-matrix'
-import { Ticket, CheckCircle2, Clock, ShieldCheck } from 'lucide-react'
+import { Ticket, CheckCircle2, Clock, ShieldCheck, Star } from 'lucide-react'
 
 function currentQuarterRange() {
   const now = new Date()
@@ -32,7 +32,7 @@ export default async function TicketsDashboardPage({
 
   const { data: tickets } = await supabase
     .from('tickets')
-    .select('id, status, priority, category, assigned_to, sla_due_at, resolved_at, created_at')
+    .select('id, status, priority, category, assigned_to, sla_due_at, resolved_at, created_at, satisfaction_rating, satisfaction_responded_at')
     .gte('created_at', `${from}T00:00:00`)
     .lte('created_at', `${to}T23:59:59`)
 
@@ -50,6 +50,9 @@ export default async function TicketsDashboardPage({
   const resolvedWithSla = resolved.filter((t) => t.sla_due_at && t.resolved_at)
   const withinSla = resolvedWithSla.filter((t) => new Date(t.resolved_at!) <= new Date(t.sla_due_at!))
   const slaComplianceRate = resolvedWithSla.length > 0 ? Math.round((withinSla.length / resolvedWithSla.length) * 100) : null
+
+  const satisfactionRatings = (tickets ?? []).filter((t) => t.satisfaction_responded_at).map((t) => t.satisfaction_rating as number)
+  const avgSatisfaction = satisfactionRatings.length > 0 ? satisfactionRatings.reduce((a, b) => a + b, 0) / satisfactionRatings.length : null
 
   const categoryCounts = new Map<string, number>()
   for (const t of tickets ?? []) {
@@ -107,7 +110,7 @@ export default async function TicketsDashboardPage({
 
       <PeriodSelector from={from} to={to} basePath="/tickets/dashboard" />
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         <MetricCard icon={Ticket} accent="brand" label="Total de tickets" value={String(total)} />
         <MetricCard icon={CheckCircle2} accent="positive" label="Resolvidos/Fechados" value={String(resolved.length)} hint={total > 0 ? `${Math.round((resolved.length / total) * 100)}%` : undefined} />
         <MetricCard
@@ -122,6 +125,13 @@ export default async function TicketsDashboardPage({
           label="% dentro do prazo (SLA)"
           value={slaComplianceRate !== null ? `${slaComplianceRate}%` : '—'}
           hint={resolvedWithSla.length > 0 ? `${resolvedWithSla.length} avaliados` : undefined}
+        />
+        <MetricCard
+          icon={Star}
+          accent={avgSatisfaction !== null && avgSatisfaction >= 4 ? 'positive' : avgSatisfaction !== null && avgSatisfaction >= 3 ? 'warn' : 'negative'}
+          label="Satisfação média"
+          value={avgSatisfaction !== null ? `${avgSatisfaction.toFixed(1)}/5` : '—'}
+          hint={satisfactionRatings.length > 0 ? `${satisfactionRatings.length} avaliações` : undefined}
         />
       </div>
 

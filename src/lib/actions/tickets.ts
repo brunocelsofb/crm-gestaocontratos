@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PRIORITY_SLA_DAYS, type PriorityTier } from '@/lib/utils/gut-matrix'
+import { departmentLabel } from '@/lib/constants/departments'
 
 export type ActionState = { error?: string }
 
@@ -164,7 +165,18 @@ export async function updateTicketStatus(ticketId: string, status: string): Prom
   const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
   if (status === 'resolvido' || status === 'fechado') update.resolved_at = new Date().toISOString()
 
-  const { data: ticket } = await supabase.from('tickets').select('ticket_number, subject, contract_id').eq('id', ticketId).maybeSingle()
+  const { data: ticket } = await supabase
+    .from('tickets')
+    .select('ticket_number, subject, contract_id, satisfaction_token')
+    .eq('id', ticketId)
+    .maybeSingle()
+
+  // Ao FINALIZAR (fechado) de verdade, gera o link da pesquisa rápida
+  // de satisfação — só uma vez, não sobrescreve se já existir (ex: se
+  // reabrir e fechar de novo).
+  if (status === 'fechado' && !ticket?.satisfaction_token) {
+    update.satisfaction_token = crypto.randomUUID()
+  }
 
   const { error } = await supabase.from('tickets').update(update).eq('id', ticketId)
   if (error) return { error: error.message }
@@ -226,13 +238,14 @@ export async function addTicketMessage(ticketId: string, message: string, isInte
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!message.trim()) return { error: 'Escreva algo antes de enviar.' }
 
-  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('full_name, department').eq('id', user.id).maybeSingle()
 
   const { error } = await supabase.from('ticket_messages').insert({
     ticket_id: ticketId,
     author_type: 'interno',
     author_id: user.id,
     author_name: profile?.full_name ?? 'Equipe',
+    author_department: profile?.department ? departmentLabel(profile.department) : null,
     message,
     is_internal_note: isInternalNote,
   })
@@ -270,6 +283,24 @@ export async function deleteTicket(ticketId: string) {
   revalidatePath('/tickets')
 }
 
+// Resposta da pesquisa rápida de satisfação — pública (sem login),
+// disparada quando o atendimento é finalizado.
+export async function submitTicketSatisfaction(token: string, rating: number, comment: string): Promise<ActionState> {
+  const supabase = createAdminClient()
+
+  const { data: ticket } = await supabase.from('tickets').select('id, satisfaction_responded_at').eq('satisfaction_token', token).maybeSingle()
+  if (!ticket) return { error: 'Link inválido.' }
+  if (ticket.satisfaction_responded_at) return { error: 'Essa pesquisa já foi respondida.' }
+
+  const { error } = await supabase
+    .from('tickets')
+    .update({ satisfaction_rating: rating, satisfaction_comment: comment || null, satisfaction_responded_at: new Date().toISOString() })
+    .eq('id', ticket.id)
+
+  if (error) return { error: error.message }
+  return {}
+}
+
 // ------------------------------------------------------------
 // Transferir/devolver entre áreas — mesma lógica já usada nos
 // contratos: apuração e resposta interna acontecem transferindo o
@@ -298,7 +329,8 @@ export async function transferTicket(ticketId: string, toDepartment: string, not
     author_type: 'interno',
     author_id: user.id,
     author_name: profile?.full_name ?? 'Equipe',
-    message: `Transferido pra apuração da área "${toDepartment}". ${note}`,
+    author_department: profile?.department ? departmentLabel(profile.department) : null,
+    message: `Transferido pra apuração da área "${departmentLabel(toDepartment)}". ${note}`,
     is_internal_note: true,
   })
 
@@ -307,7 +339,7 @@ export async function transferTicket(ticketId: string, toDepartment: string, not
       contract_id: ticketRow.contract_id,
       user_id: user.id,
       type: 'system',
-      content: `Ticket ${ticketRow.ticket_number} transferido pra área "${toDepartment}" pra apuração.`,
+      content: `Ticket ${ticketRow.ticket_number} transferido pra área "${departmentLabel(toDepartment)}" pra apuração${profile?.department ? ` (por ${profile.full_name}, ${departmentLabel(profile.department)})` : ''}.`,
     })
   }
 
@@ -323,7 +355,7 @@ export async function returnTicket(ticketId: string, note: string): Promise<Acti
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!note.trim()) return { error: 'Descreva o que foi apurado antes de devolver.' }
 
-  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('full_name, department').eq('id', user.id).maybeSingle()
   const { data: ticketRow } = await supabase.from('tickets').select('ticket_number, contract_id, previous_department').eq('id', ticketId).maybeSingle()
 
   const { error } = await supabase
@@ -337,6 +369,7 @@ export async function returnTicket(ticketId: string, note: string): Promise<Acti
     author_type: 'interno',
     author_id: user.id,
     author_name: profile?.full_name ?? 'Equipe',
+    author_department: profile?.department ? departmentLabel(profile.department) : null,
     message: `Apuração concluída, devolvido. ${note}`,
     is_internal_note: true,
   })
@@ -346,7 +379,7 @@ export async function returnTicket(ticketId: string, note: string): Promise<Acti
       contract_id: ticketRow.contract_id,
       user_id: user.id,
       type: 'system',
-      content: `Ticket ${ticketRow.ticket_number} devolvido após apuração.`,
+      content: `Ticket ${ticketRow.ticket_number} devolvido após apuração${profile?.department ? ` (por ${profile.full_name}, ${departmentLabel(profile.department)})` : ''}.`,
     })
   }
 

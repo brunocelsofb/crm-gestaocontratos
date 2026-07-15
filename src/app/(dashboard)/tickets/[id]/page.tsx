@@ -52,6 +52,25 @@ export default async function TicketDetailPage({
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${SLA_STYLES[sla]}`}>{SLA_LABELS[sla]}</span>
       </div>
 
+      {ticket.satisfaction_token && (
+        <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
+          <p className="text-xs font-medium text-purple-800">
+            Pesquisa rápida de satisfação {ticket.satisfaction_responded_at ? '(já respondida)' : '(ainda não respondida — copie e envie pro cliente)'}
+          </p>
+          {ticket.satisfaction_responded_at ? (
+            <p className="mt-1 text-sm text-purple-900">
+              Nota: <strong>{ticket.satisfaction_rating}/5</strong>
+              {ticket.satisfaction_comment && <> — &ldquo;{ticket.satisfaction_comment}&rdquo;</>}
+            </p>
+          ) : (
+            <div className="mt-1.5 flex items-center gap-2">
+              <input readOnly value={`${protocol}://${host}/avaliar-atendimento/${ticket.satisfaction_token}`} className="flex-1 truncate rounded-md border border-purple-200 bg-white px-2 py-1 font-mono text-xs text-purple-700" />
+              <CopyLinkButton link={`${protocol}://${host}/avaliar-atendimento/${ticket.satisfaction_token}`} />
+            </div>
+          )}
+        </div>
+      )}
+
       <TicketContractLink
         ticketId={ticket.id}
         linkedContractId={ticket.contract_id}
@@ -97,7 +116,7 @@ export default async function TicketDetailPage({
               {m.is_internal_note && <p className="mb-0.5 text-[10px] font-semibold uppercase">Nota interna</p>}
               <p>{m.message}</p>
               <p className={`mt-1 text-[10px] ${m.author_type === 'cliente' || m.is_internal_note ? 'text-gray-400' : 'text-white/70'}`}>
-                {m.author_name} · {new Date(m.created_at).toLocaleString('pt-BR')}
+                {m.author_name}{m.author_department ? ` (${m.author_department})` : ''} · {new Date(m.created_at).toLocaleString('pt-BR')}
               </p>
             </div>
           </div>

@@ -903,6 +903,10 @@ create table contract_crm.tickets (
   sla_due_at timestamptz,
   resolved_at timestamptz,
   public_token text unique default gen_random_uuid()::text,
+  satisfaction_token text unique,
+  satisfaction_rating integer check (satisfaction_rating between 1 and 5),
+  satisfaction_comment text,
+  satisfaction_responded_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -919,6 +923,7 @@ create table contract_crm.ticket_messages (
   author_name text not null,
   message text not null,
   is_internal_note boolean not null default false,
+  author_department text,
   created_at timestamptz not null default now()
 );
 
