@@ -168,7 +168,7 @@ export function AssistantPanel() {
             : { position: 'fixed', right: 20, bottom: 20 }
         }
         className="z-40 flex h-12 w-12 cursor-grab items-center justify-center rounded-full bg-brand-700 text-xl text-white shadow-lg hover:bg-brand-800 active:cursor-grabbing"
-        title="Assistente de IA — clique pra abrir, arraste pra mover"
+        title="Théo — clique pra abrir, arraste pra mover"
       >
         🤖
       </button>
@@ -183,7 +183,7 @@ export function AssistantPanel() {
           className="z-40 flex h-[520px] w-96 flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
         >
           <div className="flex items-center justify-between rounded-t-xl bg-brand-700 px-4 py-3">
-            <p className="text-sm font-medium text-white">🤖 Assistente do CRM</p>
+            <p className="text-sm font-medium text-white">🤖 Théo</p>
             <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white">✕</button>
           </div>
 

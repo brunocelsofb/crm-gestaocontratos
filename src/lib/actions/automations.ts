@@ -13,6 +13,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
   const name = (formData.get('name') as string)?.trim()
   const trigger_type = formData.get('trigger_type') as string
   const trigger_stage_id = (formData.get('trigger_stage_id') as string) || null
+  const trigger_pipeline_id = (formData.get('trigger_pipeline_id') as string) || null
   const days_threshold = formData.get('days_threshold') ? Number(formData.get('days_threshold')) : null
   const action_type = formData.get('action_type') as string
   const target_stage_id = (formData.get('target_stage_id') as string) || null
@@ -22,8 +23,11 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
   const notify_user_id = (formData.get('notify_user_id') as string) || null
   const notify_message = (formData.get('notify_message') as string) || null
 
+  const isOutcomeTrigger = trigger_type === 'outcome_won' || trigger_type === 'outcome_lost'
+
   if (!name) return { error: 'Dê um nome pra automação.' }
-  if (!trigger_stage_id) return { error: 'Escolha a etapa do gatilho.' }
+  if (isOutcomeTrigger && !trigger_pipeline_id) return { error: 'Escolha o funil do gatilho.' }
+  if (!isOutcomeTrigger && !trigger_stage_id) return { error: 'Escolha a etapa do gatilho.' }
   if (trigger_type === 'days_without_progress' && !days_threshold) return { error: 'Informe quantos dias parado até disparar.' }
 
   if (action_type === 'move_to_stage' && !target_stage_id) return { error: 'Escolha a etapa de destino.' }
@@ -36,6 +40,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
     name,
     trigger_type,
     trigger_stage_id,
+    trigger_pipeline_id,
     days_threshold,
     action_type,
     target_stage_id,
@@ -60,10 +65,91 @@ export async function toggleAutomationRule(ruleId: string, isActive: boolean): P
   return {}
 }
 
+// ------------------------------------------------------------
+// Executa a AÇÃO de uma regra já disparada — compartilhada entre os
+// três gatilhos (entrar em etapa, tempo parado, desfecho), pra não
+// repetir a mesma lógica em três lugares diferentes.
+// ------------------------------------------------------------
+export async function executeAutomationAction(
+  rule: {
+    id: string
+    name: string
+    action_type: string
+    target_stage_id: string | null
+    task_content: string | null
+    email_template_id: string | null
+    notify_user_id: string | null
+    notify_message: string | null
+  },
+  contractId: string,
+  pipelineRunId: string | null
+): Promise<void> {
+  const supabase = createAdminClient()
+
+  if ((rule.action_type === 'move_to_stage' || rule.action_type === 'move_to_pipeline') && rule.target_stage_id) {
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      pipeline_run_id: pipelineRunId,
+      type: 'automation_triggered',
+      content: `Automação "${rule.name}" disparada.`,
+      metadata: { rule_id: rule.id },
+    })
+    const { moveContractStage } = await import('./pipeline')
+    await moveContractStage(contractId, rule.target_stage_id)
+  } else if (rule.action_type === 'create_task' && rule.task_content) {
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      pipeline_run_id: pipelineRunId,
+      type: 'task',
+      content: rule.task_content,
+    })
+  } else if (rule.action_type === 'notify_user' && rule.notify_user_id) {
+    await supabase.from('notifications').insert({
+      user_id: rule.notify_user_id,
+      message: rule.notify_message || `Automação "${rule.name}" disparada num contrato.`,
+    })
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      pipeline_run_id: pipelineRunId,
+      type: 'automation_triggered',
+      content: `Automação "${rule.name}" disparada — notificação enviada.`,
+      metadata: { rule_id: rule.id },
+    })
+  } else if (rule.action_type === 'send_email' && rule.email_template_id) {
+    const { sendAutomatedTemplateEmail } = await import('./email')
+    await sendAutomatedTemplateEmail(contractId, rule.email_template_id)
+  }
+}
+
 export async function deleteAutomationRule(ruleId: string) {
   const supabase = createAdminClient()
   await supabase.from('automation_rules').delete().eq('id', ruleId)
   revalidatePath('/automations')
+}
+
+// ------------------------------------------------------------
+// Dispara automação por DESFECHO — chamada de dentro do closeRun()
+// (Ganho/Perdido ou Renovado/Não renovado, dependendo do pipeline).
+// Diferente das outras, essa é por PIPELINE inteiro, não por etapa.
+// ------------------------------------------------------------
+export async function checkAndTriggerOutcomeAutomations(
+  contractId: string,
+  pipelineId: string,
+  pipelineRunId: string,
+  outcome: 'won' | 'lost'
+): Promise<void> {
+  const supabase = createAdminClient()
+
+  const { data: rules } = await supabase
+    .from('automation_rules')
+    .select('*')
+    .eq('trigger_type', outcome === 'won' ? 'outcome_won' : 'outcome_lost')
+    .eq('trigger_pipeline_id', pipelineId)
+    .eq('is_active', true)
+
+  for (const rule of rules ?? []) {
+    await executeAutomationAction(rule, contractId, pipelineRunId)
+  }
 }
 
 // ------------------------------------------------------------

@@ -195,8 +195,9 @@ create index idx_activities_created_at on contract_crm.activities(created_at des
 create table contract_crm.automation_rules (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  trigger_type text not null default 'stage_entry' check (trigger_type in ('stage_entry', 'days_without_progress')),
+  trigger_type text not null default 'stage_entry' check (trigger_type in ('stage_entry', 'days_without_progress', 'outcome_won', 'outcome_lost')),
   trigger_stage_id uuid references contract_crm.stages(id),
+  trigger_pipeline_id uuid references contract_crm.pipelines(id),
   days_threshold integer,
   action_type text not null check (action_type in ('move_to_pipeline', 'move_to_stage', 'create_task', 'send_email', 'notify_user')),
   target_pipeline_id uuid references contract_crm.pipelines(id),

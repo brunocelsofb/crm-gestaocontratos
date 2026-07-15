@@ -6,7 +6,7 @@ export default async function AutomationsPage() {
 
   const [{ data: rules }, { data: pipelines }, { data: stages }, { data: templates }, { data: users }] = await Promise.all([
     supabase.from('automation_rules').select('*').order('created_at', { ascending: false }),
-    supabase.from('pipelines').select('id, name').order('name'),
+    supabase.from('pipelines').select('id, name, type, won_label, lost_label').order('name'),
     supabase.from('stages').select('id, name, pipeline_id').order('order_index'),
     supabase.from('email_templates').select('id, name').order('name'),
     supabase.from('profiles').select('id, full_name').order('full_name'),

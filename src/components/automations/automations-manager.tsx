@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createAutomationRule, toggleAutomationRule, deleteAutomationRule } from '@/lib/actions/automations'
 
-type Pipeline = { id: string; name: string }
+type Pipeline = { id: string; name: string; type: string; won_label: string; lost_label: string }
 type Stage = { id: string; name: string; pipeline_id: string }
 type Template = { id: string; name: string }
 type UserOption = { id: string; full_name: string }
@@ -12,6 +12,7 @@ type Rule = {
   name: string
   trigger_type: string
   trigger_stage_id: string | null
+  trigger_pipeline_id: string | null
   days_threshold: number | null
   action_type: string
   target_stage_id: string | null
@@ -56,6 +57,16 @@ export function AutomationsManager({
     return `${pipeline?.name ?? '?'} → ${stage.name}`
   }
 
+  function triggerDescription(r: Rule) {
+    if (r.trigger_type === 'outcome_won' || r.trigger_type === 'outcome_lost') {
+      const pipeline = pipelines.find((p) => p.id === r.trigger_pipeline_id)
+      const label = r.trigger_type === 'outcome_won' ? pipeline?.won_label ?? 'Ganho' : pipeline?.lost_label ?? 'Perdido'
+      return `marcar "${label}" em ${pipeline?.name ?? '?'}`
+    }
+    if (r.trigger_type === 'days_without_progress') return `parado ${r.days_threshold} dias em ${stageLabel(r.trigger_stage_id)}`
+    return `entrar em ${stageLabel(r.trigger_stage_id)}`
+  }
+
   async function handleSubmit(formData: FormData) {
     setBusy(true)
     setError(null)
@@ -94,19 +105,37 @@ export function AutomationsManager({
               <select name="trigger_type" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
                 <option value="stage_entry">Entrar numa etapa</option>
                 <option value="days_without_progress">Ficar parado X dias numa etapa</option>
+                <option value="outcome_won">Marcar sucesso (Ganho ou Renovado)</option>
+                <option value="outcome_lost">Marcar perda (Perdido ou Não renovado)</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs text-gray-500">Etapa</label>
-              <select name="trigger_stage_id" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
-                <option value="">Selecione...</option>
-                {pipelines.map((p) => (
-                  <optgroup key={p.id} label={p.name}>
-                    {stages.filter((s) => s.pipeline_id === p.id).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
+
+            {(triggerType === 'outcome_won' || triggerType === 'outcome_lost') ? (
+              <div>
+                <label className="block text-xs text-gray-500">Funil</label>
+                <select name="trigger_pipeline_id" required className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+                  <option value="">Selecione...</option>
+                  {pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({triggerType === 'outcome_won' ? p.won_label : p.lost_label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs text-gray-500">Etapa</label>
+                <select name="trigger_stage_id" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+                  <option value="">Selecione...</option>
+                  {pipelines.map((p) => (
+                    <optgroup key={p.id} label={p.name}>
+                      {stages.filter((s) => s.pipeline_id === p.id).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {triggerType === 'days_without_progress' && (
               <div>
                 <label className="block text-xs text-gray-500">Quantos dias parado</label>
@@ -114,6 +143,11 @@ export function AutomationsManager({
               </div>
             )}
           </div>
+          {(triggerType === 'outcome_won' || triggerType === 'outcome_lost') && (
+            <p className="mt-2 text-xs text-gray-400">
+              O rótulo que aparece pra equipe muda conforme o funil (Vendas mostra &quot;Ganho&quot;/&quot;Perdido&quot;, Gestão de Contratos mostra &quot;Renovado&quot;/&quot;Não renovado&quot;) — mas é o mesmo tipo de evento por trás.
+            </p>
+          )}
         </div>
 
         <div className="rounded-md bg-gray-50 p-3">
@@ -195,7 +229,7 @@ export function AutomationsManager({
               </div>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Quando: {r.trigger_type === 'days_without_progress' ? `parado ${r.days_threshold} dias em` : 'entrar em'} {stageLabel(r.trigger_stage_id)}
+              Quando: {triggerDescription(r)}
               {' → '}Então: {ACTION_LABELS[r.action_type]}
               {r.action_type === 'move_to_stage' && ` (${stageLabel(r.target_stage_id)})`}
               {r.action_type === 'create_task' && r.task_content && ` ("${r.task_content}")`}

@@ -35,7 +35,7 @@ export async function checkBudgetAvailable(): Promise<{ ok: boolean; message?: s
   if (totalCost >= budget) {
     return {
       ok: false,
-      message: `Orçamento mensal do Assistente de IA (US$ ${budget}) atingido — já foram gastos aproximadamente US$ ${totalCost.toFixed(2)} este mês. Aumente o orçamento em Configurações se precisar continuar usando.`,
+      message: `Orçamento mensal do Théo (US$ ${budget}) atingido — já foram gastos aproximadamente US$ ${totalCost.toFixed(2)} este mês. Aumente o orçamento em Configurações se precisar continuar usando.`,
     }
   }
 

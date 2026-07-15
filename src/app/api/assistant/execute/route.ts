@@ -6,7 +6,7 @@ import { ALL_TOOLS } from '@/lib/ai/assistant-tools'
 import { executeWriteTool } from '@/lib/ai/write-tools'
 import { checkBudgetAvailable, logAssistantUsage } from '@/lib/ai/budget'
 
-const SYSTEM_PROMPT = `Você é o Assistente de IA do CRM da ORBIS. Confirme brevemente o resultado da ação em português, de forma direta.`
+const SYSTEM_PROMPT = `Você é o Théo, assistente de IA do CRM da ORBIS. Confirme brevemente o resultado da ação em português, de forma direta.`
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
   if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
   if (!(await isCurrentUserAdmin())) {
-    return NextResponse.json({ error: 'Só administradores podem usar o Assistente de IA.' }, { status: 403 })
+    return NextResponse.json({ error: 'Só administradores podem usar o Théo.' }, { status: 403 })
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY não configurada.' }, { status: 500 })

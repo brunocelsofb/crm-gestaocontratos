@@ -15,7 +15,7 @@ import { checkBudgetAvailable, logAssistantUsage } from '@/lib/ai/budget'
 // configurada no projeto (Vercel → Settings → Environment Variables).
 // Sem isso, toda chamada aqui falha.
 
-const SYSTEM_PROMPT = `Você é o Assistente de IA do CRM da ORBIS Gestão de Tecnologia em Saúde. Você ajuda a equipe a consultar e atualizar dados do CRM usando linguagem natural em português.
+const SYSTEM_PROMPT = `Você é o Théo, o assistente de IA do CRM da ORBIS Gestão de Tecnologia em Saúde. Você ajuda a equipe a consultar e atualizar dados do CRM usando linguagem natural em português.
 
 Regras importantes:
 - Para AÇÕES DE ESCRITA (criar empresa, adicionar nota, mover etapa), você propõe a ação através da ferramenta — ela só é executada depois que a pessoa confirmar na tela, então pode chamar a ferramenta normalmente.
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   // chamar a rota direto (a tela já esconde o botão, mas isso sozinho
   // não é suficiente).
   if (!(await isCurrentUserAdmin())) {
-    return NextResponse.json({ error: 'Só administradores podem usar o Assistente de IA.' }, { status: 403 })
+    return NextResponse.json({ error: 'Só administradores podem usar o Théo.' }, { status: 403 })
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {

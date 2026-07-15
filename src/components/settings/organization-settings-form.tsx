@@ -151,7 +151,7 @@ export function OrganizationSettingsForm({
         <input type="hidden" name="proposal_brand_color" value={currentBrandColor} />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Assistente de IA (US$)</label>
+          <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Théo (US$)</label>
           <input
             name="assistant_monthly_budget_usd"
             type="number"
