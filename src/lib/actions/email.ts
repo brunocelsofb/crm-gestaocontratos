@@ -272,12 +272,18 @@ export async function buildEmailFromTemplate(
     : { data: null }
   const { data: orgSettings } = await supabase.from('organization_settings').select('company_name, company_cnpj').eq('id', 'default').maybeSingle()
 
-  const { data: customFieldDefs } = await supabase.from('custom_fields').select('id, field_key')
+  const { data: customFieldDefs } = await supabase.from('custom_fields').select('id, field_key, field_type')
   const { data: customFieldValues } = await supabase.from('contract_custom_field_values').select('custom_field_id, value').eq('contract_id', contractId)
   const valueByFieldId = new Map((customFieldValues ?? []).map((v) => [v.custom_field_id, v.value]))
   const customVars: Record<string, string> = {}
   for (const field of customFieldDefs ?? []) {
-    customVars[field.field_key] = valueByFieldId.get(field.id) ?? ''
+    const rawValue = valueByFieldId.get(field.id) ?? ''
+    // Campo de arquivo guarda só o caminho no Storage — vira um link
+    // de verdade quando usado dentro de um e-mail.
+    customVars[field.field_key] =
+      field.field_type === 'file' && rawValue
+        ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/email-assets/${rawValue}`
+        : rawValue
   }
 
   const vars = {

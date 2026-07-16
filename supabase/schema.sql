@@ -1093,7 +1093,7 @@ create table contract_crm.custom_fields (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   field_key text not null unique,
-  field_type text not null default 'text' check (field_type in ('text', 'number', 'date', 'select')),
+  field_type text not null default 'text' check (field_type in ('text', 'textarea', 'number', 'date', 'select', 'multiselect', 'file')),
   select_options jsonb,
   context text not null default 'contract' check (context in ('contract')),
   created_at timestamptz not null default now()

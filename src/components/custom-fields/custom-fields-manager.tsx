@@ -5,6 +5,16 @@ import { createCustomField, deleteCustomField } from '@/lib/actions/custom-field
 
 type CustomField = { id: string; name: string; field_key: string; field_type: string; select_options: string[] | null }
 
+const FIELD_TYPE_LABELS: Record<string, string> = {
+  text: 'Texto curto',
+  textarea: 'Texto longo',
+  number: 'Número',
+  date: 'Data',
+  select: 'Lista (única)',
+  multiselect: 'Lista (múltipla)',
+  file: 'Arquivo',
+}
+
 export function CustomFieldsManager({ initialFields }: { initialFields: CustomField[] }) {
   const [fieldType, setFieldType] = useState('text')
   const [busy, setBusy] = useState(false)
@@ -36,13 +46,16 @@ export function CustomFieldsManager({ initialFields }: { initialFields: CustomFi
         <div>
           <label className="block text-xs text-gray-500">Tipo</label>
           <select name="field_type" value={fieldType} onChange={(e) => setFieldType(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
-            <option value="text">Texto</option>
+            <option value="text">Texto curto</option>
+            <option value="textarea">Texto longo</option>
             <option value="number">Número</option>
             <option value="date">Data</option>
-            <option value="select">Lista de opções</option>
+            <option value="select">Lista de opções (escolha única)</option>
+            <option value="multiselect">Lista de opções (múltipla escolha)</option>
+            <option value="file">Upload de arquivo</option>
           </select>
         </div>
-        {fieldType === 'select' && (
+        {(fieldType === 'select' || fieldType === 'multiselect') && (
           <div>
             <label className="block text-xs text-gray-500">Opções (separadas por vírgula)</label>
             <input name="select_options" placeholder="Ex: Recorrente, Pontual, Sob demanda" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
@@ -60,7 +73,7 @@ export function CustomFieldsManager({ initialFields }: { initialFields: CustomFi
             <div>
               <span className="font-medium text-gray-900">{f.name}</span>
               <code className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{'{{' + f.field_key + '}}'}</code>
-              <span className="ml-2 text-xs text-gray-400">({f.field_type === 'text' ? 'Texto' : f.field_type === 'number' ? 'Número' : f.field_type === 'date' ? 'Data' : 'Lista'})</span>
+              <span className="ml-2 text-xs text-gray-400">({FIELD_TYPE_LABELS[f.field_type] ?? f.field_type})</span>
             </div>
             <button onClick={() => handleDelete(f.id)} className="text-xs text-negative-600 hover:underline">Remover</button>
           </div>

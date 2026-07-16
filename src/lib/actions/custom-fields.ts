@@ -33,7 +33,7 @@ export async function createCustomField(formData: FormData): Promise<ActionState
     return { error: `"${field_key}" já é uma variável padrão do sistema — escolha outro nome.` }
   }
 
-  const select_options = field_type === 'select' && selectOptionsRaw
+  const select_options = (field_type === 'select' || field_type === 'multiselect') && selectOptionsRaw
     ? selectOptionsRaw.split(',').map((s) => s.trim()).filter(Boolean)
     : null
 
