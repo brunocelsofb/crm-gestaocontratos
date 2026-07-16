@@ -32,7 +32,16 @@ export async function POST(request: Request) {
   }
 
   const cleanPhone = phone.replace(/\D/g, '')
-  const { data: matchingContacts } = await supabase.from('contacts').select('id').ilike('phone', `%${cleanPhone.slice(-8)}%`)
+  const last8 = cleanPhone.slice(-8)
+  const { data: matchingContacts } = await supabase.from('contacts').select('id').ilike('phone', `%${last8}%`)
+
+  // DEPURAÇÃO TEMPORÁRIA: registra o resultado de cada passo do
+  // vínculo, pra sabermos exatamente onde está falhando sem precisar
+  // ficar adivinhando de novo a cada teste.
+  await supabase.from('webhook_debug_log').insert({
+    source: 'zapi_whatsapp_match',
+    raw_payload: { phone, cleanPhone, last8, matchingContactsCount: matchingContacts?.length ?? 0, matchingContactIds: matchingContacts?.map((c) => c.id) ?? [] },
+  })
 
   if (!matchingContacts || matchingContacts.length === 0) {
     return NextResponse.json({ ok: true, matched: false })
@@ -45,6 +54,11 @@ export async function POST(request: Request) {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  await supabase.from('webhook_debug_log').insert({
+    source: 'zapi_whatsapp_contract_lookup',
+    raw_payload: { contractFound: !!contract, contractId: contract?.id ?? null },
+  })
 
   if (!contract) {
     return NextResponse.json({ ok: true, matched: false })
