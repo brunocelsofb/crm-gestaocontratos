@@ -13,7 +13,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key')
+    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -26,6 +26,7 @@ export default async function SettingsPage() {
       <OrganizationSettingsForm
         currentName={settings?.name ?? 'Contract CRM'}
         currentCompanyName={settings?.company_name ?? ''}
+        currentCompanyCnpj={settings?.company_cnpj ?? ''}
         currentLogoPath={settings?.logo_storage_path ?? null}
         currentHeaderText={settings?.proposal_header_text ?? ''}
         currentFooterText={settings?.proposal_footer_text ?? ''}

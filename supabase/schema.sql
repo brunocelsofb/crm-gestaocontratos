@@ -361,6 +361,7 @@ create table contract_crm.organization_settings (
   assistant_monthly_budget_usd numeric default 10,
   ticket_number_prefix text default 'TICKET',
   proposal_number_prefix text default 'PROP',
+  company_cnpj text,
   inbound_email_domain text,
   mailgun_webhook_signing_key text,
   updated_at timestamptz not null default now()
@@ -1083,3 +1084,37 @@ create policy "contract_emails_insert" on contract_crm.contract_emails for inser
 alter table contract_crm.profiles add column email_signature text;
 alter table contract_crm.contract_emails add column tracking_token text unique default gen_random_uuid()::text;
 alter table contract_crm.contract_emails add column opened_at timestamptz;
+
+
+-- ------------------------------------------------------------
+-- 31. Campos customizados
+-- ------------------------------------------------------------
+create table contract_crm.custom_fields (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  field_key text not null unique,
+  field_type text not null default 'text' check (field_type in ('text', 'number', 'date', 'select')),
+  select_options jsonb,
+  context text not null default 'contract' check (context in ('contract')),
+  created_at timestamptz not null default now()
+);
+
+create table contract_crm.contract_custom_field_values (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  custom_field_id uuid not null references contract_crm.custom_fields(id) on delete cascade,
+  value text,
+  updated_at timestamptz not null default now(),
+  unique (contract_id, custom_field_id)
+);
+
+create index idx_ccfv_contract on contract_crm.contract_custom_field_values(contract_id);
+
+alter table contract_crm.custom_fields enable row level security;
+alter table contract_crm.contract_custom_field_values enable row level security;
+
+create policy "custom_fields_select" on contract_crm.custom_fields for select using (auth.role() = 'authenticated');
+create policy "custom_fields_all" on contract_crm.custom_fields for all using (auth.role() = 'authenticated');
+
+create policy "ccfv_select" on contract_crm.contract_custom_field_values for select using (auth.role() = 'authenticated');
+create policy "ccfv_all" on contract_crm.contract_custom_field_values for all using (auth.role() = 'authenticated');

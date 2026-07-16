@@ -33,6 +33,7 @@ export async function updateOrganizationSettings(
 
   const name = (formData.get('name') as string)?.trim()
   const company_name = (formData.get('company_name') as string)?.trim() || null
+  const company_cnpj = (formData.get('company_cnpj') as string)?.trim() || null
   const proposal_header_text = (formData.get('proposal_header_text') as string)?.trim() || null
   const proposal_footer_text = (formData.get('proposal_footer_text') as string)?.trim() || null
   const proposal_brand_color = (formData.get('proposal_brand_color') as string)?.trim() || '#1B556B'
@@ -46,6 +47,7 @@ export async function updateOrganizationSettings(
     .update({
       name,
       company_name,
+      company_cnpj,
       proposal_header_text,
       proposal_footer_text,
       proposal_brand_color,

@@ -10,6 +10,7 @@ const initialState: ActionState = {}
 export function OrganizationSettingsForm({
   currentName,
   currentCompanyName,
+  currentCompanyCnpj,
   currentLogoPath,
   currentHeaderText,
   currentFooterText,
@@ -18,6 +19,7 @@ export function OrganizationSettingsForm({
 }: {
   currentName: string
   currentCompanyName: string
+  currentCompanyCnpj: string
   currentLogoPath: string | null
   currentHeaderText: string
   currentFooterText: string
@@ -96,6 +98,17 @@ export function OrganizationSettingsForm({
           <p className="mt-1 text-xs text-gray-400">
             Usado na pergunta da pesquisa NPS e no PDF das propostas — é o nome da sua empresa, não do sistema.
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">CNPJ da empresa</label>
+          <input
+            name="company_cnpj"
+            defaultValue={currentCompanyCnpj}
+            placeholder="00.000.000/0000-00"
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-400">Disponível como variável <code>{'{{minha_cnpj}}'}</code> nos templates de e-mail.</p>
         </div>
 
         <div>

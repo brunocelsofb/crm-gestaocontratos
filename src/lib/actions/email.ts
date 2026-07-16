@@ -256,17 +256,42 @@ export async function buildEmailFromTemplate(
   if (!contract) return null
 
   const { data: company } = contract.company_id
-    ? await supabase.from('companies').select('name, trade_name').eq('id', contract.company_id).maybeSingle()
+    ? await supabase.from('companies').select('name, trade_name, cnpj').eq('id', contract.company_id).maybeSingle()
     : { data: null }
   const { data: contact } = contract.contact_id
     ? await supabase.from('contacts').select('name, email').eq('id', contract.contact_id).maybeSingle()
     : { data: null }
+  const { data: run } = await supabase
+    .from('pipeline_runs')
+    .select('value')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+  const { data: owner } = contract.owner_id
+    ? await supabase.from('profiles').select('full_name').eq('id', contract.owner_id).maybeSingle()
+    : { data: null }
+  const { data: orgSettings } = await supabase.from('organization_settings').select('company_name, company_cnpj').eq('id', 'default').maybeSingle()
+
+  const { data: customFieldDefs } = await supabase.from('custom_fields').select('id, field_key')
+  const { data: customFieldValues } = await supabase.from('contract_custom_field_values').select('custom_field_id, value').eq('contract_id', contractId)
+  const valueByFieldId = new Map((customFieldValues ?? []).map((v) => [v.custom_field_id, v.value]))
+  const customVars: Record<string, string> = {}
+  for (const field of customFieldDefs ?? []) {
+    customVars[field.field_key] = valueByFieldId.get(field.id) ?? ''
+  }
 
   const vars = {
     cliente: contract.client_name ?? '',
     empresa: company?.name ?? contract.client_name ?? '',
     contato: contact?.name ?? '',
     processo: contract.process_number ?? '',
+    valor: run?.value ? Number(run.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '',
+    cnpj: company?.cnpj ?? '',
+    minha_empresa: orgSettings?.company_name ?? '',
+    minha_cnpj: orgSettings?.company_cnpj ?? '',
+    responsavel: owner?.full_name ?? '',
+    data_hoje: new Date().toLocaleDateString('pt-BR'),
+    ...customVars,
   }
 
   return {

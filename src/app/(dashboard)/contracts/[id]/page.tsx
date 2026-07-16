@@ -15,7 +15,9 @@ import { RenewalValueSection } from '@/components/contracts/renewal-value-sectio
 import { ProposalsSection } from '@/components/proposals/proposals-section'
 import { ContractTicketsSection } from '@/components/tickets/contract-tickets-section'
 import { ContractEmailSection } from '@/components/email/contract-email-section'
+import { ContractCustomFieldsSection } from '@/components/custom-fields/contract-custom-fields-section'
 import { getConnectedEmailAccount } from '@/lib/actions/email'
+import { getContractCustomFieldValues } from '@/lib/actions/custom-fields'
 import { DeleteContractButton } from '@/components/contracts/delete-contract-button'
 import { ActionPlanSection } from '@/components/contracts/action-plan-section'
 import { DimensioningSection } from '@/components/contracts/dimensioning-section'
@@ -175,11 +177,13 @@ export default async function ContractDetailPage({
     return { stageId: stage.id, days, isOverdue }
   })
 
-  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }] = await Promise.all([
+  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues] = await Promise.all([
     supabase.from('email_templates').select('id, name').eq('context', 'contract').order('name'),
     supabase.from('contract_emails').select('id, from_email, to_email, cc_email, bcc_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
     getConnectedEmailAccount(),
     supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle(),
+    supabase.from('custom_fields').select('id, name, field_key, field_type, select_options').order('name'),
+    getContractCustomFieldValues(contract.id),
   ])
 
   const inboundEmailAddress =
@@ -367,6 +371,8 @@ export default async function ContractDetailPage({
                     </div>
                   </div>
                 )}
+
+                <ContractCustomFieldsSection contractId={contract.id} fields={customFields ?? []} values={customFieldValues} />
 
                 <div className="space-y-3">
                   <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>

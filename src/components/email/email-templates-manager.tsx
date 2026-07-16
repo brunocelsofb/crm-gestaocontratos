@@ -14,10 +14,12 @@ export function EmailTemplatesManager({
   initialTemplates,
   pipelines,
   stages,
+  customFields,
 }: {
   initialTemplates: Template[]
   pipelines: Pipeline[]
   stages: Stage[]
+  customFields: { id: string; name: string; field_key: string }[]
 }) {
   const [state, formAction, pending] = useActionState(createEmailTemplate, initialState)
   const formRef = useRef<HTMLFormElement>(null)
@@ -60,8 +62,14 @@ export function EmailTemplatesManager({
         </div>
         <div>
           <label className="block text-xs text-gray-500">
-            Corpo do e-mail (HTML simples) — variáveis de contrato: <code>{'{{cliente}}'}</code> <code>{'{{empresa}}'}</code> <code>{'{{contato}}'}</code> <code>{'{{processo}}'}</code>
+            Corpo do e-mail (HTML simples) — variáveis de contrato: <code>{'{{cliente}}'}</code> <code>{'{{empresa}}'}</code> <code>{'{{contato}}'}</code> <code>{'{{processo}}'}</code> <code>{'{{valor}}'}</code> <code>{'{{cnpj}}'}</code> <code>{'{{responsavel}}'}</code> <code>{'{{data_hoje}}'}</code> <code>{'{{minha_empresa}}'}</code> <code>{'{{minha_cnpj}}'}</code>
             {' '}| variáveis de ticket: <code>{'{{ticket_numero}}'}</code> <code>{'{{ticket_assunto}}'}</code> <code>{'{{solicitante}}'}</code>
+            {customFields.length > 0 && (
+              <>
+                {' '}| campos customizados: {customFields.map((f) => <code key={f.id} className="mr-1">{'{{' + f.field_key + '}}'}</code>)}
+                {' '}(<a href="/custom-fields" className="text-brand-700 hover:underline">gerenciar</a>)
+              </>
+            )}
           </label>
           <textarea name="body" required rows={6} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-mono focus:border-brand-700 focus:outline-none" />
         </div>

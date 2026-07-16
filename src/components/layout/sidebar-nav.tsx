@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList, Tag, BarChart3, Target, LifeBuoy, Mail, UserCircle, Zap } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList, Tag, BarChart3, Target, LifeBuoy, Mail, UserCircle, Zap, Sliders } from 'lucide-react'
 
 const BASE_NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,6 +18,7 @@ const BASE_NAV_ITEMS = [
   { href: '/proposals/templates', label: 'Modelos de Proposta', icon: FileText },
   { href: '/proposals/catalog', label: 'Catálogo de Produtos', icon: FileText },
   { href: '/email-templates', label: 'Templates de E-mail', icon: Mail },
+  { href: '/custom-fields', label: 'Campos Customizados', icon: Sliders },
   { href: '/automations', label: 'Automações', icon: Zap },
   { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
 ]
