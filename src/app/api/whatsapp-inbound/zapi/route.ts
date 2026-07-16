@@ -14,6 +14,11 @@ export async function POST(request: Request) {
   const supabase = createAdminClient()
   const body = await request.json().catch(() => null)
 
+  // DEPURAÇÃO TEMPORÁRIA: grava exatamente o que chegou, pra
+  // conseguirmos ver o formato real do Z-API — remover depois que
+  // confirmarmos que o resto da rota está funcionando certo.
+  await supabase.from('webhook_debug_log').insert({ source: 'zapi_whatsapp', raw_payload: body })
+
   if (!body) return NextResponse.json({ ok: true })
 
   if (body.fromMe) return NextResponse.json({ ok: true, skipped: 'fromMe' })
