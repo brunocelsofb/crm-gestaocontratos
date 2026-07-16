@@ -119,14 +119,16 @@ export async function createEmailTemplate(_prevState: ActionState, formData: For
   if (!user) return { error: 'Usuário não autenticado.' }
 
   const name = (formData.get('name') as string)?.trim()
-  const subject = (formData.get('subject') as string)?.trim()
+  const subject = (formData.get('subject') as string)?.trim() || null
   const body = (formData.get('body') as string)?.trim()
   const context = (formData.get('context') as string) || 'contract'
+  const channel = (formData.get('channel') as string) || 'email'
   const trigger_stage_id = (formData.get('trigger_stage_id') as string) || null
 
-  if (!name || !subject || !body) return { error: 'Preencha nome, assunto e corpo do e-mail.' }
+  if (!name || !body) return { error: 'Preencha nome e corpo da mensagem.' }
+  if (channel === 'email' && !subject) return { error: 'Preencha o assunto do e-mail.' }
 
-  const { error } = await supabase.from('email_templates').insert({ name, subject, body, context, trigger_stage_id, created_by: user.id })
+  const { error } = await supabase.from('email_templates').insert({ name, subject, body, context, channel, trigger_stage_id, created_by: user.id })
   if (error) return { error: error.message }
 
   revalidatePath('/email-templates')

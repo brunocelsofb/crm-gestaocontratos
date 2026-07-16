@@ -5,6 +5,7 @@ import { getCurrentProfile } from '@/lib/auth/role'
 import { OrganizationSettingsForm } from '@/components/settings/organization-settings-form'
 import { NumberingSettingsForm } from '@/components/settings/numbering-settings-form'
 import { InboundEmailSettingsForm } from '@/components/settings/inbound-email-settings-form'
+import { WhatsAppSettingsForm } from '@/components/settings/whatsapp-settings-form'
 
 export default async function SettingsPage() {
   const profile = await getCurrentProfile()
@@ -13,7 +14,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key')
+    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -41,6 +42,7 @@ export default async function SettingsPage() {
         currentDomain={settings?.inbound_email_domain ?? ''}
         hasSigningKey={!!settings?.mailgun_webhook_signing_key}
       />
+      <WhatsAppSettingsForm isConnected={!!settings?.zapi_instance_id} />
       <p className="text-xs text-gray-400">
         Conectar seu Gmail e configurar sua assinatura de e-mail agora fica em{' '}
         <Link href="/minha-conta" className="text-brand-700 hover:underline">Minha Conta</Link> — é pessoal, não de organização.

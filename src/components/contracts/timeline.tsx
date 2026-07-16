@@ -4,12 +4,14 @@
 
 import { ExpandableRow } from '@/components/surveys/expandable-row'
 
-type EmailMetadata = {
+type EventMetadata = {
   kind?: 'sent' | 'received' | 'opened'
   subject?: string
   from_email?: string
   to_email?: string
   body?: string
+  phone?: string
+  message?: string
 }
 
 type Activity = {
@@ -20,7 +22,7 @@ type Activity = {
   due_date: string | null
   completed: boolean | null
   profiles: { full_name: string } | null
-  metadata: EmailMetadata | null
+  metadata: EventMetadata | null
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -41,12 +43,19 @@ const EMAIL_KIND_LABEL: Record<string, string> = {
   opened: 'Um e-mail enviado foi visualizado',
 }
 
+const WHATSAPP_KIND_LABEL: Record<string, string> = {
+  sent: 'WhatsApp Enviado',
+  received: 'WhatsApp Recebido',
+  opened: 'WhatsApp Enviado',
+}
+
 // Cores por categoria de evento, não por sequência — ver design system.
 const TYPE_COLOR: Record<string, string> = {
   note: 'bg-amber-100 text-amber-700',
   task: 'bg-emerald-100 text-emerald-700',
   call: 'bg-emerald-100 text-emerald-700',
   email: 'bg-blue-100 text-blue-700',
+  whatsapp: 'bg-emerald-100 text-emerald-700',
   stage_change: 'bg-blue-100 text-blue-700',
   pipeline_change: 'bg-purple-100 text-purple-700',
   automation_triggered: 'bg-purple-100 text-purple-700',
@@ -70,19 +79,23 @@ export function Timeline({ activities }: { activities: Activity[] }) {
   return (
     <div className="space-y-4">
       {activities.map((a) => {
-        if (a.type === 'email' && a.metadata?.kind) {
+        if ((a.type === 'email' || a.type === 'whatsapp') && a.metadata?.kind) {
           const kind = a.metadata.kind
-          const icon = kind === 'sent' ? '📤' : kind === 'received' ? '📥' : '👁️'
+          const isWhatsApp = a.type === 'whatsapp'
+          const icon = kind === 'sent' ? (isWhatsApp ? '💬' : '📤') : kind === 'received' ? '📥' : '👁️'
+          const kindLabel = isWhatsApp ? WHATSAPP_KIND_LABEL[kind] : EMAIL_KIND_LABEL[kind]
+          const badgeColor = isWhatsApp ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+          const title = isWhatsApp ? a.metadata.message : a.metadata.subject
           return (
             <ExpandableRow
               key={a.id}
               summary={
                 <div className="flex items-start gap-3">
-                  <span className="h-fit shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700">
-                    {icon} {EMAIL_KIND_LABEL[kind]}
+                  <span className={`h-fit shrink-0 rounded-full px-2 py-1 text-[11px] font-medium ${badgeColor}`}>
+                    {icon} {kindLabel}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-800">{a.metadata.subject}</p>
+                    <p className="truncate text-sm font-medium text-gray-800">{title}</p>
                     <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
                       <span>{relativeTime(a.created_at)}</span>
                       <span>·</span>
@@ -99,12 +112,22 @@ export function Timeline({ activities }: { activities: Activity[] }) {
               }
             >
               <div className="space-y-1 text-sm text-gray-700">
-                {a.metadata.subject && <p><strong>Assunto:</strong> {a.metadata.subject}</p>}
-                <p><strong>Data:</strong> {new Date(a.created_at).toLocaleString('pt-BR')}</p>
-                {a.metadata.from_email && <p><strong>De:</strong> {a.metadata.from_email}</p>}
-                {a.metadata.to_email && <p><strong>Para:</strong> {a.metadata.to_email}</p>}
-                {a.metadata.body && (
-                  <div className="mt-2 rounded-md border border-gray-100 bg-gray-50 p-3" dangerouslySetInnerHTML={{ __html: a.metadata.body }} />
+                {isWhatsApp ? (
+                  <>
+                    <p><strong>Data:</strong> {new Date(a.created_at).toLocaleString('pt-BR')}</p>
+                    {a.metadata.phone && <p><strong>Telefone:</strong> {a.metadata.phone}</p>}
+                    {a.metadata.message && <p className="mt-2 whitespace-pre-wrap rounded-md border border-gray-100 bg-gray-50 p-3">{a.metadata.message}</p>}
+                  </>
+                ) : (
+                  <>
+                    {a.metadata.subject && <p><strong>Assunto:</strong> {a.metadata.subject}</p>}
+                    <p><strong>Data:</strong> {new Date(a.created_at).toLocaleString('pt-BR')}</p>
+                    {a.metadata.from_email && <p><strong>De:</strong> {a.metadata.from_email}</p>}
+                    {a.metadata.to_email && <p><strong>Para:</strong> {a.metadata.to_email}</p>}
+                    {a.metadata.body && (
+                      <div className="mt-2 rounded-md border border-gray-100 bg-gray-50 p-3" dangerouslySetInnerHTML={{ __html: a.metadata.body }} />
+                    )}
+                  </>
                 )}
               </div>
             </ExpandableRow>

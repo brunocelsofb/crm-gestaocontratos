@@ -21,6 +21,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
   const target_pipeline_id = (formData.get('target_pipeline_id') as string) || null
   const task_content = (formData.get('task_content') as string) || null
   const email_template_id = (formData.get('email_template_id') as string) || null
+  const whatsapp_template_id = (formData.get('whatsapp_template_id') as string) || null
   const notify_user_id = (formData.get('notify_user_id') as string) || null
   const notify_message = (formData.get('notify_message') as string) || null
 
@@ -39,6 +40,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
   }
 
   if (isTicketTrigger && action_type !== 'send_email') return { error: 'Esse gatilho só funciona com a ação "Enviar e-mail".' }
+  if (action_type === 'send_whatsapp' && !whatsapp_template_id) return { error: 'Escolha o template de WhatsApp.' }
 
   if (action_type === 'move_to_stage' && !target_stage_id) return { error: 'Escolha a etapa de destino.' }
   if (action_type === 'create_task' && !task_content) return { error: 'Descreva a tarefa a ser criada.' }
@@ -58,6 +60,7 @@ export async function createAutomationRule(formData: FormData): Promise<ActionSt
     target_pipeline_id,
     task_content,
     email_template_id,
+    whatsapp_template_id,
     notify_user_id,
     notify_message,
   })
@@ -89,6 +92,7 @@ export async function executeAutomationAction(
     target_stage_id: string | null
     task_content: string | null
     email_template_id: string | null
+    whatsapp_template_id: string | null
     notify_user_id: string | null
     notify_message: string | null
   },
@@ -129,6 +133,9 @@ export async function executeAutomationAction(
   } else if (rule.action_type === 'send_email' && rule.email_template_id) {
     const { sendAutomatedTemplateEmail } = await import('./email')
     await sendAutomatedTemplateEmail(contractId, rule.email_template_id)
+  } else if (rule.action_type === 'send_whatsapp' && rule.whatsapp_template_id) {
+    const { sendAutomatedWhatsAppTemplateMessage } = await import('./whatsapp')
+    await sendAutomatedWhatsAppTemplateMessage(contractId, rule.whatsapp_template_id)
   }
 }
 

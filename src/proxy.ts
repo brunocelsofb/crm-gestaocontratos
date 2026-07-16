@@ -40,7 +40,7 @@ export async function proxy(request: NextRequest) {
 
   // Rota pública: a pesquisa de NPS é respondida por clientes externos,
   // que não têm (e não devem precisar de) conta no sistema.
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/nps/') || request.nextUrl.pathname.startsWith('/survey/') || request.nextUrl.pathname.startsWith('/proposal/') || request.nextUrl.pathname.includes('/pdf/public') || request.nextUrl.pathname.startsWith('/captura') || request.nextUrl.pathname.startsWith('/suporte') || request.nextUrl.pathname.startsWith('/acompanhar-ticket') || request.nextUrl.pathname.startsWith('/api/email-track') || request.nextUrl.pathname.startsWith('/api/email-assets') || request.nextUrl.pathname.startsWith('/api/email-inbound')
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/nps/') || request.nextUrl.pathname.startsWith('/survey/') || request.nextUrl.pathname.startsWith('/proposal/') || request.nextUrl.pathname.includes('/pdf/public') || request.nextUrl.pathname.startsWith('/captura') || request.nextUrl.pathname.startsWith('/suporte') || request.nextUrl.pathname.startsWith('/acompanhar-ticket') || request.nextUrl.pathname.startsWith('/api/email-track') || request.nextUrl.pathname.startsWith('/api/email-assets') || request.nextUrl.pathname.startsWith('/api/email-inbound') || request.nextUrl.pathname.startsWith('/api/whatsapp-inbound')
 
   // Usuário não logado tentando acessar área protegida -> manda para login
   if (!user && !isAuthRoute && !isPublicRoute) {

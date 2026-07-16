@@ -203,13 +203,14 @@ create table contract_crm.automation_rules (
   trigger_pipeline_id uuid references contract_crm.pipelines(id),
   trigger_tag_id uuid references contract_crm.tags(id) on delete cascade,
   days_threshold integer,
-  action_type text not null check (action_type in ('move_to_pipeline', 'move_to_stage', 'create_task', 'send_email', 'notify_user')),
+  action_type text not null check (action_type in ('move_to_pipeline', 'move_to_stage', 'create_task', 'send_email', 'notify_user', 'send_whatsapp')),
   target_pipeline_id uuid references contract_crm.pipelines(id),
   target_stage_id uuid references contract_crm.stages(id),
   task_content text,
   email_template_id uuid references contract_crm.email_templates(id) on delete set null,
   notify_user_id uuid references contract_crm.profiles(id),
   notify_message text,
+  whatsapp_template_id uuid references contract_crm.email_templates(id) on delete set null,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -362,6 +363,10 @@ create table contract_crm.organization_settings (
   ticket_number_prefix text default 'TICKET',
   proposal_number_prefix text default 'PROP',
   company_cnpj text,
+  zapi_instance_id text,
+  zapi_token text,
+  zapi_client_token text,
+  zapi_webhook_secret text,
   inbound_email_domain text,
   mailgun_webhook_signing_key text,
   updated_at timestamptz not null default now()
@@ -1033,9 +1038,10 @@ create table contract_crm.email_accounts (
 create table contract_crm.email_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  subject text not null,
+  subject text,
   body text not null,
   context text not null default 'contract' check (context in ('contract', 'ticket')),
+  channel text not null default 'email' check (channel in ('email', 'whatsapp')),
   trigger_stage_id uuid references contract_crm.stages(id) on delete set null,
   created_by uuid references contract_crm.profiles(id),
   created_at timestamptz not null default now()
@@ -1118,3 +1124,28 @@ create policy "custom_fields_all" on contract_crm.custom_fields for all using (a
 
 create policy "ccfv_select" on contract_crm.contract_custom_field_values for select using (auth.role() = 'authenticated');
 create policy "ccfv_all" on contract_crm.contract_custom_field_values for all using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 32. Integração com WhatsApp (Z-API)
+-- ------------------------------------------------------------
+create table contract_crm.contract_whatsapp_messages (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  sent_by uuid references contract_crm.profiles(id),
+  direction text not null check (direction in ('enviado', 'recebido')),
+  phone text not null,
+  message text not null,
+  template_id uuid references contract_crm.email_templates(id) on delete set null,
+  triggered_automatically boolean not null default false,
+  zapi_message_id text,
+  status text not null default 'enviado' check (status in ('enviado', 'falhou')),
+  error_message text,
+  created_at timestamptz not null default now()
+);
+
+create index idx_contract_whatsapp_contract on contract_crm.contract_whatsapp_messages(contract_id);
+
+alter table contract_crm.contract_whatsapp_messages enable row level security;
+create policy "contract_whatsapp_select" on contract_crm.contract_whatsapp_messages for select using (auth.role() = 'authenticated');
+create policy "contract_whatsapp_insert" on contract_crm.contract_whatsapp_messages for insert with check (true);

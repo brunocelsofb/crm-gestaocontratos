@@ -5,7 +5,7 @@ import { createAutomationRule, toggleAutomationRule, deleteAutomationRule } from
 
 type Pipeline = { id: string; name: string; type: string; won_label: string; lost_label: string }
 type Stage = { id: string; name: string; pipeline_id: string }
-type Template = { id: string; name: string; context?: string }
+type Template = { id: string; name: string; context?: string; channel?: string }
 type UserOption = { id: string; full_name: string }
 type Tag = { id: string; name: string; color: string }
 type Rule = {
@@ -20,6 +20,7 @@ type Rule = {
   target_stage_id: string | null
   task_content: string | null
   email_template_id: string | null
+  whatsapp_template_id: string | null
   notify_user_id: string | null
   notify_message: string | null
   is_active: boolean
@@ -30,6 +31,7 @@ const ACTION_LABELS: Record<string, string> = {
   move_to_pipeline: 'Mover pra outro funil',
   create_task: 'Criar tarefa',
   send_email: 'Enviar e-mail (template)',
+  send_whatsapp: 'Enviar WhatsApp (template)',
   notify_user: 'Notificar alguém',
 }
 
@@ -68,7 +70,10 @@ export function AutomationsManager({
   const isTagTrigger = triggerType === 'tag_added' || triggerType === 'tag_removed'
   const isExpirationTrigger = triggerType === 'days_before_expiration'
   const isTicketTrigger = triggerType === 'ticket_linked'
-  const relevantTemplates = isTicketTrigger ? templates.filter((t) => t.context === 'ticket') : templates.filter((t) => t.context !== 'ticket')
+  const isWhatsAppAction = actionType === 'send_whatsapp'
+  const relevantTemplates = templates
+    .filter((t) => (isTicketTrigger ? t.context === 'ticket' : t.context !== 'ticket'))
+    .filter((t) => (isWhatsAppAction ? t.channel === 'whatsapp' : t.channel !== 'whatsapp'))
 
   function stageLabel(stageId: string | null) {
     if (!stageId) return '—'
@@ -234,10 +239,12 @@ export function AutomationsManager({
               </div>
             )}
 
-            {actionType === 'send_email' && (
+            {(actionType === 'send_email' || actionType === 'send_whatsapp') && (
               <div>
-                <label className="block text-xs text-gray-500">Template de e-mail {isTicketTrigger ? '(de atendimento)' : '(de contrato)'}</label>
-                <select name="email_template_id" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+                <label className="block text-xs text-gray-500">
+                  Template de {isWhatsAppAction ? 'WhatsApp' : 'e-mail'} {isTicketTrigger ? '(de atendimento)' : '(de contrato)'}
+                </label>
+                <select name={isWhatsAppAction ? 'whatsapp_template_id' : 'email_template_id'} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
                   <option value="">Selecione...</option>
                   {relevantTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>

@@ -8,7 +8,7 @@ export default async function AutomationsPage() {
     supabase.from('automation_rules').select('*').order('created_at', { ascending: false }),
     supabase.from('pipelines').select('id, name, type, won_label, lost_label').order('name'),
     supabase.from('stages').select('id, name, pipeline_id').order('order_index'),
-    supabase.from('email_templates').select('id, name, context').order('name'),
+    supabase.from('email_templates').select('id, name, context, channel').order('name'),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('tags').select('id, name, color').order('name'),
   ])
