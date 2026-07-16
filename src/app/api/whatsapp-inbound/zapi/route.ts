@@ -21,64 +21,79 @@ export async function POST(request: Request) {
 
   if (!body) return NextResponse.json({ ok: true })
 
-  if (body.fromMe) return NextResponse.json({ ok: true, skipped: 'fromMe' })
-  if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
+  // Tudo dentro de um try/catch — sem isso, qualquer erro no meio do
+  // caminho derruba a função inteira SEM deixar rastro nenhum (nem no
+  // log de depuração), o que foi exatamente o que aconteceu até agora.
+  try {
+    if (body.fromMe) return NextResponse.json({ ok: true, skipped: 'fromMe' })
+    if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
 
-  const phone: string | undefined = body.phone
-  const messageText: string | undefined = body.text?.message ?? body.body ?? body.message
-  const senderName: string | undefined = body.senderName ?? body.chatName
+    const phone: string | undefined = body.phone
+    const messageText: string | undefined = body.text?.message ?? body.body ?? body.message
+    const senderName: string | undefined = body.senderName ?? body.chatName
 
-  if (!phone || !messageText) {
-    return NextResponse.json({ ok: true, skipped: 'sem telefone ou mensagem' })
+    if (!phone || !messageText) {
+      return NextResponse.json({ ok: true, skipped: 'sem telefone ou mensagem' })
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '')
+    const last8 = cleanPhone.slice(-8)
+    const { data: matchingContacts, error: contactsError } = await supabase.from('contacts').select('id').ilike('phone', `%${last8}%`)
+
+    await supabase.from('webhook_debug_log').insert({
+      source: 'zapi_whatsapp_match',
+      raw_payload: {
+        phone,
+        cleanPhone,
+        last8,
+        matchingContactsCount: matchingContacts?.length ?? 0,
+        matchingContactIds: matchingContacts?.map((c) => c.id) ?? [],
+        contactsError: contactsError?.message ?? null,
+      },
+    })
+
+    if (!matchingContacts || matchingContacts.length === 0) {
+      return NextResponse.json({ ok: true, matched: false })
+    }
+
+    const { data: contract, error: contractError } = await supabase
+      .from('contracts')
+      .select('id')
+      .in('contact_id', matchingContacts.map((c) => c.id))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    await supabase.from('webhook_debug_log').insert({
+      source: 'zapi_whatsapp_contract_lookup',
+      raw_payload: { contractFound: !!contract, contractId: contract?.id ?? null, contractError: contractError?.message ?? null },
+    })
+
+    if (!contract) {
+      return NextResponse.json({ ok: true, matched: false })
+    }
+
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: contract.id,
+      direction: 'recebido',
+      phone,
+      message: messageText,
+      status: 'enviado',
+    })
+
+    await supabase.from('activities').insert({
+      contract_id: contract.id,
+      type: 'whatsapp',
+      content: `WhatsApp recebido de ${senderName ?? phone}.`,
+      metadata: { kind: 'received', phone, message: messageText },
+    })
+
+    return NextResponse.json({ ok: true, matched: true })
+  } catch (e) {
+    await supabase.from('webhook_debug_log').insert({
+      source: 'zapi_whatsapp_error',
+      raw_payload: { error: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : null },
+    })
+    return NextResponse.json({ ok: true, error: 'internal' })
   }
-
-  const cleanPhone = phone.replace(/\D/g, '')
-  const last8 = cleanPhone.slice(-8)
-  const { data: matchingContacts } = await supabase.from('contacts').select('id').ilike('phone', `%${last8}%`)
-
-  // DEPURAÇÃO TEMPORÁRIA: registra o resultado de cada passo do
-  // vínculo, pra sabermos exatamente onde está falhando sem precisar
-  // ficar adivinhando de novo a cada teste.
-  await supabase.from('webhook_debug_log').insert({
-    source: 'zapi_whatsapp_match',
-    raw_payload: { phone, cleanPhone, last8, matchingContactsCount: matchingContacts?.length ?? 0, matchingContactIds: matchingContacts?.map((c) => c.id) ?? [] },
-  })
-
-  if (!matchingContacts || matchingContacts.length === 0) {
-    return NextResponse.json({ ok: true, matched: false })
-  }
-
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('id')
-    .in('contact_id', matchingContacts.map((c) => c.id))
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  await supabase.from('webhook_debug_log').insert({
-    source: 'zapi_whatsapp_contract_lookup',
-    raw_payload: { contractFound: !!contract, contractId: contract?.id ?? null },
-  })
-
-  if (!contract) {
-    return NextResponse.json({ ok: true, matched: false })
-  }
-
-  await supabase.from('contract_whatsapp_messages').insert({
-    contract_id: contract.id,
-    direction: 'recebido',
-    phone,
-    message: messageText,
-    status: 'enviado',
-  })
-
-  await supabase.from('activities').insert({
-    contract_id: contract.id,
-    type: 'whatsapp',
-    content: `WhatsApp recebido de ${senderName ?? phone}.`,
-    metadata: { kind: 'received', phone, message: messageText },
-  })
-
-  return NextResponse.json({ ok: true, matched: true })
 }
