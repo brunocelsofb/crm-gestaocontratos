@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   if (!body) return NextResponse.json({ ok: true })
 
   if (body.fromMe) return NextResponse.json({ ok: true, skipped: 'fromMe' })
+  if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
 
   const phone: string | undefined = body.phone
   const messageText: string | undefined = body.text?.message ?? body.body ?? body.message
