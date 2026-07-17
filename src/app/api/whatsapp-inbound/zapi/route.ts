@@ -52,16 +52,42 @@ export async function POST(request: Request) {
     }
 
     const phone: string | undefined = body.phone
+    const chatLid: string | undefined = body.chatLid
     const media = extractMedia(body)
     const messageText: string | undefined = body.text?.message ?? body.image?.caption ?? body.video?.caption ?? body.body ?? body.message
     const senderName: string | undefined = body.senderName ?? body.chatName
     const senderPhoto: string | undefined = body.photo ?? body.senderPhoto
 
-    if (!phone || (!messageText && !media)) {
-      return NextResponse.json({ ok: true, skipped: 'sem telefone ou conteúdo' })
+    if ((!phone && !chatLid) || (!messageText && !media)) {
+      return NextResponse.json({ ok: true, skipped: 'sem telefone/lid ou conteúdo' })
     }
 
-    const cleanPhone = phone.replace(/\D/g, '')
+    // "phone" às vezes vem como um LID (ex: "123456@lid") em vez do
+    // número de verdade — sobretudo em mensagens respondidas pelo
+    // celular, fora do CRM. Se for o caso, resolve pelo dicionário
+    // aprendido; se ainda não tiver aprendido esse LID, não dá pra
+    // vincular por telefone (mas não perde a mensagem — fica em
+    // "não vinculada" usando o LID mesmo, até aparecer uma mensagem
+    // recebida normal que ensine o dicionário).
+    let effectivePhone = phone
+    const isLid = !phone || phone.includes('@lid') || phone === chatLid
+    if (isLid && chatLid) {
+      const { data: mapped } = await supabase.from('whatsapp_lid_map').select('phone').eq('lid', chatLid).maybeSingle()
+      if (mapped) effectivePhone = mapped.phone
+    }
+
+    // Aprende o dicionário: se essa mensagem trouxe um telefone de
+    // verdade (não-LID) JUNTO com o chatLid, guarda a relação pra
+    // usar depois em mensagens que só tragam o LID.
+    if (phone && !phone.includes('@lid') && phone !== chatLid && chatLid) {
+      await supabase.from('whatsapp_lid_map').upsert({ lid: chatLid, phone, updated_at: new Date().toISOString() })
+    }
+
+    if (!effectivePhone) {
+      return NextResponse.json({ ok: true, skipped: 'LID ainda não mapeado pra um telefone' })
+    }
+
+    const cleanPhone = effectivePhone.replace(/\D/g, '')
     const last8 = cleanPhone.slice(-8)
     const { data: matchingContacts } = await supabase.from('contacts').select('id, company_id').ilike('phone', `%${last8}%`)
 
@@ -103,7 +129,7 @@ export async function POST(request: Request) {
       contract_id: contractId,
       unlinked_sender_name: contractId ? null : (senderName ?? null),
       direction,
-      phone,
+      phone: effectivePhone,
       message: displayMessage,
       status: 'enviado',
       zapi_message_id: messageId ?? null,
@@ -120,8 +146,8 @@ export async function POST(request: Request) {
     await supabase.from('activities').insert({
       contract_id: contractId,
       type: 'whatsapp',
-      content: isFromMe ? `WhatsApp enviado (pelo celular) pra ${phone}.` : `WhatsApp recebido de ${senderName ?? phone}.`,
-      metadata: { kind: isFromMe ? 'sent' : 'received', phone, message: displayMessage },
+      content: isFromMe ? `WhatsApp enviado (pelo celular) pra ${effectivePhone}.` : `WhatsApp recebido de ${senderName ?? effectivePhone}.`,
+      metadata: { kind: isFromMe ? 'sent' : 'received', phone: effectivePhone, message: displayMessage },
     })
 
     // Notifica o dono da conta só quando é o CLIENTE escrevendo — não
@@ -133,7 +159,7 @@ export async function POST(request: Request) {
         await supabase.from('notifications').insert({
           user_id: contract.owner_id,
           contract_id: contractId,
-          message: `Nova mensagem de WhatsApp de ${senderName ?? phone} em "${contract.title}".`,
+          message: `Nova mensagem de WhatsApp de ${senderName ?? effectivePhone} em "${contract.title}".`,
         })
       }
     }

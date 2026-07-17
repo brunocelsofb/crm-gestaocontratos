@@ -1179,3 +1179,15 @@ create index idx_contract_contacts_contact on contract_crm.contract_contacts(con
 
 alter table contract_crm.contract_contacts enable row level security;
 create policy "contract_contacts_all" on contract_crm.contract_contacts for all using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 34. Dicionário LID → telefone real (WhatsApp)
+-- ------------------------------------------------------------
+create table contract_crm.whatsapp_lid_map (
+  lid text primary key,
+  phone text not null,
+  updated_at timestamptz not null default now()
+);
+alter table contract_crm.whatsapp_lid_map enable row level security;
+create policy "whatsapp_lid_map_all" on contract_crm.whatsapp_lid_map for all using (true);
