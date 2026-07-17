@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Recebe eventos de mensagem recebida do Z-API (configurar no painel
-// deles: Webhooks → "Ao receber" → colar essa URL).
+// Recebe eventos do Z-API (configurar no painel deles: Webhooks →
+// "Ao receber" → colar essa URL, e ATIVAR a opção "Notificar as
+// enviadas por mim também" — sem isso, mensagens respondidas direto
+// pelo celular, fora do CRM, nunca aparecem aqui).
 //
-// Vínculo confirmado e testado: bate pelo telefone do REMETENTE contra
+// Vínculo confirmado e testado: bate pelo telefone contra
 // contract_crm.contacts.phone, prioriza o contato exato vinculado ao
 // contrato (contract_contacts), com fallback pra qualquer contato da
 // mesma empresa.
 //
-// NOTA DE INCERTEZA: a extração de MÍDIA (foto/áudio/documento) abaixo
-// segue o formato mais comum documentado pelo Z-API (image.imageUrl,
-// audio.audioUrl, document.documentUrl+fileName), mas nunca vi um
+// NOTA DE INCERTEZA: a extração de MÍDIA (foto/áudio/documento) segue
+// o formato mais comum documentado pelo Z-API, mas nunca vi um
 // payload real desses chegando — só testei mensagem de texto até
-// agora. Pode precisar de ajuste assim que a primeira mídia real
-// chegar (mesmo processo de depuração que já fizemos pro texto).
+// agora.
 type MediaInfo = { url: string; type: 'image' | 'audio' | 'document' | 'video'; filename: string | null }
 
 function extractMedia(body: any): MediaInfo | null {
@@ -32,8 +32,19 @@ export async function POST(request: Request) {
   if (!body) return NextResponse.json({ ok: true })
 
   try {
-    if (body.fromMe) return NextResponse.json({ ok: true, skipped: 'fromMe' })
     if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
+
+    const isFromMe: boolean = body.fromMe === true
+    const messageId: string | undefined = body.messageId
+
+    // Se foi mandada por "mim" (a conta conectada) e a gente já tinha
+    // registrado ela pelo próprio envio do CRM (mesmo messageId), não
+    // duplica — só entra aqui de verdade quando a resposta veio direto
+    // do celular, por fora do CRM.
+    if (isFromMe && messageId) {
+      const { data: existing } = await supabase.from('contract_whatsapp_messages').select('id').eq('zapi_message_id', messageId).maybeSingle()
+      if (existing) return NextResponse.json({ ok: true, skipped: 'já registrada pelo CRM' })
+    }
 
     const phone: string | undefined = body.phone
     const media = extractMedia(body)
@@ -78,20 +89,23 @@ export async function POST(request: Request) {
       }
     }
 
+    const direction = isFromMe ? 'enviado' : 'recebido'
+
     // Sem contrato achado — NÃO descarta a mensagem. Guarda como "não
     // vinculada" (contract_id null), pra aparecer na Central de
     // Atendimento e alguém poder vincular a uma conta depois.
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       unlinked_sender_name: contractId ? null : (senderName ?? null),
-      direction: 'recebido',
+      direction,
       phone,
       message: displayMessage,
       status: 'enviado',
+      zapi_message_id: messageId ?? null,
       media_url: media?.url ?? null,
       media_type: media?.type ?? null,
       media_filename: media?.filename ?? null,
-      sender_photo_url: senderPhoto ?? null,
+      sender_photo_url: isFromMe ? null : (senderPhoto ?? null),
     })
 
     if (!contractId) {
@@ -101,19 +115,22 @@ export async function POST(request: Request) {
     await supabase.from('activities').insert({
       contract_id: contractId,
       type: 'whatsapp',
-      content: `WhatsApp recebido de ${senderName ?? phone}.`,
-      metadata: { kind: 'received', phone, message: displayMessage },
+      content: isFromMe ? `WhatsApp enviado (pelo celular) pra ${phone}.` : `WhatsApp recebido de ${senderName ?? phone}.`,
+      metadata: { kind: isFromMe ? 'sent' : 'received', phone, message: displayMessage },
     })
 
-    // Notifica o dono da conta (se tiver um) de que chegou mensagem
-    // nova — sem isso, a única forma de saber é abrindo o contrato.
-    const { data: contract } = await supabase.from('contracts').select('owner_id, title').eq('id', contractId).maybeSingle()
-    if (contract?.owner_id) {
-      await supabase.from('notifications').insert({
-        user_id: contract.owner_id,
-        contract_id: contractId,
-        message: `Nova mensagem de WhatsApp de ${senderName ?? phone} em "${contract.title}".`,
-      })
+    // Notifica o dono da conta só quando é o CLIENTE escrevendo — não
+    // faz sentido notificar alguém sobre uma mensagem que ele mesmo
+    // acabou de mandar pelo celular.
+    if (!isFromMe) {
+      const { data: contract } = await supabase.from('contracts').select('owner_id, title').eq('id', contractId).maybeSingle()
+      if (contract?.owner_id) {
+        await supabase.from('notifications').insert({
+          user_id: contract.owner_id,
+          contract_id: contractId,
+          message: `Nova mensagem de WhatsApp de ${senderName ?? phone} em "${contract.title}".`,
+        })
+      }
     }
 
     return NextResponse.json({ ok: true, matched: true })
