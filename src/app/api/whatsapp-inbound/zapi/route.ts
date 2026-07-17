@@ -28,16 +28,23 @@ export async function POST(request: Request) {
 
     const cleanPhone = phone.replace(/\D/g, '')
     const last8 = cleanPhone.slice(-8)
-    const { data: matchingContacts } = await supabase.from('contacts').select('id').ilike('phone', `%${last8}%`)
+    const { data: matchingContacts } = await supabase.from('contacts').select('id, company_id').ilike('phone', `%${last8}%`)
 
     if (!matchingContacts || matchingContacts.length === 0) {
       return NextResponse.json({ ok: true, matched: false })
     }
 
+    // Bate tanto pelo contato EXATO selecionado no contrato quanto por
+    // qualquer contrato da MESMA EMPRESA desse contato — uma empresa
+    // pode ter várias pessoas mandando mensagem, não só quem está
+    // marcado como "Contato" principal.
+    const contactIds = matchingContacts.map((c) => c.id)
+    const companyIds = matchingContacts.map((c) => c.company_id).filter((id): id is string => !!id)
+
     const { data: contract } = await supabase
       .from('contracts')
       .select('id')
-      .in('contact_id', matchingContacts.map((c) => c.id))
+      .or(`contact_id.in.(${contactIds.join(',')})${companyIds.length > 0 ? `,company_id.in.(${companyIds.join(',')})` : ''}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
