@@ -7,9 +7,11 @@ import { createLead } from '@/lib/actions/leads'
 export function LeadCaptureForm({
   onSuccess,
   redirectAfter,
+  defaultPhone,
 }: {
   onSuccess?: () => void
   redirectAfter?: (leadId: string) => string
+  defaultPhone?: string
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -57,11 +59,15 @@ export function LeadCaptureForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Telefone</label>
-        <input name="phone" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
+        <input name="phone" defaultValue={defaultPhone} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Empresa</label>
-        <input name="company_name" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
+        <input name="company_name" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">CNPJ</label>
+        <input name="cnpj" required placeholder="00.000.000/0000-00" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none" />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Como você conheceu a ORBIS?</label>

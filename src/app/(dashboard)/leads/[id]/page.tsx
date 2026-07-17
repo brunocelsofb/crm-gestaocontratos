@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { LeadActionsPanel } from '@/components/leads/lead-actions-panel'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { calculateLeadScore } from '@/lib/utils/lead-score'
+import { LeadWhatsAppSection } from '@/components/whatsapp/lead-whatsapp-section'
+import { getWhatsAppMessagesByLead } from '@/lib/actions/whatsapp'
 
 export default async function LeadDetailPage({
   params,
@@ -13,11 +15,12 @@ export default async function LeadDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: lead }, { data: activities }, { data: allProfiles }, isAdmin] = await Promise.all([
+  const [{ data: lead }, { data: activities }, { data: allProfiles }, isAdmin, whatsappMessages] = await Promise.all([
     supabase.from('leads').select('*').eq('id', id).maybeSingle(),
     supabase.from('lead_activities').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name'),
     isCurrentUserAdmin(),
+    getWhatsAppMessagesByLead(id),
   ])
 
   if (!lead) notFound()
@@ -40,7 +43,9 @@ export default async function LeadDetailPage({
 
       <div>
         <h1 className="text-lg font-semibold text-gray-900">{lead.name}</h1>
-        <p className="text-sm text-gray-500">{lead.company_name ?? 'Sem empresa informada'} · Pontuação: <span className="font-semibold">{lead.score}</span></p>
+        <p className="text-sm text-gray-500">
+          {lead.company_name ?? 'Sem empresa informada'}{lead.cnpj ? ` · CNPJ: ${lead.cnpj}` : ''} · Pontuação: <span className="font-semibold">{lead.score}</span>
+        </p>
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -88,6 +93,8 @@ export default async function LeadDetailPage({
           </div>
         )}
       </div>
+
+      <LeadWhatsAppSection phone={lead.phone} leadName={lead.name} messages={whatsappMessages} />
 
       <LeadActionsPanel
         leadId={lead.id}

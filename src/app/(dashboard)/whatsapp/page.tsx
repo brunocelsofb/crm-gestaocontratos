@@ -9,7 +9,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
   const supabase = await createClient()
 
-  const [{ data: recentMessages }, unlinkedConversations] = await Promise.all([
+  const [{ data: recentMessages }, unlinkedConversations, { data: leadMessages }] = await Promise.all([
     supabase
       .from('contract_whatsapp_messages')
       .select('contract_id, message, media_type, direction, created_at')
@@ -17,7 +17,24 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       .order('created_at', { ascending: false })
       .limit(200),
     getUnlinkedWhatsAppConversations(),
+    supabase
+      .from('contract_whatsapp_messages')
+      .select('lead_id, message, media_type, direction, created_at')
+      .not('lead_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(200),
   ])
+
+  const latestByLead = new Map<string, { message: string; media_type: string | null; direction: string; created_at: string }>()
+  for (const m of leadMessages ?? []) {
+    if (!m.lead_id) continue
+    if (!latestByLead.has(m.lead_id)) latestByLead.set(m.lead_id, m)
+  }
+  const leadIds = Array.from(latestByLead.keys())
+  const { data: leadsData } = leadIds.length ? await supabase.from('leads').select('id, name, company_name').in('id', leadIds) : { data: [] }
+  const leadConversations = (leadsData ?? [])
+    .map((l) => ({ ...l, latest: latestByLead.get(l.id)! }))
+    .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
   const latestByContract = new Map<string, { message: string; media_type: string | null; direction: string; created_at: string }>()
   for (const m of recentMessages ?? []) {
@@ -86,6 +103,23 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
                 <p className="font-medium text-gray-900">{c.senderName || c.phone}</p>
                 <p className="truncate text-xs text-gray-500">{c.lastMediaType ? `[${c.lastMediaType}]` : c.lastMessage}</p>
                 <p className="text-[10px] text-gray-400">{new Date(c.lastMessageAt).toLocaleString('pt-BR')}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {leadConversations.length > 0 && (
+          <div className="space-y-1">
+            <p className="px-1 text-xs font-semibold uppercase text-purple-700">🎯 Leads em qualificação ({leadConversations.length})</p>
+            {leadConversations.map((l) => (
+              <Link
+                key={l.id}
+                href={`/leads/${l.id}`}
+                className="block rounded-md border border-transparent bg-purple-50/50 px-3 py-2 text-sm hover:bg-purple-50"
+              >
+                <p className="font-medium text-gray-900">{l.name}{l.company_name ? ` · ${l.company_name}` : ''}</p>
+                <p className="truncate text-xs text-gray-500">{l.latest.media_type ? `[${l.latest.media_type}]` : l.latest.message}</p>
+                <p className="text-[10px] text-gray-400">{new Date(l.latest.created_at).toLocaleString('pt-BR')}</p>
               </Link>
             ))}
           </div>

@@ -31,11 +31,6 @@ export async function POST(request: Request) {
 
   if (!body) return NextResponse.json({ ok: true })
 
-  // DEPURAÇÃO TEMPORÁRIA (de novo): grava todo payload recebido, pra
-  // vermos se "fromMe: true" está mesmo chegando depois de ativar
-  // "Notificar as enviadas por mim também" no Z-API.
-  await supabase.from('webhook_debug_log').insert({ source: 'zapi_whatsapp_v2', raw_payload: body })
-
   try {
     if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
 
@@ -94,6 +89,7 @@ export async function POST(request: Request) {
     const displayMessage = messageText || (media ? `[${media.type}]` : '')
 
     let contractId: string | null = null
+    let leadId: string | null = null
 
     if (matchingContacts && matchingContacts.length > 0) {
       const contactIds = matchingContacts.map((c) => c.id)
@@ -122,12 +118,55 @@ export async function POST(request: Request) {
 
     const direction = isFromMe ? 'enviado' : 'recebido'
 
+    // Sem contrato — verifica se já existe um lead pra esse telefone
+    // (de uma captação anterior, ou já vinculado por essa mesma
+    // triagem).
+    if (!contractId) {
+      const { data: prompt } = await supabase.from('whatsapp_capture_prompts').select('lead_id').ilike('phone', `%${last8}%`).maybeSingle()
+      leadId = prompt?.lead_id ?? null
+
+      // Primeiro contato de verdade desse telefone (nunca mandamos o
+      // link de captação pra ele) — dispara automaticamente. Só
+      // dispara pra mensagem do CLIENTE (não fromMe), senão a gente
+      // mandaria o link pra nós mesmos testando.
+      if (!prompt && !isFromMe) {
+        const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token').eq('id', 'default').maybeSingle()
+        if (zapiSettings?.zapi_instance_id && zapiSettings.zapi_token && zapiSettings.zapi_client_token) {
+          const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(effectivePhone)}`
+          const welcomeMessage = `Olá! Pra te atender melhor, preenche rapidinho seus dados aqui: ${captureUrl}`
+          try {
+            const { sendZApiTextMessage } = await import('@/lib/whatsapp/zapi')
+            const sendResult = await sendZApiTextMessage({
+              instanceId: zapiSettings.zapi_instance_id,
+              token: zapiSettings.zapi_token,
+              clientToken: zapiSettings.zapi_client_token,
+              phone: effectivePhone,
+              message: welcomeMessage,
+            })
+            await supabase.from('contract_whatsapp_messages').insert({
+              contract_id: null,
+              direction: 'enviado',
+              phone: effectivePhone,
+              message: welcomeMessage,
+              triggered_automatically: true,
+              zapi_message_id: sendResult.messageId,
+              status: 'enviado',
+            })
+          } catch (e) {
+            console.error('Falha ao mandar link de captação automático:', e)
+          }
+        }
+        await supabase.from('whatsapp_capture_prompts').insert({ phone: effectivePhone })
+      }
+    }
+
     // Sem contrato achado — NÃO descarta a mensagem. Guarda como "não
     // vinculada" (contract_id null), pra aparecer na Central de
     // Atendimento e alguém poder vincular a uma conta depois.
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
-      unlinked_sender_name: contractId ? null : (senderName ?? null),
+      lead_id: leadId,
+      unlinked_sender_name: contractId || leadId ? null : (senderName ?? null),
       direction,
       phone: effectivePhone,
       message: displayMessage,
@@ -140,7 +179,7 @@ export async function POST(request: Request) {
     })
 
     if (!contractId) {
-      return NextResponse.json({ ok: true, matched: false, storedUnlinked: true })
+      return NextResponse.json({ ok: true, matched: !!leadId, storedUnlinked: !leadId })
     }
 
     await supabase.from('activities').insert({

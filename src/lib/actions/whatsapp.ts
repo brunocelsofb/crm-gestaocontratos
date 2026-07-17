@@ -278,6 +278,7 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
     .from('contract_whatsapp_messages')
     .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at')
     .is('contract_id', null)
+    .is('lead_id', null)
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -417,4 +418,61 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
 
   revalidatePath('/whatsapp')
   return {}
+}
+
+// ------------------------------------------------------------
+// Lembrete pra quem recebeu o link de Captação e não preencheu ainda
+// — chamado pelo cron diário. Manda só UMA vez, 24h depois do
+// primeiro contato, pra não ser inconveniente.
+// ------------------------------------------------------------
+export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked: number; sent: number }> {
+  const supabase = createAdminClient()
+
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: pending } = await supabase
+    .from('whatsapp_capture_prompts')
+    .select('phone')
+    .is('lead_id', null)
+    .is('reminder_sent_at', null)
+    .lt('sent_at', oneDayAgo)
+
+  if (!pending || pending.length === 0) return { checked: 0, sent: 0 }
+
+  const creds = await getZApiCredentials()
+  if (!creds) return { checked: pending.length, sent: 0 }
+
+  let sent = 0
+  for (const p of pending) {
+    const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(p.phone)}`
+    const reminderMessage = `Oi, tudo bem? Só passando pra lembrar de preencher seus dados aqui, assim conseguimos te atender: ${captureUrl}`
+    try {
+      const result = await sendZApiTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
+      await supabase.from('contract_whatsapp_messages').insert({
+        contract_id: null,
+        direction: 'enviado',
+        phone: p.phone,
+        message: reminderMessage,
+        triggered_automatically: true,
+        zapi_message_id: result.messageId,
+        status: 'enviado',
+      })
+      await supabase.from('whatsapp_capture_prompts').update({ reminder_sent_at: new Date().toISOString() }).eq('phone', p.phone)
+      sent++
+    } catch (e) {
+      console.error(`Falha ao mandar lembrete de captação pra ${p.phone}:`, e)
+    }
+  }
+
+  return { checked: pending.length, sent }
+}
+
+export async function getWhatsAppMessagesByLead(leadId: string) {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('contract_whatsapp_messages')
+    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+  return data ?? []
 }

@@ -871,6 +871,7 @@ create table contract_crm.leads (
   email text,
   phone text,
   company_name text,
+  cnpj text,
   message text,
   source text default 'manual',
   status text not null default 'novo' check (status in ('novo', 'em_qualificacao', 'qualificado', 'descartado', 'convertido')),
@@ -1132,6 +1133,7 @@ create policy "ccfv_all" on contract_crm.contract_custom_field_values for all us
 create table contract_crm.contract_whatsapp_messages (
   id uuid primary key default gen_random_uuid(),
   contract_id uuid references contract_crm.contracts(id) on delete cascade,
+  lead_id uuid references contract_crm.leads(id) on delete set null,
   unlinked_sender_name text,
   sent_by uuid references contract_crm.profiles(id),
   direction text not null check (direction in ('enviado', 'recebido')),
@@ -1191,3 +1193,17 @@ create table contract_crm.whatsapp_lid_map (
 );
 alter table contract_crm.whatsapp_lid_map enable row level security;
 create policy "whatsapp_lid_map_all" on contract_crm.whatsapp_lid_map for all using (true);
+
+
+-- ------------------------------------------------------------
+-- 35. Rastreamento de convite pra Captação via WhatsApp
+-- ------------------------------------------------------------
+create table contract_crm.whatsapp_capture_prompts (
+  phone text primary key,
+  sent_at timestamptz not null default now(),
+  reminder_sent_at timestamptz,
+  lead_id uuid references contract_crm.leads(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+alter table contract_crm.whatsapp_capture_prompts enable row level security;
+create policy "whatsapp_capture_prompts_all" on contract_crm.whatsapp_capture_prompts for all using (true);

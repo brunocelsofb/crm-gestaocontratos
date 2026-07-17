@@ -17,20 +17,33 @@ export async function createLead(formData: FormData): Promise<ActionState & { le
   const email = (formData.get('email') as string)?.trim() || null
   const phone = (formData.get('phone') as string)?.trim() || null
   const company_name = (formData.get('company_name') as string)?.trim() || null
+  const cnpj = (formData.get('cnpj') as string)?.trim() || null
   const message = (formData.get('message') as string)?.trim() || null
   const source = (formData.get('source') as string) || 'manual'
 
   if (!name) return { error: 'Nome é obrigatório.' }
+  if (!company_name) return { error: 'Empresa é obrigatória.' }
+  if (!cnpj) return { error: 'CNPJ é obrigatório.' }
 
   const { score } = calculateLeadScore({ email, phone, company_name, message, source })
 
   const { data, error } = await supabase
     .from('leads')
-    .insert({ name, email, phone, company_name, message, source, score })
+    .insert({ name, email, phone, company_name, cnpj, message, source, score })
     .select('id')
     .single()
 
   if (error) return { error: error.message }
+
+  // Se essa pessoa tinha mandado mensagem de WhatsApp antes de
+  // preencher o formulário (fluxo de triagem), vincula a conversa a
+  // esse lead agora — fecha o ciclo, o histórico não fica solto.
+  if (phone) {
+    const adminClient = createAdminClient()
+    const cleanPhone = phone.replace(/\D/g, '')
+    await adminClient.from('contract_whatsapp_messages').update({ lead_id: data.id, unlinked_sender_name: null }).ilike('phone', `%${cleanPhone.slice(-8)}%`).is('contract_id', null)
+    await adminClient.from('whatsapp_capture_prompts').update({ lead_id: data.id }).ilike('phone', `%${cleanPhone.slice(-8)}%`)
+  }
 
   // Avisa o time comercial de um lead novo — mesmo padrão de
   // notificação já usado no resto do sistema.
@@ -174,6 +187,10 @@ export async function convertLeadToOpportunity(leadId: string): Promise<ActionSt
   }
 
   await supabase.from('leads').update({ status: 'convertido', converted_contract_id: contract.id, updated_at: now }).eq('id', leadId)
+
+  // Migra o histórico de WhatsApp do lead pro contrato novo — a
+  // conversa não pode ficar pra trás só porque virou oportunidade.
+  await supabase.from('contract_whatsapp_messages').update({ contract_id: contract.id, lead_id: null }).eq('lead_id', leadId)
 
   await supabase.from('lead_activities').insert({
     lead_id: leadId,
