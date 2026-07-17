@@ -1131,7 +1131,8 @@ create policy "ccfv_all" on contract_crm.contract_custom_field_values for all us
 -- ------------------------------------------------------------
 create table contract_crm.contract_whatsapp_messages (
   id uuid primary key default gen_random_uuid(),
-  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  contract_id uuid references contract_crm.contracts(id) on delete cascade,
+  unlinked_sender_name text,
   sent_by uuid references contract_crm.profiles(id),
   direction text not null check (direction in ('enviado', 'recebido')),
   phone text not null,

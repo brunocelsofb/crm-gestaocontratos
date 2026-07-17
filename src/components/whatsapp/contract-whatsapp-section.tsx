@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { sendContractWhatsApp, buildWhatsAppFromTemplate, sendContractWhatsAppMedia } from '@/lib/actions/whatsapp'
+import { sendContractWhatsApp, buildWhatsAppFromTemplate, sendContractWhatsAppMedia, resolveContactNameByPhone, saveWhatsAppConversationAsNote } from '@/lib/actions/whatsapp'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 import { createClient } from '@/lib/supabase/client'
 import { sanitizeStorageFileName } from '@/lib/utils/storage'
@@ -29,23 +29,33 @@ export function ContractWhatsAppSection({
   isConnected,
   templates,
   defaultPhone,
-  contactName,
   messageLog,
 }: {
   contractId: string
   isConnected: boolean
   templates: Template[]
   defaultPhone: string | null
-  contactName?: string | null
   messageLog: WhatsAppLog[]
 }) {
   const router = useRouter()
-  const [phone, setPhone] = useState(defaultPhone ?? '')
+  // O telefone "da conversa" (pra saber quem é a pessoa de verdade no
+  // cabeçalho) é o da mensagem mais recente já trocada — não o
+  // contato principal do contrato, que pode ser outra pessoa.
+  const conversationPhone = messageLog[0]?.phone ?? defaultPhone ?? ''
+  const [phone, setPhone] = useState(defaultPhone ?? conversationPhone)
   const [message, setMessage] = useState('')
   const [templateId, setTemplateId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [resolvedName, setResolvedName] = useState<string | null>(null)
+  const [showNoteBox, setShowNoteBox] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [noteSaved, setNoteSaved] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (conversationPhone) resolveContactNameByPhone(conversationPhone).then(setResolvedName)
+  }, [conversationPhone])
 
   async function handleTemplateChange(id: string) {
     setTemplateId(id)
@@ -102,6 +112,24 @@ export function ContractWhatsAppSection({
     }
   }
 
+  function buildConversationSummary(): string {
+    const chronological = [...messageLog].reverse()
+    return chronological
+      .map((m) => `${m.direction === 'enviado' ? 'Nós' : resolvedName ?? phone}: ${m.message}`)
+      .join('\n')
+  }
+
+  async function handleSaveNote() {
+    setBusy(true)
+    const text = noteText.trim() || buildConversationSummary()
+    await saveWhatsAppConversationAsNote(contractId, `[Conversa de WhatsApp salva]\n\n${text}`)
+    setBusy(false)
+    setNoteSaved(true)
+    setShowNoteBox(false)
+    setNoteText('')
+    router.refresh()
+  }
+
   if (!isConnected) {
     return (
       <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
@@ -113,7 +141,27 @@ export function ContractWhatsAppSection({
 
   return (
     <div className="space-y-4">
-      <WhatsAppChatView messages={messageLog} contactName={contactName} contactPhone={phone} />
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">{messageLog.length} mensage{messageLog.length === 1 ? 'm' : 'ns'} nessa conversa</p>
+        <div>
+          <button onClick={() => setShowNoteBox((v) => !v)} className="text-xs text-brand-700 hover:underline">
+            📝 Salvar conversa como nota
+          </button>
+          {noteSaved && <span className="ml-2 text-xs text-positive-700">Salvo no histórico!</span>}
+        </div>
+      </div>
+
+      {showNoteBox && (
+        <div className="space-y-2 rounded-lg border border-brand-200 bg-brand-50 p-3">
+          <p className="text-xs text-gray-600">Deixa em branco pra salvar a conversa inteira, ou escreve um resumo:</p>
+          <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} placeholder="Ex: Cliente confirmou interesse, aguardando aprovação do jurídico." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <button onClick={handleSaveNote} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+            {busy ? 'Salvando...' : 'Salvar nota'}
+          </button>
+        </div>
+      )}
+
+      <WhatsAppChatView messages={messageLog} contactName={resolvedName ?? 'Sem contato cadastrado'} contactPhone={conversationPhone} />
 
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-sm font-medium text-gray-900">Enviar WhatsApp</p>

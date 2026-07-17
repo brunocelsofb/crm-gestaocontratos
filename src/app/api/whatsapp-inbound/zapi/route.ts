@@ -49,41 +49,41 @@ export async function POST(request: Request) {
     const last8 = cleanPhone.slice(-8)
     const { data: matchingContacts } = await supabase.from('contacts').select('id, company_id').ilike('phone', `%${last8}%`)
 
-    if (!matchingContacts || matchingContacts.length === 0) {
-      return NextResponse.json({ ok: true, matched: false })
-    }
-
-    const contactIds = matchingContacts.map((c) => c.id)
-    const companyIds = matchingContacts.map((c) => c.company_id).filter((id): id is string => !!id)
-
-    const { data: exactLink } = await supabase
-      .from('contract_contacts')
-      .select('contract_id')
-      .in('contact_id', contactIds)
-      .limit(1)
-      .maybeSingle()
-
-    let contractId: string | null = exactLink?.contract_id ?? null
-
-    if (!contractId && companyIds.length > 0) {
-      const { data: companyMatch } = await supabase
-        .from('contracts')
-        .select('id')
-        .in('company_id', companyIds)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      contractId = companyMatch?.id ?? null
-    }
-
-    if (!contractId) {
-      return NextResponse.json({ ok: true, matched: false })
-    }
-
     const displayMessage = messageText || (media ? `[${media.type}]` : '')
 
+    let contractId: string | null = null
+
+    if (matchingContacts && matchingContacts.length > 0) {
+      const contactIds = matchingContacts.map((c) => c.id)
+      const companyIds = matchingContacts.map((c) => c.company_id).filter((id): id is string => !!id)
+
+      const { data: exactLink } = await supabase
+        .from('contract_contacts')
+        .select('contract_id')
+        .in('contact_id', contactIds)
+        .limit(1)
+        .maybeSingle()
+
+      contractId = exactLink?.contract_id ?? null
+
+      if (!contractId && companyIds.length > 0) {
+        const { data: companyMatch } = await supabase
+          .from('contracts')
+          .select('id')
+          .in('company_id', companyIds)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        contractId = companyMatch?.id ?? null
+      }
+    }
+
+    // Sem contrato achado — NÃO descarta a mensagem. Guarda como "não
+    // vinculada" (contract_id null), pra aparecer na Central de
+    // Atendimento e alguém poder vincular a uma conta depois.
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
+      unlinked_sender_name: contractId ? null : (senderName ?? null),
       direction: 'recebido',
       phone,
       message: displayMessage,
@@ -93,6 +93,10 @@ export async function POST(request: Request) {
       media_filename: media?.filename ?? null,
       sender_photo_url: senderPhoto ?? null,
     })
+
+    if (!contractId) {
+      return NextResponse.json({ ok: true, matched: false, storedUnlinked: true })
+    }
 
     await supabase.from('activities').insert({
       contract_id: contractId,

@@ -1,19 +1,26 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
+import { UnlinkedWhatsAppConversation } from '@/components/whatsapp/unlinked-whatsapp-conversation'
+import { getUnlinkedWhatsAppConversations, getUnlinkedMessagesByPhone, searchContractsForLinking } from '@/lib/actions/whatsapp'
 
-export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string }> }) {
-  const { contract: selectedContractId } = await searchParams
+export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
+  const { contract: selectedContractId, phone: selectedPhone } = await searchParams
   const supabase = await createClient()
 
-  const { data: recentMessages } = await supabase
-    .from('contract_whatsapp_messages')
-    .select('contract_id, message, media_type, direction, created_at')
-    .order('created_at', { ascending: false })
-    .limit(200)
+  const [{ data: recentMessages }, unlinkedConversations] = await Promise.all([
+    supabase
+      .from('contract_whatsapp_messages')
+      .select('contract_id, message, media_type, direction, created_at')
+      .not('contract_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    getUnlinkedWhatsAppConversations(),
+  ])
 
   const latestByContract = new Map<string, { message: string; media_type: string | null; direction: string; created_at: string }>()
   for (const m of recentMessages ?? []) {
+    if (!m.contract_id) continue
     if (!latestByContract.has(m.contract_id)) latestByContract.set(m.contract_id, m)
   }
 
@@ -42,7 +49,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     ])
 
     const { data: contactPhone } = selectedContract?.contact_id
-      ? await supabase.from('contacts').select('name, phone').eq('id', selectedContract.contact_id).maybeSingle()
+      ? await supabase.from('contacts').select('phone').eq('id', selectedContract.contact_id).maybeSingle()
       : { data: null }
 
     selectedData = {
@@ -50,33 +57,67 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       templates: whatsappTemplates ?? [],
       messages: whatsappMessages ?? [],
       defaultPhone: contactPhone?.phone ?? null,
-      contactName: contactPhone?.name ?? null,
     }
+  }
+
+  let selectedUnlinked = null
+  if (selectedPhone) {
+    const messages = await getUnlinkedMessagesByPhone(selectedPhone)
+    const conv = unlinkedConversations.find((c) => c.phone === selectedPhone)
+    selectedUnlinked = { phone: selectedPhone, senderName: conv?.senderName ?? null, messages }
   }
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
-      <div className="w-72 shrink-0 space-y-1 overflow-y-auto">
-        <h1 className="mb-2 px-1 text-lg font-semibold text-gray-900">Central de Atendimento</h1>
-        {conversations.map((c) => (
-          <Link
-            key={c.id}
-            href={`/whatsapp?contract=${c.id}`}
-            className={`block rounded-md px-3 py-2 text-sm hover:bg-gray-100 ${selectedContractId === c.id ? 'border border-brand-200 bg-brand-50' : 'border border-transparent'}`}
-          >
-            <p className="font-medium text-gray-900">{c.client_name || c.title}</p>
-            <p className="truncate text-xs text-gray-500">
-              {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
-              {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
-            </p>
-            <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
-          </Link>
-        ))}
-        {conversations.length === 0 && <p className="px-1 text-sm text-gray-400">Nenhuma conversa ainda.</p>}
+      <div className="w-72 shrink-0 space-y-3 overflow-y-auto">
+        <h1 className="px-1 text-lg font-semibold text-gray-900">Central de Atendimento</h1>
+
+        {unlinkedConversations.length > 0 && (
+          <div className="space-y-1">
+            <p className="px-1 text-xs font-semibold uppercase text-yellow-700">⚠️ Não vinculadas ({unlinkedConversations.length})</p>
+            {unlinkedConversations.map((c) => (
+              <Link
+                key={c.phone}
+                href={`/whatsapp?phone=${encodeURIComponent(c.phone)}`}
+                className={`block rounded-md border px-3 py-2 text-sm hover:bg-yellow-50 ${selectedPhone === c.phone ? 'border-yellow-400 bg-yellow-50' : 'border-transparent bg-yellow-50/50'}`}
+              >
+                <p className="font-medium text-gray-900">{c.senderName || c.phone}</p>
+                <p className="truncate text-xs text-gray-500">{c.lastMediaType ? `[${c.lastMediaType}]` : c.lastMessage}</p>
+                <p className="text-[10px] text-gray-400">{new Date(c.lastMessageAt).toLocaleString('pt-BR')}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          {unlinkedConversations.length > 0 && <p className="px-1 text-xs font-semibold uppercase text-gray-400">Contas</p>}
+          {conversations.map((c) => (
+            <Link
+              key={c.id}
+              href={`/whatsapp?contract=${c.id}`}
+              className={`block rounded-md px-3 py-2 text-sm hover:bg-gray-100 ${selectedContractId === c.id ? 'border border-brand-200 bg-brand-50' : 'border border-transparent'}`}
+            >
+              <p className="font-medium text-gray-900">{c.client_name || c.title}</p>
+              <p className="truncate text-xs text-gray-500">
+                {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
+                {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
+              </p>
+              <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
+            </Link>
+          ))}
+          {conversations.length === 0 && <p className="px-1 text-sm text-gray-400">Nenhuma conta com conversa ainda.</p>}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {selectedData?.contract ? (
+        {selectedUnlinked ? (
+          <UnlinkedWhatsAppConversation
+            phone={selectedUnlinked.phone}
+            senderName={selectedUnlinked.senderName}
+            messages={selectedUnlinked.messages}
+            searchContracts={searchContractsForLinking}
+          />
+        ) : selectedData?.contract ? (
           <div className="space-y-2">
             <div>
               <Link href={`/contracts/${selectedData.contract.id}`} className="text-sm font-medium text-brand-700 hover:underline">
@@ -88,7 +129,6 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               isConnected={isConnected}
               templates={selectedData.templates}
               defaultPhone={selectedData.defaultPhone}
-              contactName={selectedData.contactName}
               messageLog={selectedData.messages}
             />
           </div>

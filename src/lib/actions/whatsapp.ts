@@ -257,3 +257,121 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
     })
   }
 }
+
+// ------------------------------------------------------------
+// Conversas SEM conta vinculada — número escreveu, ninguém no CRM
+// reconhece esse telefone ainda. Fica visível na Central de
+// Atendimento até alguém vincular a uma conta.
+// ------------------------------------------------------------
+export type UnlinkedConversation = {
+  phone: string
+  senderName: string | null
+  senderPhoto: string | null
+  lastMessage: string
+  lastMediaType: string | null
+  lastMessageAt: string
+}
+
+export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConversation[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('contract_whatsapp_messages')
+    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at')
+    .is('contract_id', null)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  const byPhone = new Map<string, UnlinkedConversation>()
+  for (const m of data ?? []) {
+    if (byPhone.has(m.phone)) continue
+    byPhone.set(m.phone, {
+      phone: m.phone,
+      senderName: m.unlinked_sender_name,
+      senderPhoto: m.sender_photo_url,
+      lastMessage: m.message,
+      lastMediaType: m.media_type,
+      lastMessageAt: m.created_at,
+    })
+  }
+  return Array.from(byPhone.values())
+}
+
+export async function getUnlinkedMessagesByPhone(phone: string) {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('contract_whatsapp_messages')
+    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status')
+    .eq('phone', phone)
+    .is('contract_id', null)
+    .order('created_at', { ascending: false })
+  return data ?? []
+}
+
+// Vincula TODO o histórico de um telefone a um contrato de uma vez —
+// de agora em diante, novas mensagens desse número já entram direto
+// vinculadas (porque o contato/telefone passa a ser reconhecido).
+export async function linkUnlinkedWhatsAppConversation(phone: string, contractId: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('contract_whatsapp_messages')
+    .update({ contract_id: contractId, unlinked_sender_name: null })
+    .eq('phone', phone)
+    .is('contract_id', null)
+
+  if (error) return { error: error.message }
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    type: 'system',
+    content: `Conversa de WhatsApp (${phone}) vinculada a esta conta.`,
+  })
+
+  revalidatePath('/whatsapp')
+  revalidatePath(`/contracts/${contractId}`)
+  return {}
+}
+
+// "Salvar como nota" — pega a conversa (ou um resumo dela) e registra
+// como nota no histórico da conta, igual o recurso do PipeRun.
+export async function saveWhatsAppConversationAsNote(contractId: string, noteText: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+
+  const { error } = await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'note',
+    content: noteText,
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath(`/contracts/${contractId}`)
+  return {}
+}
+
+// Resolve o NOME de quem está de verdade na conversa, pelo telefone —
+// em vez de assumir que é o contato principal do contrato (que pode
+// ser outra pessoa da mesma empresa).
+export async function resolveContactNameByPhone(phone: string): Promise<string | null> {
+  const supabase = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+  const last8 = cleanPhone.slice(-8)
+  const { data } = await supabase.from('contacts').select('name').ilike('phone', `%${last8}%`).limit(1).maybeSingle()
+  return data?.name ?? null
+}
+
+// Busca contratos pelo nome do cliente/empresa — usado no picker de
+// "vincular conversa não reconhecida a uma conta".
+export async function searchContractsForLinking(query: string): Promise<{ id: string; label: string }[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('contracts')
+    .select('id, title, client_name')
+    .ilike('client_name', `%${query}%`)
+    .limit(8)
+
+  return (data ?? []).map((c) => ({ id: c.id, label: c.client_name || c.title }))
+}
