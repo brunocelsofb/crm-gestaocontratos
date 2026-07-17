@@ -130,10 +130,11 @@ export async function POST(request: Request) {
       // dispara pra mensagem do CLIENTE (não fromMe), senão a gente
       // mandaria o link pra nós mesmos testando.
       if (!prompt && !isFromMe) {
-        const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token').eq('id', 'default').maybeSingle()
+        const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token, company_name').eq('id', 'default').maybeSingle()
         if (zapiSettings?.zapi_instance_id && zapiSettings.zapi_token && zapiSettings.zapi_client_token) {
+          const companyName = zapiSettings.company_name || 'nossa empresa'
           const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(effectivePhone)}`
-          const welcomeMessage = `Olá! Pra te atender melhor, preenche rapidinho seus dados aqui: ${captureUrl}`
+          const welcomeMessage = `Olá! Aqui é da *${companyName}*. 👋\n\nPra te atendermos direito, precisamos de alguns dados seus — leva menos de 1 minuto:\n${captureUrl}\n\n(Se o link não abrir direto, salva nosso número nos seus contatos e copia o link pra abrir no navegador.)\n\nAssim que preencher, nosso time entra em contato.`
           try {
             const { sendZApiTextMessage } = await import('@/lib/whatsapp/zapi')
             const sendResult = await sendZApiTextMessage({

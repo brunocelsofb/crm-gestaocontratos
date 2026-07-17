@@ -442,10 +442,14 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
   const creds = await getZApiCredentials()
   if (!creds) return { checked: pending.length, sent: 0 }
 
+  const supabaseAdmin = supabase
+  const { data: settings } = await supabaseAdmin.from('organization_settings').select('company_name').eq('id', 'default').maybeSingle()
+  const companyName = settings?.company_name || 'nossa empresa'
+
   let sent = 0
   for (const p of pending) {
     const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(p.phone)}`
-    const reminderMessage = `Oi, tudo bem? Só passando pra lembrar de preencher seus dados aqui, assim conseguimos te atender: ${captureUrl}`
+    const reminderMessage = `Olá, aqui é da *${companyName}* de novo. 👋\n\nAinda não recebemos seus dados — pra te atendermos, preenche por aqui:\n${captureUrl}\n\n(Se o link não abrir direto, copia e cola no navegador.)`
     try {
       const result = await sendZApiTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
       await supabase.from('contract_whatsapp_messages').insert({
