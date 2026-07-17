@@ -1219,3 +1219,15 @@ create table contract_crm.whatsapp_opt_outs (
 );
 alter table contract_crm.whatsapp_opt_outs enable row level security;
 create policy "whatsapp_opt_outs_all" on contract_crm.whatsapp_opt_outs for all using (true);
+
+
+-- ------------------------------------------------------------
+-- 37. Atribuição de conversa de WhatsApp a um atendente
+-- ------------------------------------------------------------
+create table contract_crm.whatsapp_conversation_assignments (
+  phone text primary key,
+  assigned_to uuid not null references contract_crm.profiles(id) on delete cascade,
+  assigned_at timestamptz not null default now()
+);
+alter table contract_crm.whatsapp_conversation_assignments enable row level security;
+create policy "whatsapp_conversation_assignments_all" on contract_crm.whatsapp_conversation_assignments for all using (auth.role() = 'authenticated');

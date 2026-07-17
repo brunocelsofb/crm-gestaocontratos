@@ -19,6 +19,9 @@ export function WhatsAppInboxRealtimeWatcher() {
       .on('postgres_changes', { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages' }, () => {
         router.refresh()
       })
+      .on('postgres_changes', { event: '*', schema: 'contract_crm', table: 'whatsapp_conversation_assignments' }, () => {
+        router.refresh()
+      })
       .subscribe()
 
     return () => {

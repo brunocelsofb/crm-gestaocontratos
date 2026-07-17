@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage } from '@/lib/actions/whatsapp'
+import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation } from '@/lib/actions/whatsapp'
 import { convertLeadToOpportunity } from '@/lib/actions/leads'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 
@@ -31,12 +31,18 @@ export function WhatsAppConversationPanel({
   leadId,
   messages,
   searchContracts,
+  currentUserId,
+  users,
+  assignment,
 }: {
   phone: string
   displayName: string | null
   leadId: string | null
   messages: Message[]
   searchContracts: (query: string) => Promise<ContractOption[]>
+  currentUserId: string
+  users: { id: string; full_name: string }[]
+  assignment: { assigned_to: string; assigned_to_name: string } | null
 }) {
   const router = useRouter()
   const [showLinkSearch, setShowLinkSearch] = useState(false)
@@ -45,6 +51,29 @@ export function WhatsAppConversationPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
+  const [showAssignPicker, setShowAssignPicker] = useState(false)
+
+  async function handleClaim() {
+    setBusy(true)
+    await assignWhatsAppConversation(phone, currentUserId)
+    setBusy(false)
+    router.refresh()
+  }
+
+  async function handleAssignTo(userId: string) {
+    setBusy(true)
+    await assignWhatsAppConversation(phone, userId)
+    setBusy(false)
+    setShowAssignPicker(false)
+    router.refresh()
+  }
+
+  async function handleUnassign() {
+    setBusy(true)
+    await unassignWhatsAppConversation(phone)
+    setBusy(false)
+    router.refresh()
+  }
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -89,6 +118,42 @@ export function WhatsAppConversationPanel({
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white p-2.5">
+        {assignment ? (
+          <>
+            <span className="text-xs text-gray-600">
+              👤 Atendendo: <strong>{assignment.assigned_to === currentUserId ? 'Você' : assignment.assigned_to_name}</strong>
+            </span>
+            {assignment.assigned_to === currentUserId && (
+              <button onClick={handleUnassign} disabled={busy} className="text-xs text-gray-500 hover:underline disabled:opacity-50">
+                Liberar conversa
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="text-xs text-gray-400">Ninguém está atendendo ainda</span>
+            <div className="relative flex gap-2">
+              <button onClick={handleClaim} disabled={busy} className="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+                Assumir conversa
+              </button>
+              <button onClick={() => setShowAssignPicker((v) => !v)} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                Atribuir a...
+              </button>
+              {showAssignPicker && (
+                <div className="absolute right-0 top-8 z-10 w-48 rounded-md border border-gray-200 bg-white shadow-md">
+                  {users.map((u) => (
+                    <button key={u.id} onClick={() => handleAssignTo(u.id)} className="block w-full px-3 py-2 text-left text-xs hover:bg-gray-50">
+                      {u.full_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>

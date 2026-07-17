@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { WhatsAppConversationPanel } from '@/components/whatsapp/whatsapp-conversation-panel'
-import { getConversationByPhone, searchContractsForLinking } from '@/lib/actions/whatsapp'
+import { getConversationByPhone, searchContractsForLinking, getWhatsAppAssignments } from '@/lib/actions/whatsapp'
 import { WhatsAppInboxRealtimeWatcher } from '@/components/whatsapp/whatsapp-inbox-realtime-watcher'
 
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
@@ -35,6 +35,12 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       lead: m.lead_id ? leadById.get(m.lead_id) : null,
     }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
+
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
+  const { data: teamUsers } = await supabase.from('profiles').select('id, full_name').order('full_name')
+  const assignments = await getWhatsAppAssignments(openConversations.map((c) => c.phone))
 
   // Conversas JÁ vinculadas a um contrato.
   const { data: recentMessages } = await supabase
@@ -134,7 +140,14 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
                     {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
                     {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
                   </p>
-                  <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
+                  <div className="mt-0.5 flex items-center justify-between">
+                    <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
+                    {assignments[c.phone] && (
+                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600">
+                        👤 {assignments[c.phone].assigned_to === currentUser?.id ? 'Você' : assignments[c.phone].assigned_to_name}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               ))}
             </div>
@@ -168,6 +181,9 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               leadId={selectedOpenData.leadId}
               messages={selectedOpenData.messages}
               searchContracts={searchContractsForLinking}
+              currentUserId={currentUser?.id ?? ''}
+              users={teamUsers ?? []}
+              assignment={assignments[selectedPhone!] ?? null}
             />
           ) : selectedContractData?.contract ? (
             <div className="space-y-2">

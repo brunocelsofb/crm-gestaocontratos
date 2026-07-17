@@ -515,3 +515,39 @@ export async function getConversationByPhone(phone: string): Promise<{
 
   return { messages: data ?? [], leadId, displayName }
 }
+
+// ------------------------------------------------------------
+// Atribuição de conversa (sem contrato ainda) a um atendente — evita
+// dois respondendo a mesma pessoa ao mesmo tempo.
+// ------------------------------------------------------------
+export type ConversationAssignment = { assigned_to: string; assigned_to_name: string; assigned_at: string }
+
+export async function getWhatsAppAssignments(phones: string[]): Promise<Record<string, ConversationAssignment>> {
+  if (phones.length === 0) return {}
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('whatsapp_conversation_assignments')
+    .select('phone, assigned_to, assigned_at, profiles(full_name)')
+    .in('phone', phones)
+
+  const result: Record<string, ConversationAssignment> = {}
+  for (const row of data ?? []) {
+    result[row.phone] = { assigned_to: row.assigned_to, assigned_to_name: (row as any).profiles?.full_name ?? 'Alguém', assigned_at: row.assigned_at }
+  }
+  return result
+}
+
+export async function assignWhatsAppConversation(phone: string, userId: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('whatsapp_conversation_assignments').upsert({ phone, assigned_to: userId, assigned_at: new Date().toISOString() })
+  if (error) return { error: error.message }
+  revalidatePath('/whatsapp')
+  return {}
+}
+
+export async function unassignWhatsAppConversation(phone: string): Promise<ActionState> {
+  const supabase = await createClient()
+  await supabase.from('whatsapp_conversation_assignments').delete().eq('phone', phone)
+  revalidatePath('/whatsapp')
+  return {}
+}
