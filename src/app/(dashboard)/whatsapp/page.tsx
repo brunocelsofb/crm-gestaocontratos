@@ -46,20 +46,38 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   // Conversas JÁ vinculadas a um contrato.
   const { data: recentMessages } = await supabase
     .from('contract_whatsapp_messages')
-    .select('contract_id, message, media_type, direction, created_at')
+    .select('contract_id, phone, message, media_type, direction, created_at')
     .not('contract_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(200)
 
-  const latestByContract = new Map<string, { message: string; media_type: string | null; direction: string; created_at: string }>()
+  const latestByContract = new Map<string, { phone: string; message: string; media_type: string | null; direction: string; created_at: string }>()
   for (const m of recentMessages ?? []) {
     if (!m.contract_id) continue
     if (!latestByContract.has(m.contract_id)) latestByContract.set(m.contract_id, m)
   }
   const contractIds = Array.from(latestByContract.keys())
   const { data: contracts } = contractIds.length ? await supabase.from('contracts').select('id, title, client_name').in('id', contractIds) : { data: [] }
+
+  // O nome que aparece é sempre o do CONTATO (pessoa) que está na
+  // conversa de verdade — nunca o nome da empresa/conta, mesmo que a
+  // conversa esteja vinculada a um contrato.
+  const conversationPhones = Array.from(latestByContract.values()).map((m) => m.phone)
+  const contactNameByPhone = new Map<string, string>()
+  if (conversationPhones.length > 0) {
+    const { data: allContacts } = await supabase.from('contacts').select('name, phone').not('phone', 'is', null)
+    for (const phone of conversationPhones) {
+      const last8 = phone.replace(/\D/g, '').slice(-8)
+      const match = (allContacts ?? []).find((c) => c.phone && c.phone.replace(/\D/g, '').includes(last8))
+      if (match) contactNameByPhone.set(phone, match.name)
+    }
+  }
+
   const contractConversations = (contracts ?? [])
-    .map((c) => ({ ...c, latest: latestByContract.get(c.id)! }))
+    .map((c) => {
+      const latest = latestByContract.get(c.id)!
+      return { ...c, latest, contactName: contactNameByPhone.get(latest.phone) ?? null }
+    })
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
   const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle()
@@ -166,7 +184,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
                 href={`/whatsapp?contract=${c.id}`}
                 className={`block rounded-md px-3 py-2 text-sm hover:bg-gray-100 ${selectedContractId === c.id ? 'border border-brand-200 bg-brand-50' : 'border border-transparent'}`}
               >
-                <p className="font-medium text-gray-900">{c.client_name || c.title}</p>
+                <p className="font-medium text-gray-900">{c.contactName || `${c.client_name || c.title} (contato não identificado)`}</p>
                 <p className="truncate text-xs text-gray-500">
                   {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
                   {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}

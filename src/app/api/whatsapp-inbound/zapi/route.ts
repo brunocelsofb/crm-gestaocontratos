@@ -65,21 +65,28 @@ export async function POST(request: Request) {
     // vincular por telefone (mas não perde a mensagem — fica em
     // "não vinculada" usando o LID mesmo, até aparecer uma mensagem
     // recebida normal que ensine o dicionário).
-    let effectivePhone = phone
-    const isLid = !phone || phone.includes('@lid') || phone === chatLid
-    if (isLid && chatLid) {
-      const { data: mapped } = await supabase.from('whatsapp_lid_map').select('phone').eq('lid', chatLid).maybeSingle()
-      if (mapped) effectivePhone = mapped.phone
+    let effectivePhone: string | undefined = phone
+    const isLid = !phone || phone.includes('@lid')
+    if (isLid) {
+      if (chatLid) {
+        const { data: mapped } = await supabase.from('whatsapp_lid_map').select('phone').eq('lid', chatLid).maybeSingle()
+        effectivePhone = mapped?.phone
+      } else {
+        effectivePhone = undefined
+      }
     }
 
     // Aprende o dicionário: se essa mensagem trouxe um telefone de
     // verdade (não-LID) JUNTO com o chatLid, guarda a relação pra
     // usar depois em mensagens que só tragam o LID.
-    if (phone && !phone.includes('@lid') && phone !== chatLid && chatLid) {
+    if (phone && !phone.includes('@lid') && chatLid) {
       await supabase.from('whatsapp_lid_map').upsert({ lid: chatLid, phone, updated_at: new Date().toISOString() })
     }
 
-    if (!effectivePhone) {
+    // NUNCA deixa passar um valor que ainda pareça um LID — antes
+    // disso não estava sendo checado de novo aqui, e um LID cru podia
+    // acabar salvo como se fosse telefone de verdade.
+    if (!effectivePhone || effectivePhone.includes('@lid')) {
       return NextResponse.json({ ok: true, skipped: 'LID ainda não mapeado pra um telefone' })
     }
 
