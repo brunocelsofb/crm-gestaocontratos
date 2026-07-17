@@ -120,11 +120,22 @@ export async function createContact(
   return {}
 }
 
-export async function deleteContact(contactId: string, companyId: string) {
-  if (!(await isCurrentUserAdmin())) return
+export async function deleteContact(contactId: string, companyId: string): Promise<{ error?: string }> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem remover contatos.' }
   const supabase = createAdminClient()
-  await supabase.from('contacts').delete().eq('id', contactId)
+
+  // Limpa a referência de "contato principal" nos contratos que
+  // apontavam pra esse contato — sem isso, a exclusão falha calada (a
+  // chave estrangeira barra, sem avisar nada na tela).
+  await supabase.from('contracts').update({ contact_id: null }).eq('contact_id', contactId)
+  // Os vínculos de "outros contatos" (contract_contacts) saem sozinhos
+  // por cascata.
+
+  const { error } = await supabase.from('contacts').delete().eq('id', contactId)
+  if (error) return { error: error.message }
+
   revalidatePath(`/companies/${companyId}`)
+  return {}
 }
 
 export type DeleteState = { error?: string }

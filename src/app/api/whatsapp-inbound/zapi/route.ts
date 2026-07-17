@@ -34,27 +34,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, matched: false })
     }
 
-    // Bate tanto pelo contato EXATO selecionado no contrato quanto por
-    // qualquer contrato da MESMA EMPRESA desse contato — uma empresa
-    // pode ter várias pessoas mandando mensagem, não só quem está
-    // marcado como "Contato" principal.
     const contactIds = matchingContacts.map((c) => c.id)
     const companyIds = matchingContacts.map((c) => c.company_id).filter((id): id is string => !!id)
 
-    const { data: contract } = await supabase
-      .from('contracts')
-      .select('id')
-      .or(`contact_id.in.(${contactIds.join(',')})${companyIds.length > 0 ? `,company_id.in.(${companyIds.join(',')})` : ''}`)
-      .order('created_at', { ascending: false })
+    // Prioridade 1: contato exato vinculado ao contrato (via
+    // contract_contacts, que já cobre "principal" e "outros").
+    const { data: exactLink } = await supabase
+      .from('contract_contacts')
+      .select('contract_id')
+      .in('contact_id', contactIds)
       .limit(1)
       .maybeSingle()
 
-    if (!contract) {
+    let contractId: string | null = exactLink?.contract_id ?? null
+
+    // Prioridade 2 (se não achou vínculo exato): qualquer contrato da
+    // MESMA EMPRESA desse contato — várias pessoas da empresa podem
+    // mandar mensagem, não só quem está formalmente vinculado ainda.
+    if (!contractId && companyIds.length > 0) {
+      const { data: companyMatch } = await supabase
+        .from('contracts')
+        .select('id')
+        .in('company_id', companyIds)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      contractId = companyMatch?.id ?? null
+    }
+
+    if (!contractId) {
       return NextResponse.json({ ok: true, matched: false })
     }
 
     await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: contract.id,
+      contract_id: contractId,
       direction: 'recebido',
       phone,
       message: messageText,
@@ -62,7 +75,7 @@ export async function POST(request: Request) {
     })
 
     await supabase.from('activities').insert({
-      contract_id: contract.id,
+      contract_id: contractId,
       type: 'whatsapp',
       content: `WhatsApp recebido de ${senderName ?? phone}.`,
       metadata: { kind: 'received', phone, message: messageText },

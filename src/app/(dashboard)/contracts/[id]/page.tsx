@@ -16,6 +16,8 @@ import { ProposalsSection } from '@/components/proposals/proposals-section'
 import { ContractTicketsSection } from '@/components/tickets/contract-tickets-section'
 import { ContractEmailSection } from '@/components/email/contract-email-section'
 import { ContractCustomFieldsSection } from '@/components/custom-fields/contract-custom-fields-section'
+import { ContractContactsSection } from '@/components/contracts/contract-contacts-section'
+import { getContractContacts } from '@/lib/actions/contract-contacts'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { getConnectedEmailAccount } from '@/lib/actions/email'
 import { getContractCustomFieldValues } from '@/lib/actions/custom-fields'
@@ -178,7 +180,7 @@ export default async function ContractDetailPage({
     return { stageId: stage.id, days, isOverdue }
   })
 
-  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }] = await Promise.all([
+  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }, contractContacts, { data: companyAllContacts }] = await Promise.all([
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'email').order('name'),
     supabase.from('contract_emails').select('id, from_email, to_email, cc_email, bcc_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
     getConnectedEmailAccount(),
@@ -188,6 +190,10 @@ export default async function ContractDetailPage({
     supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle(),
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'whatsapp').order('name'),
     supabase.from('contract_whatsapp_messages').select('id, phone, message, direction, status, triggered_automatically, error_message, created_at').eq('contract_id', contract.id).order('created_at', { ascending: false }),
+    getContractContacts(contract.id),
+    contract.company_id
+      ? supabase.from('contacts').select('id, name, role').eq('company_id', contract.company_id).order('name')
+      : Promise.resolve({ data: [] }),
   ])
 
   const inboundEmailAddress =
@@ -375,6 +381,8 @@ export default async function ContractDetailPage({
                     </div>
                   </div>
                 )}
+
+                <ContractContactsSection contractId={contract.id} contacts={contractContacts} companyContacts={companyAllContacts ?? []} />
 
                 <ContractCustomFieldsSection contractId={contract.id} fields={customFields ?? []} values={customFieldValues} />
 

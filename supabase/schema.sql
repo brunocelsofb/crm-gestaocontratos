@@ -1149,3 +1149,26 @@ create index idx_contract_whatsapp_contract on contract_crm.contract_whatsapp_me
 alter table contract_crm.contract_whatsapp_messages enable row level security;
 create policy "contract_whatsapp_select" on contract_crm.contract_whatsapp_messages for select using (auth.role() = 'authenticated');
 create policy "contract_whatsapp_insert" on contract_crm.contract_whatsapp_messages for insert with check (true);
+
+
+-- ------------------------------------------------------------
+-- 33. Múltiplos contatos por contrato (principal + outros)
+-- ------------------------------------------------------------
+create table contract_crm.contract_contacts (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  contact_id uuid not null references contract_crm.contacts(id) on delete cascade,
+  is_primary boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (contract_id, contact_id)
+);
+
+create unique index idx_contract_contacts_one_primary
+  on contract_crm.contract_contacts (contract_id)
+  where is_primary;
+
+create index idx_contract_contacts_contract on contract_crm.contract_contacts(contract_id);
+create index idx_contract_contacts_contact on contract_crm.contract_contacts(contact_id);
+
+alter table contract_crm.contract_contacts enable row level security;
+create policy "contract_contacts_all" on contract_crm.contract_contacts for all using (auth.role() = 'authenticated');

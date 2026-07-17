@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AddContactForm } from '@/components/companies/add-contact-form'
 import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
 import { deleteContact } from '@/lib/actions/companies'
+import { RemoveContactButton } from '@/components/companies/remove-contact-button'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export default async function CompanyDetailPage({
@@ -78,14 +79,7 @@ export default async function CompanyDetailPage({
                 </p>
               </div>
               {isAdmin && (
-                <form action={deleteContact.bind(null, contact.id, company.id)}>
-                  <button
-                    type="submit"
-                    className="text-xs text-gray-400 hover:text-negative-600"
-                  >
-                    Remover
-                  </button>
-                </form>
+                <RemoveContactButton contactId={contact.id} companyId={company.id} />
               )}
             </div>
           ))}
