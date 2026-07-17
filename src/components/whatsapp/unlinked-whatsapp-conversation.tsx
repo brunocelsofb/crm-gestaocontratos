@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { linkUnlinkedWhatsAppConversation } from '@/lib/actions/whatsapp'
+import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage } from '@/lib/actions/whatsapp'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 
 type UnlinkedMessage = {
@@ -39,6 +39,21 @@ export function UnlinkedWhatsAppConversation({
   const [results, setResults] = useState<ContractOption[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [sendBusy, setSendBusy] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+
+  async function handleReply() {
+    setSendBusy(true)
+    setSendError(null)
+    const result = await sendUnlinkedWhatsAppMessage(phone, replyText)
+    setSendBusy(false)
+    if (result.error) setSendError(result.error)
+    else {
+      setReplyText('')
+      router.refresh()
+    }
+  }
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -93,6 +108,15 @@ export function UnlinkedWhatsAppConversation({
       </div>
 
       <WhatsAppChatView messages={messages} contactName={senderName} contactPhone={phone} />
+
+      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
+        <p className="text-sm font-medium text-gray-900">Responder (sem vincular a nenhuma conta ainda)</p>
+        <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+        {sendError && <p className="text-xs text-red-600">{sendError}</p>}
+        <button onClick={handleReply} disabled={sendBusy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+          {sendBusy ? 'Enviando...' : 'Enviar'}
+        </button>
+      </div>
     </div>
   )
 }

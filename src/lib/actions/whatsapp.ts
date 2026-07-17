@@ -375,3 +375,46 @@ export async function searchContractsForLinking(query: string): Promise<{ id: st
 
   return (data ?? []).map((c) => ({ id: c.id, label: c.client_name || c.title }))
 }
+
+// Responder uma conversa AINDA NÃO vinculada — sem isso, o time fica
+// de mãos atadas até alguém formalizar o vínculo, o que não é
+// realista quando a pessoa está esperando resposta na hora.
+export async function sendUnlinkedWhatsAppMessage(phone: string, message: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+  if (!message.trim()) return { error: 'Escreva a mensagem.' }
+
+  const creds = await getZApiCredentials()
+  if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
+
+  try {
+    const result = await sendZApiTextMessage({ ...creds, phone, message })
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: null,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message,
+      zapi_message_id: result.messageId,
+      status: 'enviado',
+    })
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: null,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message,
+      status: 'falhou',
+      error_message: errorMsg,
+    })
+    return { error: errorMsg }
+  }
+
+  revalidatePath('/whatsapp')
+  return {}
+}
