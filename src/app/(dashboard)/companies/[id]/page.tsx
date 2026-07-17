@@ -34,6 +34,9 @@ export default async function CompanyDetailPage({
 
   return (
     <div className="space-y-6">
+      <Link href="/companies" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
+        ← Voltar para Empresas
+      </Link>
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">{company.name}</h1>

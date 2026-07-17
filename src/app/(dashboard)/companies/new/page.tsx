@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import Link from 'next/link'
 import { createCompany, type ActionState } from '@/lib/actions/companies'
 import { CnpjLookupField } from '@/components/companies/cnpj-lookup-field'
 
@@ -13,6 +14,9 @@ export default function NewCompanyPage() {
 
   return (
     <div className="max-w-xl space-y-6">
+      <Link href="/companies" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
+        ← Voltar para Empresas
+      </Link>
       <h1 className="text-[17px] font-medium text-foreground">Nova Empresa</h1>
 
       <form action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">

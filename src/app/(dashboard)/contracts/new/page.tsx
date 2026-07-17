@@ -7,6 +7,7 @@
 
 import { useActionState } from 'react'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createContract, type ActionState } from '@/lib/actions/contracts'
 import { createClient } from '@/lib/supabase/client'
@@ -75,6 +76,9 @@ export default function NewContractPage() {
 
   return (
     <div className="max-w-xl space-y-6">
+      <Link href={companyIdParam ? `/companies/${companyIdParam}` : '/pipeline'} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
+        ← Voltar
+      </Link>
       <div>
         <h1 className="text-[17px] font-medium text-foreground">{pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}</h1>
         {pipelineName && (
