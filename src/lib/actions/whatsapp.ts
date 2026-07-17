@@ -551,3 +551,71 @@ export async function unassignWhatsAppConversation(phone: string): Promise<Actio
   revalidatePath('/whatsapp')
   return {}
 }
+
+// ------------------------------------------------------------
+// Importa conversas que já existiam no WhatsApp ANTES de conectar o
+// CRM — sem isso, o time só via o que chegasse a partir de hoje, e o
+// histórico anterior ficava perdido, só no celular.
+// ------------------------------------------------------------
+export async function importExistingWhatsAppChats(): Promise<ActionState & { imported?: number; skipped?: number }> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem importar.' }
+
+  const creds = await getZApiCredentials()
+  if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
+
+  const supabase = createAdminClient()
+
+  let chats
+  try {
+    const { getZApiChats } = await import('@/lib/whatsapp/zapi')
+    chats = await getZApiChats(creds)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Falha ao buscar conversas do WhatsApp.' }
+  }
+
+  let imported = 0
+  let skipped = 0
+
+  for (const chat of chats) {
+    if (chat.isGroup || !chat.phone) {
+      skipped++
+      continue
+    }
+
+    // Já existe alguma mensagem (de qualquer tipo) pra esse telefone?
+    // Não duplica.
+    const cleanPhone = chat.phone.replace(/\D/g, '')
+    const { count } = await supabase
+      .from('contract_whatsapp_messages')
+      .select('id', { count: 'exact', head: true })
+      .ilike('phone', `%${cleanPhone.slice(-8)}%`)
+
+    if ((count ?? 0) > 0) {
+      skipped++
+      continue
+    }
+
+    // Vê se já bate com algum contato/contrato existente (mesma
+    // lógica do webhook) — senão, entra como "não vinculada".
+    const { data: matchingContacts } = await supabase.from('contacts').select('id, company_id').ilike('phone', `%${cleanPhone.slice(-8)}%`)
+    let contractId: string | null = null
+    if (matchingContacts && matchingContacts.length > 0) {
+      const { data: exactLink } = await supabase.from('contract_contacts').select('contract_id').in('contact_id', matchingContacts.map((c) => c.id)).limit(1).maybeSingle()
+      contractId = exactLink?.contract_id ?? null
+    }
+
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
+      unlinked_sender_name: contractId ? null : chat.name,
+      direction: 'recebido',
+      phone: chat.phone,
+      message: '[Conversa importada do WhatsApp — histórico anterior à conexão com o CRM]',
+      status: 'enviado',
+      created_at: chat.lastMessageTime ? new Date(Number(chat.lastMessageTime) * 1000).toISOString() : new Date().toISOString(),
+    })
+    imported++
+  }
+
+  revalidatePath('/whatsapp')
+  return { imported, skipped }
+}

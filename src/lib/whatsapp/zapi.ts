@@ -99,6 +99,46 @@ export async function sendZApiDocumentMessage({
   return { messageId: data.messageId ?? data.zaapId ?? '' }
 }
 
+export type ZApiChat = {
+  phone: string
+  name: string | null
+  unread: number
+  lastMessageTime: string | null
+  isGroup: boolean
+}
+
+// Lista as conversas que já existem no WhatsApp conectado — inclusive
+// as de ANTES da gente conectar o CRM. É isso que permite "importar"
+// o histórico todo de uma vez, igual o WaLeads faz automaticamente.
+//
+// NOTA DE INCERTEZA: nunca testei esse endpoint ao vivo — os campos
+// (phone, name, unread, lastMessageTime, isGroup) seguem a doc
+// pública, mas o formato exato da resposta (array direto vs objeto
+// com propriedade "chats") pode precisar de ajuste.
+export async function getZApiChats({
+  instanceId,
+  token,
+  clientToken,
+}: {
+  instanceId: string
+  token: string
+  clientToken: string
+}): Promise<ZApiChat[]> {
+  const response = await fetch(`${ZAPI_BASE_URL}/instances/${instanceId}/token/${token}/chats`, {
+    headers: { 'Client-Token': clientToken },
+  })
+  if (!response.ok) throw new Error(`Falha ao listar conversas: ${await response.text()}`)
+  const data = await response.json()
+  const list = Array.isArray(data) ? data : (data.chats ?? [])
+  return list.map((c: any) => ({
+    phone: c.phone,
+    name: c.name ?? null,
+    unread: Number(c.unread ?? 0),
+    lastMessageTime: c.lastMessageTime ?? null,
+    isGroup: !!c.isGroup,
+  }))
+}
+
 export async function verifyZApiConnection({
   instanceId,
   token,

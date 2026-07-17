@@ -4,6 +4,7 @@ import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp
 import { WhatsAppConversationPanel } from '@/components/whatsapp/whatsapp-conversation-panel'
 import { getConversationByPhone, searchContractsForLinking, getWhatsAppAssignments } from '@/lib/actions/whatsapp'
 import { WhatsAppInboxRealtimeWatcher } from '@/components/whatsapp/whatsapp-inbox-realtime-watcher'
+import { ImportWhatsAppChatsButton } from '@/components/whatsapp/import-whatsapp-chats-button'
 
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
@@ -104,6 +105,10 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div />
+        <ImportWhatsAppChatsButton />
+      </div>
       {(promptsTotal ?? 0) > 0 && (
         <div className="flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs">
           <span className="text-gray-500">📊 Fluxo de captação:</span>
