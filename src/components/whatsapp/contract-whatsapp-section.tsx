@@ -29,12 +29,14 @@ export function ContractWhatsAppSection({
   isConnected,
   templates,
   defaultPhone,
+  contactName,
   messageLog,
 }: {
   contractId: string
   isConnected: boolean
   templates: Template[]
   defaultPhone: string | null
+  contactName?: string | null
   messageLog: WhatsAppLog[]
 }) {
   const router = useRouter()
@@ -111,7 +113,7 @@ export function ContractWhatsAppSection({
 
   return (
     <div className="space-y-4">
-      <WhatsAppChatView messages={messageLog} />
+      <WhatsAppChatView messages={messageLog} contactName={contactName} contactPhone={phone} />
 
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-sm font-medium text-gray-900">Enviar WhatsApp</p>

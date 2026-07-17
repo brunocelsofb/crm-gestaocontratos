@@ -42,10 +42,16 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     ])
 
     const { data: contactPhone } = selectedContract?.contact_id
-      ? await supabase.from('contacts').select('phone').eq('id', selectedContract.contact_id).maybeSingle()
+      ? await supabase.from('contacts').select('name, phone').eq('id', selectedContract.contact_id).maybeSingle()
       : { data: null }
 
-    selectedData = { contract: selectedContract, templates: whatsappTemplates ?? [], messages: whatsappMessages ?? [], defaultPhone: contactPhone?.phone ?? null }
+    selectedData = {
+      contract: selectedContract,
+      templates: whatsappTemplates ?? [],
+      messages: whatsappMessages ?? [],
+      defaultPhone: contactPhone?.phone ?? null,
+      contactName: contactPhone?.name ?? null,
+    }
   }
 
   return (
@@ -82,6 +88,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               isConnected={isConnected}
               templates={selectedData.templates}
               defaultPhone={selectedData.defaultPhone}
+              contactName={selectedData.contactName}
               messageLog={selectedData.messages}
             />
           </div>

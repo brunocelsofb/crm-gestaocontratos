@@ -38,11 +38,30 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   )
 }
 
-export function WhatsAppChatView({ messages }: { messages: ChatMessage[] }) {
+export function WhatsAppChatView({ messages, contactName, contactPhone }: { messages: ChatMessage[]; contactName?: string | null; contactPhone?: string | null }) {
   const chronological = [...messages].reverse()
+  // Foto de perfil mais recente que a gente tem de quem manda mensagem
+  // (só existe pra mensagens recebidas, não pras que a gente envia).
+  const lastReceivedPhoto = [...messages].find((m) => m.direction === 'recebido' && m.sender_photo_url)?.sender_photo_url ?? null
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg bg-[#e5ddd5] p-4">
+    <div className="overflow-hidden rounded-lg border border-gray-200">
+      {(contactName || contactPhone) && (
+        <div className="flex items-center gap-2.5 border-b border-gray-200 bg-white px-3 py-2.5">
+          {lastReceivedPhoto ? (
+            <img src={lastReceivedPhoto} alt="" className="h-9 w-9 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-500">
+              {(contactName ?? '?').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <p className="text-sm font-medium text-gray-900">{contactName || 'Sem nome cadastrado'}</p>
+            {contactPhone && <p className="text-xs text-gray-400">{contactPhone}</p>}
+          </div>
+        </div>
+      )}
+      <div className="flex flex-col gap-2 bg-[#e5ddd5] p-4">
       {chronological.map((m) => {
         const isSent = m.direction === 'enviado'
         return (
@@ -75,6 +94,7 @@ export function WhatsAppChatView({ messages }: { messages: ChatMessage[] }) {
         )
       })}
       {chronological.length === 0 && <p className="py-8 text-center text-sm text-gray-500">Nenhuma mensagem ainda.</p>}
+      </div>
     </div>
   )
 }

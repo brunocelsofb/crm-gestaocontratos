@@ -483,6 +483,7 @@ export default async function ContractDetailPage({
                 isConnected={!!orgWhatsAppSettings?.zapi_instance_id}
                 templates={whatsappTemplates ?? []}
                 defaultPhone={linkedContact?.phone ?? null}
+                contactName={linkedContact?.name ?? null}
                 messageLog={whatsappMessages ?? []}
               />
             ),
