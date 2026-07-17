@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
-import { sendZApiTextMessage, verifyZApiConnection } from '@/lib/whatsapp/zapi'
+import { sendZApiTextMessage, sendZApiImageMessage, sendZApiDocumentMessage, verifyZApiConnection } from '@/lib/whatsapp/zapi'
 
 export type ActionState = { error?: string }
 
@@ -91,6 +91,72 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       phone,
       message,
       template_id: templateId,
+      status: 'falhou',
+      error_message: errorMsg,
+    })
+    return { error: errorMsg }
+  }
+
+  revalidatePath(`/contracts/${contractId}`)
+  return {}
+}
+
+// Envio de imagem ou documento — o arquivo já precisa estar
+// hospedado (subido pro nosso Storage antes, pela tela).
+export async function sendContractWhatsAppMedia(
+  contractId: string,
+  phone: string,
+  mediaUrl: string,
+  mediaType: 'image' | 'document',
+  filename: string | null
+): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+  if (!phone) return { error: 'Informe o telefone do destinatário.' }
+
+  const creds = await getZApiCredentials()
+  if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
+
+  try {
+    const result =
+      mediaType === 'image'
+        ? await sendZApiImageMessage({ ...creds, phone, imageUrl: mediaUrl })
+        : await sendZApiDocumentMessage({ ...creds, phone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
+
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message: mediaType === 'image' ? '[imagem]' : `[documento] ${filename ?? ''}`,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      media_filename: filename,
+      zapi_message_id: result.messageId,
+      status: 'enviado',
+    })
+
+    await supabase.from('activities').insert({
+      contract_id: contractId,
+      user_id: user.id,
+      type: 'whatsapp',
+      content: `WhatsApp (${mediaType}) enviado pra ${phone}.`,
+      metadata: { kind: 'sent', phone, message: mediaType === 'image' ? '[imagem]' : `[documento] ${filename ?? ''}` },
+    })
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message: mediaType === 'image' ? '[imagem]' : `[documento] ${filename ?? ''}`,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      media_filename: filename,
       status: 'falhou',
       error_message: errorMsg,
     })

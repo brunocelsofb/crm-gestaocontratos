@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   // Só permite servir arquivos dentro dessas pastas — não abre a porta
   // pra servir qualquer arquivo do bucket sem autenticação.
-  if (!fullPath.startsWith('signatures/') && !fullPath.startsWith('custom-fields/')) {
+  if (!fullPath.startsWith('signatures/') && !fullPath.startsWith('custom-fields/') && !fullPath.startsWith('whatsapp-media/')) {
     return NextResponse.json({ error: 'Caminho inválido.' }, { status: 400 })
   }
 

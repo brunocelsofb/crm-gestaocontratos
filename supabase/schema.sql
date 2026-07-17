@@ -1140,6 +1140,12 @@ create table contract_crm.contract_whatsapp_messages (
   triggered_automatically boolean not null default false,
   zapi_message_id text,
   status text not null default 'enviado' check (status in ('enviado', 'falhou')),
+  media_url text,
+  media_type text check (media_type in ('image', 'audio', 'document', 'video')),
+  media_filename text,
+  sender_photo_url text,
+  delivery_status text check (delivery_status in ('sent', 'delivered', 'read', 'failed')),
+  read_at timestamptz,
   error_message text,
   created_at timestamptz not null default now()
 );

@@ -43,6 +43,62 @@ export async function sendZApiTextMessage({
   return { messageId: data.messageId ?? data.zaapId ?? '' }
 }
 
+// Envia imagem ou documento — a Z-API pede a URL pública do arquivo
+// (não faz upload direto), por isso a gente sobe pro nosso Storage
+// primeiro e manda o link.
+export async function sendZApiImageMessage({
+  instanceId,
+  token,
+  clientToken,
+  phone,
+  imageUrl,
+  caption,
+}: {
+  instanceId: string
+  token: string
+  clientToken: string
+  phone: string
+  imageUrl: string
+  caption?: string
+}): Promise<{ messageId: string }> {
+  const cleanPhone = phone.replace(/\D/g, '')
+  const response = await fetch(`${ZAPI_BASE_URL}/instances/${instanceId}/token/${token}/send-image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Client-Token': clientToken },
+    body: JSON.stringify({ phone: cleanPhone, image: imageUrl, caption: caption ?? '' }),
+  })
+  if (!response.ok) throw new Error(`Falha ao enviar imagem: ${await response.text()}`)
+  const data = await response.json()
+  return { messageId: data.messageId ?? data.zaapId ?? '' }
+}
+
+export async function sendZApiDocumentMessage({
+  instanceId,
+  token,
+  clientToken,
+  phone,
+  documentUrl,
+  fileName,
+}: {
+  instanceId: string
+  token: string
+  clientToken: string
+  phone: string
+  documentUrl: string
+  fileName: string
+}): Promise<{ messageId: string }> {
+  const cleanPhone = phone.replace(/\D/g, '')
+  const ext = fileName.split('.').pop() ?? 'pdf'
+  const response = await fetch(`${ZAPI_BASE_URL}/instances/${instanceId}/token/${token}/send-document/${ext}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Client-Token': clientToken },
+    body: JSON.stringify({ phone: cleanPhone, document: documentUrl, fileName }),
+  })
+  if (!response.ok) throw new Error(`Falha ao enviar documento: ${await response.text()}`)
+  const data = await response.json()
+  return { messageId: data.messageId ?? data.zaapId ?? '' }
+}
+
 export async function verifyZApiConnection({
   instanceId,
   token,

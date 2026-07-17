@@ -189,7 +189,7 @@ export default async function ContractDetailPage({
     getContractCustomFieldValues(contract.id),
     supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle(),
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'whatsapp').order('name'),
-    supabase.from('contract_whatsapp_messages').select('id, phone, message, direction, status, triggered_automatically, error_message, created_at').eq('contract_id', contract.id).order('created_at', { ascending: false }),
+    supabase.from('contract_whatsapp_messages').select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status').eq('contract_id', contract.id).order('created_at', { ascending: false }),
     getContractContacts(contract.id),
     contract.company_id
       ? supabase.from('contacts').select('id, name, role').eq('company_id', contract.company_id).order('name')

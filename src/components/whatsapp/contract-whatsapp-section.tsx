@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { sendContractWhatsApp, buildWhatsAppFromTemplate } from '@/lib/actions/whatsapp'
-import { ExpandableRow } from '@/components/surveys/expandable-row'
+import { sendContractWhatsApp, buildWhatsAppFromTemplate, sendContractWhatsAppMedia } from '@/lib/actions/whatsapp'
+import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
+import { createClient } from '@/lib/supabase/client'
+import { sanitizeStorageFileName } from '@/lib/utils/storage'
 
 type Template = { id: string; name: string }
 type WhatsAppLog = {
@@ -15,6 +17,11 @@ type WhatsAppLog = {
   triggered_automatically: boolean
   error_message: string | null
   created_at: string
+  media_url: string | null
+  media_type: string | null
+  media_filename: string | null
+  sender_photo_url: string | null
+  delivery_status: string | null
 }
 
 export function ContractWhatsAppSection({
@@ -36,6 +43,7 @@ export function ContractWhatsAppSection({
   const [templateId, setTemplateId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleTemplateChange(id: string) {
     setTemplateId(id)
@@ -61,6 +69,37 @@ export function ContractWhatsAppSection({
     }
   }
 
+  async function handleFileUpload() {
+    const file = fileInputRef.current?.files?.[0]
+    if (!file || !phone) {
+      if (!phone) setError('Informe o telefone antes de enviar um arquivo.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+
+    const supabase = createClient()
+    const storagePath = `whatsapp-media/${contractId}/${Date.now()}-${sanitizeStorageFileName(file.name)}`
+    const { error: uploadError } = await supabase.storage.from('proposal-files').upload(storagePath, file)
+
+    if (uploadError) {
+      setBusy(false)
+      setError(`Falha no upload: ${uploadError.message}`)
+      return
+    }
+
+    const publicUrl = `${window.location.origin}/api/email-assets/${storagePath}`
+    const mediaType = file.type.startsWith('image/') ? 'image' : 'document'
+    const result = await sendContractWhatsAppMedia(contractId, phone, publicUrl, mediaType, file.name)
+
+    setBusy(false)
+    if (result.error) setError(result.error)
+    else {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      router.refresh()
+    }
+  }
+
   if (!isConnected) {
     return (
       <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
@@ -72,6 +111,8 @@ export function ContractWhatsAppSection({
 
   return (
     <div className="space-y-4">
+      <WhatsAppChatView messages={messageLog} />
+
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-sm font-medium text-gray-900">Enviar WhatsApp</p>
         {templates.length > 0 && (
@@ -92,32 +133,15 @@ export function ContractWhatsAppSection({
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
-        <button onClick={handleSend} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
-          {busy ? 'Enviando...' : 'Enviar'}
-        </button>
-      </div>
-
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-gray-500">Histórico</p>
-        {messageLog.map((m) => (
-          <ExpandableRow
-            key={m.id}
-            summary={
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-gray-800">{m.direction === 'recebido' ? '📥' : '📤'} {m.message.slice(0, 60)}{m.message.length > 60 ? '...' : ''}</span>
-                <span className="shrink-0 text-xs text-gray-400">{new Date(m.created_at).toLocaleDateString('pt-BR')}</span>
-              </div>
-            }
-          >
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{m.message}</p>
-            <p className="mt-1 text-xs text-gray-400">
-              {m.direction === 'recebido' ? 'De' : 'Pra'} {m.phone} · {new Date(m.created_at).toLocaleString('pt-BR')}
-              {m.triggered_automatically && ' · Automático'}
-            </p>
-            {m.status === 'falhou' && <p className="text-xs text-red-600">Falhou: {m.error_message}</p>}
-          </ExpandableRow>
-        ))}
-        {messageLog.length === 0 && <p className="text-sm text-gray-400">Nenhuma mensagem ainda.</p>}
+        <div className="flex items-center gap-2">
+          <button onClick={handleSend} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+            {busy ? 'Enviando...' : 'Enviar'}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="text-xs" />
+          <button type="button" onClick={handleFileUpload} disabled={busy} className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            📎 Anexar
+          </button>
+        </div>
       </div>
     </div>
   )

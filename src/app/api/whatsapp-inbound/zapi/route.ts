@@ -5,9 +5,26 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // deles: Webhooks → "Ao receber" → colar essa URL).
 //
 // Vínculo confirmado e testado: bate pelo telefone do REMETENTE contra
-// contract_crm.contacts.phone, e usa o contrato onde esse contato está
-// selecionado no campo "Contato" (contracts.contact_id) — se o
-// contato certo não estiver selecionado ali, a mensagem não vincula.
+// contract_crm.contacts.phone, prioriza o contato exato vinculado ao
+// contrato (contract_contacts), com fallback pra qualquer contato da
+// mesma empresa.
+//
+// NOTA DE INCERTEZA: a extração de MÍDIA (foto/áudio/documento) abaixo
+// segue o formato mais comum documentado pelo Z-API (image.imageUrl,
+// audio.audioUrl, document.documentUrl+fileName), mas nunca vi um
+// payload real desses chegando — só testei mensagem de texto até
+// agora. Pode precisar de ajuste assim que a primeira mídia real
+// chegar (mesmo processo de depuração que já fizemos pro texto).
+type MediaInfo = { url: string; type: 'image' | 'audio' | 'document' | 'video'; filename: string | null }
+
+function extractMedia(body: any): MediaInfo | null {
+  if (body.image?.imageUrl) return { url: body.image.imageUrl, type: 'image', filename: null }
+  if (body.audio?.audioUrl) return { url: body.audio.audioUrl, type: 'audio', filename: null }
+  if (body.video?.videoUrl) return { url: body.video.videoUrl, type: 'video', filename: null }
+  if (body.document?.documentUrl) return { url: body.document.documentUrl, type: 'document', filename: body.document.fileName ?? null }
+  return null
+}
+
 export async function POST(request: Request) {
   const supabase = createAdminClient()
   const body = await request.json().catch(() => null)
@@ -19,11 +36,13 @@ export async function POST(request: Request) {
     if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
 
     const phone: string | undefined = body.phone
-    const messageText: string | undefined = body.text?.message ?? body.body ?? body.message
+    const media = extractMedia(body)
+    const messageText: string | undefined = body.text?.message ?? body.image?.caption ?? body.video?.caption ?? body.body ?? body.message
     const senderName: string | undefined = body.senderName ?? body.chatName
+    const senderPhoto: string | undefined = body.photo ?? body.senderPhoto
 
-    if (!phone || !messageText) {
-      return NextResponse.json({ ok: true, skipped: 'sem telefone ou mensagem' })
+    if (!phone || (!messageText && !media)) {
+      return NextResponse.json({ ok: true, skipped: 'sem telefone ou conteúdo' })
     }
 
     const cleanPhone = phone.replace(/\D/g, '')
@@ -37,8 +56,6 @@ export async function POST(request: Request) {
     const contactIds = matchingContacts.map((c) => c.id)
     const companyIds = matchingContacts.map((c) => c.company_id).filter((id): id is string => !!id)
 
-    // Prioridade 1: contato exato vinculado ao contrato (via
-    // contract_contacts, que já cobre "principal" e "outros").
     const { data: exactLink } = await supabase
       .from('contract_contacts')
       .select('contract_id')
@@ -48,9 +65,6 @@ export async function POST(request: Request) {
 
     let contractId: string | null = exactLink?.contract_id ?? null
 
-    // Prioridade 2 (se não achou vínculo exato): qualquer contrato da
-    // MESMA EMPRESA desse contato — várias pessoas da empresa podem
-    // mandar mensagem, não só quem está formalmente vinculado ainda.
     if (!contractId && companyIds.length > 0) {
       const { data: companyMatch } = await supabase
         .from('contracts')
@@ -66,20 +80,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, matched: false })
     }
 
+    const displayMessage = messageText || (media ? `[${media.type}]` : '')
+
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       direction: 'recebido',
       phone,
-      message: messageText,
+      message: displayMessage,
       status: 'enviado',
+      media_url: media?.url ?? null,
+      media_type: media?.type ?? null,
+      media_filename: media?.filename ?? null,
+      sender_photo_url: senderPhoto ?? null,
     })
 
     await supabase.from('activities').insert({
       contract_id: contractId,
       type: 'whatsapp',
       content: `WhatsApp recebido de ${senderName ?? phone}.`,
-      metadata: { kind: 'received', phone, message: messageText },
+      metadata: { kind: 'received', phone, message: displayMessage },
     })
+
+    // Notifica o dono da conta (se tiver um) de que chegou mensagem
+    // nova — sem isso, a única forma de saber é abrindo o contrato.
+    const { data: contract } = await supabase.from('contracts').select('owner_id, title').eq('id', contractId).maybeSingle()
+    if (contract?.owner_id) {
+      await supabase.from('notifications').insert({
+        user_id: contract.owner_id,
+        contract_id: contractId,
+        message: `Nova mensagem de WhatsApp de ${senderName ?? phone} em "${contract.title}".`,
+      })
+    }
 
     return NextResponse.json({ ok: true, matched: true })
   } catch (e) {
