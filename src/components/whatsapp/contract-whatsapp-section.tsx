@@ -31,6 +31,7 @@ type WhatsAppLog = {
   media_filename: string | null
   sender_photo_url: string | null
   delivery_status: string | null
+  sent_by_name?: string | null
 }
 
 export function ContractWhatsAppSection({

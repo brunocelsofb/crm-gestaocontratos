@@ -13,6 +13,7 @@ type ChatMessage = {
   error_message: string | null
   triggered_automatically: boolean
   created_at: string
+  sent_by_name?: string | null
 }
 
 const DELIVERY_TICK: Record<string, string> = {
@@ -73,6 +74,11 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: { mess
                 <div className="h-7 w-7 shrink-0 rounded-full bg-gray-300" />
               )
             )}
+            {isSent && (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-medium text-white" title={m.sent_by_name ?? 'Enviado pelo celular'}>
+                {m.sent_by_name ? m.sent_by_name.charAt(0).toUpperCase() : m.triggered_automatically ? '🤖' : '📱'}
+              </div>
+            )}
             <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${isSent ? 'bg-[#dcf8c6] text-gray-900' : 'bg-white text-gray-900'}`}>
               {m.media_url && m.media_type ? (
                 <MediaContent mediaUrl={m.media_url} mediaType={m.media_type} mediaFilename={m.media_filename} />
@@ -80,6 +86,7 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: { mess
                 <p className="whitespace-pre-wrap">{m.message}</p>
               )}
               <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-gray-500">
+                {isSent && <span>{m.sent_by_name ?? (m.triggered_automatically ? 'Automação' : 'Pelo celular')} · </span>}
                 {m.triggered_automatically && <span title="Enviado por automação">🤖</span>}
                 <span>{new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                 {isSent && m.status === 'falhou' && <span className="text-red-600" title={m.error_message ?? ''}>Falhou</span>}

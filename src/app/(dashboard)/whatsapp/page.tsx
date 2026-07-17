@@ -44,7 +44,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'whatsapp').order('name'),
       supabase
         .from('contract_whatsapp_messages')
-        .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status')
+        .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, profiles(full_name)')
         .eq('contract_id', selectedContractId)
         .order('created_at', { ascending: false }),
     ])
@@ -56,7 +56,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     selectedData = {
       contract: selectedContract,
       templates: whatsappTemplates ?? [],
-      messages: whatsappMessages ?? [],
+      messages: (whatsappMessages ?? []).map((m: any) => ({ ...m, sent_by_name: m.profiles?.full_name ?? null })),
       defaultPhone: contactPhone?.phone ?? null,
     }
   }
