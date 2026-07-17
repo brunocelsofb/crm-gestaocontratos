@@ -1,5 +1,14 @@
 'use client'
 
+// NOTA DE INCERTEZA: a parte de tempo real (supabase.channel(...).on(
+// 'postgres_changes', ...)) segue o mesmo padrão já usado no sino de
+// notificações deste projeto — se as mensagens não aparecerem
+// sozinhas (só ao recarregar a página), confira em Database →
+// Replication → supabase_realtime no painel do Supabase se a tabela
+// contract_whatsapp_messages está habilitada lá (a migração já tenta
+// habilitar isso via SQL, mas o painel é o jeito mais confiável de
+// confirmar).
+
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { sendContractWhatsApp, buildWhatsAppFromTemplate, sendContractWhatsAppMedia, resolveContactNameByPhone, saveWhatsAppConversationAsNote } from '@/lib/actions/whatsapp'
@@ -38,10 +47,46 @@ export function ContractWhatsAppSection({
   messageLog: WhatsAppLog[]
 }) {
   const router = useRouter()
+  // Mantém as mensagens em estado local (não só a prop) — é isso que
+  // permite mensagem nova aparecer sozinha via tempo real, sem
+  // precisar de router.refresh() (que recarrega a página inteira).
+  const [messages, setMessages] = useState(messageLog)
+  useEffect(() => setMessages(messageLog), [messageLog])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`whatsapp:${contractId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
+        (payload) => {
+          setMessages((prev) => {
+            // Evita duplicar se a própria pessoa acabou de enviar (já
+            // está no estado local pelo router.refresh do handleSend).
+            if (prev.some((m) => m.id === (payload.new as any).id)) return prev
+            return [payload.new as WhatsAppLog, ...prev]
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
+        (payload) => {
+          setMessages((prev) => prev.map((m) => (m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m)))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [contractId])
+
   // O telefone "da conversa" (pra saber quem é a pessoa de verdade no
   // cabeçalho) é o da mensagem mais recente já trocada — não o
   // contato principal do contrato, que pode ser outra pessoa.
-  const conversationPhone = messageLog[0]?.phone ?? defaultPhone ?? ''
+  const conversationPhone = messages[0]?.phone ?? defaultPhone ?? ''
   const [phone, setPhone] = useState(defaultPhone ?? conversationPhone)
   const [message, setMessage] = useState('')
   const [templateId, setTemplateId] = useState('')
@@ -113,7 +158,7 @@ export function ContractWhatsAppSection({
   }
 
   function buildConversationSummary(): string {
-    const chronological = [...messageLog].reverse()
+    const chronological = [...messages].reverse()
     return chronological
       .map((m) => `${m.direction === 'enviado' ? 'Nós' : resolvedName ?? phone}: ${m.message}`)
       .join('\n')
@@ -142,7 +187,7 @@ export function ContractWhatsAppSection({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">{messageLog.length} mensage{messageLog.length === 1 ? 'm' : 'ns'} nessa conversa</p>
+        <p className="text-xs text-gray-400">{messages.length} mensage{messages.length === 1 ? 'm' : 'ns'} nessa conversa</p>
         <div>
           <button onClick={() => setShowNoteBox((v) => !v)} className="text-xs text-brand-700 hover:underline">
             📝 Salvar conversa como nota
@@ -161,7 +206,7 @@ export function ContractWhatsAppSection({
         </div>
       )}
 
-      <WhatsAppChatView messages={messageLog} contactName={resolvedName ?? 'Sem contato cadastrado'} contactPhone={conversationPhone} />
+      <WhatsAppChatView messages={messages} contactName={resolvedName ?? 'Sem contato cadastrado'} contactPhone={conversationPhone} />
 
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-sm font-medium text-gray-900">Enviar WhatsApp</p>

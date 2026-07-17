@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { UnlinkedWhatsAppConversation } from '@/components/whatsapp/unlinked-whatsapp-conversation'
 import { getUnlinkedWhatsAppConversations, getUnlinkedMessagesByPhone, searchContractsForLinking } from '@/lib/actions/whatsapp'
+import { WhatsAppInboxRealtimeWatcher } from '@/components/whatsapp/whatsapp-inbox-realtime-watcher'
 
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
@@ -69,6 +70,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
+      <WhatsAppInboxRealtimeWatcher />
       <div className="w-72 shrink-0 space-y-3 overflow-y-auto">
         <h1 className="px-1 text-lg font-semibold text-gray-900">Central de Atendimento</h1>
 
