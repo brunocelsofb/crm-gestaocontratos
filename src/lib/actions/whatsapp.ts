@@ -447,8 +447,7 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
   if (!creds) return { checked: pending.length, sent: 0 }
 
   const supabaseAdmin = supabase
-  const { data: settings } = await supabaseAdmin.from('organization_settings').select('company_name').eq('id', 'default').maybeSingle()
-  const companyName = settings?.company_name || 'nossa empresa'
+  const { data: settings } = await supabaseAdmin.from('organization_settings').select('company_name, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message').eq('id', 'default').maybeSingle()
 
   let sent = 0
   for (const p of pending) {
@@ -456,7 +455,8 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
     if (!guard.ok) continue
 
     const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(p.phone)}`
-    const reminderMessage = `Olá, aqui é da *${companyName}* de novo. 👋\n\nAinda não recebemos seus dados — pra te atendermos, preenche por aqui:\n${captureUrl}\n\n(Se o link não abrir direto, copia e cola no navegador.)`
+    const { buildReminderMessage } = await import('@/lib/whatsapp/guardrails')
+    const reminderMessage = buildReminderMessage(settings ?? { company_name: null, whatsapp_is_online: false, whatsapp_welcome_message: null, whatsapp_welcome_message_online: null, whatsapp_reminder_message: null }, captureUrl)
     try {
       const result = await sendZApiTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
       await supabase.from('contract_whatsapp_messages').insert({
@@ -618,4 +618,46 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
 
   revalidatePath('/whatsapp')
   return { imported, skipped }
+}
+
+// ------------------------------------------------------------
+// Configuração do "bot" — mensagens editáveis e status online/offline.
+// ------------------------------------------------------------
+export async function updateWhatsAppBotSettings(formData: FormData): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem configurar isso.' }
+
+  const whatsapp_is_online = formData.get('whatsapp_is_online') === 'on'
+  const whatsapp_welcome_message = (formData.get('whatsapp_welcome_message') as string)?.trim() || null
+  const whatsapp_welcome_message_online = (formData.get('whatsapp_welcome_message_online') as string)?.trim() || null
+  const whatsapp_reminder_message = (formData.get('whatsapp_reminder_message') as string)?.trim() || null
+  const whatsapp_daily_auto_limit = formData.get('whatsapp_daily_auto_limit') ? Number(formData.get('whatsapp_daily_auto_limit')) : 3
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('organization_settings')
+    .update({
+      whatsapp_is_online,
+      whatsapp_welcome_message,
+      whatsapp_welcome_message_online,
+      whatsapp_reminder_message,
+      whatsapp_daily_auto_limit,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', 'default')
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
+}
+
+// Toggle rápido de "estamos online" — separado da action geral pra
+// poder ficar num botão de um clique só, sem precisar salvar o resto.
+export async function toggleWhatsAppOnlineStatus(isOnline: boolean): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
+  const supabase = await createClient()
+  const { error } = await supabase.from('organization_settings').update({ whatsapp_is_online: isOnline }).eq('id', 'default')
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  revalidatePath('/whatsapp')
+  return {}
 }

@@ -368,6 +368,10 @@ create table contract_crm.organization_settings (
   zapi_client_token text,
   zapi_webhook_secret text,
   whatsapp_daily_auto_limit integer not null default 3,
+  whatsapp_is_online boolean not null default false,
+  whatsapp_welcome_message text,
+  whatsapp_welcome_message_online text,
+  whatsapp_reminder_message text,
   inbound_email_domain text,
   mailgun_webhook_signing_key text,
   updated_at timestamptz not null default now()

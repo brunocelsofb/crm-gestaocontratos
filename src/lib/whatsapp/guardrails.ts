@@ -44,3 +44,40 @@ export async function canSendAutomatedWhatsApp(phone: string): Promise<{ ok: boo
 
   return { ok: true }
 }
+
+// ------------------------------------------------------------
+// Monta as mensagens automáticas do "bot" — usa o texto customizado
+// da organização se tiver um configurado, senão cai num padrão
+// razoável. Suporta {{empresa}} e {{link}} como variáveis.
+// ------------------------------------------------------------
+export const DEFAULT_WELCOME_OFFLINE = 'Olá! Aqui é da *{{empresa}}*. 👋\n\nPra te atendermos direito, precisamos de alguns dados seus — leva menos de 1 minuto:\n{{link}}\n\n(Se o link não abrir direto, salva nosso número nos seus contatos e copia o link pra abrir no navegador.)\n\nAssim que preencher, nosso time entra em contato. Se preferir, é só continuar escrevendo aqui mesmo que alguém do time vê.'
+
+export const DEFAULT_WELCOME_ONLINE = 'Olá! Aqui é da *{{empresa}}*. 👋 Já estamos online e alguém do time já viu sua mensagem!\n\nEnquanto isso, se puder, deixa seus dados aqui pra agilizar o atendimento:\n{{link}}'
+
+export const DEFAULT_REMINDER = 'Olá, aqui é da *{{empresa}}* de novo. 👋\n\nAinda não recebemos seus dados — pra te atendermos, preenche por aqui:\n{{link}}\n\n(Se o link não abrir direto, copia e cola no navegador.)'
+
+export type WhatsAppBotSettings = {
+  whatsapp_is_online: boolean
+  whatsapp_welcome_message: string | null
+  whatsapp_welcome_message_online: string | null
+  whatsapp_reminder_message: string | null
+  company_name: string | null
+}
+
+function fillBotVars(text: string, vars: { empresa: string; link: string }): string {
+  return text.replace(/\{\{empresa\}\}/g, vars.empresa).replace(/\{\{link\}\}/g, vars.link)
+}
+
+export function buildWelcomeMessage(settings: WhatsAppBotSettings, captureUrl: string): string {
+  const empresa = settings.company_name || 'nossa empresa'
+  const template = settings.whatsapp_is_online
+    ? settings.whatsapp_welcome_message_online || DEFAULT_WELCOME_ONLINE
+    : settings.whatsapp_welcome_message || DEFAULT_WELCOME_OFFLINE
+  return fillBotVars(template, { empresa, link: captureUrl })
+}
+
+export function buildReminderMessage(settings: WhatsAppBotSettings, captureUrl: string): string {
+  const empresa = settings.company_name || 'nossa empresa'
+  const template = settings.whatsapp_reminder_message || DEFAULT_REMINDER
+  return fillBotVars(template, { empresa, link: captureUrl })
+}

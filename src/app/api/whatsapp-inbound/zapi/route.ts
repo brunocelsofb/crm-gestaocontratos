@@ -157,11 +157,11 @@ export async function POST(request: Request) {
         if (!guard.ok) {
           console.log(`Envio automático bloqueado pra ${effectivePhone}: ${guard.reason}`)
         } else {
-        const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token, company_name').eq('id', 'default').maybeSingle()
+        const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token, company_name, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message').eq('id', 'default').maybeSingle()
         if (zapiSettings?.zapi_instance_id && zapiSettings.zapi_token && zapiSettings.zapi_client_token) {
-          const companyName = zapiSettings.company_name || 'nossa empresa'
           const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(effectivePhone)}`
-          const welcomeMessage = `Olá! Aqui é da *${companyName}*. 👋\n\nPra te atendermos direito, precisamos de alguns dados seus — leva menos de 1 minuto:\n${captureUrl}\n\n(Se o link não abrir direto, salva nosso número nos seus contatos e copia o link pra abrir no navegador.)\n\nAssim que preencher, nosso time entra em contato. Se preferir, é só continuar escrevendo aqui mesmo que alguém do time vê.`
+          const { buildWelcomeMessage } = await import('@/lib/whatsapp/guardrails')
+          const welcomeMessage = buildWelcomeMessage(zapiSettings, captureUrl)
           try {
             const { sendZApiTextMessage } = await import('@/lib/whatsapp/zapi')
             const sendResult = await sendZApiTextMessage({
