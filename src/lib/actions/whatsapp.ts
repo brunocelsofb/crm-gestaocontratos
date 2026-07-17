@@ -487,3 +487,31 @@ export async function getWhatsAppMessagesByLead(leadId: string) {
     .order('created_at', { ascending: false })
   return data ?? []
 }
+
+// Busca uma conversa por telefone, direto — funciona tanto pra "sem
+// vínculo nenhum" quanto "já é um lead" (ambas vivem fora de um
+// contrato). Usado pela Central de Atendimento unificada.
+export async function getConversationByPhone(phone: string): Promise<{
+  messages: Awaited<ReturnType<typeof getUnlinkedMessagesByPhone>>
+  leadId: string | null
+  displayName: string | null
+}> {
+  const supabase = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+  const { data } = await supabase
+    .from('contract_whatsapp_messages')
+    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name')
+    .ilike('phone', `%${cleanPhone.slice(-8)}%`)
+    .is('contract_id', null)
+    .order('created_at', { ascending: false })
+
+  const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
+  let displayName = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
+
+  if (leadId && !displayName) {
+    const { data: lead } = await supabase.from('leads').select('name').eq('id', leadId).maybeSingle()
+    displayName = lead?.name ?? null
+  }
+
+  return { messages: data ?? [], leadId, displayName }
+}
