@@ -4,26 +4,16 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // Recebe eventos de mensagem recebida do Z-API (configurar no painel
 // deles: Webhooks → "Ao receber" → colar essa URL).
 //
-// NOTA DE INCERTEZA: o formato exato do JSON que o Z-API manda pra cá
-// eu não confirmei ao vivo — os nomes de campo abaixo (phone, text,
-// senderName, fromMe) são os mais comuns na documentação pública
-// deles, mas PRECISA ser validado assim que a primeira mensagem real
-// chegar. Se não vincular certo, me manda o payload exato que
-// aparecer no log da Vercel.
+// Vínculo confirmado e testado: bate pelo telefone do REMETENTE contra
+// contract_crm.contacts.phone, e usa o contrato onde esse contato está
+// selecionado no campo "Contato" (contracts.contact_id) — se o
+// contato certo não estiver selecionado ali, a mensagem não vincula.
 export async function POST(request: Request) {
   const supabase = createAdminClient()
   const body = await request.json().catch(() => null)
 
-  // DEPURAÇÃO TEMPORÁRIA: grava exatamente o que chegou, pra
-  // conseguirmos ver o formato real do Z-API — remover depois que
-  // confirmarmos que o resto da rota está funcionando certo.
-  await supabase.from('webhook_debug_log').insert({ source: 'zapi_whatsapp', raw_payload: body })
-
   if (!body) return NextResponse.json({ ok: true })
 
-  // Tudo dentro de um try/catch — sem isso, qualquer erro no meio do
-  // caminho derruba a função inteira SEM deixar rastro nenhum (nem no
-  // log de depuração), o que foi exatamente o que aconteceu até agora.
   try {
     if (body.fromMe) return NextResponse.json({ ok: true, skipped: 'fromMe' })
     if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
@@ -38,36 +28,19 @@ export async function POST(request: Request) {
 
     const cleanPhone = phone.replace(/\D/g, '')
     const last8 = cleanPhone.slice(-8)
-    const { data: matchingContacts, error: contactsError } = await supabase.from('contacts').select('id').ilike('phone', `%${last8}%`)
-
-    await supabase.from('webhook_debug_log').insert({
-      source: 'zapi_whatsapp_match',
-      raw_payload: {
-        phone,
-        cleanPhone,
-        last8,
-        matchingContactsCount: matchingContacts?.length ?? 0,
-        matchingContactIds: matchingContacts?.map((c) => c.id) ?? [],
-        contactsError: contactsError?.message ?? null,
-      },
-    })
+    const { data: matchingContacts } = await supabase.from('contacts').select('id').ilike('phone', `%${last8}%`)
 
     if (!matchingContacts || matchingContacts.length === 0) {
       return NextResponse.json({ ok: true, matched: false })
     }
 
-    const { data: contract, error: contractError } = await supabase
+    const { data: contract } = await supabase
       .from('contracts')
       .select('id')
       .in('contact_id', matchingContacts.map((c) => c.id))
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    await supabase.from('webhook_debug_log').insert({
-      source: 'zapi_whatsapp_contract_lookup',
-      raw_payload: { contractFound: !!contract, contractId: contract?.id ?? null, contractError: contractError?.message ?? null },
-    })
 
     if (!contract) {
       return NextResponse.json({ ok: true, matched: false })
@@ -90,10 +63,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, matched: true })
   } catch (e) {
-    await supabase.from('webhook_debug_log').insert({
-      source: 'zapi_whatsapp_error',
-      raw_payload: { error: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : null },
-    })
+    console.error('Erro no webhook de WhatsApp:', e)
     return NextResponse.json({ ok: true, error: 'internal' })
   }
 }
