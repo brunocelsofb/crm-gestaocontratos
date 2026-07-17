@@ -367,6 +367,7 @@ create table contract_crm.organization_settings (
   zapi_token text,
   zapi_client_token text,
   zapi_webhook_secret text,
+  whatsapp_daily_auto_limit integer not null default 3,
   inbound_email_domain text,
   mailgun_webhook_signing_key text,
   updated_at timestamptz not null default now()
@@ -1207,3 +1208,14 @@ create table contract_crm.whatsapp_capture_prompts (
 );
 alter table contract_crm.whatsapp_capture_prompts enable row level security;
 create policy "whatsapp_capture_prompts_all" on contract_crm.whatsapp_capture_prompts for all using (true);
+
+
+-- ------------------------------------------------------------
+-- 36. Opt-out de WhatsApp automático
+-- ------------------------------------------------------------
+create table contract_crm.whatsapp_opt_outs (
+  phone text primary key,
+  created_at timestamptz not null default now()
+);
+alter table contract_crm.whatsapp_opt_outs enable row level security;
+create policy "whatsapp_opt_outs_all" on contract_crm.whatsapp_opt_outs for all using (true);

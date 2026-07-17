@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { sendZApiTextMessage, sendZApiImageMessage, sendZApiDocumentMessage, verifyZApiConnection } from '@/lib/whatsapp/zapi'
+import { canSendAutomatedWhatsApp } from '@/lib/whatsapp/guardrails'
 
 export type ActionState = { error?: string }
 
@@ -225,6 +226,9 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
 
   const filled = await buildWhatsAppFromTemplate(templateId, contractId)
   if (!filled?.phone) return
+
+  const guard = await canSendAutomatedWhatsApp(filled.phone)
+  if (!guard.ok) return
 
   try {
     const result = await sendZApiTextMessage({ ...creds, phone: filled.phone, message: filled.message })
@@ -448,6 +452,9 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
 
   let sent = 0
   for (const p of pending) {
+    const guard = await canSendAutomatedWhatsApp(p.phone)
+    if (!guard.ok) continue
+
     const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(p.phone)}`
     const reminderMessage = `Olá, aqui é da *${companyName}* de novo. 👋\n\nAinda não recebemos seus dados — pra te atendermos, preenche por aqui:\n${captureUrl}\n\n(Se o link não abrir direto, copia e cola no navegador.)`
     try {

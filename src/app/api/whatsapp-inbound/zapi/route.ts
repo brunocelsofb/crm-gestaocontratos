@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isOptOutMessage, recordWhatsAppOptOut, canSendAutomatedWhatsApp } from '@/lib/whatsapp/guardrails'
 
 // Recebe eventos do Z-API (configurar no painel deles: Webhooks →
 // "Ao receber" → colar essa URL, e ATIVAR a opção "Notificar as
@@ -82,6 +83,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: 'LID ainda não mapeado pra um telefone' })
     }
 
+    // Opt-out — a pessoa pediu pra parar de receber mensagem
+    // automática. Registra e confirma, sem processar o resto.
+    if (!isFromMe && messageText && isOptOutMessage(messageText)) {
+      await recordWhatsAppOptOut(effectivePhone)
+      try {
+        const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token').eq('id', 'default').maybeSingle()
+        if (zapiSettings?.zapi_instance_id && zapiSettings.zapi_token && zapiSettings.zapi_client_token) {
+          const { sendZApiTextMessage } = await import('@/lib/whatsapp/zapi')
+          await sendZApiTextMessage({
+            instanceId: zapiSettings.zapi_instance_id,
+            token: zapiSettings.zapi_token,
+            clientToken: zapiSettings.zapi_client_token,
+            phone: effectivePhone,
+            message: 'Combinado, não vamos mais te mandar mensagens automáticas. Se precisar de algo, é só escrever por aqui que um atendente vê. 🙂',
+          })
+        }
+      } catch (e) {
+        console.error('Falha ao confirmar opt-out:', e)
+      }
+      return NextResponse.json({ ok: true, optedOut: true })
+    }
+
     const cleanPhone = effectivePhone.replace(/\D/g, '')
     const last8 = cleanPhone.slice(-8)
     const { data: matchingContacts } = await supabase.from('contacts').select('id, company_id').ilike('phone', `%${last8}%`)
@@ -130,11 +153,15 @@ export async function POST(request: Request) {
       // dispara pra mensagem do CLIENTE (não fromMe), senão a gente
       // mandaria o link pra nós mesmos testando.
       if (!prompt && !isFromMe) {
+        const guard = await canSendAutomatedWhatsApp(effectivePhone)
+        if (!guard.ok) {
+          console.log(`Envio automático bloqueado pra ${effectivePhone}: ${guard.reason}`)
+        } else {
         const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token, company_name').eq('id', 'default').maybeSingle()
         if (zapiSettings?.zapi_instance_id && zapiSettings.zapi_token && zapiSettings.zapi_client_token) {
           const companyName = zapiSettings.company_name || 'nossa empresa'
           const captureUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/captura?phone=${encodeURIComponent(effectivePhone)}`
-          const welcomeMessage = `Olá! Aqui é da *${companyName}*. 👋\n\nPra te atendermos direito, precisamos de alguns dados seus — leva menos de 1 minuto:\n${captureUrl}\n\n(Se o link não abrir direto, salva nosso número nos seus contatos e copia o link pra abrir no navegador.)\n\nAssim que preencher, nosso time entra em contato.`
+          const welcomeMessage = `Olá! Aqui é da *${companyName}*. 👋\n\nPra te atendermos direito, precisamos de alguns dados seus — leva menos de 1 minuto:\n${captureUrl}\n\n(Se o link não abrir direto, salva nosso número nos seus contatos e copia o link pra abrir no navegador.)\n\nAssim que preencher, nosso time entra em contato. Se preferir, é só continuar escrevendo aqui mesmo que alguém do time vê.`
           try {
             const { sendZApiTextMessage } = await import('@/lib/whatsapp/zapi')
             const sendResult = await sendZApiTextMessage({
@@ -157,7 +184,32 @@ export async function POST(request: Request) {
             console.error('Falha ao mandar link de captação automático:', e)
           }
         }
+        }
         await supabase.from('whatsapp_capture_prompts').insert({ phone: effectivePhone })
+      }
+
+      // Handoff mais rápido: se a pessoa já mandou 2+ mensagens sem
+      // nunca ter preenchido o formulário, não espera o lembrete de
+      // 24h — avisa o time comercial na hora, pode ser algo urgente.
+      if (!isFromMe && !leadId) {
+        const { count: unlinkedCount } = await supabase
+          .from('contract_whatsapp_messages')
+          .select('id', { count: 'exact', head: true })
+          .ilike('phone', `%${last8}%`)
+          .eq('direction', 'recebido')
+          .is('contract_id', null)
+          .is('lead_id', null)
+
+        // A mensagem atual ainda não foi gravada nesse ponto — contagem
+        // de 1 aqui significa que essa é a SEGUNDA mensagem no total.
+        if ((unlinkedCount ?? 0) === 1) {
+          const { data: commercialProfiles } = await supabase.from('profiles').select('id').eq('department', 'comercial')
+          if (commercialProfiles && commercialProfiles.length > 0) {
+            await supabase.from('notifications').insert(
+              commercialProfiles.map((p) => ({ user_id: p.id, message: `${senderName ?? effectivePhone} já mandou 2 mensagens de WhatsApp sem preencher o cadastro — vale dar uma olhada.` }))
+            )
+          }
+        }
       }
     }
 

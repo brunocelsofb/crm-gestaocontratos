@@ -54,6 +54,16 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle()
   const isConnected = !!zapiSettings?.zapi_instance_id
 
+  // Métricas do fluxo de captação — sem isso não dá pra saber se está
+  // funcionando ou só incomodando gente.
+  const [{ count: promptsTotal }, { count: promptsConverted }, { count: remindersSent }, { count: optOuts }] = await Promise.all([
+    supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }),
+    supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }).not('lead_id', 'is', null),
+    supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }).not('reminder_sent_at', 'is', null),
+    supabase.from('whatsapp_opt_outs').select('phone', { count: 'exact', head: true }),
+  ])
+  const conversionRate = promptsTotal && promptsTotal > 0 ? Math.round(((promptsConverted ?? 0) / promptsTotal) * 100) : 0
+
   let selectedData = null
   if (selectedContractId) {
     const [{ data: selectedContract }, { data: whatsappTemplates }, { data: whatsappMessages }] = await Promise.all([
@@ -86,7 +96,20 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-4">
+    <div className="space-y-3">
+      {(promptsTotal ?? 0) > 0 && (
+        <div className="flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs">
+          <span className="text-gray-500">📊 Fluxo de captação:</span>
+          <span><strong>{promptsTotal}</strong> link{promptsTotal === 1 ? '' : 's'} mandado{promptsTotal === 1 ? '' : 's'}</span>
+          <span className="text-gray-300">·</span>
+          <span><strong className="text-positive-700">{conversionRate}%</strong> preencheram</span>
+          <span className="text-gray-300">·</span>
+          <span><strong>{remindersSent}</strong> lembrete{remindersSent === 1 ? '' : 's'} enviado{remindersSent === 1 ? '' : 's'}</span>
+          <span className="text-gray-300">·</span>
+          <span><strong>{optOuts}</strong> pediram pra sair</span>
+        </div>
+      )}
+      <div className="flex h-[calc(100vh-11rem)] gap-4">
       <WhatsAppInboxRealtimeWatcher />
       <div className="w-72 shrink-0 space-y-3 overflow-y-auto">
         <h1 className="px-1 text-lg font-semibold text-gray-900">Central de Atendimento</h1>
@@ -173,6 +196,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
             Selecione uma conversa à esquerda.
           </div>
         )}
+      </div>
       </div>
     </div>
   )
