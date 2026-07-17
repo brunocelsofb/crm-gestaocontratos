@@ -31,6 +31,11 @@ export async function POST(request: Request) {
 
   if (!body) return NextResponse.json({ ok: true })
 
+  // DEPURAÇÃO TEMPORÁRIA (de novo): grava todo payload recebido, pra
+  // vermos se "fromMe: true" está mesmo chegando depois de ativar
+  // "Notificar as enviadas por mim também" no Z-API.
+  await supabase.from('webhook_debug_log').insert({ source: 'zapi_whatsapp_v2', raw_payload: body })
+
   try {
     if (body.isGroup) return NextResponse.json({ ok: true, skipped: 'isGroup' })
 
