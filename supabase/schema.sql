@@ -1163,6 +1163,7 @@ create index idx_contract_whatsapp_contract on contract_crm.contract_whatsapp_me
 alter table contract_crm.contract_whatsapp_messages enable row level security;
 create policy "contract_whatsapp_select" on contract_crm.contract_whatsapp_messages for select using (auth.role() = 'authenticated');
 create policy "contract_whatsapp_insert" on contract_crm.contract_whatsapp_messages for insert with check (true);
+create policy "contract_whatsapp_update" on contract_crm.contract_whatsapp_messages for update using (auth.role() = 'authenticated');
 
 
 -- ------------------------------------------------------------

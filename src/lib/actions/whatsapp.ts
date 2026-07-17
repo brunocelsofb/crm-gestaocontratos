@@ -317,13 +317,17 @@ export async function getUnlinkedMessagesByPhone(phone: string) {
 // vinculadas (porque o contato/telefone passa a ser reconhecido).
 export async function linkUnlinkedWhatsAppConversation(phone: string, contractId: string): Promise<ActionState> {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('contract_whatsapp_messages')
     .update({ contract_id: contractId, unlinked_sender_name: null })
     .eq('phone', phone)
     .is('contract_id', null)
+    .select('id')
 
   if (error) return { error: error.message }
+  // Se não alterou nenhuma linha, algo está bloqueando silenciosamente
+  // (ex: permissão de banco) — melhor avisar do que fingir que deu certo.
+  if (!data || data.length === 0) return { error: 'Não consegui vincular — nenhuma mensagem foi atualizada. Tente de novo ou avise o suporte.' }
 
   await supabase.from('activities').insert({
     contract_id: contractId,
