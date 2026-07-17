@@ -1236,3 +1236,37 @@ create table contract_crm.whatsapp_conversation_assignments (
 );
 alter table contract_crm.whatsapp_conversation_assignments enable row level security;
 create policy "whatsapp_conversation_assignments_all" on contract_crm.whatsapp_conversation_assignments for all using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 38. Integração com ZapSign
+-- ------------------------------------------------------------
+create table contract_crm.zapsign_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  zapsign_template_token text not null,
+  type text not null default 'contrato' check (type in ('contrato', 'aditivo')),
+  created_at timestamptz not null default now()
+);
+alter table contract_crm.zapsign_templates enable row level security;
+create policy "zapsign_templates_all" on contract_crm.zapsign_templates for all using (auth.role() = 'authenticated');
+
+create table contract_crm.zapsign_documents (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contract_crm.contracts(id) on delete cascade,
+  template_id uuid references contract_crm.zapsign_templates(id) on delete set null,
+  name text not null,
+  zapsign_doc_token text,
+  pdf_url text,
+  signed_pdf_url text,
+  status text not null default 'pendente' check (status in ('pendente', 'enviado', 'assinado', 'recusado', 'expirado', 'erro')),
+  sent_at timestamptz,
+  signed_at timestamptz,
+  error_message text,
+  created_by uuid references contract_crm.profiles(id),
+  created_at timestamptz not null default now()
+);
+create index idx_zapsign_documents_contract on contract_crm.zapsign_documents(contract_id);
+alter table contract_crm.zapsign_documents enable row level security;
+create policy "zapsign_documents_all" on contract_crm.zapsign_documents for all using (auth.role() = 'authenticated');

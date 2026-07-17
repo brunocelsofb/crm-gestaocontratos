@@ -17,6 +17,7 @@ import { ContractTicketsSection } from '@/components/tickets/contract-tickets-se
 import { ContractEmailSection } from '@/components/email/contract-email-section'
 import { ContractCustomFieldsSection } from '@/components/custom-fields/contract-custom-fields-section'
 import { ContractContactsSection } from '@/components/contracts/contract-contacts-section'
+import { ContractZapSignSection } from '@/components/zapsign/contract-zapsign-section'
 import { getContractContacts } from '@/lib/actions/contract-contacts'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { getConnectedEmailAccount } from '@/lib/actions/email'
@@ -180,7 +181,7 @@ export default async function ContractDetailPage({
     return { stageId: stage.id, days, isOverdue }
   })
 
-  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }, contractContacts, { data: companyAllContacts }] = await Promise.all([
+  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }, contractContacts, { data: companyAllContacts }, { data: zapsignTemplates }, { data: zapsignDocuments }, { data: orgZapSignSettings }] = await Promise.all([
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'email').order('name'),
     supabase.from('contract_emails').select('id, from_email, to_email, cc_email, bcc_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
     getConnectedEmailAccount(),
@@ -194,6 +195,9 @@ export default async function ContractDetailPage({
     contract.company_id
       ? supabase.from('contacts').select('id, name, role').eq('company_id', contract.company_id).order('name')
       : Promise.resolve({ data: [] }),
+    supabase.from('zapsign_templates').select('id, name, type').order('name'),
+    supabase.from('zapsign_documents').select('id, name, status, sent_at, signed_at, pdf_url, signed_pdf_url').eq('contract_id', contract.id).order('created_at', { ascending: false }),
+    supabase.from('organization_settings').select('zapsign_api_token').eq('id', 'default').maybeSingle(),
   ])
 
   const inboundEmailAddress =
@@ -484,6 +488,21 @@ export default async function ContractDetailPage({
                 templates={whatsappTemplates ?? []}
                 defaultPhone={linkedContact?.phone ?? null}
                 messageLog={(whatsappMessages ?? []).map((m: any) => ({ ...m, sent_by_name: m.profiles?.full_name ?? null }))}
+              />
+            ),
+          },
+          {
+            id: 'zapsign',
+            label: '✍️ Assinatura',
+            content: (
+              <ContractZapSignSection
+                contractId={contract.id}
+                templates={zapsignTemplates ?? []}
+                documents={zapsignDocuments ?? []}
+                defaultContactName={linkedContact?.name ?? null}
+                defaultContactEmail={linkedContact?.email ?? null}
+                defaultContactPhone={linkedContact?.phone ?? null}
+                isConnected={!!orgZapSignSettings?.zapsign_api_token}
               />
             ),
           },

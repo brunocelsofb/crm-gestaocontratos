@@ -7,6 +7,7 @@ import { NumberingSettingsForm } from '@/components/settings/numbering-settings-
 import { InboundEmailSettingsForm } from '@/components/settings/inbound-email-settings-form'
 import { WhatsAppSettingsForm } from '@/components/settings/whatsapp-settings-form'
 import { WhatsAppBotSettingsForm } from '@/components/settings/whatsapp-bot-settings-form'
+import { saveZapSignSettings } from '@/lib/actions/zapsign'
 import { DEFAULT_WELCOME_OFFLINE, DEFAULT_WELCOME_ONLINE, DEFAULT_REMINDER } from '@/lib/whatsapp/guardrails'
 
 export default async function SettingsPage() {
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit')
+    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -52,6 +53,28 @@ export default async function SettingsPage() {
         reminderMessage={settings?.whatsapp_reminder_message ?? DEFAULT_REMINDER}
         dailyLimit={settings?.whatsapp_daily_auto_limit ?? 3}
       />
+
+      <form action={async (formData: FormData) => { await saveZapSignSettings(formData) }} className="space-y-3 rounded-lg border border-gray-200 bg-white p-6">
+        <div>
+          <h3 className="text-sm font-medium text-gray-900">✍️ ZapSign — Assinatura Digital</h3>
+          <p className="mt-0.5 text-xs text-gray-400">
+            Token da API do ZapSign (encontrado em <a href="https://app.zapsign.com.br/conta/integracoes" target="_blank" rel="noopener noreferrer" className="underline">app.zapsign.com.br → Integrações → API Token</a>).
+          </p>
+        </div>
+        {settings?.zapsign_api_token ? (
+          <p className="text-sm text-positive-700">✅ Token configurado</p>
+        ) : (
+          <p className="text-xs text-yellow-700">⚠️ Não configurado ainda — sem isso não dá pra enviar contratos pra assinatura.</p>
+        )}
+        <div>
+          <label className="block text-xs text-gray-500">API Token</label>
+          <input name="zapsign_api_token" type="password" placeholder={settings?.zapsign_api_token ? '••••••••' : 'Cole o token da ZapSign aqui'} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-mono focus:border-brand-700 focus:outline-none" />
+        </div>
+        <button type="submit" className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800">
+          Salvar
+        </button>
+      </form>
+
       <p className="text-xs text-gray-400">
         Conectar seu Gmail e configurar sua assinatura de e-mail agora fica em{' '}
         <Link href="/minha-conta" className="text-brand-700 hover:underline">Minha Conta</Link> — é pessoal, não de organização.
