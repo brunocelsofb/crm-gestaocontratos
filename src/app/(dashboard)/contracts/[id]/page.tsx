@@ -206,61 +206,57 @@ export default async function ContractDetailPage({
       : null
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/pipeline"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700"
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <Link href="/pipeline" style={{ fontSize: 12, color: '#8892a4', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         ← Voltar para o Funil
       </Link>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-gray-900">{contract.client_name}</h1>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{contract.title}</span>
-            <ValidityBadge validUntil={contract.valid_until} />
-            <ContractTagSelect
-              key={currentTagId ?? 'none'}
-              tags={allTags ?? []}
-              currentTagId={currentTagId}
-              action={setContractTag.bind(null, contract.id)}
-            />
-            <AccountOwnerBadge
-              contractId={contract.id}
-              ownerName={accountOwnerName}
-              isAdmin={currentProfile?.role === 'admin'}
-              users={(allProfiles ?? []).map((p) => ({ id: p.id, full_name: p.full_name }))}
-            />
-            {contract.auto_renewal && (
-              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                🔄 Renovação automática
-              </span>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{contract.client_name}</h1>
+              <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, background: '#f1f3f8', color: '#52514e' }}>{contract.title}</span>
+              <ValidityBadge validUntil={contract.valid_until} />
+              <ContractTagSelect
+                key={currentTagId ?? 'none'}
+                tags={allTags ?? []}
+                currentTagId={currentTagId}
+                action={setContractTag.bind(null, contract.id)}
+              />
+              <AccountOwnerBadge
+                contractId={contract.id}
+                ownerName={accountOwnerName}
+                isAdmin={currentProfile?.role === 'admin'}
+                users={(allProfiles ?? []).map((p) => ({ id: p.id, full_name: p.full_name }))}
+              />
+              {contract.auto_renewal && (
+                <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, background: '#eef3ff', color: '#3b5bdb' }}>
+                  🔄 Renovação automática
+                </span>
+              )}
+            </div>
+            <p style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 12, color: '#b0b8c8' }}>{contract.process_number}</p>
+            {linkedCompany && (
+              <Link href={`/companies/${linkedCompany.id}`} style={{ marginTop: 4, display: 'inline-block', fontSize: 12, color: '#4f86f7', textDecoration: 'none' }}>
+                {linkedCompany.name} →
+              </Link>
+            )}
+            {linkedContact && (
+              <p style={{ marginTop: 4, fontSize: 12, color: '#8892a4' }}>
+                {linkedContact.name}
+                {linkedContact.role ? ` · ${linkedContact.role}` : ''}
+                {linkedContact.email ? ` · ${linkedContact.email}` : ''}
+                {linkedContact.phone ? ` · ${linkedContact.phone}` : ''}
+              </p>
             )}
           </div>
-          <p className="mt-1 font-mono text-sm text-gray-500">{contract.process_number}</p>
-          {linkedCompany && (
-            <Link href={`/companies/${linkedCompany.id}`} className="mt-1 inline-block text-xs text-brand-700 hover:underline">
-              {linkedCompany.name} →
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <Link href={`/contracts/${contract.id}/edit`} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>
+              Editar
             </Link>
-          )}
-          {linkedContact && (
-            <p className="mt-1 text-xs text-gray-500">
-              Contato: {linkedContact.name}
-              {linkedContact.role ? ` (${linkedContact.role})` : ''}
-              {linkedContact.email ? ` · ${linkedContact.email}` : ''}
-              {linkedContact.phone ? ` · ${linkedContact.phone}` : ''}
-            </p>
-          )}
-        </div>
-        <div className="flex items-start gap-2">
-          <Link
-            href={`/contracts/${contract.id}/edit`}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Editar
-          </Link>
-          {currentProfile?.role === 'admin' && <DeleteContractButton contractId={contract.id} />}
+            {currentProfile?.role === 'admin' && <DeleteContractButton contractId={contract.id} />}
+          </div>
         </div>
       </div>
 
@@ -276,7 +272,7 @@ export default async function ContractDetailPage({
           canChangeStage={canChangeStage}
         />
       ) : (
-        <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
+        <p style={{ borderRadius: 10, background: '#f8f9fb', padding: 16, fontSize: 13, color: '#8892a4' }}>
           Este contrato não tem nenhuma passagem de funil em aberto no momento.
         </p>
       )}

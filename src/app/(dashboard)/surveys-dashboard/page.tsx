@@ -36,10 +36,10 @@ export default async function SurveysDashboardPage({
   const supabase = await createClient()
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">Pesquisas de Satisfação</h1>
-        <p className="mt-0.5 text-sm text-gray-500">NPS e formulários customizados, consolidados por período.</p>
+        <h1 style={{ fontSize: 20, fontWeight: 500, color: "#1a1f36", margin: 0 }}>Pesquisas de Satisfação</h1>
+        <p style={{ fontSize: 12, color: "#8892a4", marginTop: 3 }}>NPS e formulários customizados, consolidados por período.</p>
       </div>
 
       <div className="flex gap-1 border-b border-gray-200">
