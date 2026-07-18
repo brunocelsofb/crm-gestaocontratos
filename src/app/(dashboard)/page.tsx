@@ -73,7 +73,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const receitaAtual = (wonInPeriod ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
   const churnValue = (lostInPeriod ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
   const totalOpen = (openRuns ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
-  const meta = totalOpen > 0 ? totalOpen * 0.85 : 145000
+  const meta = totalOpen > 0 ? totalOpen * 0.85 : 0
   const wonRuns = (allWonRuns ?? []).filter((r: any) => r.status === undefined || true)
   const avgTicket = wonInPeriod && wonInPeriod.length > 0 ? receitaAtual / wonInPeriod.length : 0
   const cycleDays = (wonInPeriod ?? []).filter((r: any) => r.ended_at).map((r: any) => (new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()) / 86400000)
@@ -102,7 +102,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const SOURCE_LABELS: Record<string, string> = { manual: 'Manual', whatsapp: 'WhatsApp', site: 'Site', indicacao: 'Indicação', google_ads: 'Google Ads', redes_sociais: 'Redes Sociais' }
   const leadSources = totalLeads > 0
     ? Object.entries(sourceCount).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => ({ label: SOURCE_LABELS[k] ?? k, pct: Math.round((v / totalLeads) * 100) }))
-    : [{ label: 'Indicação', pct: 40 }, { label: 'WhatsApp', pct: 30 }, { label: 'Site', pct: 20 }, { label: 'Outros', pct: 10 }]
+    : []
 
   // Ranking da equipe — combina atividades + receita do período
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name as string]))
@@ -121,22 +121,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     return { initials, name, activities: actByUser.get(id) ?? 0, revenue: revByUser.get(id) ?? 0 }
   }).sort((a, b) => b.revenue - a.revenue)
 
-  // Fallback se não tiver dados de equipe ainda
-  const teamData = team.length > 0 ? team : []
-
   return (
     <PremiumDashboard
       period={period}
       kpi={{ receita: receitaAtual, meta, ticketMedio: avgTicket, ticketDelta: null, cicloMedio: avgCycle, churnPct }}
-      funnel={funnel.length > 0 ? funnel : [
-        { label: 'Prospecção', value: 220000, count: 47 },
-        { label: 'Qualificação', value: 158000, count: 34 },
-        { label: 'Proposta', value: 105000, count: 23 },
-        { label: 'Negociação', value: 61000, count: 13 },
-      ]}
+      funnel={funnel}
       series={series}
       leadSources={leadSources}
-      team={teamData}
+      team={team}
     />
   )
 }
