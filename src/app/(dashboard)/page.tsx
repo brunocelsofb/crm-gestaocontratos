@@ -50,7 +50,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     mainPipelineId ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').eq('pipeline_id', mainPipelineId).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
     mainPipelineId ? supabase.from('pipeline_runs').select('value').eq('pipeline_id', mainPipelineId).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
     mainPipelineId ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').eq('pipeline_id', mainPipelineId).in('status', ['won', 'lost']) : Promise.resolve({ data: [] as any[] }),
-    supabase.from('activities').select('user_id, created_at').gte('created_at', `${periodFrom}T00:00:00`).lte('created_at', `${periodTo}T23:59:59`),
+    // Só atividades criadas manualmente por pessoas — exclui 'system'
+    // (eventos automáticos do CRM: mudar etapa, ZapSign, etc.) e
+    // 'whatsapp'/'email' enviados por automação. O campo user_id nulo
+    // indica automação, então filtramos só onde tem user_id.
+    supabase.from('activities').select('user_id, type, created_at')
+      .not('type', 'eq', 'system')
+      .not('user_id', 'is', null)
+      .gte('created_at', `${periodFrom}T00:00:00`).lte('created_at', `${periodTo}T23:59:59`),
     supabase.from('profiles').select('id, full_name'),
     supabase.from('leads').select('source'),
   ])
@@ -74,6 +81,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const churnValue = (lostInPeriod ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
   const totalOpen = (openRuns ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
   const meta = totalOpen > 0 ? totalOpen * 0.85 : 0
+  // meta = 85% do valor total em pipeline aberto (estimativa interna)
   const wonRuns = (allWonRuns ?? []).filter((r: any) => r.status === undefined || true)
   const avgTicket = wonInPeriod && wonInPeriod.length > 0 ? receitaAtual / wonInPeriod.length : 0
   const cycleDays = (wonInPeriod ?? []).filter((r: any) => r.ended_at).map((r: any) => (new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()) / 86400000)
