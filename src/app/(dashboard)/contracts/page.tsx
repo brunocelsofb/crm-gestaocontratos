@@ -2,8 +2,19 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ValidityBadge } from '@/components/contracts/validity-badge'
 
-// Server Component: busca os dados direto no servidor, sem useEffect
-// nem loading state no client — reduz JS enviado ao navegador.
+function fmt(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
+}
+
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  open:   { bg: '#eef3ff', color: '#3b5bdb' },
+  won:    { bg: '#eaf5ee', color: '#1a7c3e' },
+  lost:   { bg: '#fdecea', color: '#b91c1c' },
+  paused: { bg: '#fff8e6', color: '#92400e' },
+}
+const STATUS_LABEL: Record<string, string> = {
+  open: 'Em andamento', won: 'Ganho', lost: 'Perdido', paused: 'Pausado',
+}
 
 export default async function ContractsPage({
   searchParams,
@@ -13,14 +24,6 @@ export default async function ContractsPage({
   const { q } = await searchParams
   const supabase = await createClient()
 
-  // NOTA DE INCERTEZA: o Supabase/PostgREST resolve "embedding" (o join
-  // automático tipo `stages(name)`) baseado em foreign keys DECLARADAS
-  // nas tabelas. Não tenho certeza se isso funciona de forma confiável
-  // quando a origem é uma VIEW (contracts_with_current_run) em vez de
-  // uma tabela real — pode não detectar a relação. Para não arriscar
-  // quebrar em produção, faço em duas consultas simples e junto os
-  // dados aqui no servidor, em vez de depender de embedding sobre a view.
-
   let query = supabase
     .from('contracts_with_current_run')
     .select('id, process_number, title, client_name, value, run_status, stage_id')
@@ -28,15 +31,12 @@ export default async function ContractsPage({
 
   if (q?.trim()) {
     const term = q.trim().replace(/[%_]/g, '')
-    query = query.or(
-      `process_number.ilike.%${term}%,title.ilike.%${term}%,client_name.ilike.%${term}%`
-    )
+    query = query.or(`process_number.ilike.%${term}%,title.ilike.%${term}%,client_name.ilike.%${term}%`)
   }
 
   const { data: contracts, error } = await query
-
-  const contractIds = (contracts ?? []).map((c) => c.id)
   const stageIds = [...new Set((contracts ?? []).map((c) => c.stage_id).filter(Boolean))]
+  const contractIds = (contracts ?? []).map((c) => c.id)
 
   const [{ data: stages }, { data: validityData }] = await Promise.all([
     stageIds.length
@@ -50,97 +50,121 @@ export default async function ContractsPage({
   const stageById = new Map((stages ?? []).map((s) => [s.id, s]))
   const validUntilById = new Map((validityData ?? []).map((c) => [c.id, c.valid_until]))
 
+  const total = (contracts ?? []).reduce((s, c) => s + Number(c.value || 0), 0)
+  const open  = (contracts ?? []).filter(c => c.run_status === 'open').length
+  const won   = (contracts ?? []).filter(c => c.run_status === 'won').length
+  const lost  = (contracts ?? []).filter(c => c.run_status === 'lost').length
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Contratos</h1>
-        <Link
-          href="/contracts/new"
-          className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          + Novo Contrato
-        </Link>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Oportunidades</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Todas as oportunidades e contratos ativos</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link href="/contracts/new" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#1a1f36', color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 500 }}>
+            + Nova oportunidade
+          </Link>
+        </div>
       </div>
 
-      {/* Busca via GET simples — funciona sem JavaScript no client,
-          e o resultado já vem filtrado do servidor. */}
-      <form method="GET" className="flex gap-2">
-        <input
-          type="text"
-          name="q"
-          defaultValue={q ?? ''}
-          placeholder="Buscar por nº do processo, título ou cliente..."
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-        />
-        <button
-          type="submit"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Buscar
-        </button>
-        {q && (
-          <Link
-            href="/contracts"
-            className="rounded-md px-3 py-2 text-sm text-gray-500 hover:underline"
-          >
-            Limpar
-          </Link>
-        )}
-      </form>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Valor total', value: fmt(total), sub: `${(contracts ?? []).length} oportunidades` },
+          { label: 'Em andamento', value: String(open), sub: 'oportunidades abertas' },
+          { label: 'Ganhas', value: String(won), sub: 'oportunidades fechadas' },
+          { label: 'Perdidas', value: String(lost), sub: 'oportunidades perdidas' },
+        ].map(k => (
+          <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '0.5px solid #e8edf5' }}>
+            <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{k.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: '#8892a4', marginTop: 3 }}>{k.sub}</p>
+          </div>
+        ))}
+      </div>
 
-      {error && (
-        <p className="text-sm text-red-600">
-          Erro ao carregar contratos: {error.message}
-        </p>
-      )}
+      {/* Card principal */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+        {/* Filtros + busca */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', flexWrap: 'wrap' }}>
+          {['Todas', 'Em andamento', 'Ganhas', 'Perdidas'].map((f, i) => (
+            <span key={f} style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, border: '0.5px solid', borderColor: i === 0 ? '#1a1f36' : '#d1d8e8', background: i === 0 ? '#1a1f36' : '#fff', color: i === 0 ? '#fff' : '#8892a4', cursor: 'pointer' }}>{f}</span>
+          ))}
+          <div style={{ flex: 1 }} />
+          <form method="GET" style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              name="q"
+              defaultValue={q ?? ''}
+              placeholder="Buscar empresa ou processo…"
+              style={{ padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none', width: 220 }}
+            />
+            <button type="submit" style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>Buscar</button>
+            {q && <Link href="/contracts" style={{ padding: '6px 10px', fontSize: 11, color: '#8892a4', textDecoration: 'none', alignSelf: 'center' }}>Limpar</Link>}
+          </form>
+        </div>
+
+        {error && <p style={{ padding: '12px 16px', fontSize: 12, color: '#b91c1c' }}>Erro ao carregar: {error.message}</p>}
+
+        {/* Tabela */}
+        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Nº Processo</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Título</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Cliente</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Etapa</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Validade</th>
-              <th className="px-4 py-3 text-right font-medium text-gray-500">Valor</th>
+              {['Nº processo', 'Empresa / oportunidade', 'Etapa', 'Validade', 'Status', 'Valor'].map((h, i) => (
+                <th key={h} style={{ padding: '10px 16px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: i === 5 ? 'right' : 'left', borderBottom: '0.5px solid #f1f3f8', width: i === 0 ? '12%' : i === 1 ? '26%' : i === 2 ? '18%' : i === 3 ? '14%' : i === 4 ? '14%' : '16%' }}>{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {contracts?.map((c) => {
+          <tbody>
+            {(contracts ?? []).map((c) => {
               const stage = c.stage_id ? stageById.get(c.stage_id) : null
+              const st = STATUS_STYLE[c.run_status ?? 'open'] ?? STATUS_STYLE.open
+              const stLabel = STATUS_LABEL[c.run_status ?? 'open'] ?? c.run_status
               return (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-gray-900">
-                    <Link href={`/contracts/${c.id}`} className="hover:underline">
-                      {c.process_number}
+                <tr key={c.id} style={{ borderBottom: '0.5px solid #f8f9fb' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#fafbfd')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                  <td style={{ padding: '12px 16px', fontSize: 11, fontFamily: 'monospace', color: '#8892a4' }}>
+                    <Link href={`/contracts/${c.id}`} style={{ color: '#4f86f7', textDecoration: 'none' }}>{c.process_number}</Link>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <Link href={`/contracts/${c.id}`} style={{ textDecoration: 'none' }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{c.client_name}</p>
+                      <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{c.title}</p>
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{c.title}</td>
-                  <td className="px-4 py-3 text-gray-700">{c.client_name}</td>
-                  <td className="px-4 py-3">
+                  <td style={{ padding: '12px 16px' }}>
                     {stage ? (
-                      <span className="rounded-full px-2 py-1 text-xs" style={{ backgroundColor: stage.color + '20', color: stage.color }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: (stage.color ?? '#8892a4') + '20', color: stage.color ?? '#8892a4' }}>
                         {stage.name}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-400">Sem funil ativo</span>
+                      <span style={{ fontSize: 11, color: '#c8cdd8' }}>Sem funil</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td style={{ padding: '12px 16px' }}>
                     <ValidityBadge validUntil={validUntilById.get(c.id) ?? null} />
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.value || 0)}
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: st.bg, color: st.color }}>
+                      {stLabel}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>
+                    {fmt(Number(c.value || 0))}
                   </td>
                 </tr>
               )
             })}
-
-            {contracts?.length === 0 && (
+            {(contracts ?? []).length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                  {q ? `Nenhum contrato encontrado para "${q}".` : 'Nenhum contrato cadastrado ainda.'}
+                <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>
+                  {q ? `Nenhuma oportunidade encontrada para "${q}".` : 'Nenhuma oportunidade cadastrada ainda.'}
                 </td>
               </tr>
             )}
