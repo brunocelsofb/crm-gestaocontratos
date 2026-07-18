@@ -111,16 +111,25 @@ export default async function PipelinePage({
   })
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[17px] font-medium text-foreground">Funil</h1>
-        <div className="flex items-center gap-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Funil de Vendas</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>
+            {cards.filter(c => c.status === 'open').length} oportunidades abertas · {
+              new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
+                cards.filter(c => c.status === 'open').reduce((s, c) => s + c.value, 0)
+              )
+            } em pipeline
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {pipelines && pipelines.length > 0 && (
             <PipelineSelect pipelines={pipelines} selected={selectedPipeline} />
           )}
           <Link
             href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
-            className="whitespace-nowrap rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
+            style={{ whiteSpace: 'nowrap', borderRadius: 8, background: '#1a1f36', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none' }}
           >
             + {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
           </Link>
@@ -138,7 +147,7 @@ export default async function PipelinePage({
           isAdmin={isAdmin}
         />
       ) : (
-        <p className="text-sm text-gray-400">Nenhuma etapa cadastrada para este pipeline.</p>
+        <p style={{ fontSize: 13, color: '#8892a4' }}>Nenhuma etapa cadastrada para este pipeline.</p>
       )}
     </div>
   )

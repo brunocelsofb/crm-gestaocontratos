@@ -61,9 +61,9 @@ function fmt(value: number) {
 }
 
 const FRESHNESS_STYLES = {
-  fresh: 'bg-white border-gray-200',
-  warning: 'bg-yellow-50 border-yellow-200 border-l-2 border-l-yellow-400',
-  stale: 'bg-negative-100 border-negative-600/30 border-l-2 border-l-negative-600',
+  fresh:   { border: '0.5px solid #e8edf5', background: '#fff', borderLeft: '0.5px solid #e8edf5' },
+  warning: { border: '0.5px solid #fde68a', background: '#fffdf5', borderLeft: '3px solid #f59e0b' },
+  stale:   { border: '0.5px solid #fca5a5', background: '#fff5f5', borderLeft: '3px solid #ef4444' },
 } as const
 
 function Card({ card, sla, showValidity, wonLabel, lostLabel }: { card: RunCard; sla: number | null; showValidity: boolean; wonLabel: string; lostLabel: string }) {
@@ -99,45 +99,48 @@ function Card({ card, sla, showValidity, wonLabel, lostLabel }: { card: RunCard;
             ? 'Começando a esfriar — considere um follow-up'
             : 'Interação recente'
       }
-      className={`mb-3 rounded-lg border p-3 text-sm shadow-sm ${FRESHNESS_STYLES[isClosed ? 'fresh' : card.freshness]} ${
-        isClosed ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
-      } ${isDragging ? 'opacity-40' : ''}`}
+      style={{
+        ...FRESHNESS_STYLES[isClosed ? 'fresh' : card.freshness],
+        borderRadius: 10,
+        padding: '12px',
+        marginBottom: 8,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        cursor: isClosed ? 'default' : 'grab',
+        opacity: isDragging ? 0.4 : isClosed ? 0.8 : 1,
+      }}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
         <button
           type="button"
           onClick={openAccount}
           onPointerDown={(e) => e.stopPropagation()}
-          title={card.companyId ? 'Abrir empresa' : 'Abrir contrato (sem empresa vinculada ainda)'}
-          className="text-left text-sm font-semibold leading-snug text-gray-900 hover:text-brand-700 hover:underline"
+          title={card.companyId ? 'Abrir empresa' : 'Abrir contrato'}
+          style={{ textAlign: 'left', fontSize: 13, fontWeight: 500, color: '#1a1f36', background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 1.3 }}
         >
           {card.clientName}
         </button>
-        {card.status === 'won' && <span className="shrink-0 rounded-full bg-positive-100 px-2 py-0.5 text-xs font-medium text-positive-700">{wonLabel}</span>}
-        {card.status === 'lost' && <span className="shrink-0 rounded-full bg-negative-100 px-2 py-0.5 text-xs font-medium text-negative-700">{lostLabel}</span>}
+        {card.status === 'won' && <span style={{ flexShrink: 0, borderRadius: 20, background: '#eaf5ee', color: '#1a7c3e', fontSize: 10, fontWeight: 500, padding: '2px 7px' }}>{wonLabel}</span>}
+        {card.status === 'lost' && <span style={{ flexShrink: 0, borderRadius: 20, background: '#fdecea', color: '#b91c1c', fontSize: 10, fontWeight: 500, padding: '2px 7px' }}>{lostLabel}</span>}
       </div>
 
       {card.tag && (
-        <span
-          className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium text-white"
-          style={{ backgroundColor: card.tag.color }}
-        >
+        <span style={{ display: 'inline-block', marginTop: 6, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 500, color: '#fff', background: card.tag.color }}>
           {card.tag.name}
         </span>
       )}
 
-      <p className="mt-1.5 font-mono text-xs text-gray-400">{card.processNumber}</p>
+      <p style={{ marginTop: 4, fontFamily: 'monospace', fontSize: 10, color: '#b0b8c8' }}>{card.processNumber}</p>
 
       {showValidity && card.validUntil && (
-        <div className="mt-1.5">
+        <div style={{ marginTop: 6 }}>
           <ValidityBadge validUntil={card.validUntil} />
         </div>
       )}
 
-      <div className="mt-2.5 flex items-center justify-between border-t border-black/5 pt-2.5">
-        <span className="text-sm font-medium text-gray-700">{fmt(card.value)}</span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${overdue ? 'bg-negative-100 text-negative-700' : 'bg-gray-100 text-gray-500'}`}>
-          {days === 0 ? '< 1 dia' : `${days} dias`}
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{fmt(card.value)}</span>
+        <span style={{ borderRadius: 20, padding: '2px 7px', fontSize: 10, fontWeight: 500, background: overdue ? '#fdecea' : '#f1f3f8', color: overdue ? '#b91c1c' : '#8892a4' }}>
+          {days === 0 ? '< 1 dia' : `${days}d`}
         </span>
       </div>
     </div>
@@ -151,17 +154,26 @@ function Column({ stage, cards, showValidity, wonLabel, lostLabel }: { stage: St
   return (
     <div
       ref={setNodeRef}
-      className={`w-72 shrink-0 rounded-lg p-3 transition-colors ${isOver ? 'bg-blue-50' : 'bg-gray-100'}`}
+      style={{
+        width: 272,
+        flexShrink: 0,
+        borderRadius: 12,
+        padding: '12px 10px',
+        background: isOver ? '#eef3ff' : '#f1f3f8',
+        border: isOver ? '0.5px solid #b0c4f8' : '0.5px solid #e8edf5',
+        transition: 'background 0.15s, border 0.15s',
+      }}
     >
-      <p className="px-1 text-sm font-semibold text-gray-700">{stage.name}</p>
-      <p className="px-1 pb-3 text-xs text-gray-400">
-        {cards.length} · {fmt(total)}
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: 10 }}>
+        <p style={{ fontSize: 12, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{stage.name}</p>
+        <span style={{ fontSize: 10, color: '#8892a4', background: '#fff', border: '0.5px solid #e8edf5', borderRadius: 20, padding: '2px 7px' }}>{cards.length}</span>
+      </div>
+      <p style={{ fontSize: 11, color: '#8892a4', padding: '0 4px', marginBottom: 10 }}>{fmt(total)}</p>
       {cards.map((c) => (
         <Card key={c.runId} card={c} sla={stage.sla_days} showValidity={showValidity} wonLabel={wonLabel} lostLabel={lostLabel} />
       ))}
       {cards.length === 0 && (
-        <p className="py-8 text-center text-xs text-gray-400">Vazio</p>
+        <p style={{ padding: '32px 0', textAlign: 'center', fontSize: 11, color: '#c8cdd8' }}>Vazio</p>
       )}
     </div>
   )
@@ -171,15 +183,19 @@ const TRASH_ZONE_ID = '__trash__'
 
 function TrashDropzone() {
   const { setNodeRef, isOver } = useDroppable({ id: TRASH_ZONE_ID })
-
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-center justify-center gap-2 rounded-lg border-2 border-dashed p-3 text-sm transition-colors ${
-        isOver ? 'border-negative-500 bg-negative-100 text-negative-700' : 'border-gray-300 text-gray-400'
-      }`}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        borderRadius: 10, border: `1.5px dashed ${isOver ? '#ef4444' : '#d1d8e8'}`,
+        padding: '10px', fontSize: 12, marginBottom: 4,
+        background: isOver ? '#fdecea' : 'transparent',
+        color: isOver ? '#b91c1c' : '#8892a4',
+        transition: 'all 0.15s',
+      }}
     >
-      <Trash2 size={16} />
+      <Trash2 size={14} />
       Arraste aqui para excluir permanentemente (admin)
     </div>
   )
@@ -305,22 +321,22 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-500">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {error && <p style={{ fontSize: 12, color: '#b91c1c' }}>{error}</p>}
+        <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8892a4', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={showClosed}
             onChange={(e) => setShowClosed(e.target.checked)}
-            className="rounded border-gray-300"
+            style={{ borderRadius: 4 }}
           />
           Mostrar encerrados ({closedCount})
         </label>
       </div>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         {isAdmin && <TrashDropzone />}
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
           {stages.map((stage) => (
             <Column
               key={stage.id}
