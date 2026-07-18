@@ -3,15 +3,16 @@ import { createClient } from '@/lib/supabase/server'
 import { PeriodSelector } from '@/components/dashboard/period-selector'
 import { BulkSendNpsButton } from '@/components/nps/bulk-send-nps-button'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
+import { NpsCharts } from '@/components/dashboard/nps-charts'
 import { calculateNps, categorizeScore } from '@/lib/utils/nps'
 import { calculateResponseScore, calculateAverageScore } from '@/lib/utils/survey-score'
 import type { Question } from '@/lib/actions/custom-surveys'
 
 const NPS_CATEGORY_LABELS = { promoter: 'Promotor', passive: 'Neutro', detractor: 'Detrator' } as const
-const NPS_CATEGORY_STYLES = {
-  promoter: 'bg-positive-100 text-positive-700',
-  passive: 'bg-yellow-100 text-yellow-800',
-  detractor: 'bg-negative-100 text-negative-700',
+const NPS_CATEGORY_STYLE = {
+  promoter: { bg: '#eaf5ee', color: '#1a7c3e' },
+  passive:  { bg: '#fff8e6', color: '#92400e' },
+  detractor:{ bg: '#fdecea', color: '#b91c1c' },
 } as const
 
 function currentQuarterRange() {
@@ -32,29 +33,29 @@ export default async function SurveysDashboardPage({
   const defaultRange = currentQuarterRange()
   const from = params.from ?? defaultRange.from
   const to = params.to ?? defaultRange.to
-
   const supabase = await createClient()
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 500, color: "#1a1f36", margin: 0 }}>Pesquisas de Satisfação</h1>
-        <p style={{ fontSize: 12, color: "#8892a4", marginTop: 3 }}>NPS e formulários customizados, consolidados por período.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Pesquisas & NPS</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Satisfação dos clientes consolidada por período.</p>
+        </div>
+        <BulkSendNpsButton />
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
-        <Link
-          href={`/surveys-dashboard?tab=nps&from=${from}&to=${to}`}
-          className={`px-4 py-2 text-sm font-medium ${tab === 'nps' ? 'border-b-2 border-brand-700 text-brand-700' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          NPS
-        </Link>
-        <Link
-          href={`/surveys-dashboard?tab=surveys&from=${from}&to=${to}`}
-          className={`px-4 py-2 text-sm font-medium ${tab === 'surveys' ? 'border-b-2 border-brand-700 text-brand-700' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Pesquisas Customizadas
-        </Link>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 2, borderBottom: '0.5px solid #e8edf5' }}>
+        {[{ label: 'NPS', value: 'nps' }, { label: 'Pesquisas Customizadas', value: 'surveys' }].map(t => (
+          <Link key={t.value} href={`/surveys-dashboard?tab=${t.value}&from=${from}&to=${to}`}
+            style={{ padding: '8px 16px', fontSize: 13, fontWeight: tab === t.value ? 500 : 400, textDecoration: 'none',
+              color: tab === t.value ? '#1a1f36' : '#8892a4',
+              borderBottom: tab === t.value ? '2px solid #1a1f36' : '2px solid transparent',
+              marginBottom: -0.5 }}>
+            {t.label}
+          </Link>
+        ))}
       </div>
 
       {tab === 'nps' ? (
@@ -66,319 +67,228 @@ export default async function SurveysDashboardPage({
   )
 }
 
-// ------------------------------------------------------------
-// Aba NPS
-// ------------------------------------------------------------
-async function NpsTab({
-  supabase,
-  from,
-  to,
-  selectedTagId,
-}: {
-  supabase: Awaited<ReturnType<typeof createClient>>
-  from: string
-  to: string
-  selectedTagId: string
+async function NpsTab({ supabase, from, to, selectedTagId }: {
+  supabase: Awaited<ReturnType<typeof createClient>>; from: string; to: string; selectedTagId: string
 }) {
   const [{ data: surveysRaw }, { data: allTags }] = await Promise.all([
-    supabase
-      .from('nps_surveys')
-      .select('id, contract_id, score, comment, answered_at, respondent_name, respondent_email, respondent_phone')
-      .eq('status', 'answered')
-      .gte('answered_at', `${from}T00:00:00`)
-      .lte('answered_at', `${to}T23:59:59`)
-      .order('answered_at', { ascending: false }),
+    supabase.from('nps_surveys').select('id, contract_id, score, comment, answered_at, respondent_name, respondent_email, respondent_phone').eq('status', 'answered').gte('answered_at', `${from}T00:00:00`).lte('answered_at', `${to}T23:59:59`).order('answered_at', { ascending: false }),
     supabase.from('tags').select('id, name, color').order('name'),
   ])
 
-  const allContractIds = [...new Set((surveysRaw ?? []).map((s) => s.contract_id))]
-
+  const allContractIds = [...new Set((surveysRaw ?? []).map(s => s.contract_id))]
   const [{ data: contracts }, { data: contractTagRows }] = await Promise.all([
-    allContractIds.length
-      ? supabase.from('contracts').select('id, client_name, company_id, contact_id').in('id', allContractIds)
-      : Promise.resolve({ data: [] as { id: string; client_name: string; company_id: string | null; contact_id: string | null }[] }),
-    allContractIds.length
-      ? supabase.from('contract_tags').select('contract_id, tag_id').in('contract_id', allContractIds)
-      : Promise.resolve({ data: [] as { contract_id: string; tag_id: string }[] }),
+    allContractIds.length ? supabase.from('contracts').select('id, client_name, company_id, contact_id').in('id', allContractIds) : Promise.resolve({ data: [] as any[] }),
+    allContractIds.length ? supabase.from('contract_tags').select('contract_id, tag_id').in('contract_id', allContractIds) : Promise.resolve({ data: [] as any[] }),
   ])
 
-  const contractById = new Map((contracts ?? []).map((c) => [c.id, c]))
-  const tagIdByContract = new Map((contractTagRows ?? []).map((r) => [r.contract_id, r.tag_id]))
-  const tagById = new Map((allTags ?? []).map((t) => [t.id, t]))
+  const contractById = new Map((contracts ?? []).map((c: any) => [c.id, c]))
+  const tagIdByContract = new Map((contractTagRows ?? []).map((r: any) => [r.contract_id, r.tag_id]))
+  const tagById = new Map((allTags ?? []).map(t => [t.id, t]))
 
-  const surveys = (surveysRaw ?? []).filter((s) => {
+  const surveys = (surveysRaw ?? []).filter(s => {
     if (selectedTagId === 'all') return true
     const contractTagId = tagIdByContract.get(s.contract_id) ?? null
     if (selectedTagId === 'none') return !contractTagId
     return contractTagId === selectedTagId
   })
 
-  const contractIds = [...new Set(surveys.map((s) => s.contract_id))]
-  const companyIds = [...new Set(contractIds.map((id) => contractById.get(id)?.company_id).filter((v): v is string => !!v))]
-  const contactIds = [...new Set(contractIds.map((id) => contractById.get(id)?.contact_id).filter((v): v is string => !!v))]
+  const contractIds = [...new Set(surveys.map(s => s.contract_id))]
+  const companyIds = [...new Set(contractIds.map(id => contractById.get(id)?.company_id).filter((v): v is string => !!v))]
+  const contactIds = [...new Set(contractIds.map(id => contractById.get(id)?.contact_id).filter((v): v is string => !!v))]
 
   const [{ data: companies }, { data: contacts }] = await Promise.all([
-    companyIds.length
-      ? supabase.from('companies').select('id, name, trade_name, cnpj').in('id', companyIds)
-      : Promise.resolve({ data: [] as { id: string; name: string; trade_name: string | null; cnpj: string | null }[] }),
-    contactIds.length
-      ? supabase.from('contacts').select('id, name').in('id', contactIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    companyIds.length ? supabase.from('companies').select('id, name, trade_name, cnpj').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+    contactIds.length ? supabase.from('contacts').select('id, name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
   ])
 
-  const companyById = new Map((companies ?? []).map((c) => [c.id, c]))
-  const contactById = new Map((contacts ?? []).map((c) => [c.id, c]))
+  const companyById = new Map((companies ?? []).map((c: any) => [c.id, c]))
+  const contactById = new Map((contacts ?? []).map((c: any) => [c.id, c]))
 
-  const scores = surveys.map((s) => s.score).filter((s): s is number => s !== null)
+  const scores = surveys.map(s => s.score).filter((s): s is number => s !== null)
   const { nps, promoters, passives, detractors, total } = calculateNps(scores)
+
+  // Histórico dos últimos 6 meses para o gráfico de evolução
+  const history = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    const mFrom = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+    const mTo = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
+    const { data: mSurveys } = await supabase.from('nps_surveys').select('score').eq('status', 'answered').gte('answered_at', `${mFrom}T00:00:00`).lte('answered_at', `${mTo}T23:59:59`)
+    const mScores = (mSurveys ?? []).map((s: any) => s.score).filter((s: any): s is number => s !== null)
+    const { nps: mNps } = calculateNps(mScores)
+    history.push({ month: d.toLocaleDateString('pt-BR', { month: 'short' }), nps: mNps, total: mScores.length })
+  }
 
   function tagFilterHref(tagId: string) {
     return `/surveys-dashboard?tab=nps&from=${from}&to=${to}&tag=${tagId}`
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap gap-2">
-          <a href={tagFilterHref('all')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${selectedTagId === 'all' ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-            Todas as tags
-          </a>
-          {allTags?.map((t) => (
-            <a
-              key={t.id}
-              href={tagFilterHref(t.id)}
-              className="rounded-full px-3 py-1.5 text-sm font-medium"
-              style={selectedTagId === t.id ? { backgroundColor: t.color, color: '#fff' } : { border: '1px solid #D1D5DB', color: '#374151' }}
-            >
-              {t.name}
-            </a>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Filtros de período e tag */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <a href={tagFilterHref('all')} style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, textDecoration: 'none', border: '0.5px solid', borderColor: selectedTagId === 'all' ? '#1a1f36' : '#d1d8e8', background: selectedTagId === 'all' ? '#1a1f36' : '#fff', color: selectedTagId === 'all' ? '#fff' : '#8892a4' }}>Todas as tags</a>
+          {allTags?.map(t => (
+            <a key={t.id} href={tagFilterHref(t.id)} style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, textDecoration: 'none', border: '0.5px solid', borderColor: selectedTagId === t.id ? t.color : '#d1d8e8', background: selectedTagId === t.id ? t.color : '#fff', color: selectedTagId === t.id ? '#fff' : '#8892a4' }}>{t.name}</a>
           ))}
-          <a href={tagFilterHref('none')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${selectedTagId === 'none' ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-            Sem tag
-          </a>
+          <a href={tagFilterHref('none')} style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, textDecoration: 'none', border: '0.5px solid', borderColor: selectedTagId === 'none' ? '#1a1f36' : '#d1d8e8', background: selectedTagId === 'none' ? '#1a1f36' : '#fff', color: selectedTagId === 'none' ? '#fff' : '#8892a4' }}>Sem tag</a>
         </div>
-        <BulkSendNpsButton />
+        <PeriodSelector from={from} to={to} basePath="/surveys-dashboard" extraParams={{ tab: 'nps', tag: selectedTagId }} />
       </div>
 
-      <PeriodSelector from={from} to={to} basePath="/surveys-dashboard" extraParams={{ tab: 'nps', tag: selectedTagId }} />
+      {/* Gráficos premium */}
+      <NpsCharts nps={nps} promoters={promoters} passives={passives} detractors={detractors} total={total} history={history} />
 
-      <div className="grid grid-cols-4 gap-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">NPS do período</p>
-          <p className={`text-3xl font-semibold ${nps === null ? 'text-gray-300' : nps >= 50 ? 'text-positive-700' : nps >= 0 ? 'text-yellow-700' : 'text-negative-700'}`}>
-            {nps === null ? '—' : nps}
-          </p>
+      {/* Lista de respostas */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8' }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Respostas individuais</p>
+          <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{total} resposta{total !== 1 ? 's' : ''} no período selecionado</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Promotores</p>
-          <p className="text-3xl font-semibold text-positive-700">{promoters}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Neutros</p>
-          <p className="text-3xl font-semibold text-yellow-700">{passives}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Detratores</p>
-          <p className="text-3xl font-semibold text-negative-700">{detractors}</p>
-        </div>
-      </div>
-
-      <p className="text-xs text-gray-400">{total} resposta{total === 1 ? '' : 's'} no período · NPS = % Promotores − % Detratores</p>
-
-      <div className="space-y-2">
-        {surveys.map((s) => {
-          const contract = contractById.get(s.contract_id)
-          const company = contract?.company_id ? companyById.get(contract.company_id) : null
-          const contact = contract?.contact_id ? contactById.get(contract.contact_id) : null
-          const category = s.score !== null ? categorizeScore(s.score) : null
-          const tag = tagById.get(tagIdByContract.get(s.contract_id) ?? '')
-
-          return (
-            <ExpandableRow
-              key={s.id}
-              summary={
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{company?.name ?? contract?.client_name ?? '—'}</span>
-                      {tag && (
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style={{ backgroundColor: tag.color }}>
-                          {tag.name}
-                        </span>
-                      )}
-                      {category && (
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${NPS_CATEGORY_STYLES[category]}`}>
-                          {NPS_CATEGORY_LABELS[category]} — {s.score}
-                        </span>
-                      )}
+        <div style={{ padding: '0 16px 8px' }}>
+          {surveys.map(s => {
+            const contract = contractById.get(s.contract_id)
+            const company = contract?.company_id ? companyById.get(contract.company_id) : null
+            const contact = contract?.contact_id ? contactById.get(contract.contact_id) : null
+            const category = s.score !== null ? categorizeScore(s.score) : null
+            const tag = tagById.get(tagIdByContract.get(s.contract_id) ?? '')
+            const catSt = category ? NPS_CATEGORY_STYLE[category] : null
+            return (
+              <ExpandableRow
+                key={s.id}
+                summary={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{company?.name ?? contract?.client_name ?? '—'}</span>
+                        {tag && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: tag.color, color: '#fff' }}>{tag.name}</span>}
+                        {category && catSt && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: catSt.bg, color: catSt.color }}>{NPS_CATEGORY_LABELS[category]} — {s.score}</span>}
+                      </div>
+                      <p style={{ marginTop: 3, fontSize: 11, color: '#8892a4' }}>
+                        {s.respondent_name ?? contact?.name ?? '—'} · {s.answered_at ? new Date(s.answered_at).toLocaleDateString('pt-BR') : '—'}
+                      </p>
                     </div>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      Respondido por {s.respondent_name ?? contact?.name ?? '—'} em {s.answered_at ? new Date(s.answered_at).toLocaleDateString('pt-BR') : '—'}
-                    </p>
                   </div>
+                }
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11 }}>
+                  <div><p style={{ color: '#8892a4', marginBottom: 2 }}>CNPJ</p><p style={{ fontFamily: 'monospace', color: '#52514e' }}>{company?.cnpj ?? '—'}</p></div>
+                  <div><p style={{ color: '#8892a4', marginBottom: 2 }}>E-mail / Telefone</p><p style={{ color: '#52514e' }}>{[s.respondent_email, s.respondent_phone].filter(Boolean).join(' · ') || '—'}</p></div>
                 </div>
-              }
-            >
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <p className="text-gray-400">CNPJ</p>
-                  <p className="font-mono text-gray-700">{company?.cnpj ?? '—'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">E-mail / Telefone</p>
-                  <p className="text-gray-700">{[s.respondent_email, s.respondent_phone].filter(Boolean).join(' · ') || '—'}</p>
-                </div>
-              </div>
-              {s.comment && (
-                <div>
-                  <p className="text-xs text-gray-400">Comentário</p>
-                  <p className="text-sm text-gray-600">&ldquo;{s.comment}&rdquo;</p>
-                </div>
-              )}
-            </ExpandableRow>
-          )
-        })}
-        {surveys.length === 0 && (
-          <p className="rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400">
-            Nenhuma resposta de NPS neste período{selectedTagId !== 'all' ? ' com esse filtro' : ''}.
-          </p>
-        )}
+                {s.comment && (
+                  <div style={{ marginTop: 8 }}>
+                    <p style={{ fontSize: 10, color: '#8892a4', marginBottom: 4 }}>Comentário</p>
+                    <p style={{ fontSize: 13, color: '#52514e', fontStyle: 'italic' }}>&ldquo;{s.comment}&rdquo;</p>
+                  </div>
+                )}
+              </ExpandableRow>
+            )
+          })}
+          {surveys.length === 0 && (
+            <p style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>
+              Nenhuma resposta de NPS neste período{selectedTagId !== 'all' ? ' com esse filtro' : ''}.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-// ------------------------------------------------------------
-// Aba Pesquisas Customizadas
-// ------------------------------------------------------------
-async function SurveysTab({
-  supabase,
-  from,
-  to,
-  selectedTemplateId,
-}: {
-  supabase: Awaited<ReturnType<typeof createClient>>
-  from: string
-  to: string
-  selectedTemplateId?: string
+async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
+  supabase: Awaited<ReturnType<typeof createClient>>; from: string; to: string; selectedTemplateId?: string
 }) {
-  const { data: templates } = await supabase
-    .from('survey_templates')
-    .select('id, name, questions')
-    .order('name')
-
+  const { data: templates } = await supabase.from('survey_templates').select('id, name, questions').order('name')
   const templateId = selectedTemplateId ?? templates?.[0]?.id
-  const selectedTemplate = templates?.find((t) => t.id === templateId)
+  const selectedTemplate = templates?.find(t => t.id === templateId)
   const questions = (selectedTemplate?.questions ?? []) as Question[]
 
   const { data: responses } = templateId
-    ? await supabase
-        .from('custom_surveys')
-        .select('id, respondent_name, respondent_email, respondent_phone, contract_id, responses, answered_at')
-        .eq('template_id', templateId)
-        .eq('status', 'answered')
-        .gte('answered_at', `${from}T00:00:00`)
-        .lte('answered_at', `${to}T23:59:59`)
-        .order('answered_at', { ascending: false })
-    : { data: [] as { id: string; respondent_name: string | null; respondent_email: string | null; respondent_phone: string | null; contract_id: string; responses: unknown; answered_at: string | null }[] }
+    ? await supabase.from('custom_surveys').select('id, respondent_name, respondent_email, respondent_phone, contract_id, responses, answered_at').eq('template_id', templateId).eq('status', 'answered').gte('answered_at', `${from}T00:00:00`).lte('answered_at', `${to}T23:59:59`).order('answered_at', { ascending: false })
+    : { data: [] as any[] }
 
-  const contractIds = [...new Set((responses ?? []).map((r) => r.contract_id))]
-  const { data: contracts } = contractIds.length
-    ? await supabase.from('contracts').select('id, client_name, process_number').in('id', contractIds)
-    : { data: [] as { id: string; client_name: string; process_number: string }[] }
-  const contractById = new Map((contracts ?? []).map((c) => [c.id, c]))
+  const contractIds = [...new Set((responses ?? []).map((r: any) => r.contract_id))]
+  const { data: contracts } = contractIds.length ? await supabase.from('contracts').select('id, client_name, process_number').in('id', contractIds) : { data: [] as any[] }
+  const contractById = new Map((contracts ?? []).map((c: any) => [c.id, c]))
 
-  const responsesWithScore = (responses ?? []).map((r) => ({
-    ...r,
-    score: calculateResponseScore(questions, r.responses as Record<string, string | string[]> | null),
-  }))
-
-  const averageScore = calculateAverageScore(responsesWithScore.map((r) => r.score))
+  const responsesWithScore = (responses ?? []).map((r: any) => ({ ...r, score: calculateResponseScore(questions, r.responses as Record<string, string | string[]> | null) }))
+  const averageScore = calculateAverageScore(responsesWithScore.map((r: any) => r.score))
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {templates?.map((t) => (
-          <a
-            key={t.id}
-            href={`/surveys-dashboard?tab=surveys&template=${t.id}&from=${from}&to=${to}`}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${t.id === templateId ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-          >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {templates?.map(t => (
+          <a key={t.id} href={`/surveys-dashboard?tab=surveys&template=${t.id}&from=${from}&to=${to}`}
+            style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, textDecoration: 'none', border: '0.5px solid', borderColor: t.id === templateId ? '#1a1f36' : '#d1d8e8', background: t.id === templateId ? '#1a1f36' : '#fff', color: t.id === templateId ? '#fff' : '#8892a4' }}>
             {t.name}
           </a>
         ))}
-        {(!templates || templates.length === 0) && (
-          <p className="text-sm text-gray-400">Nenhum formulário criado ainda — crie um em &quot;Formulários&quot;.</p>
-        )}
+        {(!templates || templates.length === 0) && <p style={{ fontSize: 12, color: '#8892a4' }}>Nenhum formulário criado ainda.</p>}
       </div>
 
       {templateId && (
         <>
           <PeriodSelector from={from} to={to} basePath="/surveys-dashboard" extraParams={{ tab: 'surveys', template: templateId }} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs text-gray-500">Pontuação média do período</p>
-              {averageScore ? (
-                <p className="text-3xl font-semibold text-brand-700">{averageScore.value} <span className="text-base font-normal text-gray-400">/ {averageScore.max}</span></p>
-              ) : (
-                <p className="mt-1 text-xs text-gray-400">Sem perguntas de nota/satisfação neste formulário, ou sem respostas no período.</p>
-              )}
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs text-gray-500">Respostas no período</p>
-              <p className="text-3xl font-semibold text-gray-900">{responsesWithScore.length}</p>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            {[
+              { label: 'Pontuação média', value: averageScore ? `${averageScore.value} / ${averageScore.max}` : '—', sub: 'do período' },
+              { label: 'Respostas', value: String(responsesWithScore.length), sub: 'no período' },
+              { label: 'Formulário', value: selectedTemplate?.name ?? '—', sub: `${questions.length} pergunta${questions.length !== 1 ? 's' : ''}` },
+            ].map(k => (
+              <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '0.5px solid #e8edf5' }}>
+                <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{k.label}</p>
+                <p style={{ fontSize: 18, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{k.value}</p>
+                <p style={{ fontSize: 11, color: '#8892a4', marginTop: 3 }}>{k.sub}</p>
+              </div>
+            ))}
           </div>
 
-          <div className="space-y-2">
-            {responsesWithScore.map((r) => {
-              const contract = contractById.get(r.contract_id)
-              return (
-                <ExpandableRow
-                  key={r.id}
-                  summary={
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{r.respondent_name}</span>
-                        {r.score && (
-                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700">
-                            {r.score.scale === 'likert' ? 'Satisfação' : 'Nota'} {r.score.value}/{r.score.max}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {contract ? `${contract.client_name} · ${contract.process_number}` : '—'} · {r.answered_at ? new Date(r.answered_at).toLocaleDateString('pt-BR') : '—'}
-                      </p>
-                    </div>
-                  }
-                >
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <p className="text-gray-400">E-mail / Telefone</p>
-                      <p className="text-gray-700">{[r.respondent_email, r.respondent_phone].filter(Boolean).join(' · ') || '—'}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 border-t border-gray-100 pt-2">
-                    {questions.map((q) => {
-                      const answer = (r.responses as Record<string, string | string[]> | null)?.[q.id]
-                      const display = Array.isArray(answer) ? (answer.length ? answer.join(', ') : '—') : (answer || '—')
-                      return (
-                        <div key={q.id}>
-                          <p className="text-xs font-medium text-gray-500">{q.label}</p>
-                          <p className="text-sm text-gray-700">{display}</p>
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8' }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Respostas individuais</p>
+            </div>
+            <div style={{ padding: '0 16px 8px' }}>
+              {responsesWithScore.map((r: any) => {
+                const contract = contractById.get(r.contract_id)
+                return (
+                  <ExpandableRow key={r.id}
+                    summary={
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{r.respondent_name}</span>
+                          {r.score && <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: '#eef3ff', color: '#3b5bdb' }}>{r.score.scale === 'likert' ? 'Satisfação' : 'Nota'} {r.score.value}/{r.score.max}</span>}
                         </div>
-                      )
-                    })}
-                  </div>
-                </ExpandableRow>
-              )
-            })}
-            {responsesWithScore.length === 0 && (
-              <p className="rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400">
-                Nenhuma resposta neste período.
-              </p>
-            )}
+                        <p style={{ marginTop: 3, fontSize: 11, color: '#8892a4' }}>
+                          {contract ? `${contract.client_name} · ${contract.process_number}` : '—'} · {r.answered_at ? new Date(r.answered_at).toLocaleDateString('pt-BR') : '—'}
+                        </p>
+                      </div>
+                    }
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11 }}>
+                      <div><p style={{ color: '#8892a4', marginBottom: 2 }}>E-mail / Telefone</p><p style={{ color: '#52514e' }}>{[r.respondent_email, r.respondent_phone].filter(Boolean).join(' · ') || '—'}</p></div>
+                    </div>
+                    <div style={{ borderTop: '0.5px solid #f1f3f8', marginTop: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {questions.map((q: Question) => {
+                        const answer = (r.responses as Record<string, string | string[]> | null)?.[q.id]
+                        const display = Array.isArray(answer) ? (answer.length ? answer.join(', ') : '—') : (answer || '—')
+                        return (
+                          <div key={q.id}>
+                            <p style={{ fontSize: 10, color: '#8892a4', marginBottom: 2 }}>{q.label}</p>
+                            <p style={{ fontSize: 13, color: '#52514e' }}>{display}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </ExpandableRow>
+                )
+              })}
+              {responsesWithScore.length === 0 && (
+                <p style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>Nenhuma resposta neste período.</p>
+              )}
+            </div>
           </div>
         </>
       )}
