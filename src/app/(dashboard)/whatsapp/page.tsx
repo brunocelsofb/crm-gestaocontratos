@@ -84,20 +84,25 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle()
   const isConnected = !!zapiSettings?.zapi_instance_id
 
-  // Métricas do funil de WhatsApp
+  // Métricas do funil de WhatsApp — tudo em contagens de TELEFONES
+  // únicos, nunca mensagens individuais (uma conversa tem muitas
+  // mensagens, contar mensagem inflaria os números).
   const [
-    { count: totalEntradas },
-    { count: totalLeadsWpp },
-    { count: totalConvertidos },
-    { count: totalVinculados },
-    { count: totalOptOut },
+    { count: totalEntradas },      // prompts enviados = 1 por telefone por definição (PK)
+    { count: totalLeadsWpp },      // prompts que viraram lead
+    { count: totalOptOut },        // opt-outs
+    { data: vinculadosData },      // mensagens vinculadas a contrato — precisa desduplicar por telefone
+    { count: totalConvertidos },   // leads WhatsApp convertidos em oportunidade
   ] = await Promise.all([
     supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }),
     supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }).not('lead_id', 'is', null),
-    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('source', 'whatsapp').eq('status', 'convertido'),
-    supabase.from('contract_whatsapp_messages').select('phone', { count: 'exact', head: true }).not('contract_id', 'is', null).is('lead_id', null),
     supabase.from('whatsapp_opt_outs').select('phone', { count: 'exact', head: true }),
+    supabase.from('contract_whatsapp_messages').select('phone').not('contract_id', 'is', null).is('lead_id', null),
+    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'convertido'),
   ])
+
+  // Desduplicar por telefone — quantas CONVERSAS distintas foram vinculadas
+  const totalVinculados = new Set((vinculadosData ?? []).map(m => m.phone)).size
 
   // Histórico diário dos últimos 14 dias
   const historyData: { day: string; entradas: number; leads: number }[] = []
