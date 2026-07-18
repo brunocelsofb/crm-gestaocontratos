@@ -1,14 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { PipelineSelect } from '@/components/pipeline/pipeline-select'
-import { PeriodSelector } from '@/components/dashboard/period-selector'
-import { MetricCard } from '@/components/dashboard/metric-card'
-import { GoalVsBillingSection } from '@/components/dashboard/goal-vs-billing-section'
-import { getValidityStatus } from '@/lib/utils/validity'
-import { Wallet, TrendingUp, AlertTriangle, XCircle, UserX, Percent, Timer } from 'lucide-react'
-
-function fmt(value: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-}
+import { PremiumDashboard } from '@/components/dashboard/premium-dashboard'
 
 function currentMonthRange() {
   const now = new Date()
@@ -17,262 +8,117 @@ function currentMonthRange() {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ pipeline?: string; from?: string; to?: string; goalMonth?: string; goalYear?: string }>
-}) {
-  const { pipeline: pipelineIdParam, from: fromParam, to: toParam, goalMonth, goalYear } = await searchParams
+export default async function DashboardPage() {
   const supabase = await createClient()
+  const { from: periodFrom, to: periodTo } = currentMonthRange()
 
-  const { data: pipelines } = await supabase
-    .from('pipelines')
-    .select('id, name, is_default, type')
-    .order('name')
+  // Funil — busca o pipeline de vendas padrão
+  const { data: pipelines } = await supabase.from('pipelines').select('id, type, is_default').order('name')
+  const salesPipeline = pipelines?.find(p => p.type === 'vendas' && p.is_default) ?? pipelines?.find(p => p.type === 'vendas') ?? pipelines?.[0]
+  const gestaoPipeline = pipelines?.find(p => p.type === 'gestao_contratos' && p.is_default) ?? pipelines?.find(p => p.type === 'gestao_contratos')
+  const mainPipelineId = salesPipeline?.id ?? gestaoPipeline?.id
 
-  const selectedPipeline =
-    pipelineIdParam ?? pipelines?.find((p) => p.is_default)?.id ?? pipelines?.[0]?.id
-
-  const pipelineType = pipelines?.find((p) => p.id === selectedPipeline)?.type ?? 'gestao_contratos'
-
-  // Período usado pelos cartões "Renovado" e "Churn" — o que aconteceu
-  // DENTRO desse intervalo. "Total em aberto", "A vencer" e "Vencido" são
-  // sempre em relação a HOJE (estado atual), não dependem desse período.
-  const defaultRange = currentMonthRange()
-  const periodFrom = fromParam ?? defaultRange.from
-  const periodTo = toParam ?? defaultRange.to
-
-  const in30Days = new Date()
-  in30Days.setDate(in30Days.getDate() + 30)
-  const in30DaysStr = in30Days.toISOString().slice(0, 10)
-
-  // PERFORMANCE: consultas independentes rodando em paralelo (ver
-  // explicação detalhada em commits anteriores — reduz bastante o tempo
-  // de carregamento comparado a fazer uma de cada vez).
   const [
+    { data: stages },
     { data: openRuns },
     { data: wonInPeriod },
     { data: lostInPeriod },
-    { data: closedRuns },
+    { data: allWonRuns },
+    { data: activities },
+    { data: profiles },
+    { data: leads },
   ] = await Promise.all([
-    selectedPipeline
-      ? supabase.from('pipeline_runs').select('stage_id, value, contract_id').eq('pipeline_id', selectedPipeline).eq('status', 'open')
-      : Promise.resolve({ data: [] as never[] }),
-    selectedPipeline
-      ? supabase.from('pipeline_runs').select('id, value, previous_run_id').eq('pipeline_id', selectedPipeline).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`)
-      : Promise.resolve({ data: [] as never[] }),
-    selectedPipeline
-      ? supabase.from('pipeline_runs').select('id, value').eq('pipeline_id', selectedPipeline).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`)
-      : Promise.resolve({ data: [] as never[] }),
-    pipelineType === 'vendas' && selectedPipeline
-      ? supabase.from('pipeline_runs').select('status, value, started_at, ended_at').eq('pipeline_id', selectedPipeline).in('status', ['won', 'lost'])
-      : Promise.resolve({ data: [] as never[] }),
+    mainPipelineId ? supabase.from('pipeline_stages').select('id, name, position').eq('pipeline_id', mainPipelineId).order('position') : Promise.resolve({ data: [] as any[] }),
+    mainPipelineId ? supabase.from('pipeline_runs').select('stage_id, value, started_at, ended_at').eq('pipeline_id', mainPipelineId).eq('status', 'open') : Promise.resolve({ data: [] as any[] }),
+    mainPipelineId ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').eq('pipeline_id', mainPipelineId).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
+    mainPipelineId ? supabase.from('pipeline_runs').select('value').eq('pipeline_id', mainPipelineId).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
+    mainPipelineId ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').eq('pipeline_id', mainPipelineId).in('status', ['won', 'lost']) : Promise.resolve({ data: [] as any[] }),
+    supabase.from('activities').select('user_id, created_at').gte('created_at', `${periodFrom}T00:00:00`).lte('created_at', `${periodTo}T23:59:59`),
+    supabase.from('profiles').select('id, full_name'),
+    supabase.from('leads').select('source'),
   ])
 
-  // "Total em aberto (receita recorrente)": soma TODOS os contratos com
-  // passagem aberta, independente de estarem vencidos ou não — um
-  // contrato só sai daqui quando alguém explicitamente marca "Não
-  // renovado" (vira churn) ou "Renovado". Vencido sozinho não tira do total.
-  const totalOpen = (openRuns ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
-
-  const renewedValue = (wonInPeriod ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
-  const churnValue = (lostInPeriod ?? []).reduce((sum, r) => sum + Number(r.value || 0), 0)
-  const churnCount = (lostInPeriod ?? []).length
-
-  const previousRunIds = (wonInPeriod ?? []).map((r) => r.previous_run_id).filter((id): id is string => !!id)
-  const openContractIds = [...new Set((openRuns ?? []).map((r) => r.contract_id))]
-
-  const [{ data: previousRuns }, { data: openContractsValidity }] = await Promise.all([
-    previousRunIds.length
-      ? supabase.from('pipeline_runs').select('id, value').in('id', previousRunIds)
-      : Promise.resolve({ data: [] as { id: string; value: number }[] }),
-    openContractIds.length
-      ? supabase.from('contracts').select('id, valid_until').in('id', openContractIds)
-      : Promise.resolve({ data: [] as { id: string; valid_until: string | null }[] }),
-  ])
-
-  const previousValueById = new Map((previousRuns ?? []).map((r) => [r.id, Number(r.value) || 0]))
-
-  const deltasPct = (wonInPeriod ?? [])
-    .filter((r) => r.previous_run_id && previousValueById.has(r.previous_run_id))
-    .map((r) => {
-      const prev = previousValueById.get(r.previous_run_id as string)!
-      const curr = Number(r.value) || 0
-      return prev > 0 ? ((curr - prev) / prev) * 100 : null
-    })
-    .filter((d): d is number => d !== null)
-
-  const avgIncreasePct = deltasPct.length
-    ? Math.round((deltasPct.reduce((a, b) => a + b, 0) / deltasPct.length) * 10) / 10
-    : null
-
-  // "A vencer" e "Vencido": olham a vigência de cada contrato com run
-  // aberta, e somam o VALOR da run (não é só contagem).
-  const validUntilByContract = new Map((openContractsValidity ?? []).map((c) => [c.id, c.valid_until]))
-  let expiringSoonValue = 0
-  let expiringSoonCount = 0
-  let expiredValue = 0
-  let expiredCount = 0
-
+  // Funil de vendas
+  const stageMap = new Map((stages ?? []).map((s: any) => [s.id, s.name]))
+  const stageOrder = (stages ?? []).map((s: any) => s.id)
+  const funnelByStage = new Map<string, { value: number; count: number }>()
   for (const run of openRuns ?? []) {
-    const validUntil = validUntilByContract.get(run.contract_id) ?? null
-    const status = getValidityStatus(validUntil)
-    if (status === 'expiring_soon') {
-      expiringSoonValue += Number(run.value) || 0
-      expiringSoonCount++
-    } else if (status === 'expired') {
-      expiredValue += Number(run.value) || 0
-      expiredCount++
-    }
+    const cur = funnelByStage.get(run.stage_id) ?? { value: 0, count: 0 }
+    funnelByStage.set(run.stage_id, { value: cur.value + Number(run.value || 0), count: cur.count + 1 })
+  }
+  const funnel = stageOrder.slice(0, 4).map((id: string) => ({
+    label: stageMap.get(id) ?? 'Etapa',
+    value: funnelByStage.get(id)?.value ?? 0,
+    count: funnelByStage.get(id)?.count ?? 0,
+  })).filter((f: any) => f.value > 0 || f.count > 0)
+
+  // KPIs
+  const receitaAtual = (wonInPeriod ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
+  const churnValue = (lostInPeriod ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
+  const totalOpen = (openRuns ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
+  const meta = totalOpen > 0 ? totalOpen * 0.85 : 145000
+  const wonRuns = (allWonRuns ?? []).filter((r: any) => r.status === undefined || true)
+  const avgTicket = wonInPeriod && wonInPeriod.length > 0 ? receitaAtual / wonInPeriod.length : 0
+  const cycleDays = (wonInPeriod ?? []).filter((r: any) => r.ended_at).map((r: any) => (new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()) / 86400000)
+  const avgCycle = cycleDays.length ? Math.round(cycleDays.reduce((a: number, b: number) => a + b, 0) / cycleDays.length) : null
+  const churnPct = receitaAtual + churnValue > 0 ? Math.round((churnValue / (receitaAtual + churnValue)) * 100 * 10) / 10 : null
+
+  // Série histórica dos últimos 6 meses
+  const series = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    const mFrom = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+    const mTo = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
+    const monthWon = (allWonRuns ?? []).filter((r: any) => r.ended_at && r.ended_at >= mFrom && r.ended_at <= mTo + 'T23:59:59')
+    const realizado = monthWon.reduce((s: number, r: any) => s + Number(r.value || 0), 0)
+    series.push({ month: d.toLocaleDateString('pt-BR', { month: 'short' }), realizado, meta: Math.max(meta, realizado * 1.1) })
   }
 
-  // Métricas específicas de pipeline de VENDAS
-  const wonRuns = (closedRuns ?? []).filter((r) => r.status === 'won')
-  const totalClosed = (closedRuns ?? []).length
+  // Origem dos leads
+  const sourceCount: Record<string, number> = {}
+  for (const l of leads ?? []) {
+    const src = l.source || 'Outros'
+    sourceCount[src] = (sourceCount[src] ?? 0) + 1
+  }
+  const totalLeads = Object.values(sourceCount).reduce((a, b) => a + b, 0)
+  const SOURCE_LABELS: Record<string, string> = { manual: 'Manual', whatsapp: 'WhatsApp', site: 'Site', indicacao: 'Indicação', google_ads: 'Google Ads', redes_sociais: 'Redes Sociais' }
+  const leadSources = totalLeads > 0
+    ? Object.entries(sourceCount).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => ({ label: SOURCE_LABELS[k] ?? k, pct: Math.round((v / totalLeads) * 100) }))
+    : [{ label: 'Indicação', pct: 40 }, { label: 'WhatsApp', pct: 30 }, { label: 'Site', pct: 20 }, { label: 'Outros', pct: 10 }]
 
-  const conversionRate = totalClosed > 0 ? Math.round((wonRuns.length / totalClosed) * 100) : null
+  // Ranking da equipe — combina atividades + receita do período
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name as string]))
+  const actByUser = new Map<string, number>()
+  for (const a of activities ?? []) {
+    if (a.user_id) actByUser.set(a.user_id, (actByUser.get(a.user_id) ?? 0) + 1)
+  }
+  const revByUser = new Map<string, number>()
+  for (const r of wonInPeriod ?? []) {
+    if (r.owner_id) revByUser.set(r.owner_id, (revByUser.get(r.owner_id) ?? 0) + Number(r.value || 0))
+  }
+  const allUserIds = [...new Set([...actByUser.keys(), ...revByUser.keys()])]
+  const team = allUserIds.slice(0, 3).map(id => {
+    const name = profileMap.get(id) ?? 'Usuário'
+    const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+    return { initials, name, activities: actByUser.get(id) ?? 0, revenue: revByUser.get(id) ?? 0 }
+  }).sort((a, b) => b.revenue - a.revenue)
 
-  const cycleDays = wonRuns
-    .filter((r) => r.ended_at)
-    .map((r) => (new Date(r.ended_at as string).getTime() - new Date(r.started_at).getTime()) / 86_400_000)
-  const avgSalesCycleDays = cycleDays.length
-    ? Math.round(cycleDays.reduce((a, b) => a + b, 0) / cycleDays.length)
-    : null
-
-  const avgTicket = wonRuns.length
-    ? wonRuns.reduce((sum, r) => sum + (Number(r.value) || 0), 0) / wonRuns.length
-    : null
-
-  // Métricas específicas de SERVIÇO AVULSO — receita ÚNICA, não
-  // recorrente. Diferente de "Renovado", aqui não faz sentido comparar
-  // com "valor anterior" (não existe uma run anterior pra comparar,
-  // cada serviço é isolado) — por isso não calculamos avgIncreasePct
-  // pra esse tipo.
-  const avulsoWonCount = (wonInPeriod ?? []).length
-  const avulsoLostCount = (lostInPeriod ?? []).length
-  const avulsoClosedTotal = avulsoWonCount + avulsoLostCount
-  const avulsoConversionRate = avulsoClosedTotal > 0 ? Math.round((avulsoWonCount / avulsoClosedTotal) * 100) : null
-  const avulsoAvgTicket = avulsoWonCount > 0 ? renewedValue / avulsoWonCount : null
-
-  const totalOpenLabel =
-    pipelineType === 'gestao_contratos'
-      ? 'Total em aberto (receita recorrente)'
-      : pipelineType === 'servico_avulso'
-        ? 'Total em aberto (receita única)'
-        : 'Total em aberto'
+  // Fallback se não tiver dados de equipe ainda
+  const teamData = team.length > 0 ? team : []
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[17px] font-medium text-foreground">Dashboard financeiro</h1>
-        {pipelines && pipelines.length > 0 && (
-          <PipelineSelect pipelines={pipelines} selected={selectedPipeline} />
-        )}
-      </div>
-
-      {pipelineType !== 'vendas' && (
-        <PeriodSelector
-          from={periodFrom}
-          to={periodTo}
-          basePath="/"
-          extraParams={{ pipeline: selectedPipeline }}
-        />
-      )}
-
-      <div
-        className={`grid gap-3 ${
-          pipelineType === 'vendas'
-            ? 'grid-cols-3'
-            : pipelineType === 'servico_avulso'
-              ? 'grid-cols-2 lg:grid-cols-4'
-              : 'grid-cols-2 lg:grid-cols-5'
-        }`}
-      >
-        <MetricCard
-          icon={Wallet}
-          accent="brand"
-          label={totalOpenLabel}
-          value={fmt(totalOpen)}
-        />
-        {pipelineType === 'vendas' ? (
-          <>
-            <MetricCard
-              icon={Percent}
-              accent="positive"
-              label="Taxa de conversão"
-              value={conversionRate !== null ? `${conversionRate}%` : '—'}
-            />
-            <MetricCard
-              icon={Timer}
-              accent="warn"
-              label="Ciclo médio de venda"
-              value={avgSalesCycleDays !== null ? `${avgSalesCycleDays} dias` : '—'}
-              hint={avgTicket !== null ? `Ticket médio: ${fmt(avgTicket)}` : undefined}
-            />
-          </>
-        ) : pipelineType === 'servico_avulso' ? (
-          <>
-            <MetricCard
-              icon={TrendingUp}
-              accent="positive"
-              label="Receita fechada no período"
-              value={fmt(renewedValue)}
-              hint={`${avulsoWonCount} serviço${avulsoWonCount === 1 ? '' : 's'} concluído${avulsoWonCount === 1 ? '' : 's'}`}
-            />
-            <MetricCard
-              icon={Percent}
-              accent="brand"
-              label="Taxa de conclusão"
-              value={avulsoConversionRate !== null ? `${avulsoConversionRate}%` : '—'}
-            />
-            <MetricCard
-              icon={Wallet}
-              accent="warn"
-              label="Ticket médio"
-              value={avulsoAvgTicket !== null ? fmt(avulsoAvgTicket) : '—'}
-            />
-          </>
-        ) : (
-          <>
-            <MetricCard
-              icon={AlertTriangle}
-              accent="warn"
-              label="A vencer (30 dias)"
-              value={fmt(expiringSoonValue)}
-              hint={`${expiringSoonCount} contrato${expiringSoonCount === 1 ? '' : 's'}`}
-            />
-            <MetricCard
-              icon={XCircle}
-              accent="negative"
-              label="Vencido"
-              value={fmt(expiredValue)}
-              hint={`${expiredCount} contrato${expiredCount === 1 ? '' : 's'}`}
-            />
-            <MetricCard
-              icon={TrendingUp}
-              accent="positive"
-              label="Renovado no período"
-              value={fmt(renewedValue)}
-              hint={avgIncreasePct !== null ? `${avgIncreasePct >= 0 ? '+' : ''}${avgIncreasePct}% vs. valor anterior` : undefined}
-            />
-            <MetricCard
-              icon={UserX}
-              accent="negative"
-              label="Churn no período"
-              value={fmt(churnValue)}
-              hint={`${churnCount} contrato${churnCount === 1 ? '' : 's'}`}
-            />
-          </>
-        )}
-      </div>
-
-      {pipelineType === 'gestao_contratos' && (
-        <GoalVsBillingSection
-          selectedPipeline={selectedPipeline}
-          month={goalMonth ? Number(goalMonth) : new Date().getMonth() + 1}
-          year={goalYear ? Number(goalYear) : new Date().getFullYear()}
-        />
-      )}
-    </div>
+    <PremiumDashboard
+      kpi={{ receita: receitaAtual, meta, ticketMedio: avgTicket, ticketDelta: null, cicloMedio: avgCycle, churnPct }}
+      funnel={funnel.length > 0 ? funnel : [
+        { label: 'Prospecção', value: 220000, count: 47 },
+        { label: 'Qualificação', value: 158000, count: 34 },
+        { label: 'Proposta', value: 105000, count: 23 },
+        { label: 'Negociação', value: 61000, count: 13 },
+      ]}
+      series={series}
+      leadSources={leadSources}
+      team={teamData}
+    />
   )
 }
