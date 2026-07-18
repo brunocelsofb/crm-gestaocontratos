@@ -5,6 +5,7 @@ import { WhatsAppConversationPanel } from '@/components/whatsapp/whatsapp-conver
 import { getConversationByPhone, searchContractsForLinking, getWhatsAppAssignments } from '@/lib/actions/whatsapp'
 import { WhatsAppInboxRealtimeWatcher } from '@/components/whatsapp/whatsapp-inbox-realtime-watcher'
 import { ImportWhatsAppChatsButton } from '@/components/whatsapp/import-whatsapp-chats-button'
+import { WhatsAppCharts } from '@/components/whatsapp/whatsapp-charts'
 
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
@@ -83,14 +84,40 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const { data: zapiSettings } = await supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle()
   const isConnected = !!zapiSettings?.zapi_instance_id
 
-  // Métricas do fluxo de captação.
-  const [{ count: promptsTotal }, { count: promptsConverted }, { count: remindersSent }, { count: optOuts }] = await Promise.all([
+  // Métricas do funil de WhatsApp
+  const [
+    { count: totalEntradas },
+    { count: totalLeadsWpp },
+    { count: totalConvertidos },
+    { count: totalVinculados },
+    { count: totalOptOut },
+  ] = await Promise.all([
     supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }),
     supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }).not('lead_id', 'is', null),
-    supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }).not('reminder_sent_at', 'is', null),
+    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('source', 'whatsapp').eq('status', 'convertido'),
+    supabase.from('contract_whatsapp_messages').select('phone', { count: 'exact', head: true }).not('contract_id', 'is', null).is('lead_id', null),
     supabase.from('whatsapp_opt_outs').select('phone', { count: 'exact', head: true }),
   ])
-  const conversionRate = promptsTotal && promptsTotal > 0 ? Math.round(((promptsConverted ?? 0) / promptsTotal) * 100) : 0
+
+  // Histórico diário dos últimos 14 dias
+  const historyData: { day: string; entradas: number; leads: number }[] = []
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const dayStr = d.toISOString().slice(0, 10)
+    const [{ count: entradas }, { count: leads }] = await Promise.all([
+      supabase.from('contract_whatsapp_messages').select('phone', { count: 'exact', head: true }).eq('direction', 'recebido').gte('created_at', `${dayStr}T00:00:00`).lte('created_at', `${dayStr}T23:59:59`).is('contract_id', null),
+      supabase.from('whatsapp_capture_prompts').select('phone', { count: 'exact', head: true }).gte('sent_at', `${dayStr}T00:00:00`).lte('sent_at', `${dayStr}T23:59:59`),
+    ])
+    historyData.push({ day: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), entradas: entradas ?? 0, leads: leads ?? 0 })
+  }
+
+  const funnelData = [
+    { label: 'Entradas', value: totalEntradas ?? 0, color: '#4f86f7' },
+    { label: 'Leads gerados', value: totalLeadsWpp ?? 0, color: '#6366f1' },
+    { label: 'Vinculados a conta', value: totalVinculados ?? 0, color: '#7c3aed' },
+    { label: 'Convertidos', value: totalConvertidos ?? 0, color: '#1a7c3e' },
+  ]
 
   let selectedContractData = null
   if (selectedContractId) {
@@ -122,24 +149,29 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Central de Atendimento WhatsApp</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Conversas, leads e métricas de captação.</p>
+        </div>
         <ImportWhatsAppChatsButton />
       </div>
-      {(promptsTotal ?? 0) > 0 && (
-        <div className="flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs">
-          <span className="text-gray-500">📊 Fluxo de captação:</span>
-          <span><strong>{promptsTotal}</strong> link{promptsTotal === 1 ? '' : 's'} mandado{promptsTotal === 1 ? '' : 's'}</span>
-          <span className="text-gray-300">·</span>
-          <span><strong className="text-positive-700">{conversionRate}%</strong> preencheram</span>
-          <span className="text-gray-300">·</span>
-          <span><strong>{remindersSent}</strong> lembrete{remindersSent === 1 ? '' : 's'} enviado{remindersSent === 1 ? '' : 's'}</span>
-          <span className="text-gray-300">·</span>
-          <span><strong>{optOuts}</strong> pediram pra sair</span>
-        </div>
-      )}
-      <div className="flex h-[calc(100vh-11rem)] gap-4">
+
+      {/* Gráficos */}
+      <WhatsAppCharts
+        totalEntradas={totalEntradas ?? 0}
+        totalLeads={totalLeadsWpp ?? 0}
+        totalConvertidos={totalConvertidos ?? 0}
+        totalVinculados={totalVinculados ?? 0}
+        totalOptOut={totalOptOut ?? 0}
+        funnelData={funnelData}
+        historyData={historyData}
+      />
+
+      {/* Inbox */}
+      <div style={{ display: 'flex', height: 'calc(100vh - 26rem)', gap: 12 }}>
         <WhatsAppInboxRealtimeWatcher />
         <div className="w-72 shrink-0 space-y-3 overflow-y-auto">
           <h1 className="px-1 text-lg font-semibold text-gray-900">Central de Atendimento</h1>
@@ -224,7 +256,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               />
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-gray-400">
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#b0b8c8' }}>
               Selecione uma conversa à esquerda.
             </div>
           )}
