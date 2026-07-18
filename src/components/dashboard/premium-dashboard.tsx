@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import Link from 'next/link'
 
 type KPI = { receita: number; meta: number; ticketMedio: number; ticketDelta: number | null; cicloMedio: number | null; churnPct: number | null }
 type FunnelStage = { label: string; value: number; count: number }
@@ -21,12 +22,13 @@ function fmtFull(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
 }
 
-export function PremiumDashboard({ kpi, funnel, series, leadSources, team }: {
+export function PremiumDashboard({ kpi, funnel, series, leadSources, team, period = 'month' }: {
   kpi: KPI
   funnel: FunnelStage[]
   series: MonthSeries[]
   leadSources: LeadSource[]
   team: TeamMember[]
+  period?: string
 }) {
   const areaRef = useRef<HTMLCanvasElement>(null)
   const donutRef = useRef<HTMLCanvasElement>(null)
@@ -100,8 +102,19 @@ export function PremiumDashboard({ kpi, funnel, series, leadSources, team }: {
           <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>Atualizado agora · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {['Semana', 'Este Mês', 'Trimestre', 'Ano'].map((f, i) => (
-            <button key={f} style={{ padding: '5px 12px', fontSize: 11, borderRadius: 20, border: '0.5px solid', borderColor: i === 1 ? '#1a1f36' : '#d1d8e8', background: i === 1 ? '#1a1f36' : '#fff', color: i === 1 ? '#fff' : '#8892a4', cursor: 'pointer' }}>{f}</button>
+          {[
+            { label: 'Semana', value: 'week' },
+            { label: 'Este Mês', value: 'month' },
+            { label: 'Trimestre', value: 'quarter' },
+            { label: 'Ano', value: 'year' },
+          ].map((f) => (
+            <Link key={f.value} href={`/?period=${f.value}`}
+              style={{ padding: '5px 12px', fontSize: 11, borderRadius: 20, border: '0.5px solid', textDecoration: 'none',
+                borderColor: period === f.value ? '#1a1f36' : '#d1d8e8',
+                background: period === f.value ? '#1a1f36' : '#fff',
+                color: period === f.value ? '#fff' : '#8892a4' }}>
+              {f.label}
+            </Link>
           ))}
         </div>
       </div>

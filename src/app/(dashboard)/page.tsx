@@ -1,16 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { PremiumDashboard } from '@/components/dashboard/premium-dashboard'
 
-function currentMonthRange() {
+function getPeriodRange(period: string) {
   const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
+  switch (period) {
+    case 'week': {
+      const from = new Date(now)
+      from.setDate(now.getDate() - 7)
+      return { from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+    }
+    case 'quarter': {
+      const from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+      return { from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+    }
+    case 'year': {
+      return { from: `${now.getFullYear()}-01-01`, to: now.toISOString().slice(0, 10) }
+    }
+    default: { // month
+      const from = new Date(now.getFullYear(), now.getMonth(), 1)
+      const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
+    }
+  }
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period = 'month' } = await searchParams
   const supabase = await createClient()
-  const { from: periodFrom, to: periodTo } = currentMonthRange()
+  const { from: periodFrom, to: periodTo } = getPeriodRange(period)
 
   // Funil — busca o pipeline de vendas padrão
   const { data: pipelines } = await supabase.from('pipelines').select('id, type, is_default').order('name')
@@ -109,6 +126,7 @@ export default async function DashboardPage() {
 
   return (
     <PremiumDashboard
+      period={period}
       kpi={{ receita: receitaAtual, meta, ticketMedio: avgTicket, ticketDelta: null, cicloMedio: avgCycle, churnPct }}
       funnel={funnel.length > 0 ? funnel : [
         { label: 'Prospecção', value: 220000, count: 47 },
