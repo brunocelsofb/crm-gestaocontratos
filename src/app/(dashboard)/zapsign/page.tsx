@@ -3,6 +3,7 @@ import { createZapSignTemplate, deleteZapSignTemplate } from '@/lib/actions/zaps
 import Link from 'next/link'
 
 export default async function ZapSignTemplatesPage() {
+  try {
   const supabase = await createClient()
   const { data: templates } = await supabase.from('zapsign_templates').select('*').order('created_at', { ascending: false })
   const { data: settings } = await supabase.from('organization_settings').select('zapsign_api_token').eq('id', 'default').maybeSingle()
@@ -71,4 +72,13 @@ export default async function ZapSignTemplatesPage() {
       </div>
     </div>
   )
+  } catch (e: any) {
+    return (
+      <div className="max-w-2xl space-y-4 rounded-lg border border-red-300 bg-red-50 p-6">
+        <h1 className="text-lg font-semibold text-red-900">Erro ao carregar a página</h1>
+        <p className="font-mono text-sm text-red-700">{e?.message ?? String(e)}</p>
+        <p className="text-xs text-red-500">Cole esse erro e manda pra investigar.</p>
+      </div>
+    )
+  }
 }
