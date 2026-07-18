@@ -1,27 +1,15 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
-export default async function CompaniesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>
-}) {
+export default async function CompaniesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams
   const supabase = await createClient()
 
-  let query = supabase
-    .from('companies')
-    .select('id, name, cnpj, created_at')
-    .order('name')
-
-  if (q?.trim()) {
-    const term = q.trim().replace(/[%_]/g, '')
-    query = query.ilike('name', `%${term}%`)
-  }
+  let query = supabase.from('companies').select('id, name, cnpj, created_at').order('name')
+  if (q?.trim()) query = query.ilike('name', `%${q.trim().replace(/[%_]/g, '')}%`)
 
   const { data: companies, error } = await query
-
-  const companyIds = (companies ?? []).map((c) => c.id)
+  const companyIds = (companies ?? []).map(c => c.id)
   const { data: contractCounts } = companyIds.length
     ? await supabase.from('contracts').select('company_id').in('company_id', companyIds)
     : { data: [] }
@@ -32,77 +20,81 @@ export default async function CompaniesPage({
     countByCompany.set(c.company_id, (countByCompany.get(c.company_id) ?? 0) + 1)
   }
 
+  const total = companies?.length ?? 0
+  const comContratos = (companies ?? []).filter(c => (countByCompany.get(c.id) ?? 0) > 0).length
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Empresas</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/companies/inactive"
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Clientes Inativos
-          </Link>
-          <Link
-            href="/companies/import"
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Importar CSV
-          </Link>
-          <Link
-            href="/companies/new"
-            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
-          >
-            + Nova Empresa
-          </Link>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Empresas</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Base de clientes e parceiros cadastrados</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link href="/companies/inactive" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>Inativos</Link>
+          <Link href="/companies/import" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>Importar CSV</Link>
+          <Link href="/companies/new" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#1a1f36', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>+ Nova Empresa</Link>
         </div>
       </div>
 
-      <form method="GET" className="flex gap-2">
-        <input
-          type="text"
-          name="q"
-          defaultValue={q ?? ''}
-          placeholder="Buscar por nome..."
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-        />
-        <button
-          type="submit"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Buscar
-        </button>
-      </form>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Total de empresas', value: String(total), sub: 'na base de clientes' },
+          { label: 'Com contratos', value: String(comContratos), sub: 'clientes ativos' },
+          { label: 'Sem contratos', value: String(total - comContratos), sub: 'sem oportunidade aberta' },
+        ].map(k => (
+          <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '0.5px solid #e8edf5' }}>
+            <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{k.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: '#8892a4', marginTop: 3 }}>{k.sub}</p>
+          </div>
+        ))}
+      </div>
 
-      {error && <p className="text-sm text-red-600">Erro ao carregar empresas: {error.message}</p>}
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <form method="GET" style={{ display: 'flex', gap: 6, flex: 1 }}>
+            <input type="text" name="q" defaultValue={q ?? ''} placeholder="Buscar empresa pelo nome…"
+              style={{ padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none', width: 260 }} />
+            <button type="submit" style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>Buscar</button>
+            {q && <Link href="/companies" style={{ padding: '6px 10px', fontSize: 11, color: '#8892a4', textDecoration: 'none', alignSelf: 'center' }}>Limpar</Link>}
+          </form>
+        </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+        {error && <p style={{ padding: '12px 16px', fontSize: 12, color: '#b91c1c' }}>Erro: {error.message}</p>}
+
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Nome</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">CNPJ</th>
-              <th className="px-4 py-3 text-right font-medium text-gray-500">Contratos</th>
+              {['Empresa', 'CNPJ', 'Contratos', 'Cadastrada em'].map((h, i) => (
+                <th key={h} style={{ padding: '10px 16px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: i >= 2 ? 'right' : 'left', borderBottom: '0.5px solid #f1f3f8' }}>{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {companies?.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  <Link href={`/companies/${c.id}`} className="hover:underline">
-                    {c.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-gray-500">{c.cnpj || '—'}</td>
-                <td className="px-4 py-3 text-right text-gray-700">{countByCompany.get(c.id) ?? 0}</td>
-              </tr>
-            ))}
-            {companies?.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-gray-400">
-                  {q ? `Nenhuma empresa encontrada para "${q}".` : 'Nenhuma empresa cadastrada ainda.'}
-                </td>
-              </tr>
+          <tbody>
+            {(companies ?? []).map(c => {
+              const cnt = countByCompany.get(c.id) ?? 0
+              return (
+                <tr key={c.id} style={{ borderBottom: '0.5px solid #f8f9fb' }}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <Link href={`/companies/${c.id}`} style={{ textDecoration: 'none' }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{c.name}</p>
+                    </Link>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, color: '#8892a4', fontFamily: 'monospace' }}>{c.cnpj || '—'}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: cnt > 0 ? '#eef3ff' : '#f1f3f8', color: cnt > 0 ? '#3b5bdb' : '#8892a4' }}>
+                      {cnt} contrato{cnt !== 1 ? 's' : ''}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, color: '#8892a4' }}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+                </tr>
+              )
+            })}
+            {(companies ?? []).length === 0 && (
+              <tr><td colSpan={4} style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>
+                {q ? `Nenhuma empresa encontrada para "${q}".` : 'Nenhuma empresa cadastrada ainda.'}
+              </td></tr>
             )}
           </tbody>
         </table>

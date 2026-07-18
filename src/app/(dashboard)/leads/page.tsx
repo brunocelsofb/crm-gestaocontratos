@@ -1,132 +1,121 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { LeadsHelpCard } from '@/components/leads/leads-help-card'
 
-const STATUS_LABELS: Record<string, string> = {
-  novo: 'Novo',
-  em_qualificacao: 'Em Qualificação',
-  qualificado: 'Qualificado',
-  descartado: 'Descartado',
-  convertido: 'Convertido',
-}
+const STATUS_LABELS: Record<string, string> = { novo: 'Novo', em_qualificacao: 'Em Qualificação', qualificado: 'Qualificado', descartado: 'Descartado', convertido: 'Convertido' }
 const STATUS_ORDER = ['novo', 'em_qualificacao', 'qualificado', 'convertido', 'descartado']
-const STATUS_STYLES: Record<string, string> = {
-  novo: 'bg-blue-100 text-blue-700',
-  em_qualificacao: 'bg-yellow-100 text-yellow-800',
-  qualificado: 'bg-positive-100 text-positive-700',
-  convertido: 'bg-brand-100 text-brand-700',
-  descartado: 'bg-gray-100 text-gray-500',
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  novo:            { bg: '#eef3ff', color: '#3b5bdb' },
+  em_qualificacao: { bg: '#fff8e6', color: '#92400e' },
+  qualificado:     { bg: '#eaf5ee', color: '#1a7c3e' },
+  convertido:      { bg: '#f0eeff', color: '#5f38c9' },
+  descartado:      { bg: '#f1f3f8', color: '#8892a4' },
+}
+const SOURCE_LABELS: Record<string, string> = { indicacao: 'Indicação', evento: 'Evento', formulario_site: 'Site', ligacao: 'Ligação', anuncio: 'Anúncio', manual: 'Manual', whatsapp: 'WhatsApp', outro: 'Outro' }
+
+function scoreBar(score: number) {
+  const color = score >= 60 ? '#1a7c3e' : score >= 30 ? '#f59e0b' : '#d1d8e8'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+      <div style={{ width: 48, height: 4, borderRadius: 2, background: '#f1f3f8', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.min(100, score)}%`, background: color, borderRadius: 2 }} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 500, color, minWidth: 24, textAlign: 'right' }}>{score}</span>
+    </div>
+  )
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  indicacao: 'Indicação',
-  evento: 'Evento',
-  formulario_site: 'Site',
-  ligacao: 'Ligação',
-  anuncio: 'Anúncio',
-  manual: 'Manual',
-  outro: 'Outro',
-}
-
-function scoreColor(score: number) {
-  if (score >= 60) return 'text-positive-700'
-  if (score >= 30) return 'text-yellow-700'
-  return 'text-gray-400'
-}
-
-export default async function LeadsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string }>
-}) {
+export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: statusFilter } = await searchParams
   const supabase = await createClient()
 
-  const { data: leads } = await supabase
-    .from('leads')
-    .select('id, name, email, phone, company_name, status, score, source, created_at')
-    .order('score', { ascending: false })
+  const { data: leads } = await supabase.from('leads').select('id, name, email, phone, company_name, status, score, source, created_at').order('score', { ascending: false })
 
-  const filtered = statusFilter ? (leads ?? []).filter((l) => l.status === statusFilter) : leads ?? []
-
+  const filtered = statusFilter ? (leads ?? []).filter(l => l.status === statusFilter) : leads ?? []
   const countByStatus: Record<string, number> = {}
-  for (const l of leads ?? []) {
-    countByStatus[l.status] = (countByStatus[l.status] ?? 0) + 1
-  }
+  for (const l of leads ?? []) countByStatus[l.status] = (countByStatus[l.status] ?? 0) + 1
+
+  const totalLeads = leads?.length ?? 0
+  const qualificados = countByStatus['qualificado'] ?? 0
+  const convertidos = countByStatus['convertido'] ?? 0
+  const avgScore = totalLeads > 0 ? Math.round((leads ?? []).reduce((s, l) => s + l.score, 0) / totalLeads) : 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Leads & Captação</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Antes de virar oportunidade — qualifique e converta quando fizer sentido.</p>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Leads & Captação</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Qualifique e converta quando fizer sentido.</p>
         </div>
-        <div className="flex gap-2">
-          <a href="/captura" target="_blank" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            🔗 Ver formulário público
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a href="/captura" target="_blank" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>
+            🔗 Formulário público
           </a>
-          <Link href="/leads/new" className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800">
+          <Link href="/leads/new" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#1a1f36', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>
             + Novo Lead
           </Link>
         </div>
       </div>
 
-      <LeadsHelpCard />
-
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/leads"
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${!statusFilter ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-        >
-          Todos ({leads?.length ?? 0})
-        </Link>
-        {STATUS_ORDER.map((s) => (
-          <Link
-            key={s}
-            href={`/leads?status=${s}`}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${statusFilter === s ? 'bg-brand-700 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-          >
-            {STATUS_LABELS[s]} ({countByStatus[s] ?? 0})
-          </Link>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Total de leads', value: String(totalLeads), sub: 'captados até hoje' },
+          { label: 'Qualificados', value: String(qualificados), sub: 'prontos pra converter' },
+          { label: 'Convertidos', value: String(convertidos), sub: 'viraram oportunidade' },
+          { label: 'Score médio', value: String(avgScore), sub: 'pontuação média' },
+        ].map(k => (
+          <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '0.5px solid #e8edf5' }}>
+            <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{k.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: '#8892a4', marginTop: 3 }}>{k.sub}</p>
+          </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', flexWrap: 'wrap' }}>
+          <Link href="/leads" style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, textDecoration: 'none', border: '0.5px solid', borderColor: !statusFilter ? '#1a1f36' : '#d1d8e8', background: !statusFilter ? '#1a1f36' : '#fff', color: !statusFilter ? '#fff' : '#8892a4' }}>
+            Todos ({totalLeads})
+          </Link>
+          {STATUS_ORDER.map(s => (
+            <Link key={s} href={`/leads?status=${s}`} style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20, textDecoration: 'none', border: '0.5px solid', borderColor: statusFilter === s ? '#1a1f36' : '#d1d8e8', background: statusFilter === s ? '#1a1f36' : '#fff', color: statusFilter === s ? '#fff' : '#8892a4' }}>
+              {STATUS_LABELS[s]} ({countByStatus[s] ?? 0})
+            </Link>
+          ))}
+        </div>
+
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Nome</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Empresa</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Origem</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-              <th className="px-4 py-3 text-right font-medium text-gray-500">Pontuação</th>
-              <th className="px-4 py-3 text-right font-medium text-gray-500">Recebido</th>
+              {['Nome / contato', 'Empresa', 'Origem', 'Status', 'Pontuação', 'Recebido'].map((h, i) => (
+                <th key={h} style={{ padding: '10px 16px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: i >= 4 ? 'right' : 'left', borderBottom: '0.5px solid #f1f3f8' }}>{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filtered.map((lead) => (
-              <tr key={lead.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <Link href={`/leads/${lead.id}`} className="font-medium text-brand-700 hover:underline">
-                    {lead.name}
-                  </Link>
-                  <div className="text-xs text-gray-400">{lead.email ?? lead.phone ?? '—'}</div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{lead.company_name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-500">{SOURCE_LABELS[lead.source ?? ''] ?? lead.source ?? 'manual'}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[lead.status]}`}>
-                    {STATUS_LABELS[lead.status]}
-                  </span>
-                </td>
-                <td className={`px-4 py-3 text-right font-semibold ${scoreColor(lead.score)}`}>{lead.score}</td>
-                <td className="px-4 py-3 text-right text-xs text-gray-400">{new Date(lead.created_at).toLocaleDateString('pt-BR')}</td>
-              </tr>
-            ))}
+          <tbody>
+            {filtered.map(lead => {
+              const st = STATUS_STYLE[lead.status] ?? STATUS_STYLE.novo
+              return (
+                <tr key={lead.id} style={{ borderBottom: '0.5px solid #f8f9fb' }}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <Link href={`/leads/${lead.id}`} style={{ textDecoration: 'none' }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{lead.name}</p>
+                      <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{lead.email ?? lead.phone ?? '—'}</p>
+                    </Link>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, color: '#52514e' }}>{lead.company_name ?? '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, color: '#8892a4' }}>{SOURCE_LABELS[lead.source ?? ''] ?? lead.source ?? 'Manual'}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: st.bg, color: st.color }}>
+                      {STATUS_LABELS[lead.status]}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>{scoreBar(lead.score)}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, color: '#8892a4' }}>{new Date(lead.created_at).toLocaleDateString('pt-BR')}</td>
+                </tr>
+              )
+            })}
             {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nenhum lead nessa categoria ainda.</td>
-              </tr>
+              <tr><td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>Nenhum lead nessa categoria ainda.</td></tr>
             )}
           </tbody>
         </table>
