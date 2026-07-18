@@ -7,7 +7,6 @@ import { NumberingSettingsForm } from '@/components/settings/numbering-settings-
 import { InboundEmailSettingsForm } from '@/components/settings/inbound-email-settings-form'
 import { WhatsAppSettingsForm } from '@/components/settings/whatsapp-settings-form'
 import { WhatsAppBotSettingsForm } from '@/components/settings/whatsapp-bot-settings-form'
-import { saveZapSignSettings } from '@/lib/actions/zapsign'
 import { DEFAULT_WELCOME_OFFLINE, DEFAULT_WELCOME_ONLINE, DEFAULT_REMINDER } from '@/lib/whatsapp/guardrails'
 
 export default async function SettingsPage() {
@@ -54,7 +53,7 @@ export default async function SettingsPage() {
         dailyLimit={settings?.whatsapp_daily_auto_limit ?? 3}
       />
 
-      <form action={async (formData: FormData) => { await saveZapSignSettings(formData) }} className="space-y-3 rounded-lg border border-gray-200 bg-white p-6">
+      <form method="POST" action="/api/zapsign/save-token" className="space-y-3 rounded-lg border border-gray-200 bg-white p-6">
         <div>
           <h3 className="text-sm font-medium text-gray-900">✍️ ZapSign — Assinatura Digital</h3>
           <p className="mt-0.5 text-xs text-gray-400">
