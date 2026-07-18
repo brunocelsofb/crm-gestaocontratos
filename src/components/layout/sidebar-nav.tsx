@@ -2,44 +2,31 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings2, Users, Settings, Smile, ClipboardList, Tag, BarChart3, Target, LifeBuoy, Mail, UserCircle, Zap, Sliders, MessageCircle, FileSignature } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, FileText, Building2, Settings, Target, LifeBuoy, MessageCircle, BarChart3 } from 'lucide-react'
 
 const BASE_NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/minha-conta', label: 'Minha Conta', icon: UserCircle },
   { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
   { href: '/leads', label: 'Leads', icon: Target },
-  { href: '/tickets', label: 'Atendimento', icon: LifeBuoy },
-  { href: '/whatsapp', label: 'Central WhatsApp', icon: MessageCircle },
   { href: '/contracts', label: 'Contratos', icon: FileText },
   { href: '/companies', label: 'Empresas', icon: Building2 },
-  { href: '/surveys-dashboard', label: 'Pesquisas e NPS', icon: BarChart3 },
-  { href: '/surveys', label: 'Formulários', icon: ClipboardList },
-  { href: '/tags', label: 'Tags', icon: Tag },
-  { href: '/proposals/templates', label: 'Modelos de Proposta', icon: FileText },
-  { href: '/proposals/catalog', label: 'Catálogo de Produtos', icon: FileText },
-  { href: '/email-templates', label: 'Templates de E-mail', icon: Mail },
-  { href: '/custom-fields', label: 'Campos Customizados', icon: Sliders },
-  { href: '/automations', label: 'Automações', icon: Zap },
-  { href: '/zapsign', label: 'Modelos ZapSign', icon: FileSignature },
-  { href: '/pipelines', label: 'Funis e Etapas', icon: Settings2 },
+  { href: '/tickets', label: 'Atendimento', icon: LifeBuoy },
+  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  { href: '/surveys-dashboard', label: 'Pesquisas & NPS', icon: BarChart3 },
 ]
 
 export function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname()
 
-  const items = isAdmin
-    ? [
-        ...BASE_NAV_ITEMS,
-        { href: '/users', label: 'Usuários', icon: Users },
-        { href: '/settings', label: 'Configurações', icon: Settings },
-      ]
-    : BASE_NAV_ITEMS
+  const items = [
+    ...BASE_NAV_ITEMS,
+    { href: '/settings', label: 'Configurações', icon: Settings },
+  ]
 
   return (
     <nav className="space-y-0.5">
       {items.map((item) => {
-        const active = pathname === item.href
+        const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
         const Icon = item.icon
         return (
           <Link
