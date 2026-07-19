@@ -3,10 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 
 const ALLOWED_FIELDS = [
   'contract_number', 'sankhya_code', 'cnpj_billing', 'contract_type',
-  'monthly_value', 'validity_months', 'valid_until', 'engineer_id',
-  'coordinator_id', 'abc_curve', 'sphere', 'nature', 'region',
-  'score_billing', 'score_visit', 'score_loyalty', 'has_measurement',
-  'has_audit', 'has_management_plan', 'has_parts_included',
+  'monthly_value', 'validity_months', 'valid_until',
+  'engineer_name', 'coordinator_name',
+  'abc_curve', 'sphere', 'nature', 'region', 'uf', 'segment', 'economic_group',
+  'score_billing', 'score_visit', 'score_loyalty', 'score_weight',
+  'has_measurement', 'has_audit', 'has_parts', 'team_type',
   'municipality', 'state', 'internal_notes',
 ]
 

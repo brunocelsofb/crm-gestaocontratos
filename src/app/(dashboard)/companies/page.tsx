@@ -23,6 +23,19 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   const total = companies?.length ?? 0
   const comContratos = (companies ?? []).filter(c => (countByCompany.get(c.id) ?? 0) > 0).length
 
+  // Clientes inativos — empresas que já tiveram contrato mas não têm
+  // nenhum aberto há mais de 180 dias (6 meses sem comprar)
+  const { data: recentContracts } = await supabase
+    .from('contracts')
+    .select('company_id, created_at')
+    .not('company_id', 'is', null)
+    .gte('created_at', new Date(Date.now() - 180 * 86400000).toISOString())
+
+  const recentCompanyIds = new Set((recentContracts ?? []).map((c: any) => c.company_id))
+  const inactivos = (companies ?? []).filter(c =>
+    (countByCompany.get(c.id) ?? 0) > 0 && !recentCompanyIds.has(c.id)
+  ).length
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -37,16 +50,17 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {[
           { label: 'Total de empresas', value: String(total), sub: 'na base de clientes' },
           { label: 'Com contratos', value: String(comContratos), sub: 'clientes ativos' },
           { label: 'Sem contratos', value: String(total - comContratos), sub: 'sem oportunidade aberta' },
+          { label: '⚠ Inativos +6 meses', value: String(inactivos), sub: 'sem compra há 6+ meses', alert: inactivos > 0 },
         ].map(k => (
-          <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '0.5px solid #e8edf5' }}>
+          <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: `0.5px solid ${(k as any).alert ? '#fca5a5' : '#e8edf5'}` }}>
             <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{k.label}</p>
-            <p style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{k.value}</p>
-            <p style={{ fontSize: 11, color: '#8892a4', marginTop: 3 }}>{k.sub}</p>
+            <p style={{ fontSize: 20, fontWeight: 500, color: (k as any).alert ? '#b91c1c' : '#1a1f36', letterSpacing: '-0.5px' }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: (k as any).alert ? '#b91c1c' : '#8892a4', marginTop: 3 }}>{k.sub}</p>
           </div>
         ))}
       </div>
@@ -78,7 +92,12 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
                 <tr key={c.id} style={{ borderBottom: '0.5px solid #f8f9fb' }}>
                   <td style={{ padding: '12px 16px' }}>
                     <Link href={`/companies/${c.id}`} style={{ textDecoration: 'none' }}>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{c.name}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{c.name}</p>
+                        {(countByCompany.get(c.id) ?? 0) > 0 && !recentCompanyIds.has(c.id) && (
+                          <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: '#fff8e6', color: '#92400e' }}>⚠ Inativo +6m</span>
+                        )}
+                      </div>
                     </Link>
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 12, color: '#8892a4', fontFamily: 'monospace' }}>{c.cnpj || '—'}</td>

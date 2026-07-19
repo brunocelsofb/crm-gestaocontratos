@@ -561,6 +561,24 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
           await supabase.from('contracts').update(carteiraPatch).eq('id', contractId)
         }
 
+        // Registra renovação se o pipeline de origem é gestao_contratos
+        const { data: fromPipelineInfo } = await supabase
+          .from('pipelines').select('type').eq('id', run.pipeline_id).maybeSingle()
+        if (fromPipelineInfo?.type === 'gestao_contratos') {
+          const { data: currRenewal } = await supabase
+            .from('contracts').select('renewal_count').eq('id', contractId).maybeSingle()
+          await supabase.from('contracts')
+            .update({ renewal_count: (currRenewal?.renewal_count ?? 0) + 1 })
+            .eq('id', contractId)
+          await supabase.from('activities').insert({
+            contract_id: contractId,
+            user_id: user.id,
+            type: 'system',
+            content: `🔄 Renovação registrada. Contrato renovado e movido para "${targetPipeline?.name}", etapa "${targetStage.name}".`,
+            metadata: { from_run: run.id, to_run: newRun?.id, renewal: true },
+          })
+        }
+
         await supabase.from('activities').insert({
           contract_id: contractId,
           pipeline_run_id: newRun.id,
