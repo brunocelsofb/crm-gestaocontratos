@@ -350,7 +350,7 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 
   const { data: run } = await supabase
     .from('pipeline_runs')
-    .select('id, stage_id, pipeline_id')
+    .select('id, stage_id, pipeline_id, value, revenue_type')
     .eq('contract_id', contractId)
     .eq('status', 'open')
     .maybeSingle()
@@ -535,6 +535,31 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
           entered_at: now,
           changed_by: user.id,
         })
+
+        // Pré-popula campos da carteira com o que já foi preenchido
+        // em Novos Negócios — evita redigitar. Só preenche se ainda
+        // estiver vazio (não sobrescreve se já tinha algo).
+        const { data: currentContract } = await supabase
+          .from('contracts')
+          .select('monthly_value, contract_type, municipality, state, cnpj_billing')
+          .eq('id', contractId)
+          .maybeSingle()
+
+        const carteiraPatch: Record<string, any> = {}
+
+        // Valor do run vira valor mensal se ainda não tinha
+        if (!currentContract?.monthly_value && run.value) {
+          carteiraPatch.monthly_value = Number(run.value)
+        }
+        // Tipo de receita do run vira tipo de contrato
+        if (!currentContract?.contract_type && (run as any).revenue_type) {
+          const typeMap: Record<string, string> = { mrr: 'fixo', spot: 'spot' }
+          carteiraPatch.contract_type = typeMap[(run as any).revenue_type] ?? null
+        }
+
+        if (Object.keys(carteiraPatch).length > 0) {
+          await supabase.from('contracts').update(carteiraPatch).eq('id', contractId)
+        }
 
         await supabase.from('activities').insert({
           contract_id: contractId,
