@@ -35,6 +35,8 @@ export default function NewContractPage() {
   const [pipelineType, setPipelineType] = useState<string>('gestao_contratos')
   const [stages, setStages] = useState<Stage[]>([])
   const [fieldConfigs, setFieldConfigs] = useState<PipelineFieldConfig[]>([])
+  const [tags, setTags] = useState<{ id: string; name: string; color: string }[]>([])
+  const [orgCnpj, setOrgCnpj] = useState<string>('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -68,12 +70,16 @@ export default function NewContractPage() {
       setPipelineId(resolvedPipelineId)
 
       if (resolvedPipelineId) {
-        const [{ data: stagesData }, { data: configsData }] = await Promise.all([
+        const [{ data: stagesData }, { data: configsData }, { data: tagsData }, { data: orgData }] = await Promise.all([
           supabase.from('stages').select('id, name').eq('pipeline_id', resolvedPipelineId).order('order_index'),
           supabase.from('pipeline_field_configs').select('*').eq('pipeline_id', resolvedPipelineId).order('display_order'),
+          supabase.from('tags').select('id, name, color').order('name'),
+          supabase.from('organization_settings').select('company_cnpj').eq('id', 'default').maybeSingle(),
         ])
         setStages(stagesData ?? [])
         setFieldConfigs((configsData ?? []) as PipelineFieldConfig[])
+        setTags(tagsData ?? [])
+        setOrgCnpj(orgData?.company_cnpj ?? '')
       }
     }
 
@@ -124,10 +130,59 @@ export default function NewContractPage() {
 
         <CompanyContactSection preselectedCompanyId={companyIdParam ?? undefined} />
 
+        {/* Cargo do contato */}
+        {show('contact_cargo') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Cargo do contato {req('contact_cargo') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <input name="contact_cargo" required={req('contact_cargo')} placeholder="Ex: Gerente, Diretor..." className={inputCls} />
+          </div>
+        )}
+
+        {/* CNPJ do cliente */}
+        {show('cnpj_client') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">CNPJ do Cliente {req('cnpj_client') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <input name="cnpj_client" required={req('cnpj_client')} placeholder="00.000.000/0000-00" className={inputCls} />
+          </div>
+        )}
+
+        {/* CNPJ da ORBIS */}
+        {show('cnpj_orbis') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">CNPJ da ORBIS (contratada) {req('cnpj_orbis') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <input name="cnpj_orbis" defaultValue={orgCnpj} required={req('cnpj_orbis')} placeholder="00.000.000/0000-00" className={inputCls} />
+            {orgCnpj && <p style={{ fontSize: 10, color: '#8892a4', marginTop: 3 }}>Preenchido automaticamente com o CNPJ da organização</p>}
+          </div>
+        )}
+
+        {/* Tag */}
+        {show('tag') && tags.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Tag / Etiqueta {req('tag') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <select name="tag_id" required={req('tag')} className={inputCls}>
+              <option value="">Sem tag</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Valor */}
         {show('value') && (
           <div>
             <label className="block text-sm font-medium text-gray-700">Valor estimado (R$) {req('value') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
             <input name="value" type="number" step="0.01" min="0" defaultValue={0} required={req('value')} className={inputCls} />
+          </div>
+        )}
+
+        {/* Tipo de receita MRR vs Spot */}
+        {show('revenue_type') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Tipo de Receita {req('revenue_type') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <select name="revenue_type" required={req('revenue_type')} className={inputCls}>
+              <option value="">Selecione...</option>
+              <option value="mrr">MRR — Recorrente mensal</option>
+              <option value="spot">Spot — Avulso / único</option>
+            </select>
           </div>
         )}
 
