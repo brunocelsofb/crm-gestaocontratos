@@ -1270,3 +1270,22 @@ create table contract_crm.zapsign_documents (
 create index idx_zapsign_documents_contract on contract_crm.zapsign_documents(contract_id);
 alter table contract_crm.zapsign_documents enable row level security;
 create policy "zapsign_documents_all" on contract_crm.zapsign_documents for all using (auth.role() = 'authenticated');
+
+
+-- ------------------------------------------------------------
+-- 39. Configuração de campos por funil
+-- ------------------------------------------------------------
+create table contract_crm.pipeline_field_configs (
+  id            uuid primary key default gen_random_uuid(),
+  pipeline_id   uuid not null references contract_crm.pipelines(id) on delete cascade,
+  field_key     text not null,
+  field_label   text not null,
+  visibility    text not null default 'optional'
+                check (visibility in ('required', 'optional', 'hidden')),
+  display_order integer not null default 0,
+  created_at    timestamptz not null default now(),
+  unique (pipeline_id, field_key)
+);
+alter table contract_crm.pipeline_field_configs enable row level security;
+create policy "pipeline_field_configs_all" on contract_crm.pipeline_field_configs
+  for all using (auth.role() = 'authenticated');

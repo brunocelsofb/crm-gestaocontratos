@@ -503,7 +503,7 @@ export default async function ContractDetailPage({
               />
             ),
           },
-          {
+          ...(isCurrentlyInContractsPipeline ? [{
             id: 'carteira',
             label: '📋 Dados da Carteira',
             content: (
@@ -537,7 +537,7 @@ export default async function ContractDetailPage({
                 profiles={(allProfiles ?? []).map(p => ({ id: p.id, full_name: p.full_name }))}
               />
             ),
-          },
+          }] : []),
         ]}
       />
     </div>

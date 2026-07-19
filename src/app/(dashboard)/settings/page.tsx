@@ -14,6 +14,7 @@ const CONFIG_SECTIONS = [
     title: 'Oportunidades',
     items: [
       { href: '/pipelines', label: 'Funis e Etapas', description: 'Configure os funis e as etapas do seu processo de vendas' },
+      { href: '/settings/campos-oportunidade', label: 'Campos por Funil', description: 'Defina quais campos são obrigatórios/opcionais em cada funil' },
       { href: '/custom-fields', label: 'Campos Customizados', description: 'Adicione campos personalizados às oportunidades' },
       { href: '/automations', label: 'Automações', description: 'Regras automáticas por gatilho ou tempo' },
       { href: '/tags', label: 'Tags', description: 'Organize e classifique com etiquetas' },
