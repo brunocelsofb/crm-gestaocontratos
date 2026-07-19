@@ -201,14 +201,19 @@ export async function moveContractStage(
       stage_id: newStage.id,
       stage_entered_at: now,
     }
+    // Só fecha como "won" automaticamente ao entrar numa etapa de vitória.
+    // Para "lost" NÃO fechamos automaticamente — o usuário precisa usar
+    // o botão "Marcar como Perdido" explicitamente. Isso evita que mover
+    // um card pra uma etapa intermediária feche o negócio como perdido
+    // por acidente (bug relatado: etapa "2b" fechava como lost ao arrastar).
     if (newStage.is_won) {
       runUpdate.status = 'won'
       runUpdate.ended_at = now
     }
-    if (newStage.is_lost) {
-      runUpdate.status = 'lost'
-      runUpdate.ended_at = now
-    }
+    // REMOVIDO: if (newStage.is_lost) { runUpdate.status = 'lost' }
+    // Motivo: is_lost na etapa agora só serve pra indicar que o botão
+    // "Marcar como Perdido" está disponível nessa etapa — não fecha
+    // automaticamente ao mover.
 
     await supabase.from('pipeline_runs').update(runUpdate).eq('id', run.id)
 
