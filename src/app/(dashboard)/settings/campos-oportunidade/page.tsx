@@ -54,6 +54,7 @@ export default async function CamposOportunidadePage({
 
       {activePipelineId && (
         <PipelineFieldConfigForm
+          key={activePipelineId}
           pipelineId={activePipelineId}
           initialConfigs={configs}
         />
