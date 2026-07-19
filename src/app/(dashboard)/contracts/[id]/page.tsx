@@ -18,6 +18,7 @@ import { ContractEmailSection } from '@/components/email/contract-email-section'
 import { ContractCustomFieldsSection } from '@/components/custom-fields/contract-custom-fields-section'
 import { ContractContactsSection } from '@/components/contracts/contract-contacts-section'
 import { ContractZapSignSection } from '@/components/zapsign/contract-zapsign-section'
+import { PortfolioFieldsForm } from '@/components/carteira/portfolio-fields-form'
 import { getContractContacts } from '@/lib/actions/contract-contacts'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { getConnectedEmailAccount } from '@/lib/actions/email'
@@ -499,6 +500,41 @@ export default async function ContractDetailPage({
                 defaultContactEmail={linkedContact?.email ?? null}
                 defaultContactPhone={linkedContact?.phone ?? null}
                 isConnected={!!orgZapSignSettings?.zapsign_api_token}
+              />
+            ),
+          },
+          {
+            id: 'carteira',
+            label: '📋 Dados da Carteira',
+            content: (
+              <PortfolioFieldsForm
+                contractId={contract.id}
+                initial={{
+                  contract_number: (contract as any).contract_number ?? null,
+                  sankhya_code: (contract as any).sankhya_code ?? null,
+                  cnpj_billing: (contract as any).cnpj_billing ?? null,
+                  contract_type: (contract as any).contract_type ?? null,
+                  monthly_value: (contract as any).monthly_value ?? null,
+                  validity_months: (contract as any).validity_months ?? null,
+                  valid_until: (contract as any).valid_until ?? null,
+                  engineer_id: (contract as any).engineer_id ?? null,
+                  coordinator_id: (contract as any).coordinator_id ?? null,
+                  abc_curve: (contract as any).abc_curve ?? null,
+                  sphere: (contract as any).sphere ?? null,
+                  nature: (contract as any).nature ?? null,
+                  region: (contract as any).region ?? null,
+                  score_billing: (contract as any).score_billing ?? null,
+                  score_visit: (contract as any).score_visit ?? null,
+                  score_loyalty: (contract as any).score_loyalty ?? null,
+                  has_measurement: (contract as any).has_measurement ?? false,
+                  has_audit: (contract as any).has_audit ?? false,
+                  has_management_plan: (contract as any).has_management_plan ?? false,
+                  has_parts_included: (contract as any).has_parts_included ?? false,
+                  municipality: (contract as any).municipality ?? null,
+                  state: (contract as any).state ?? null,
+                  internal_notes: (contract as any).internal_notes ?? null,
+                }}
+                profiles={(allProfiles ?? []).map(p => ({ id: p.id, full_name: p.full_name }))}
               />
             ),
           },

@@ -14,10 +14,21 @@ export default async function ContractsPage({
   const { q, status } = await searchParams
   const supabase = await createClient()
 
-  let query = supabase
-    .from('contracts_with_current_run')
-    .select('id, process_number, title, client_name, value, run_status, stage_id')
-    .order('created_at', { ascending: false })
+  // Busca só pipelines de tipo 'vendas' — Oportunidades são exclusivamente
+  // negócios em negociação, não contratos de gestão de carteira.
+  const { data: salesPipelines } = await supabase.from('pipelines').select('id').eq('type', 'vendas')
+  const salesPipelineIds = (salesPipelines ?? []).map(p => p.id)
+
+  let query = salesPipelineIds.length
+    ? supabase
+        .from('contracts_with_current_run')
+        .select('id, process_number, title, client_name, value, run_status, stage_id, pipeline_id')
+        .in('pipeline_id', salesPipelineIds)
+        .order('created_at', { ascending: false })
+    : supabase
+        .from('contracts_with_current_run')
+        .select('id, process_number, title, client_name, value, run_status, stage_id, pipeline_id')
+        .eq('pipeline_id', '00000000-0000-0000-0000-000000000000') // retorna vazio se não tem funil de vendas
 
   if (q?.trim()) {
     const term = q.trim().replace(/[%_]/g, '')
