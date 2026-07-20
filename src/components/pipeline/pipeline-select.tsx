@@ -2,11 +2,17 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
+const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
+  vendas:          { bg: '#eaf5ee', color: '#1a7c3e' },
+  gestao_contratos:{ bg: '#eef3ff', color: '#3b5bdb' },
+  servico_avulso:  { bg: '#fff8e6', color: '#92400e' },
+}
+
 export function PipelineSelect({
   pipelines,
   selected,
 }: {
-  pipelines: { id: string; name: string }[]
+  pipelines: { id: string; name: string; type?: string }[]
   selected?: string
 }) {
   const router = useRouter()
@@ -20,16 +26,34 @@ export function PipelineSelect({
   }
 
   return (
-    <select
-      value={selected}
-      onChange={(e) => handleChange(e.target.value)}
-      className="w-56 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none"
-    >
-      {pipelines.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-        </option>
-      ))}
-    </select>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {pipelines.map(p => {
+        const isActive = p.id === selected
+        const badge = TYPE_BADGE[(p.type ?? '')] ?? { bg: '#f1f3f8', color: '#8892a4' }
+        return (
+          <button
+            key={p.id}
+            onClick={() => handleChange(p.id)}
+            style={{
+              padding: '6px 14px',
+              fontSize: 12,
+              fontWeight: isActive ? 500 : 400,
+              borderRadius: 20,
+              border: '0.5px solid',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              borderColor: isActive ? '#1a1f36' : '#d1d8e8',
+              background: isActive ? '#1a1f36' : '#fff',
+              color: isActive ? '#fff' : '#52514e',
+            }}
+          >
+            {!isActive && (
+              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: badge.color, marginRight: 5, verticalAlign: 'middle', marginTop: -1 }} />
+            )}
+            {p.name}
+          </button>
+        )
+      })}
+    </div>
   )
 }

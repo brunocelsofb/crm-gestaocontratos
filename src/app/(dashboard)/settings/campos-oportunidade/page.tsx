@@ -16,10 +16,14 @@ export default async function CamposOportunidadePage({
   const { pipeline: selectedPipelineId } = await searchParams
   const supabase = await createClient()
 
-  const { data: pipelines } = await supabase
-    .from('pipelines')
-    .select('id, name, type')
-    .order('name')
+  const { data: pipelinesRaw } = await supabase.from('pipelines').select('id, name, type').order('name')
+  const TYPE_ORDER: Record<string, number> = { vendas: 0, gestao_contratos: 1, servico_avulso: 2 }
+  const pipelines = (pipelinesRaw ?? []).sort((a, b) => {
+    const ao = TYPE_ORDER[a.type] ?? 9
+    const bo = TYPE_ORDER[b.type] ?? 9
+    if (ao !== bo) return ao - bo
+    return a.name.localeCompare(b.name, 'pt-BR')
+  })
 
   const activePipelineId = selectedPipelineId ?? pipelines?.[0]?.id
   const configs = activePipelineId ? await getPipelineFieldConfigs(activePipelineId) : []

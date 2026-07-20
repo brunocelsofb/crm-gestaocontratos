@@ -23,10 +23,19 @@ export default async function PipelinePage({
   // atualizado na hora" por "tela rápida agora".
   void checkAndTriggerRenewals()
 
-  const { data: pipelines } = await supabase
+  const { data: pipelinesRaw } = await supabase
     .from('pipelines')
     .select('id, name, is_default, type, won_label, lost_label')
     .order('name')
+
+  // Ordena: funis de vendas primeiro (Novos Negócios), gestao_contratos depois
+  const TYPE_ORDER: Record<string, number> = { vendas: 0, gestao_contratos: 1, servico_avulso: 2 }
+  const pipelines = (pipelinesRaw ?? []).sort((a, b) => {
+    const ao = TYPE_ORDER[a.type] ?? 9
+    const bo = TYPE_ORDER[b.type] ?? 9
+    if (ao !== bo) return ao - bo
+    return a.name.localeCompare(b.name, 'pt-BR')
+  })
 
   const selectedPipeline =
     pipelineIdParam ?? pipelines?.find((p) => p.is_default)?.id ?? pipelines?.[0]?.id
