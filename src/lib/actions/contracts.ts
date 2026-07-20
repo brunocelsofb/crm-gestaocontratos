@@ -303,6 +303,15 @@ export async function deleteContract(contractId: string, redirectTo?: string): P
   if (!isAdmin) return { error: 'Só administradores podem excluir contratos.' }
 
   const supabase = createAdminClient()
+
+  // Limpa a referência no lead antes de deletar — se um lead foi
+  // convertido nessa oportunidade, o banco bloquearia o delete por
+  // FK. Setamos null pra desvincular sem apagar o lead.
+  await supabase
+    .from('leads')
+    .update({ converted_contract_id: null })
+    .eq('converted_contract_id', contractId)
+
   const { error } = await supabase.from('contracts').delete().eq('id', contractId)
 
   if (error) return { error: error.message }
