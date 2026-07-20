@@ -46,6 +46,22 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('pipelines').select('id, is_default').eq('type', 'vendas'),
   ])
 
+  if (!company) notFound()
+
+  // Busca leads vinculados à empresa por CNPJ ou nome
+  const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
+  let leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source').order('created_at', { ascending: false }).limit(20)
+  if (cnpjDigits) {
+    leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source')
+      .or(`cnpj.eq.${cnpjDigits},company_name.ilike.${company.name}`)
+      .order('created_at', { ascending: false }).limit(20)
+  } else if (company.name) {
+    leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source')
+      .ilike('company_name', company.name)
+      .order('created_at', { ascending: false }).limit(20)
+  }
+  const { data: companyLeads } = await leadsQuery
+
   const defaultSalesPipeline = (salesPipelines ?? []).find(p => p.is_default)?.id ?? salesPipelines?.[0]?.id
 
   if (!company) notFound()
@@ -121,6 +137,40 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               </div>
             </div>
           </div>
+
+          {/* Leads vinculados */}
+          {(companyLeads ?? []).length > 0 && (
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+              <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Leads ({(companyLeads ?? []).length})</p>
+                <Link href="/leads" style={{ fontSize: 11, color: '#4f86f7', textDecoration: 'none' }}>Ver todos os leads →</Link>
+              </div>
+              <div>
+                {(companyLeads ?? []).map(l => {
+                  const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+                    novo: { bg: '#eef3ff', color: '#3b5bdb' },
+                    em_qualificacao: { bg: '#fff8e6', color: '#92400e' },
+                    qualificado: { bg: '#eaf5ee', color: '#1a7c3e' },
+                    convertido: { bg: '#f0eeff', color: '#5f38c9' },
+                    descartado: { bg: '#f1f3f8', color: '#8892a4' },
+                  }
+                  const st = STATUS_STYLE[l.status] ?? STATUS_STYLE.novo
+                  const STATUS_LABEL: Record<string, string> = { novo: 'Novo', em_qualificacao: 'Em Qualificação', qualificado: 'Qualificado', convertido: 'Convertido', descartado: 'Descartado' }
+                  return (
+                    <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '0.5px solid #f8f9fb' }}>
+                      <div>
+                        <Link href={`/leads/${l.id}`} style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', textDecoration: 'none' }}>{l.name}</Link>
+                        <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{l.email ?? '—'} · {new Date(l.created_at).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: st.bg, color: st.color }}>
+                        {STATUS_LABEL[l.status] ?? l.status}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Oportunidades vinculadas */}
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>

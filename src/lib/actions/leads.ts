@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { calculateLeadScore } from '@/lib/utils/lead-score'
+import { isCurrentUserAdmin } from '@/lib/auth/role'
 
 export type ActionState = { error?: string }
 
@@ -34,6 +35,24 @@ export async function createLead(formData: FormData): Promise<ActionState & { le
     .single()
 
   if (error) return { error: error.message }
+
+  // Tenta vincular automaticamente a uma empresa existente por CNPJ
+  if (cnpj) {
+    const adminClient = createAdminClient()
+    const cnpjDigits = cnpj.replace(/\D/g, '')
+    const { data: existingCompany } = await adminClient
+      .from('companies').select('id')
+      .or(`cnpj.eq.${cnpjDigits},cnpj.eq.${cnpj}`)
+      .maybeSingle()
+    if (existingCompany) {
+      // Registra atividade na empresa sobre o novo lead
+      await adminClient.from('activities').insert({
+        company_id: existingCompany.id,
+        type: 'note',
+        content: `📥 Novo lead recebido: "${name}" (${source ?? 'formulário'})`,
+      })
+    }
+  }
 
   // Se essa pessoa tinha mandado mensagem de WhatsApp antes de
   // preencher o formulário (fluxo de triagem), vincula a conversa a
@@ -90,10 +109,16 @@ export async function addLeadNote(leadId: string, content: string): Promise<Acti
   return {}
 }
 
-export async function deleteLead(leadId: string) {
+export async function deleteLead(leadId: string): Promise<{ error?: string }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) return { error: 'Só administradores podem excluir leads.' }
   const supabase = createAdminClient()
-  await supabase.from('leads').delete().eq('id', leadId)
+  // Desvincula o lead de qualquer contrato antes de deletar
+  await supabase.from('contracts').update({ contact_id: null }).eq('contact_id', leadId)
+  const { error } = await supabase.from('leads').delete().eq('id', leadId)
+  if (error) return { error: error.message }
   revalidatePath('/leads')
+  return {}
 }
 
 // Converte um lead qualificado numa OPORTUNIDADE de verdade: cria (ou
@@ -111,28 +136,74 @@ export async function convertLeadToOpportunity(leadId: string): Promise<ActionSt
   if (lead.status === 'convertido') return { error: 'Este lead já foi convertido.' }
 
   let companyId: string | null = null
-  if (lead.company_name) {
-    const { data: existingCompany } = await supabase.from('companies').select('id').ilike('name', lead.company_name).maybeSingle()
-    if (existingCompany) {
-      companyId = existingCompany.id
-    } else {
-      const { data: newCompany } = await supabase
-        .from('companies')
-        .insert({ name: lead.company_name, owner_id: user.id })
-        .select('id')
-        .single()
-      companyId = newCompany?.id ?? null
-    }
+
+  // 1. Tenta vincular por CNPJ (mais confiável que nome)
+  if (lead.cnpj) {
+    const cnpjDigits = lead.cnpj.replace(/\D/g, '')
+    const { data: byeCnpj } = await supabase
+      .from('companies')
+      .select('id')
+      .or(`cnpj.eq.${cnpjDigits},cnpj.eq.${lead.cnpj}`)
+      .maybeSingle()
+    if (byeCnpj) companyId = byeCnpj.id
+  }
+
+  // 2. Fallback: busca por nome da empresa
+  if (!companyId && lead.company_name) {
+    const { data: byName } = await supabase
+      .from('companies')
+      .select('id')
+      .ilike('name', lead.company_name.trim())
+      .maybeSingle()
+    if (byName) companyId = byName.id
+  }
+
+  // 3. Cria a empresa se não encontrou
+  if (!companyId && lead.company_name) {
+    const { data: newCompany } = await supabase
+      .from('companies')
+      .insert({
+        name: lead.company_name,
+        cnpj: lead.cnpj ? lead.cnpj.replace(/\D/g, '') : null,
+        status: 'prospect',
+        owner_id: user.id,
+      })
+      .select('id')
+      .single()
+    companyId = newCompany?.id ?? null
+  }
+
+  // Registra atividade na empresa sobre o lead convertido
+  if (companyId) {
+    await supabase.from('activities').insert({
+      company_id: companyId,
+      user_id: user.id,
+      type: 'note',
+      content: `🔗 Lead "${lead.name}" convertido em oportunidade (origem: ${lead.source ?? 'formulário'}).`,
+    })
   }
 
   let contactId: string | null = null
   if (companyId) {
-    const { data: newContact } = await supabase
-      .from('contacts')
-      .insert({ company_id: companyId, name: lead.name, email: lead.email, phone: lead.phone, is_primary: true })
-      .select('id')
-      .single()
-    contactId = newContact?.id ?? null
+    // Verifica se já existe contato com mesmo e-mail
+    if (lead.email) {
+      const { data: existingContact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('email', lead.email)
+        .maybeSingle()
+      if (existingContact) contactId = existingContact.id
+    }
+
+    if (!contactId) {
+      const { data: newContact } = await supabase
+        .from('contacts')
+        .insert({ company_id: companyId, name: lead.name, email: lead.email, phone: lead.phone, is_primary: false })
+        .select('id')
+        .single()
+      contactId = newContact?.id ?? null
+    }
   }
 
   const { data: salesPipeline } = await supabase.from('pipelines').select('id').eq('type', 'vendas').eq('is_default', true).maybeSingle()

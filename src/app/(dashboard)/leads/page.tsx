@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentProfile } from '@/lib/auth/role'
+import { DeleteLeadButton } from '@/components/leads/delete-lead-button'
 
 const STATUS_LABELS: Record<string, string> = { novo: 'Novo', em_qualificacao: 'Em Qualificação', qualificado: 'Qualificado', descartado: 'Descartado', convertido: 'Convertido' }
 const STATUS_ORDER = ['novo', 'em_qualificacao', 'qualificado', 'convertido', 'descartado']
@@ -27,6 +29,8 @@ function scoreBar(score: number) {
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: statusFilter } = await searchParams
   const supabase = await createClient()
+  const profile = await getCurrentProfile()
+  const isAdmin = profile?.role === 'admin'
 
   const { data: leads } = await supabase.from('leads').select('id, name, email, phone, company_name, status, score, source, created_at').order('score', { ascending: false })
 
@@ -86,8 +90,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Nome / contato', 'Empresa', 'Origem', 'Status', 'Pontuação', 'Recebido'].map((h, i) => (
-                <th key={h} style={{ padding: '10px 16px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: i >= 4 ? 'right' : 'left', borderBottom: '0.5px solid #f1f3f8' }}>{h}</th>
+              {['Nome / contato', 'Empresa', 'Origem', 'Status', 'Pontuação', 'Recebido', ''].map((h, i) => (
+                <th key={h + i} style={{ padding: '10px 16px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: i >= 4 && i < 6 ? 'right' : 'left', borderBottom: '0.5px solid #f1f3f8' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -111,11 +115,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                   </td>
                   <td style={{ padding: '12px 16px' }}>{scoreBar(lead.score)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, color: '#8892a4' }}>{new Date(lead.created_at).toLocaleDateString('pt-BR')}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    {isAdmin && <DeleteLeadButton leadId={lead.id} leadName={lead.name} />}
+                  </td>
                 </tr>
               )
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>Nenhum lead nessa categoria ainda.</td></tr>
+              <tr><td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>Nenhum lead nessa categoria ainda.</td></tr>
             )}
           </tbody>
         </table>
