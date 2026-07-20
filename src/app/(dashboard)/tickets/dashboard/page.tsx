@@ -106,108 +106,104 @@ export default async function TicketsDashboardPage({
     }
   })
 
+  const slaAlert = slaComplianceRate !== null && slaComplianceRate < 80
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Dashboard de Atendimento</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Visão consolidada dos chamados — dados de gestão à vista.</p>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Dashboard de Atendimento</h1>
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Visão consolidada dos chamados — dados de gestão à vista.</p>
         </div>
-        <Link href="/tickets" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+        <Link href="/tickets" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>
           ← Ver lista de tickets
         </Link>
       </div>
 
       <PeriodSelector from={from} to={to} basePath="/tickets/dashboard" />
 
-      <div className="grid grid-cols-5 gap-3">
-        <MetricCard icon={Ticket} accent="brand" label="Total de tickets" value={String(total)} />
-        <MetricCard icon={CheckCircle2} accent="positive" label="Resolvidos/Fechados" value={String(resolved.length)} hint={total > 0 ? `${Math.round((resolved.length / total) * 100)}%` : undefined} />
-        <MetricCard
-          icon={Clock}
-          accent="warn"
-          label="Tempo médio de resolução"
-          value={avgResolutionDays !== null ? `${avgResolutionDays.toFixed(1)}d` : '—'}
-        />
-        <MetricCard
-          icon={ShieldCheck}
-          accent={slaComplianceRate !== null && slaComplianceRate >= 80 ? 'positive' : 'negative'}
-          label="% dentro do prazo (SLA)"
-          value={slaComplianceRate !== null ? `${slaComplianceRate}%` : '—'}
-          hint={resolvedWithSla.length > 0 ? `${resolvedWithSla.length} avaliados` : undefined}
-        />
-        <MetricCard
-          icon={Star}
-          accent={avgSatisfaction !== null && avgSatisfaction >= 4 ? 'positive' : avgSatisfaction !== null && avgSatisfaction >= 3 ? 'warn' : 'negative'}
-          label="Satisfação média"
-          value={avgSatisfaction !== null ? `${avgSatisfaction.toFixed(1)}/5` : '—'}
-          hint={satisfactionRatings.length > 0 ? `${satisfactionRatings.length} avaliações` : undefined}
-        />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Total de tickets', value: String(total), sub: 'no período' },
+          { label: 'Resolvidos', value: String(resolved.length), sub: total > 0 ? `${Math.round((resolved.length / total) * 100)}% do total` : '—' },
+          { label: 'Tempo médio resolução', value: avgResolutionDays !== null ? `${avgResolutionDays.toFixed(1)}d` : '—', sub: 'dias até resolução' },
+          { label: 'SLA dentro do prazo', value: slaComplianceRate !== null ? `${slaComplianceRate}%` : '—', sub: `${resolvedWithSla.length} avaliados`, alert: slaAlert },
+          { label: 'Satisfação média', value: avgSatisfaction !== null ? `${avgSatisfaction.toFixed(1)}/5` : '—', sub: `${satisfactionRatings.length} avaliações` },
+        ].map(k => (
+          <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: `0.5px solid ${(k as any).alert ? '#fca5a5' : '#e8edf5'}` }}>
+            <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{k.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 500, color: (k as any).alert ? '#b91c1c' : '#1a1f36', letterSpacing: '-0.5px', margin: 0 }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: (k as any).alert ? '#b91c1c' : '#8892a4', marginTop: 3 }}>{k.sub}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-foreground">Abertos vs Resolvidos — últimos 6 meses</h2>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 14 }}>Abertos vs Resolvidos — últimos 6 meses</p>
         <TicketTrendChart data={trendData} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-medium text-foreground">Por categoria</h2>
-          {categoryData.length > 0 ? <TicketBreakdownChart data={categoryData} /> : <p className="text-sm text-gray-400">Sem dados no período.</p>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 14 }}>Por categoria</p>
+          {categoryData.length > 0 ? <TicketBreakdownChart data={categoryData} /> : <p style={{ fontSize: 12, color: '#8892a4' }}>Sem dados no período.</p>}
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-medium text-foreground">Por responsável</h2>
-          {assigneeData.length > 0 ? <TicketBreakdownChart data={assigneeData} /> : <p className="text-sm text-gray-400">Sem dados no período.</p>}
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 14 }}>Por responsável</p>
+          {assigneeData.length > 0 ? <TicketBreakdownChart data={assigneeData} /> : <p style={{ fontSize: 12, color: '#8892a4' }}>Sem dados no período.</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {(['nao_critica', 'pouco_critica', 'critica', 'muito_critica'] as const).map((p) => {
           const count = (tickets ?? []).filter((t) => t.priority === p).length
+          const isCrit = p === 'critica' || p === 'muito_critica'
           return (
-            <div key={p} className="rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">{PRIORITY_LABELS[p]}</p>
-              <p className="text-lg font-semibold text-gray-900">{count}</p>
+            <div key={p} style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: `0.5px solid ${isCrit && count > 0 ? '#fca5a5' : '#e8edf5'}` }}>
+              <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>{PRIORITY_LABELS[p]}</p>
+              <p style={{ fontSize: 20, fontWeight: 500, color: isCrit && count > 0 ? '#b91c1c' : '#1a1f36', letterSpacing: '-0.5px', margin: 0 }}>{count}</p>
             </div>
           )
         })}
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-foreground">
-          Avaliações de satisfação recebidas ({satisfactionResponses.length})
-        </h2>
-        <div className="space-y-1.5">
-          {satisfactionResponses.map((t) => (
-            <ExpandableRow
-              key={t.id}
-              summary={
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <span className="font-medium text-gray-900">{t.contract_id ? contractNameById.get(t.contract_id) ?? '—' : 'Sem conta vinculada'}</span>
-                    <span className="ml-2 text-xs text-gray-400">{t.ticket_number} · {t.subject}</span>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8' }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Avaliações de satisfação</p>
+          <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{satisfactionResponses.length} avaliações no período</p>
+        </div>
+        <div style={{ padding: '0 16px 8px' }}>
+          {satisfactionResponses.map((t) => {
+            const rating = t.satisfaction_rating ?? 0
+            const ratingStyle = rating >= 4
+              ? { bg: '#eaf5ee', color: '#1a7c3e' }
+              : rating === 3 ? { bg: '#fff8e6', color: '#92400e' }
+              : { bg: '#fdecea', color: '#b91c1c' }
+            return (
+              <ExpandableRow
+                key={t.id}
+                summary={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{t.contract_id ? contractNameById.get(t.contract_id) ?? '—' : 'Sem conta vinculada'}</span>
+                      <span style={{ marginLeft: 8, fontSize: 11, color: '#8892a4' }}>{t.ticket_number} · {t.subject}</span>
+                    </div>
+                    <span style={{ flexShrink: 0, padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: ratingStyle.bg, color: ratingStyle.color }}>
+                      {rating}/5
+                    </span>
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      (t.satisfaction_rating ?? 0) >= 4 ? 'bg-positive-100 text-positive-700' : (t.satisfaction_rating ?? 0) === 3 ? 'bg-yellow-100 text-yellow-800' : 'bg-negative-100 text-negative-700'
-                    }`}
-                  >
-                    {t.satisfaction_rating}/5
-                  </span>
-                </div>
-              }
-            >
-              {t.satisfaction_comment && <p className="text-sm text-gray-600">&ldquo;{t.satisfaction_comment}&rdquo;</p>}
-              <p className="text-xs text-gray-400">
-                Avaliado em {new Date(t.satisfaction_responded_at!).toLocaleDateString('pt-BR')}
-              </p>
-              <Link href={`/tickets/${t.id}`} className="inline-block text-xs text-brand-700 hover:underline">
-                Ver ticket →
-              </Link>
-            </ExpandableRow>
-          ))}
+                }
+              >
+                {t.satisfaction_comment && <p style={{ fontSize: 13, color: '#52514e', fontStyle: 'italic' }}>&ldquo;{t.satisfaction_comment}&rdquo;</p>}
+                <p style={{ fontSize: 11, color: '#8892a4', marginTop: 4 }}>
+                  Avaliado em {new Date(t.satisfaction_responded_at!).toLocaleDateString('pt-BR')}
+                </p>
+                <Link href={`/tickets/${t.id}`} style={{ fontSize: 11, color: '#4f86f7', textDecoration: 'none' }}>Ver ticket →</Link>
+              </ExpandableRow>
+            )
+          })}
           {satisfactionResponses.length === 0 && (
-            <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-400">
+            <p style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, color: '#8892a4' }}>
               Nenhuma avaliação recebida ainda neste período.
             </p>
           )}

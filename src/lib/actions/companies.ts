@@ -165,3 +165,4 @@ export async function deleteCompany(companyId: string): Promise<DeleteState> {
 
   redirect('/companies')
 }
+
