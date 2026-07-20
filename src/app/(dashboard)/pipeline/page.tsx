@@ -40,7 +40,21 @@ export default async function PipelinePage({
   const selectedPipeline =
     pipelineIdParam ?? pipelines?.find((p) => p.is_default)?.id ?? pipelines?.[0]?.id
 
-  const pipelineType = pipelines?.find((p) => p.id === selectedPipeline)?.type ?? 'gestao_contratos'
+  const selectedPipelineData = pipelines?.find(p => p.id === selectedPipeline)
+  const pipelineName = selectedPipelineData?.name ?? 'Funil'
+  const pipelineType = selectedPipelineData?.type ?? 'gestao_contratos'
+
+  const TYPE_LABEL: Record<string, string> = {
+    vendas: 'Novos Negócios',
+    gestao_contratos: 'Gestão de Contratos',
+    servico_avulso: 'Serviço Avulso',
+  }
+  const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
+    vendas: { bg: '#eaf5ee', color: '#1a7c3e' },
+    gestao_contratos: { bg: '#eef3ff', color: '#3b5bdb' },
+    servico_avulso: { bg: '#fff8e6', color: '#92400e' },
+  }
+  const typeBadge = TYPE_COLOR[pipelineType] ?? TYPE_COLOR.vendas
 
   // PERFORMANCE: stages e runs não dependem uma da outra — rodam em
   // paralelo em vez de uma esperar a outra terminar.
@@ -119,30 +133,66 @@ export default async function PipelinePage({
     }
   })
 
+  const openCards = cards.filter(c => c.status === 'open')
+  const totalOpen = openCards.reduce((s, c) => s + c.value, 0)
+  const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Funil de Vendas</h1>
-          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>
-            {cards.filter(c => c.status === 'open').length} oportunidades abertas · {
-              new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
-                cards.filter(c => c.status === 'open').reduce((s, c) => s + c.value, 0)
-              )
-            } em pipeline
-          </p>
+
+      {/* Cards de seleção de funil — premium, um por funil */}
+      {pipelines && pipelines.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {pipelines.map(p => {
+            const isActive = p.id === selectedPipeline
+            const badge = TYPE_COLOR[p.type] ?? TYPE_COLOR.vendas
+            return (
+              <Link key={p.id} href={`/pipeline?pipeline=${p.id}`} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  padding: '10px 16px', borderRadius: 10, minWidth: 160, cursor: 'pointer',
+                  border: `0.5px solid ${isActive ? '#1a1f36' : '#e8edf5'}`,
+                  background: isActive ? '#1a1f36' : '#fff',
+                  transition: 'all 0.15s',
+                }}>
+                  <span style={{
+                    display: 'inline-block', fontSize: 10, fontWeight: 500, padding: '1px 7px', borderRadius: 20, marginBottom: 5,
+                    background: isActive ? 'rgba(255,255,255,0.12)' : badge.bg,
+                    color: isActive ? '#fff' : badge.color,
+                  }}>
+                    {TYPE_LABEL[p.type] ?? p.type}
+                  </span>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: isActive ? '#fff' : '#1a1f36', margin: 0 }}>{p.name}</p>
+                  {isActive && (
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>
+                      {openCards.length} aberta{openCards.length !== 1 ? 's' : ''} · {fmtCurrency(totalOpen)}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
         </div>
+      )}
+
+      {/* Header do funil ativo */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {pipelines && pipelines.length > 0 && (
-            <PipelineSelect pipelines={pipelines} selected={selectedPipeline} />
+          <h1 style={{ fontSize: 18, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{pipelineName}</h1>
+          <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: typeBadge.bg, color: typeBadge.color }}>
+            {TYPE_LABEL[pipelineType]}
+          </span>
+          {pipelines && pipelines.length === 1 && (
+            <span style={{ fontSize: 12, color: '#8892a4' }}>
+              {openCards.length} aberta{openCards.length !== 1 ? 's' : ''} · {fmtCurrency(totalOpen)}
+            </span>
           )}
-          <Link
-            href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
-            style={{ whiteSpace: 'nowrap', borderRadius: 8, background: '#1a1f36', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none' }}
-          >
-            + {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
-          </Link>
         </div>
+        <Link
+          href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
+          style={{ whiteSpace: 'nowrap', borderRadius: 8, background: '#1a1f36', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none' }}
+        >
+          + {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
+        </Link>
       </div>
 
       {stages && stages.length > 0 ? (
