@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import { addMonthsToDateString } from '@/lib/utils/date'
 
-const MONTH_SHORTCUTS = [1, 2, 3, 6, 12]
+const MONTH_SHORTCUTS = [1, 2, 3, 6, 12, 24, 36, 48, 60]
 
 export function ValidityPeriodInput({
   defaultFrom,
   defaultUntil,
   defaultAutoRenewal,
+  required = false,
 }: {
   defaultFrom?: string | null
   defaultUntil?: string | null
   defaultAutoRenewal?: boolean
+  required?: boolean
 }) {
   const [from, setFrom] = useState(defaultFrom ?? '')
   const [until, setUntil] = useState(defaultUntil ?? '')
@@ -22,51 +24,54 @@ export function ValidityPeriodInput({
     setUntil(addMonthsToDateString(from, months))
   }
 
+  const inputStyle = {
+    width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8,
+    border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none',
+  }
+
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4">
+      {required && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#fff8e6', border: '0.5px solid #fde68a' }}>
+          <span style={{ fontSize: 12, color: '#92400e' }}>⚠ Preencha a vigência — obrigatório para contratos ativos.</span>
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Vigência — início</label>
-          <input
-            name="valid_from"
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
+          <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>
+            Vigência — início {required && <span style={{ color: '#b91c1c' }}>*</span>}
+          </label>
+          <input name="valid_from" type="date" value={from} required={required}
+            onChange={e => setFrom(e.target.value)} style={inputStyle} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Vigência — fim</label>
-          <input
-            name="valid_until"
-            type="date"
-            value={until}
-            onChange={(e) => setUntil(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {MONTH_SHORTCUTS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={!from}
-                onClick={() => applyMonths(m)}
-                title={!from ? 'Preencha o início da vigência primeiro' : `Calcular ${m} mês(es) a partir do início`}
-                className="rounded-full border border-gray-300 px-2 py-0.5 text-[11px] text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                +{m} {m === 1 ? 'mês' : 'meses'}
+          <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>
+            Vigência — fim {required && <span style={{ color: '#b91c1c' }}>*</span>}
+          </label>
+          <input name="valid_until" type="date" value={until} required={required}
+            onChange={e => setUntil(e.target.value)} style={inputStyle} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+            {MONTH_SHORTCUTS.map(m => (
+              <button key={m} type="button" disabled={!from} onClick={() => applyMonths(m)}
+                title={!from ? 'Preencha o início primeiro' : `+${m} meses a partir do início`}
+                style={{
+                  padding: '3px 8px', fontSize: 10, borderRadius: 20, cursor: from ? 'pointer' : 'not-allowed',
+                  border: '0.5px solid #d1d8e8', background: '#fff', color: from ? '#1a1f36' : '#b0b8c8',
+                  opacity: from ? 1 : 0.5,
+                }}>
+                +{m}m
               </button>
             ))}
           </div>
-          <p className="mt-1 text-[11px] text-gray-400">
-            Os botões calculam a data certinho (considerando meses de 28 a 31 dias) — ou digite a data exata direto no campo.
+          <p style={{ marginTop: 4, fontSize: 10, color: '#b0b8c8' }}>
+            Clique em +Xm para calcular o fim a partir do início — ou digite a data direto.
           </p>
         </div>
       </div>
 
-      <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" name="auto_renewal" defaultChecked={defaultAutoRenewal} className="rounded border-gray-300" />
-        Renovação automática (por cláusula contratual — normalmente só precisa atualizar a vigência, sem negociação)
+      <label style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#52514e', cursor: 'pointer' }}>
+        <input type="checkbox" name="auto_renewal" defaultChecked={defaultAutoRenewal} />
+        Renovação automática (por cláusula contratual)
       </label>
     </div>
   )

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { moveContractStage, reopenRun, closeRun } from '@/lib/actions/pipeline'
+import { addMonthsToDateString } from '@/lib/utils/date'
 
 type Stage = {
   id: string
@@ -15,9 +16,11 @@ type Stage = {
 
 type StageTiming = {
   stageId: string
-  days: number | null   // null = etapa ainda não visitada
+  days: number | null
   isOverdue: boolean
 }
+
+const MONTH_SHORTCUTS = [1, 2, 3, 6, 12, 24, 36, 48, 60]
 
 export function StageBar({
   contractId,
@@ -28,6 +31,7 @@ export function StageBar({
   wonLabel,
   lostLabel,
   canChangeStage,
+  pipelineType,
 }: {
   contractId: string
   stages: Stage[]
@@ -37,14 +41,19 @@ export function StageBar({
   wonLabel: string
   lostLabel: string
   canChangeStage: boolean
+  pipelineType?: string
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [showWonModal, setShowWonModal] = useState(false)
+  const [validFrom, setValidFrom] = useState('')
+  const [validUntil, setValidUntil] = useState('')
 
   const currentIndex = stages.findIndex((s) => s.id === currentStageId)
   const currentStage = stages[currentIndex]
   const canMarkWon = currentStage?.is_won === true
   const canMarkLost = currentStage?.is_lost === true
+  const isGestaoContratos = pipelineType === 'gestao_contratos'
 
   function timingFor(stageId: string) {
     return timings.find((t) => t.stageId === stageId)
@@ -66,11 +75,32 @@ export function StageBar({
     })
   }
 
-  function handleClose(outcome: 'won' | 'lost') {
+  function handleWonClick() {
+    // Para Gestão de Contratos: exige vigência antes de fechar
+    if (isGestaoContratos) {
+      setShowWonModal(true)
+      return
+    }
+    handleClose('won')
+  }
+
+  function handleClose(outcome: 'won' | 'lost', extraData?: { validFrom?: string; validUntil?: string }) {
     setError(null)
     startTransition(async () => {
+      // Salva vigência antes de fechar, se fornecida
+      if (extraData?.validFrom || extraData?.validUntil) {
+        await fetch(`/api/carteira/${contractId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            valid_from: extraData.validFrom || null,
+            valid_until: extraData.validUntil || null,
+          }),
+        })
+      }
       const result = await closeRun(contractId, outcome)
       if (result.error) setError(result.error)
+      else setShowWonModal(false)
     })
   }
 
@@ -123,9 +153,62 @@ export function StageBar({
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {/* Desfecho — SEMPRE disponível, independente da etapa atual do
-          processo. É a mudança que separa "onde o contrato está" de
-          "qual foi o resultado final". */}
+      {/* Modal de vigência obrigatória — só aparece em Gestão de Contratos */}
+      {showWonModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 480, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '0.5px solid #e8edf5' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 500, color: '#1a1f36', marginBottom: 4 }}>Confirmar Renovação</h2>
+            <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 16 }}>
+              Preencha a nova vigência antes de confirmar. O fim é calculado a partir do início.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>
+                  Início da vigência <span style={{ color: '#b91c1c' }}>*</span>
+                </label>
+                <input type="date" value={validFrom} onChange={e => setValidFrom(e.target.value)}
+                  style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>
+                  Fim da vigência <span style={{ color: '#b91c1c' }}>*</span>
+                </label>
+                <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)}
+                  style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 16 }}>
+              {MONTH_SHORTCUTS.map(m => (
+                <button key={m} type="button" disabled={!validFrom}
+                  onClick={() => validFrom && setValidUntil(addMonthsToDateString(validFrom, m))}
+                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 20, border: '0.5px solid #d1d8e8', background: '#fff', color: validFrom ? '#1a1f36' : '#b0b8c8', cursor: validFrom ? 'pointer' : 'not-allowed', opacity: validFrom ? 1 : 0.5 }}>
+                  +{m}m
+                </button>
+              ))}
+            </div>
+
+            {!validFrom || !validUntil ? (
+              <p style={{ fontSize: 11, color: '#f59e0b', marginBottom: 12 }}>⚠ Preencha início e fim da vigência para continuar.</p>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowWonModal(false)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                disabled={isPending || !validFrom || !validUntil}
+                onClick={() => handleClose('won', { validFrom, validUntil })}
+                style={{ padding: '8px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: !validFrom || !validUntil ? '#d1d8e8' : '#1a7c3e', color: '#fff', cursor: !validFrom || !validUntil ? 'not-allowed' : 'pointer' }}>
+                {isPending ? 'Salvando...' : `Confirmar ${wonLabel}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desfecho */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
           Etapa atual: <span className="font-medium text-gray-900">{stages[currentIndex]?.name ?? '—'}</span>
@@ -133,7 +216,7 @@ export function StageBar({
         {status === 'open' && (
           <div className="flex gap-2">
             <button
-              onClick={() => handleClose('won')}
+              onClick={handleWonClick}
               disabled={isPending || !canMarkWon}
               title={canMarkWon ? undefined : `Só é possível marcar "${wonLabel}" quando o contrato está numa etapa habilitada para isso`}
               className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:cursor-not-allowed disabled:opacity-40"

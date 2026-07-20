@@ -130,14 +130,6 @@ export default function NewContractPage() {
 
         <CompanyContactSection preselectedCompanyId={companyIdParam ?? undefined} />
 
-        {/* Cargo do contato */}
-        {show('contact_cargo') && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Cargo do contato {req('contact_cargo') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
-            <input name="contact_cargo" required={req('contact_cargo')} placeholder="Ex: Gerente, Diretor..." className={inputCls} />
-          </div>
-        )}
-
         {/* CNPJ da ORBIS */}
         {show('cnpj_orbis') && (
           <div>
@@ -203,8 +195,6 @@ export default function NewContractPage() {
             <input name="expected_close_date" type="date" required={req('expected_close_date')} className={inputCls} />
           </div>
         )}
-
-        <ValidityPeriodInput />
 
         {show('description') && (
           <div>

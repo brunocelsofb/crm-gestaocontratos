@@ -271,6 +271,7 @@ export default async function ContractDetailPage({
           wonLabel={pipelineById.get(displayRun.pipeline_id)?.won_label ?? 'Ganho'}
           lostLabel={pipelineById.get(displayRun.pipeline_id)?.lost_label ?? 'Perdido'}
           canChangeStage={canChangeStage}
+          pipelineType={pipelineById.get(displayRun.pipeline_id)?.type}
         />
       ) : (
         <p style={{ borderRadius: 10, background: '#f8f9fb', padding: 16, fontSize: 13, color: '#8892a4' }}>
