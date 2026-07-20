@@ -4,72 +4,169 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { createCompany, type ActionState } from '@/lib/actions/companies'
 import { CnpjLookupField } from '@/components/companies/cnpj-lookup-field'
+import type { CnpjData } from '@/lib/actions/cnpj-lookup'
 
 const initialState: ActionState = {}
+
+const STATUS_OPTIONS = [
+  { value: 'lead', label: 'Lead', desc: 'Contato inicial — ainda não qualificado. Pode ser de uma campanha ou prospecção fria.' },
+  { value: 'prospect', label: 'Prospect', desc: 'Lead qualificado — há interesse real e fit com o produto.' },
+  { value: 'cliente_ativo', label: 'Cliente Ativo', desc: 'Tem contrato ativo com a ORBIS.' },
+  { value: 'cliente_inativo', label: 'Cliente Inativo', desc: 'Já foi cliente, não tem contrato ativo no momento.' },
+  { value: 'nao_qualificado', label: 'Não qualificado', desc: 'Avaliado e não tem fit com o produto ou serviço.' },
+]
+
+const SEGMENTOS = [
+  'Grupo Hospitalar (Geral e especializado)',
+  'Grupo Diagnóstico (imagem e laboratório)',
+  'Grupo Clínicas e Outros (Prestadores de Serviço / Comércio)',
+]
 
 export default function NewCompanyPage() {
   const [state, formAction, pending] = useActionState(createCompany, initialState)
   const [name, setName] = useState('')
   const [tradeName, setTradeName] = useState('')
+  const [city, setCity] = useState('')
+  const [uf, setUf] = useState('')
+  const [street, setStreet] = useState('')
+  const [streetNumber, setStreetNumber] = useState('')
+  const [neighborhood, setNeighborhood] = useState('')
+  const [zipCode, setZipCode] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [capitalSocial, setCapitalSocial] = useState('')
+  const [mainActivity, setMainActivity] = useState('')
+  const [statusHover, setStatusHover] = useState<string | null>(null)
+  const [segmentos, setSegmentos] = useState<string[]>([])
+
+  function onCnpjFound(data: { razaoSocial: string; nomeFantasia: string | null } & Partial<CnpjData>) {
+    setName(data.razaoSocial)
+    setTradeName(data.nomeFantasia ?? '')
+    if (data.municipio) setCity(data.municipio)
+    if (data.uf) setUf(data.uf)
+    if (data.logradouro) setStreet(data.logradouro)
+    if (data.numero) setStreetNumber(data.numero)
+    if (data.bairro) setNeighborhood(data.bairro)
+    if (data.cep) setZipCode(data.cep)
+    if (data.telefone) setPhone(data.telefone)
+    if (data.email) setEmail(data.email)
+    if (data.capitalSocial) setCapitalSocial(String(data.capitalSocial))
+    if (data.cnaeDescricao) setMainActivity(data.cnaeDescricao)
+  }
+
+  function toggleSegmento(s: string) {
+    setSegmentos(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+  }
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 4 }
 
   return (
-    <div className="max-w-xl space-y-6">
-      <Link href="/companies" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
-        ← Voltar para Empresas
-      </Link>
-      <h1 className="text-[17px] font-medium text-foreground">Nova Empresa</h1>
+    <div style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <Link href="/companies" style={{ fontSize: 12, color: '#8892a4', textDecoration: 'none' }}>← Voltar para Empresas</Link>
+      <div>
+        <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Nova Empresa</h1>
+        <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Busque pelo CNPJ para preencher automaticamente.</p>
+      </div>
 
-      <form action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
-        <CnpjLookupField
-          onFound={({ razaoSocial, nomeFantasia }) => {
-            setName(razaoSocial)
-            setTradeName(nomeFantasia ?? '')
-          }}
-        />
+      <form action={formAction} style={{ display: 'flex', flexDirection: 'column', gap: 16, background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 24 }}>
 
+        {/* CNPJ com busca */}
+        <CnpjLookupField onFound={onCnpjFound} />
+
+        {/* Razão Social e Nome Fantasia */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={labelStyle}>Razão Social <span style={{ color: '#b91c1c' }}>*</span></label>
+            <input name="name" required value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Nome Fantasia</label>
+            <input name="trade_name" value={tradeName} onChange={e => setTradeName(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Razão Social (Nome) <span className="text-red-500">*</span>
-          </label>
-          <input
-            name="name"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-          {state.fieldErrors?.name && (
-            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.name[0]}</p>
+          <label style={labelStyle}>Status da Empresa <span style={{ color: '#b91c1c' }}>*</span></label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+            {STATUS_OPTIONS.map(s => (
+              <label key={s.value} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                onMouseEnter={() => setStatusHover(s.value)} onMouseLeave={() => setStatusHover(null)}>
+                <input type="radio" name="status" value={s.value} defaultChecked={s.value === 'lead'}
+                  style={{ accentColor: '#1a1f36' }} />
+                <span style={{ fontSize: 12, color: '#1a1f36' }}>{s.label}</span>
+              </label>
+            ))}
+          </div>
+          {statusHover && (
+            <p style={{ fontSize: 11, color: '#52514e', background: '#f8f9fb', padding: '6px 10px', borderRadius: 6, border: '0.5px solid #e8edf5' }}>
+              ℹ️ {STATUS_OPTIONS.find(s => s.value === statusHover)?.desc}
+            </p>
           )}
         </div>
 
+        {/* Segmento */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Nome Fantasia</label>
-          <input
-            name="trade_name"
-            value={tradeName}
-            onChange={(e) => setTradeName(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
+          <label style={labelStyle}>Segmento</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {SEGMENTOS.map(s => (
+              <button key={s} type="button" onClick={() => toggleSegmento(s)}
+                style={{ padding: '4px 10px', fontSize: 11, borderRadius: 20, border: '0.5px solid', cursor: 'pointer',
+                  borderColor: segmentos.includes(s) ? '#1a1f36' : '#d1d8e8',
+                  background: segmentos.includes(s) ? '#1a1f36' : '#fff',
+                  color: segmentos.includes(s) ? '#fff' : '#52514e' }}>
+                {s}
+              </button>
+            ))}
+          </div>
+          <input type="hidden" name="segment" value={JSON.stringify(segmentos)} />
         </div>
 
+        {/* Localização */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Observações</label>
-          <textarea
-            name="notes"
-            rows={3}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
+          <label style={{ ...labelStyle, marginBottom: 8 }}>Localização</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8 }}>
+            <div><label style={labelStyle}>Logradouro</label><input name="street" value={street} onChange={e => setStreet(e.target.value)} style={inputStyle} /></div>
+            <div style={{ width: 80 }}><label style={labelStyle}>Número</label><input name="street_number" value={streetNumber} onChange={e => setStreetNumber(e.target.value)} style={inputStyle} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px 80px', gap: 8 }}>
+            <div><label style={labelStyle}>Bairro</label><input name="neighborhood" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={inputStyle} /></div>
+            <div><label style={labelStyle}>Município</label><input name="city" value={city} onChange={e => setCity(e.target.value)} style={inputStyle} /></div>
+            <div><label style={labelStyle}>UF</label><input name="state" value={uf} onChange={e => setUf(e.target.value)} style={inputStyle} maxLength={2} /></div>
+            <div><label style={labelStyle}>CEP</label><input name="zip_code" value={zipCode} onChange={e => setZipCode(e.target.value)} style={inputStyle} /></div>
+          </div>
         </div>
 
-        {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {/* Contato */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div><label style={labelStyle}>Telefone</label><input name="phone" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} placeholder="(00) 00000-0000" /></div>
+          <div><label style={labelStyle}>E-mail</label><input name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} /></div>
+        </div>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
-        >
-          {pending ? 'Salvando...' : 'Salvar Empresa'}
+        {/* Dados Receita */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={labelStyle}>Capital Social (R$)</label>
+            <input name="capital_social" type="number" value={capitalSocial} onChange={e => setCapitalSocial(e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Atividade Principal (CNAE)</label>
+            <input name="main_activity" value={mainActivity} onChange={e => setMainActivity(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Observações */}
+        <div>
+          <label style={labelStyle}>Observações</label>
+          <textarea name="notes" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+        </div>
+
+        {state.error && <p style={{ fontSize: 12, color: '#b91c1c' }}>{state.error}</p>}
+
+        <button type="submit" disabled={pending}
+          style={{ padding: '10px', fontSize: 13, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1 }}>
+          {pending ? 'Salvando...' : 'Criar Empresa'}
         </button>
       </form>
     </div>

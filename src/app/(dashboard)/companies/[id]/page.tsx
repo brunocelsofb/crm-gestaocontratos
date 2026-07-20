@@ -1,120 +1,178 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { AddContactForm } from '@/components/companies/add-contact-form'
-import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
-import { deleteContact } from '@/lib/actions/companies'
-import { RemoveContactButton } from '@/components/companies/remove-contact-button'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
+import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
+import { AddContactForm } from '@/components/companies/add-contact-form'
+import { RemoveContactButton } from '@/components/companies/remove-contact-button'
+import { NoteForm } from '@/components/companies/company-note-form'
 
-export default async function CompanyDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  lead:           { bg: '#eef3ff', color: '#3b5bdb', label: 'Lead' },
+  prospect:       { bg: '#f0eeff', color: '#5f38c9', label: 'Prospect' },
+  cliente_ativo:  { bg: '#eaf5ee', color: '#1a7c3e', label: 'Cliente Ativo' },
+  cliente_inativo:{ bg: '#fff8e6', color: '#92400e', label: 'Cliente Inativo' },
+  nao_qualificado:{ bg: '#f1f3f8', color: '#8892a4', label: 'Não qualificado' },
+}
+
+function fmt(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
+}
+
+function parseMulti(val: string | null | undefined): string[] {
+  if (!val) return []
+  try { return JSON.parse(val) } catch { return [val] }
+}
+
+export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
 
-  // PERFORMANCE: as 4 consultas abaixo não dependem umas das outras (nem
-  // "contacts"/"contracts" dependem de "company" ter carregado primeiro,
-  // já que todas usam o "id" da URL diretamente) — rodam em paralelo.
   const [
     isAdmin,
     { data: company },
     { data: contacts },
     { data: contracts },
+    { data: activities },
+    { data: profiles },
   ] = await Promise.all([
     isCurrentUserAdmin(),
-    supabase.from('companies').select('id, name, trade_name, cnpj, notes, created_at').eq('id', id).single(),
-    supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('created_at'),
-    supabase.from('contracts').select('id, process_number, title, created_at').eq('company_id', id).order('created_at', { ascending: false }),
+    supabase.from('companies').select('*').eq('id', id).single(),
+    supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('is_primary', { ascending: false }),
+    supabase.from('contracts').select('id, process_number, title, created_at, value').eq('company_id', id).order('created_at', { ascending: false }),
+    supabase.from('activities').select('id, type, content, created_at, user_id').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('profiles').select('id, full_name').order('full_name'),
   ])
 
   if (!company) notFound()
 
+  const profileById = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
+  const st = STATUS_STYLE[(company as any).status ?? 'lead'] ?? STATUS_STYLE.lead
+  const segmentos = parseMulti((company as any).segment)
+
   return (
-    <div className="space-y-6">
-      <Link href="/companies" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
-        ← Voltar para Empresas
-      </Link>
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">{company.name}</h1>
-          {company.trade_name && <p className="text-sm text-gray-500">{company.trade_name}</p>}
-          {company.cnpj && <p className="mt-0.5 text-sm text-gray-500">CNPJ: {company.cnpj}</p>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <Link href="/companies" style={{ fontSize: 12, color: '#8892a4', textDecoration: 'none' }}>← Empresas</Link>
+
+      {/* Header */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{company.name}</h1>
+              <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: st.bg, color: st.color }}>{st.label}</span>
+              {segmentos.map(s => <span key={s} style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, background: '#f1f3f8', color: '#52514e' }}>{s}</span>)}
+            </div>
+            {(company as any).trade_name && <p style={{ fontSize: 13, color: '#52514e', marginBottom: 4 }}>{(company as any).trade_name}</p>}
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#8892a4' }}>
+              {company.cnpj && <span>CNPJ: <strong style={{ color: '#1a1f36', fontFamily: 'monospace' }}>{company.cnpj}</strong></span>}
+              {(company as any).city && <span>📍 {(company as any).city}{(company as any).state ? `/${(company as any).state}` : ''}</span>}
+              {(company as any).phone && <span>📞 {(company as any).phone}</span>}
+              {(company as any).email && <span>✉ {(company as any).email}</span>}
+              {(company as any).capital_social && <span>💰 Capital: {fmt(Number((company as any).capital_social))}</span>}
+              {(company as any).main_activity && <span>🏭 {(company as any).main_activity}</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <Link href={`/companies/${company.id}/edit`} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>Editar</Link>
+            {isAdmin && <DeleteCompanyButton companyId={company.id} />}
+          </div>
         </div>
-        <div className="flex items-start gap-2">
-          <Link
-            href={`/companies/${company.id}/edit`}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Editar
-          </Link>
-          {isAdmin && <DeleteCompanyButton companyId={company.id} />}
-        </div>
+        {/* Endereço */}
+        {((company as any).street || (company as any).neighborhood) && (
+          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 8, borderTop: '0.5px solid #f1f3f8', paddingTop: 8 }}>
+            {[(company as any).street, (company as any).street_number, (company as any).neighborhood, (company as any).zip_code].filter(Boolean).join(', ')}
+          </p>
+        )}
       </div>
 
-      {company.notes && (
-        <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">{company.notes}</p>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+        {/* Coluna principal */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      <div className="space-y-3">
-        <h2 className="text-sm font-medium text-gray-900">Contatos</h2>
-        <AddContactForm companyId={company.id} />
-
-        <div className="space-y-2">
-          {contacts?.map((contact) => (
-            <div
-              key={contact.id}
-              className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{contact.name}</span>
-                  {contact.role && (
-                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] text-brand-700">
-                      {contact.role}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {[contact.email, contact.phone].filter(Boolean).join(' · ') || 'Sem e-mail/telefone cadastrado'}
-                </p>
+          {/* Visão Geral / Atividades */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8' }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Histórico de Atividades</p>
+            </div>
+            <div style={{ padding: 16 }}>
+              <NoteForm companyId={company.id} />
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(activities ?? []).map(a => (
+                  <div key={a.id} style={{ display: 'flex', gap: 10, paddingBottom: 10, borderBottom: '0.5px solid #f8f9fb' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0, color: '#52514e' }}>
+                      {a.type === 'note' ? '📝' : a.type === 'email' ? '✉' : '🔔'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 12, color: '#1a1f36', margin: 0 }}>{a.content}</p>
+                      <p style={{ fontSize: 10, color: '#b0b8c8', marginTop: 3 }}>
+                        {a.user_id ? profileById.get(a.user_id) : 'Sistema'} · {new Date(a.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {(activities ?? []).length === 0 && (
+                  <p style={{ fontSize: 12, color: '#b0b8c8', textAlign: 'center', padding: '24px 0' }}>Nenhuma atividade registrada ainda.</p>
+                )}
               </div>
-              {isAdmin && (
-                <RemoveContactButton contactId={contact.id} companyId={company.id} />
+            </div>
+          </div>
+
+          {/* Oportunidades vinculadas */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Oportunidades ({(contracts ?? []).length})</p>
+              <Link href={`/contracts/new?company=${company.id}`} style={{ fontSize: 11, color: '#4f86f7', textDecoration: 'none' }}>+ Nova oportunidade</Link>
+            </div>
+            <div>
+              {(contracts ?? []).map(c => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '0.5px solid #f8f9fb' }}>
+                  <div>
+                    <Link href={`/contracts/${c.id}`} style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', textDecoration: 'none' }}>{c.title || c.process_number}</Link>
+                    <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{Number(c.value) > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(c.value)) : '—'}</span>
+                </div>
+              ))}
+              {(contracts ?? []).length === 0 && (
+                <p style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#b0b8c8' }}>Nenhuma oportunidade vinculada ainda.</p>
               )}
             </div>
-          ))}
-          {contacts?.length === 0 && (
-            <p className="py-4 text-center text-sm text-gray-400">Nenhum contato cadastrado ainda.</p>
-          )}
+          </div>
         </div>
-      </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-900">Contratos desta empresa</h2>
-          <Link
-            href={`/contracts/new?company_id=${company.id}`}
-            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
-          >
-            + Nova Oportunidade
-          </Link>
-        </div>
-        <div className="space-y-2">
-          {contracts?.map((c) => (
-            <Link
-              key={c.id}
-              href={`/contracts/${c.id}`}
-              className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm hover:bg-gray-50"
-            >
-              <span className="font-mono text-gray-700">{c.process_number}</span>
-              <span className="text-gray-500">{c.title}</span>
-            </Link>
-          ))}
-          {contracts?.length === 0 && (
-            <p className="py-4 text-center text-sm text-gray-400">Nenhum contrato vinculado a esta empresa ainda.</p>
+        {/* Coluna lateral — Contatos */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8' }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Contatos ({(contacts ?? []).length})</p>
+            </div>
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(contacts ?? []).map(c => (
+                <div key={c.id} style={{ padding: '10px 12px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #f1f3f8' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                      {c.name} {c.is_primary && <span style={{ fontSize: 9, background: '#eef3ff', color: '#3b5bdb', padding: '1px 5px', borderRadius: 20 }}>Principal</span>}
+                    </p>
+                    <RemoveContactButton contactId={c.id} companyId={company.id} />
+                  </div>
+                  {c.role && <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{c.role}</p>}
+                  {c.email && <p style={{ fontSize: 11, color: '#4f86f7', marginTop: 2 }}>{c.email}</p>}
+                  {c.phone && <p style={{ fontSize: 11, color: '#8892a4', marginTop: 1 }}>{c.phone}</p>}
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '0 12px 12px' }}>
+              <AddContactForm companyId={company.id} />
+            </div>
+          </div>
+
+          {/* Notas */}
+          {company.notes && (
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 16 }}>
+              <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 8 }}>Observações</p>
+              <p style={{ fontSize: 12, color: '#52514e', lineHeight: 1.5 }}>{company.notes}</p>
+            </div>
           )}
         </div>
       </div>

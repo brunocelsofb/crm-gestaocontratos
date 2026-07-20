@@ -484,7 +484,7 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
   if (outcome === 'won' && pipeline?.won_target_pipeline_id) {
     const { data: targetPipeline } = await supabase
       .from('pipelines')
-      .select('name')
+      .select('name, type')
       .eq('id', pipeline.won_target_pipeline_id)
       .single()
 
@@ -559,6 +559,30 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
 
         if (Object.keys(carteiraPatch).length > 0) {
           await supabase.from('contracts').update(carteiraPatch).eq('id', contractId)
+        }
+
+        // Replica dados da empresa para a gestão de carteira
+        // (segmento, cidade, UF, município) se o contrato tiver empresa vinculada
+        const { data: contractForCompany } = await supabase
+          .from('contracts').select('company_id, municipality, state, segment')
+          .eq('id', contractId).maybeSingle()
+
+        if (contractForCompany?.company_id && targetPipeline && (targetPipeline as any).type === 'gestao_contratos') {
+          const { data: companyData } = await supabase
+            .from('companies').select('city, state, segment')
+            .eq('id', contractForCompany.company_id).maybeSingle()
+
+          if (companyData) {
+            const companyPatch: Record<string, any> = {}
+            if (!contractForCompany.municipality && companyData.city)
+              companyPatch.municipality = companyData.city
+            if (!contractForCompany.state && companyData.state)
+              companyPatch.state = companyData.state
+            if (!contractForCompany.segment && companyData.segment)
+              companyPatch.segment = companyData.segment
+            if (Object.keys(companyPatch).length > 0)
+              await supabase.from('contracts').update(companyPatch).eq('id', contractId)
+          }
         }
 
         // Registra renovação se o pipeline de origem é gestao_contratos

@@ -36,27 +36,34 @@ export async function createCompany(
   formData: FormData
 ): Promise<ActionState> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
 
   const name = (formData.get('name') as string)?.trim()
-  const trade_name = (formData.get('trade_name') as string) || null
-  const cnpj = ((formData.get('cnpj') as string) || '').replace(/\D/g, '') || null
-  const notes = (formData.get('notes') as string) || null
+  if (!name) return { fieldErrors: { name: ['Nome é obrigatório'] } }
 
-  if (!name) {
-    return { fieldErrors: { name: ['Nome é obrigatório'] } }
+  const insert: Record<string, any> = {
+    name,
+    trade_name:    (formData.get('trade_name') as string) || null,
+    cnpj:          ((formData.get('cnpj') as string) || '').replace(/\D/g, '') || null,
+    notes:         (formData.get('notes') as string) || null,
+    status:        (formData.get('status') as string) || 'lead',
+    segment:       (formData.get('segment') as string) || null,
+    street:        (formData.get('street') as string) || null,
+    street_number: (formData.get('street_number') as string) || null,
+    neighborhood:  (formData.get('neighborhood') as string) || null,
+    city:          (formData.get('city') as string) || null,
+    state:         (formData.get('state') as string) || null,
+    zip_code:      (formData.get('zip_code') as string) || null,
+    phone:         (formData.get('phone') as string) || null,
+    email:         (formData.get('email') as string) || null,
+    main_activity: (formData.get('main_activity') as string) || null,
+    owner_id:      user.id,
   }
+  const capRaw = formData.get('capital_social') as string
+  if (capRaw) insert.capital_social = Number(capRaw)
 
-  const { data: company, error } = await supabase
-    .from('companies')
-    .insert({ name, trade_name, cnpj, notes, owner_id: user.id })
-    .select()
-    .single()
-
+  const { data: company, error } = await supabase.from('companies').insert(insert).select().single()
   if (error) return { error: error.message }
 
   revalidatePath('/companies')
