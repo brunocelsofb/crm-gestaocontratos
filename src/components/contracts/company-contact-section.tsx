@@ -105,110 +105,98 @@ export function CompanyContactSection({ preselectedCompanyId }: { preselectedCom
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <p className="text-sm font-medium text-gray-900">Empresa e contato responsável</p>
+    <div style={{ background: '#f8f9fb', borderRadius: 10, border: '0.5px solid #e8edf5', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <p style={{ fontSize: 12, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Empresa e contato responsável</p>
 
-      {loadingPreselected && <p className="text-sm text-gray-400">Carregando empresa...</p>}
+      {loadingPreselected && <p style={{ fontSize: 12, color: '#8892a4' }}>Carregando empresa...</p>}
 
+      {/* Campo CNPJ — só aparece quando NÃO veio de uma empresa pré-selecionada */}
       {!preselectedCompanyId && (
         <div>
-          <label className="block text-xs font-medium text-gray-700">
-            CNPJ <span className="text-red-500">*</span>
+          <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>
+            CNPJ <span style={{ color: '#b91c1c' }}>*</span>
           </label>
-          <div className="mt-1 flex gap-2">
-            <input
-              value={cnpj}
-              onChange={(e) => {
-                setCnpj(e.target.value)
-                setChecked(false)
-              }}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={cnpj} onChange={e => { setCnpj(e.target.value); setChecked(false) }}
               placeholder="00.000.000/0000-00"
-              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={handleCheck}
+              style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', outline: 'none' }} />
+            <button type="button" onClick={handleCheck}
               disabled={checking || cnpj.replace(/\D/g, '').length !== 14}
-              className="whitespace-nowrap rounded-md border border-brand-700 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
+              style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #1a1f36', background: '#fff', color: '#1a1f36', cursor: 'pointer', whiteSpace: 'nowrap', opacity: (checking || cnpj.replace(/\D/g, '').length !== 14) ? 0.4 : 1 }}>
               {checking ? 'Verificando...' : 'Verificar'}
             </button>
           </div>
-          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+          {error && <p style={{ marginTop: 4, fontSize: 11, color: '#b91c1c' }}>{error}</p>}
         </div>
       )}
 
       {checked && foundCompany && (
-        <div className="rounded-md border border-positive-200 bg-positive-100 p-3">
+        <div>
           <input type="hidden" name="existing_company_id" value={foundCompany.id} />
-          <p className="text-sm font-medium text-positive-700">
-            ✓ Empresa já cadastrada: {foundCompany.name}
-          </p>
-          {foundCompany.trade_name && <p className="text-xs text-positive-700">{foundCompany.trade_name}</p>}
 
-          <div className="mt-3">
-            <label className="block text-xs font-medium text-gray-700">Contato responsável *</label>
-            {!wantsNewContact ? (
-              <>
-                <select
-                  name="existing_contact_id"
-                  required={!wantsNewContact}
-                  value={selectedContactId}
-                  onChange={(e) => setSelectedContactId(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-                >
-                  <option value="">Selecione um contato...</option>
-                  {foundCompany.contacts.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}{c.role ? ` — ${c.role}` : ''}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setWantsNewContact(true)}
-                  className="mt-1 text-xs text-brand-700 hover:underline"
-                >
-                  + Cadastrar novo contato para esta empresa
-                </button>
-              </>
-            ) : (
-              <NewContactFields
-                name={newContactName} setName={setNewContactName}
-                role={newContactRole} setRole={setNewContactRole}
-                email={newContactEmail} setEmail={setNewContactEmail}
-                phone={newContactPhone} setPhone={setNewContactPhone}
-                onCancel={foundCompany.contacts.length > 0 ? () => setWantsNewContact(false) : undefined}
-              />
+          {/* Empresa pré-selecionada: só mostra o nome fixo, não o aviso de "verificada" */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#eaf5ee', border: '0.5px solid #bbddc8' }}>
+            <span style={{ fontSize: 12, color: '#1a7c3e' }}>✓</span>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{foundCompany.name}</p>
+              {foundCompany.trade_name && <p style={{ fontSize: 11, color: '#52514e', marginTop: 1 }}>{foundCompany.trade_name}</p>}
+            </div>
+            {!preselectedCompanyId && (
+              <button type="button" onClick={() => { setFoundCompany(null); setChecked(false); setCnpj('') }}
+                style={{ marginLeft: 'auto', fontSize: 11, color: '#8892a4', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Trocar
+              </button>
             )}
           </div>
+
+          <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>
+            Contato responsável
+          </label>
+          {!wantsNewContact ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <select name="existing_contact_id" value={selectedContactId}
+                onChange={e => setSelectedContactId(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', outline: 'none' }}>
+                <option value="">Selecione um contato...</option>
+              {foundCompany.contacts.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}{c.role ? ` — ${c.role}` : ''}</option>
+                  ))}
+              </select>
+              <button type="button" onClick={() => setWantsNewContact(true)}
+                style={{ fontSize: 11, color: '#4f86f7', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, padding: 0 }}>
+                + Cadastrar novo contato para esta empresa
+              </button>
+            </div>
+          ) : (
+            <NewContactFields
+              name={newContactName} setName={setNewContactName}
+              role={newContactRole} setRole={setNewContactRole}
+              email={newContactEmail} setEmail={setNewContactEmail}
+              phone={newContactPhone} setPhone={setNewContactPhone}
+              onCancel={foundCompany.contacts.length > 0 ? () => setWantsNewContact(false) : undefined}
+            />
+          )}
         </div>
       )}
 
       {checked && !foundCompany && (
-        <div className="rounded-md border border-brand-100 bg-white p-3">
+        <div style={{ borderRadius: 8, border: '0.5px solid #e8edf5', background: '#fff', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <input type="hidden" name="new_company_cnpj" value={cnpj.replace(/\D/g, '')} />
-          <p className="mb-2 text-xs text-gray-500">
-            Empresa nova — não encontramos esse CNPJ na sua base ainda. Confira os dados abaixo antes de salvar.
+          <p style={{ fontSize: 11, color: '#8892a4' }}>
+            Empresa nova — não encontramos esse CNPJ na sua base. Confira os dados abaixo antes de salvar.
           </p>
-
-          <label className="block text-xs font-medium text-gray-700">Razão Social *</label>
-          <input
-            name="new_company_name"
-            required
-            value={newCompanyName}
-            onChange={(e) => setNewCompanyName(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
-          />
-
-          <label className="mt-2 block text-xs font-medium text-gray-700">Nome Fantasia</label>
-          <input
-            name="new_company_trade_name"
-            value={newCompanyTradeName}
-            onChange={(e) => setNewCompanyTradeName(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
-          />
-
-          <div className="mt-3">
-            <label className="block text-xs font-medium text-gray-700">Contato responsável *</label>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>Razão Social *</label>
+            <input name="new_company_name" required value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)}
+              style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>Nome Fantasia</label>
+            <input name="new_company_trade_name" value={newCompanyTradeName} onChange={e => setNewCompanyTradeName(e.target.value)}
+              style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase' as const, letterSpacing: '0.7px', marginBottom: 4 }}>Contato responsável *</label>
             <NewContactFields
               name={newContactName} setName={setNewContactName}
               role={newContactRole} setRole={setNewContactRole}
@@ -231,48 +219,27 @@ function NewContactFields({
   phone: string; setPhone: (v: string) => void
   onCancel?: () => void
 }) {
+  const inputStyle = { width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
   return (
-    <div className="mt-1 grid grid-cols-2 gap-2 rounded-md border border-gray-200 bg-gray-50 p-2">
-      <div className="col-span-2 sm:col-span-1">
-        <input
-          name="new_contact_name"
-          required
-          placeholder="Nome *"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
-        />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 10, borderRadius: 8, border: '0.5px solid #e8edf5', background: '#f8f9fb' }}>
+      <div style={{ gridColumn: '1/-1' }}>
+        <input name="new_contact_name" required placeholder="Nome *" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
       </div>
-      <div className="col-span-2 sm:col-span-1">
-        <input
-          name="new_contact_role"
-          placeholder="Cargo"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
-        />
+      <div>
+        <input name="new_contact_role" placeholder="Cargo" value={role}
+          onChange={e => setRole(e.target.value)} style={inputStyle} />
       </div>
-      <div className="col-span-2 sm:col-span-1">
-        <input
-          name="new_contact_email"
-          type="email"
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
-        />
+      <div>
+        <input name="new_contact_email" type="email" placeholder="E-mail" value={email}
+          onChange={e => setEmail(e.target.value)} style={inputStyle} />
       </div>
-      <div className="col-span-2 sm:col-span-1">
-        <input
-          name="new_contact_phone"
-          placeholder="Telefone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
-        />
+      <div>
+        <input name="new_contact_phone" placeholder="Telefone" value={phone}
+          onChange={e => setPhone(e.target.value)} style={inputStyle} />
       </div>
       {onCancel && (
-        <button type="button" onClick={onCancel} className="col-span-2 text-left text-xs text-gray-400 hover:underline">
+        <button type="button" onClick={onCancel}
+          style={{ gridColumn: '1/-1', fontSize: 11, color: '#8892a4', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, padding: 0 }}>
           Cancelar, escolher contato existente
         </button>
       )}
