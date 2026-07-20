@@ -35,6 +35,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     { data: contracts },
     { data: activities },
     { data: profiles },
+    { data: salesPipelines },
   ] = await Promise.all([
     isCurrentUserAdmin(),
     supabase.from('companies').select('*').eq('id', id).single(),
@@ -42,7 +43,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('contracts').select('id, process_number, title, created_at, value').eq('company_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, type, content, created_at, user_id').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
+    supabase.from('pipelines').select('id, is_default').eq('type', 'vendas'),
   ])
+
+  const defaultSalesPipeline = (salesPipelines ?? []).find(p => p.is_default)?.id ?? salesPipelines?.[0]?.id
 
   if (!company) notFound()
 
@@ -122,7 +126,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Oportunidades ({(contracts ?? []).length})</p>
-              <Link href={`/contracts/new?company=${company.id}`} style={{ fontSize: 11, color: '#4f86f7', textDecoration: 'none' }}>+ Nova oportunidade</Link>
+              <Link
+                href={`/contracts/new?company=${company.id}${defaultSalesPipeline ? `&pipeline=${defaultSalesPipeline}` : ''}`}
+                style={{ fontSize: 11, color: '#4f86f7', textDecoration: 'none' }}>
+                + Nova oportunidade
+              </Link>
             </div>
             <div>
               {(contracts ?? []).map(c => (

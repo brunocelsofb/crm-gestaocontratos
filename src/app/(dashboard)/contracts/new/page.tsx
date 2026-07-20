@@ -138,14 +138,6 @@ export default function NewContractPage() {
           </div>
         )}
 
-        {/* CNPJ do cliente */}
-        {show('cnpj_client') && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">CNPJ do Cliente {req('cnpj_client') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
-            <input name="cnpj_client" required={req('cnpj_client')} placeholder="00.000.000/0000-00" className={inputCls} />
-          </div>
-        )}
-
         {/* CNPJ da ORBIS */}
         {show('cnpj_orbis') && (
           <div>

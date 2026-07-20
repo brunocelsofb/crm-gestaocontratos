@@ -16,8 +16,10 @@ export default async function ContractsPage({
 
   // Busca só pipelines de tipo 'vendas' — Oportunidades são exclusivamente
   // negócios em negociação, não contratos de gestão de carteira.
-  const { data: salesPipelines } = await supabase.from('pipelines').select('id').eq('type', 'vendas')
+  const { data: salesPipelines } = await supabase
+    .from('pipelines').select('id, is_default').eq('type', 'vendas')
   const salesPipelineIds = (salesPipelines ?? []).map(p => p.id)
+  const defaultSalesPipeline = salesPipelines?.find(p => p.is_default)?.id ?? salesPipelineIds[0]
 
   let query = salesPipelineIds.length
     ? supabase
@@ -74,7 +76,8 @@ export default async function ContractsPage({
           <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Oportunidades</h1>
           <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Todas as oportunidades e contratos ativos</p>
         </div>
-        <Link href="/contracts/new" style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#1a1f36', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>
+        <Link href={`/contracts/new${defaultSalesPipeline ? `?pipeline=${defaultSalesPipeline}` : ''}`}
+          style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#1a1f36', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>
           + Nova oportunidade
         </Link>
       </div>
