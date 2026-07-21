@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
-import { NoteForm } from '@/components/contracts/note-form'
+import { ActivityFeed } from '@/components/activities/activity-feed'
 import { NpsSection } from '@/components/nps/nps-section'
 import { FilesSection } from '@/components/contracts/files-section'
 import { CustomSurveysSection } from '@/components/surveys/custom-surveys-section'
@@ -77,7 +77,7 @@ export default async function ContractDetailPage({
       ? supabase.from('contacts').select('id, name, role, email, phone').eq('id', contract.contact_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from('pipeline_runs').select('*').eq('contract_id', id).order('started_at', { ascending: true }),
-    supabase.from('activities').select('id, type, content, created_at, due_date, completed, user_id, metadata').eq('contract_id', id).order('created_at', { ascending: false }),
+    supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, due_date, completed, user_id, assigned_to, metadata, profiles(full_name)').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('contract_files').select('id, file_name, storage_path, file_size, mime_type, created_at').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('tags').select('id, name, color').order('name'),
     supabase.from('contract_tags').select('tag_id').eq('contract_id', id),
@@ -406,7 +406,14 @@ export default async function ContractDetailPage({
 
                 <div className="space-y-3">
                   <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>
-                  <NoteForm contractId={contract.id} />
+                  <ActivityFeed
+                    activities={activities ?? []}
+                    contractId={contract.id}
+                    companyId={contract.company_id ?? null}
+                    pipelineRunId={displayRun?.id ?? null}
+                    profiles={allProfiles ?? []}
+                    currentUserId={currentProfile?.id ?? ''}
+                  />
                   <Timeline activities={activities} />
                 </div>
               </div>

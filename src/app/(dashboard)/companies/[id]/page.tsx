@@ -5,7 +5,7 @@ import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
 import { AddContactForm } from '@/components/companies/add-contact-form'
 import { RemoveContactButton } from '@/components/companies/remove-contact-button'
-import { NoteForm } from '@/components/companies/company-note-form'
+import { ActivityFeed } from '@/components/activities/activity-feed'
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   lead:           { bg: '#eef3ff', color: '#3b5bdb', label: 'Lead' },
@@ -27,6 +27,7 @@ function parseMulti(val: string | null | undefined): string[] {
 export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const [
     isAdmin,
@@ -41,7 +42,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('companies').select('*').eq('id', id).single(),
     supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('is_primary', { ascending: false }),
     supabase.from('contracts').select('id, process_number, title, created_at, value').eq('company_id', id).order('created_at', { ascending: false }),
-    supabase.from('activities').select('id, type, content, created_at, user_id').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('pipelines').select('id, is_default').eq('type', 'vendas'),
   ])
@@ -116,7 +117,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Histórico de Atividades</p>
             </div>
             <div style={{ padding: 16 }}>
-              <NoteForm companyId={company.id} />
+              <ActivityFeed
+              activities={activities ?? []}
+              companyId={company.id}
+              profiles={profiles ?? []}
+              currentUserId={user?.id ?? ''}
+            />
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {(activities ?? []).map(a => (
                   <div key={a.id} style={{ display: 'flex', gap: 10, paddingBottom: 10, borderBottom: '0.5px solid #f8f9fb' }}>
