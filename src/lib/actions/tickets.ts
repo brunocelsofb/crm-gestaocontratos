@@ -26,7 +26,9 @@ async function generateTicketNumber(): Promise<string> {
 // Criação de ticket — usada tanto pelo formulário público de suporte
 // quanto pelo cadastro manual da equipe. Sem exigir login.
 export async function createTicket(formData: FormData): Promise<ActionState & { ticketId?: string; publicToken?: string }> {
-  const supabase = await createClient()
+  // Usa o adminClient para o insert funcionar sem autenticação
+  // (formulário público acessado por terceiros sem login)
+  const supabase = createAdminClient()
 
   const subject = (formData.get('subject') as string)?.trim()
   const description = (formData.get('description') as string)?.trim()
