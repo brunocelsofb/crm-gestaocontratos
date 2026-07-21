@@ -3,12 +3,12 @@
 import { useState, useTransition } from 'react'
 import { deleteContract } from '@/lib/actions/contracts'
 
-export function DeleteContractButton({ contractId }: { contractId: string }) {
+export function DeleteContractButton({ contractId, label = 'Excluir oportunidade' }: { contractId: string; label?: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   function handleClick() {
-    if (!confirm('Excluir este contrato PARA SEMPRE? Isso apaga também todo o histórico, arquivos, pesquisas e faturamento ligados a ele. Não tem como desfazer.')) return
+    if (!confirm(`${label} PARA SEMPRE? Isso apaga também todo o histórico e atividades ligados a ela. Não tem como desfazer.`)) return
     setError(null)
     startTransition(async () => {
       const result = await deleteContract(contractId, '/pipeline')
@@ -17,15 +17,12 @@ export function DeleteContractButton({ contractId }: { contractId: string }) {
   }
 
   return (
-    <div className="text-right">
-      <button
-        onClick={handleClick}
-        disabled={isPending}
-        className="rounded-md border border-negative-300 px-3 py-1.5 text-sm font-medium text-negative-700 hover:bg-negative-100 disabled:opacity-50"
-      >
-        {isPending ? 'Excluindo...' : 'Excluir contrato'}
+    <div>
+      <button onClick={handleClick} disabled={isPending}
+        style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}>
+        {isPending ? 'Excluindo...' : label}
       </button>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p style={{ marginTop: 4, fontSize: 11, color: '#b91c1c' }}>{error}</p>}
     </div>
   )
 }

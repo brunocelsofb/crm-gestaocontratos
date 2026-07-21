@@ -33,11 +33,11 @@ export default async function EditContractPage({
   }
 
   return (
-    <div className="max-w-xl space-y-6">
-      <Link href={`/contracts/${id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
-        ← Voltar
-      </Link>
-      <h1 className="text-[17px] font-medium text-foreground">Editar Contrato</h1>
+    <div style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <Link href={`/contracts/${id}`} style={{ fontSize: 12, color: '#8892a4', textDecoration: 'none' }}>← Voltar</Link>
+      <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+        {pipelineType === 'vendas' ? 'Editar Oportunidade' : 'Editar Contrato'}
+      </h1>
       <EditContractForm
         contractId={id}
         pipelineType={pipelineType}

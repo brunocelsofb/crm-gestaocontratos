@@ -97,7 +97,10 @@ export function EditContractForm({
         )}
       </div>
 
-      <ValidityPeriodInput defaultFrom={initial.valid_from} defaultUntil={initial.valid_until} defaultAutoRenewal={initial.auto_renewal} />
+      {/* Vigência só faz sentido em Gestão de Contratos, não em Novos Negócios */}
+      {pipelineType !== 'vendas' && pipelineType !== 'servico_avulso' && (
+        <ValidityPeriodInput defaultFrom={initial.valid_from} defaultUntil={initial.valid_until} defaultAutoRenewal={initial.auto_renewal} />
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Descrição</label>

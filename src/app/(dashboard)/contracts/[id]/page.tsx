@@ -254,9 +254,14 @@ export default async function ContractDetailPage({
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <Link href={`/contracts/${contract.id}/edit`} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>
-              Editar
+              {isCurrentlyInContractsPipeline ? 'Editar contrato' : 'Editar oportunidade'}
             </Link>
-            {currentProfile?.role === 'admin' && <DeleteContractButton contractId={contract.id} />}
+            {currentProfile?.role === 'admin' && (
+              <DeleteContractButton
+                contractId={contract.id}
+                label={isCurrentlyInContractsPipeline ? 'Excluir contrato' : 'Excluir oportunidade'}
+              />
+            )}
           </div>
         </div>
       </div>
