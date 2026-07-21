@@ -89,14 +89,24 @@ export function StageBar({
     startTransition(async () => {
       // Salva vigência antes de fechar, se fornecida
       if (extraData?.validFrom || extraData?.validUntil) {
-        await fetch(`/api/carteira/${contractId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            valid_from: extraData.validFrom || null,
-            valid_until: extraData.validUntil || null,
-          }),
-        })
+        try {
+          const res = await fetch(`/api/carteira/${contractId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              valid_from: extraData.validFrom || null,
+              valid_until: extraData.validUntil || null,
+            }),
+          })
+          if (!res.ok) {
+            const json = await res.json().catch(() => ({}))
+            setError(json.error ?? 'Erro ao salvar vigência.')
+            return
+          }
+        } catch {
+          setError('Erro de conexão ao salvar vigência.')
+          return
+        }
       }
       const result = await closeRun(contractId, outcome)
       if (result.error) setError(result.error)

@@ -378,21 +378,8 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
       .eq('id', run.pipeline_id)
       .single()
 
-    if (pipelineForGate?.type === 'vendas') {
-      const { data: latestReview } = await supabase
-        .from('dimensioning_reviews')
-        .select('status')
-        .eq('contract_id', contractId)
-        .order('sent_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (!latestReview || latestReview.status !== 'acknowledged_ok') {
-        return {
-          error: 'O time técnico ainda não deu ciência do dimensionamento. Envie o dimensionamento para aprovação antes de marcar Ganho.',
-        }
-      }
-    }
+    // NOTA: a trava de dimensionamento foi removida temporariamente.
+    // Pode ser reativada quando o fluxo de dimensionamento estiver em uso.
 
     // TRAVA ESPECÍFICA DO FUNIL DE GESTÃO DE CONTRATOS: marcar sucesso
     // aqui normalmente significa "renovação concluída" — exige que a

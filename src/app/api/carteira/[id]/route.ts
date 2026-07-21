@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 const ALLOWED_FIELDS = [
   'contract_number', 'sankhya_code', 'cnpj_billing', 'contract_type',
-  'monthly_value', 'validity_months', 'valid_until',
+  'monthly_value', 'validity_months', 'valid_until', 'valid_from',
   'engineer_name', 'coordinator_name',
   'abc_curve', 'sphere', 'nature', 'region', 'uf', 'segment', 'economic_group',
   'score_billing', 'score_visit', 'score_loyalty', 'score_weight',

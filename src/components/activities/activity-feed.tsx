@@ -54,8 +54,12 @@ export function ActivityFeed({
   async function handleDelete(id: string) {
     if (!confirm('Excluir esta atividade?')) return
     setDeletingId(id)
-    await deleteActivity(id)
+    const result = await deleteActivity(id)
     setDeletingId(null)
+    if (result?.error) {
+      alert(`Erro ao excluir: ${result.error}`)
+      return
+    }
     router.refresh()
   }
 
