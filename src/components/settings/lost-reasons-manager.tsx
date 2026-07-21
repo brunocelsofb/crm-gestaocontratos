@@ -25,14 +25,24 @@ export function LostReasonsManager({ initialReasons }: { initialReasons: Reason[
   }
 
   async function handleToggle(id: string, active: boolean) {
-    await toggleLostReason(id, !active)
-    router.refresh()
+    // Atualiza o estado local imediatamente para feedback visual instantâneo
+    setReasons(prev => prev.map(r => r.id === id ? { ...r, active: !active } : r))
+    const result = await toggleLostReason(id, !active)
+    if (result?.error) {
+      // Reverte se deu erro
+      setReasons(prev => prev.map(r => r.id === id ? { ...r, active } : r))
+      setError(result.error)
+    }
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Excluir este motivo?')) return
-    await deleteLostReason(id)
-    router.refresh()
+    setReasons(prev => prev.filter(r => r.id !== id))
+    const result = await deleteLostReason(id)
+    if (result?.error) {
+      setError(result.error)
+      router.refresh() // Recarrega para restaurar o estado correto
+    }
   }
 
   return (
