@@ -11,13 +11,12 @@ export type EmailAccountInfo = { connectionType: 'oauth_google' | 'smtp'; fromEm
 // explícitos — sem isso, cada cliente de e-mail (Gmail, Outlook,
 // etc.) aplica o próprio padrão, que costuma sair pequeno demais.
 export function wrapEmailHtml(body: string, signature: string | null, trackingPixelHtml: string): string {
-  // Converte quebras de linha em <br> para que parágrafos do template
-  // apareçam corretamente no e-mail HTML (sem isso tudo fica numa linha só)
-  const htmlBody = body
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\r\n|\r|\n/g, '<br>')
+  // Se o body já contém tags HTML, usamos diretamente (não fazemos escape).
+  // Se é texto puro, convertemos \n em <br> para preservar parágrafos.
+  const looksLikeHtml = /<[a-z][\s\S]*>/i.test(body)
+  const htmlBody = looksLikeHtml
+    ? body
+    : body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r\n|\r|\n/g, '<br>')
   const signatureBlock = signature
     ? `<br><br><div style="font-size: 13px; color: #444;">${signature}</div>`
     : ''
