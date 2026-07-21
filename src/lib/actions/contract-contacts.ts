@@ -17,22 +17,26 @@ export type ContractContact = {
 }
 
 export async function getContractContacts(contractId: string): Promise<ContractContact[]> {
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('contract_contacts')
-    .select('id, contact_id, is_primary, contacts(name, role, email, phone)')
-    .eq('contract_id', contractId)
-    .order('is_primary', { ascending: false })
+  try {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+      .from('contract_contacts')
+      .select('id, contact_id, is_primary, contacts(name, role, email, phone)')
+      .eq('contract_id', contractId)
+      .order('is_primary', { ascending: false })
 
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    contact_id: row.contact_id,
-    name: row.contacts?.name ?? '',
-    role: row.contacts?.role ?? null,
-    email: row.contacts?.email ?? null,
-    phone: row.contacts?.phone ?? null,
-    is_primary: row.is_primary,
-  }))
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      contact_id: row.contact_id,
+      name: row.contacts?.name ?? '',
+      role: row.contacts?.role ?? null,
+      email: row.contacts?.email ?? null,
+      phone: row.contacts?.phone ?? null,
+      is_primary: row.is_primary,
+    }))
+  } catch {
+    return []
+  }
 }
 
 export async function addContractContact(contractId: string, contactId: string): Promise<ActionState> {

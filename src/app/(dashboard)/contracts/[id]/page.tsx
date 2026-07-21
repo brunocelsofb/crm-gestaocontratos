@@ -187,17 +187,17 @@ export default async function ContractDetailPage({
   const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }, contractContacts, { data: companyAllContacts }, { data: zapsignTemplates }, { data: zapsignDocuments }, { data: orgZapSignSettings }] = await Promise.all([
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'email').order('name'),
     supabase.from('contract_emails').select('id, from_email, to_email, cc_email, bcc_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
-    getConnectedEmailAccount(),
+    getConnectedEmailAccount().catch(() => null),
     supabase.from('organization_settings').select('inbound_email_domain').eq('id', 'default').maybeSingle(),
     supabase.from('custom_fields').select('id, name, field_key, field_type, select_options').order('name'),
-    getContractCustomFieldValues(contract.id),
+    getContractCustomFieldValues(contract.id).catch(() => ({} as Record<string, string>)),
     supabase.from('organization_settings').select('zapi_instance_id').eq('id', 'default').maybeSingle(),
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'whatsapp').order('name'),
     supabase.from('contract_whatsapp_messages').select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, profiles(full_name)').eq('contract_id', contract.id).order('created_at', { ascending: false }),
     getContractContacts(contract.id),
     contract.company_id
       ? supabase.from('contacts').select('id, name, role').eq('company_id', contract.company_id).order('name')
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [] as { id: string; name: string; role: string | null }[] }),
     supabase.from('zapsign_templates').select('id, name, type').order('name'),
     supabase.from('zapsign_documents').select('id, name, status, sent_at, signed_at, pdf_url, signed_pdf_url').eq('contract_id', contract.id).order('created_at', { ascending: false }),
     supabase.from('organization_settings').select('zapsign_api_token').eq('id', 'default').maybeSingle(),
