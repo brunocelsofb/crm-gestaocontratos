@@ -2,19 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import type { ActivityType } from '@/lib/utils/activity-types'
 
-export type ActivityType = 'note' | 'call' | 'email' | 'whatsapp' | 'meeting' | 'task' | 'internal' | 'reminder'
-
-export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
-  note:     '📝 Nota',
-  call:     '📞 Ligação',
-  email:    '✉ E-mail',
-  whatsapp: '💬 WhatsApp',
-  meeting:  '🤝 Reunião',
-  task:     '✅ Tarefa',
-  internal: '🔧 Atividade Interna',
-  reminder: '🔔 Lembrete',
-}
+export type { ActivityType }
 
 export type CreateActivityInput = {
   contractId?: string | null
@@ -40,7 +30,8 @@ export async function createActivity(input: CreateActivityInput): Promise<{ erro
   if (!input.contractId && !input.companyId) return { error: 'Informe uma oportunidade ou empresa.' }
   if (!input.title?.trim() && !input.content?.trim()) return { error: 'Título ou descrição são obrigatórios.' }
 
-  const { data, error } = await supabase.from('activities').insert({
+  // Tenta com todos os campos novos primeiro
+  const fullRow = {
     contract_id:       input.contractId ?? null,
     company_id:        input.companyId ?? null,
     pipeline_run_id:   input.pipelineRunId ?? null,
@@ -57,13 +48,28 @@ export async function createActivity(input: CreateActivityInput): Promise<{ erro
     assigned_to:       input.assignedTo ?? user.id,
     participants:      input.participants?.length ? input.participants : null,
     completed:         input.status === 'done',
-  }).select('id').single()
+  }
 
-  if (error) return { error: error.message }
+  let result = await supabase.from('activities').insert(fullRow).select('id').single()
+
+  // Se falhou (provavelmente coluna nova não existe ainda — migration pendente),
+  // tenta com só os campos que sempre existiram
+  if (result.error) {
+    const minimalRow = {
+      contract_id:     input.contractId ?? null,
+      user_id:         user.id,
+      type:            'note' as const,
+      content:         `${input.title ? `[${input.activityType?.toUpperCase()}] ${input.title}\n` : ''}${input.content?.trim() || ''}`,
+      completed:       input.status === 'done',
+    }
+    result = await supabase.from('activities').insert(minimalRow).select('id').single()
+  }
+
+  if (result.error) return { error: result.error.message }
 
   if (input.contractId) revalidatePath(`/contracts/${input.contractId}`)
   if (input.companyId) revalidatePath(`/companies/${input.companyId}`)
-  return { id: data.id }
+  return { id: result.data?.id }
 }
 
 export async function updateActivityStatus(

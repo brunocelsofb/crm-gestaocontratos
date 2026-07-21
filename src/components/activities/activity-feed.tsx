@@ -5,12 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CreateActivityModal } from './create-activity-modal'
 import { updateActivityStatus, deleteActivity } from '@/lib/actions/activities'
-
-const TYPE_ICON: Record<string, string> = {
-  call: '📞', email: '✉', whatsapp: '💬', meeting: '🤝',
-  task: '✅', internal: '🔧', reminder: '🔔', note: '📝', system: '⚙',
-  stage_change: '🔀', pipeline_change: '🔀', automation_triggered: '⚡', transfer: '↔',
-}
+import { ACTIVITY_TYPE_ICON } from '@/lib/utils/activity-types'
 
 type Activity = {
   id: string
@@ -82,7 +77,7 @@ export function ActivityFeed({
         <p style={{ fontSize: 12, color: '#b0b8c8', textAlign: 'center', padding: '24px 0' }}>Nenhuma atividade registrada ainda.</p>
       )}
       {activities.map(a => {
-        const icon = TYPE_ICON[a.activity_type ?? a.type] ?? '📝'
+        const icon = ACTIVITY_TYPE_ICON[a.activity_type ?? a.type] ?? '📝'
         const authorId = a.assigned_to ?? a.user_id
         const author = authorId ? profileById.get(authorId) : null
         const isSystemEvent = isSystem(a)

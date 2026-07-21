@@ -405,9 +405,9 @@ export default async function ContractDetailPage({
 
                 <ContractCustomFieldsSection contractId={contract.id} fields={customFields ?? []} values={customFieldValues} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <p style={{ fontSize: 11, fontWeight: 500, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px' }}>Nota rápida</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <NoteForm contractId={contract.id} />
+                  <Timeline activities={activities} />
                 </div>
               </div>
             ),
@@ -426,11 +426,7 @@ export default async function ContractDetailPage({
               />
             ),
           },
-          {
-            id: 'historico',
-            label: 'Histórico',
-            content: <Timeline activities={activities} />,
-          },
+
           {
             id: 'responsavel',
             label: 'Responsável & Transferências',

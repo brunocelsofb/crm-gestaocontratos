@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createActivity, ACTIVITY_TYPE_LABELS, type ActivityType } from '@/lib/actions/activities'
+import { createActivity } from '@/lib/actions/activities'
+import { ACTIVITY_TYPE_LABELS, type ActivityType } from '@/lib/utils/activity-types'
 
 const ACTIVITY_TYPES = Object.entries(ACTIVITY_TYPE_LABELS) as [ActivityType, string][]
 const REMINDER_OPTIONS = [
