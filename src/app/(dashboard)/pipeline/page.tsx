@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard, type RunCard } from '@/components/pipeline/kanban-board'
 import { PipelineSelect } from '@/components/pipeline/pipeline-select'
+import { PipelineDashboard } from '@/components/pipeline/pipeline-dashboard'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { checkAndTriggerRenewals } from '@/lib/actions/pipeline'
 
@@ -10,9 +11,10 @@ const DEFAULT_SLA_DAYS = 7 // usado quando a etapa não tem SLA configurado
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ pipeline?: string }>
+  searchParams: Promise<{ pipeline?: string; dash?: string }>
 }) {
-  const { pipeline: pipelineIdParam } = await searchParams
+  const { pipeline: pipelineIdParam, dash } = await searchParams
+  const showDash = dash === '1'
   const supabase = await createClient()
   const isAdmin = await isCurrentUserAdmin()
 
@@ -187,15 +189,41 @@ export default async function PipelinePage({
             </span>
           )}
         </div>
-        <Link
-          href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
-          style={{ whiteSpace: 'nowrap', borderRadius: 8, background: '#1a1f36', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none' }}
-        >
-          + {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {showDash ? (
+            <Link href={`/pipeline${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
+              style={{ whiteSpace: 'nowrap', borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#52514e', textDecoration: 'none' }}>
+              ← Kanban
+            </Link>
+          ) : (
+            <Link href={`/pipeline?${selectedPipeline ? `pipeline=${selectedPipeline}&` : ''}dash=1`}
+              style={{ whiteSpace: 'nowrap', borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#52514e', textDecoration: 'none' }}>
+              📊 Dash
+            </Link>
+          )}
+          {!showDash && (
+            <Link
+              href={`/contracts/new${selectedPipeline ? `?pipeline=${selectedPipeline}` : ''}`}
+              style={{ whiteSpace: 'nowrap', borderRadius: 8, background: '#1a1f36', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none' }}
+            >
+              + {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
+            </Link>
+          )}
+        </div>
       </div>
 
-      {stages && stages.length > 0 ? (
+      {showDash ? (
+        <PipelineDashboard
+          pipelineId={selectedPipeline as string}
+          pipelineName={pipelineName}
+          stages={stages ?? []}
+          cards={cards}
+          allPipelines={(pipelines ?? []).filter(p => p.type === 'vendas').map(p => ({
+            id: p.id, name: p.name,
+          }))}
+          selectedPipeline={selectedPipeline as string}
+        />
+      ) : stages && stages.length > 0 ? (
         <KanbanBoard
           pipelineId={selectedPipeline as string}
           stages={stages}
