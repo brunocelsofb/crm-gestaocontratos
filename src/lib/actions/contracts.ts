@@ -198,12 +198,17 @@ export async function createContract(
     changed_by: user.id,
   })
 
+  // Busca o tipo do pipeline para usar o texto correto
+  const { data: pipelineForMsg } = await supabase
+    .from('pipelines').select('type').eq('id', stage.pipeline_id).maybeSingle()
+  const isVendasCadastro = pipelineForMsg?.type === 'vendas'
+
   await supabase.from('activities').insert({
     contract_id: contract.id,
     pipeline_run_id: run.id,
     user_id: user.id,
     type: 'system',
-    content: 'Contrato cadastrado.',
+    content: isVendasCadastro ? 'Oportunidade cadastrada.' : 'Contrato cadastrado.',
   })
 
   revalidatePath('/contracts')

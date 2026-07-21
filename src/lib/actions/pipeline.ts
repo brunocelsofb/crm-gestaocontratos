@@ -666,25 +666,39 @@ export async function updateRunValue(contractId: string, newValue: number): Prom
 
   const { data: run } = await supabase
     .from('pipeline_runs')
-    .select('id, value')
+    .select('id, value, pipeline_id')
     .eq('contract_id', contractId)
     .eq('status', 'open')
     .maybeSingle()
 
   if (!run) return { error: 'Nenhuma passagem de funil aberta para este contrato.' }
 
+  // Descobre o tipo do pipeline para usar o texto correto
+  const { data: runPipeline } = await supabase
+    .from('pipelines').select('type').eq('id', run.pipeline_id).maybeSingle()
+  const isVendas = runPipeline?.type === 'vendas'
+  const valorLabel = isVendas ? 'Valor estimado' : 'Valor do contrato'
+
   const oldValue = Number(run.value) || 0
   const { error } = await supabase.from('pipeline_runs').update({ value: newValue }).eq('id', run.id)
   if (error) return { error: error.message }
 
-  const pctChange = oldValue > 0 ? Math.round(((newValue - oldValue) / oldValue) * 1000) / 10 : null
+  // Porcentagem de reajuste — só faz sentido em contratos (renovação),
+  // não em oportunidades onde o valor ainda está sendo estimado
+  const pctChange = !isVendas && oldValue > 0
+    ? Math.round(((newValue - oldValue) / oldValue) * 1000) / 10
+    : null
+
+  const content = pctChange !== null
+    ? `${valorLabel} atualizado para ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(newValue)} (reajuste de ${pctChange >= 0 ? '+' : ''}${pctChange}% sobre ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(oldValue)}).`
+    : `${valorLabel} atualizado para ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(newValue)}.`
 
   await supabase.from('activities').insert({
     contract_id: contractId,
     pipeline_run_id: run.id,
     user_id: user.id,
     type: 'system',
-    content: `Valor do contrato atualizado de R$ ${oldValue.toLocaleString('pt-BR')} para R$ ${newValue.toLocaleString('pt-BR')}${pctChange !== null ? ` (${pctChange >= 0 ? '+' : ''}${pctChange}%)` : ''}.`,
+    content,
   })
 
   revalidatePath(`/contracts/${contractId}`)
