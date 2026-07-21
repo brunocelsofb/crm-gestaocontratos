@@ -283,7 +283,7 @@ export async function updateContract(
     contract_id: contractId,
     user_id: user.id,
     type: 'system',
-    content: 'Dados do contrato editados.',
+    content: 'Dados da oportunidade editados.',
   })
 
   revalidatePath(`/contracts/${contractId}`)

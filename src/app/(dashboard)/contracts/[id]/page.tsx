@@ -12,6 +12,7 @@ import { DepartmentSection } from '@/components/contracts/department-section'
 import { AccountOwnerBadge } from '@/components/contracts/account-owner-badge'
 import { BillingSection } from '@/components/contracts/billing-section'
 import { RenewalValueSection } from '@/components/contracts/renewal-value-section'
+import { InlineValueEditor } from '@/components/contracts/inline-value-editor'
 import { ProposalsSection } from '@/components/proposals/proposals-section'
 import { ContractTicketsSection } from '@/components/tickets/contract-tickets-section'
 import { ContractEmailSection } from '@/components/email/contract-email-section'
@@ -295,34 +296,44 @@ export default async function ContractDetailPage({
                   <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} canEdit={canChangeStage} />
                 )}
 
-                <div className={`grid gap-4 ${isCurrentlyInContractsPipeline ? 'grid-cols-3' : 'grid-cols-4'}`}>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">Valor (run atual)</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {/* Valor com botão de alterar inline em Novos Negócios */}
+                  <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
+                    <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>
+                      {isCurrentlyInContractsPipeline ? 'Valor do contrato' : 'Valor estimado'}
                     </p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
+                      </p>
+                      {canChangeStage && (
+                        <InlineValueEditor contractId={contract.id} currentValue={Number(displayRun?.value) || 0} />
+                      )}
+                    </div>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">Vigência do contrato</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {contract.valid_until
-                        ? `${contract.valid_from ? new Date(contract.valid_from).toLocaleDateString('pt-BR') : '?'} → ${new Date(contract.valid_until).toLocaleDateString('pt-BR')}`
-                        : 'Não informado'}
-                    </p>
-                  </div>
-                  {!isCurrentlyInContractsPipeline && (
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs text-gray-500">Previsão de fechamento</p>
-                      <p className="text-sm font-medium text-gray-900">
+                  {/* Vigência só em Gestão de Contratos */}
+                  {isCurrentlyInContractsPipeline ? (
+                    <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
+                      <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Vigência</p>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                        {contract.valid_until
+                          ? `${contract.valid_from ? new Date(contract.valid_from).toLocaleDateString('pt-BR') : '?'} → ${new Date(contract.valid_until).toLocaleDateString('pt-BR')}`
+                          : 'Não informada'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
+                      <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Previsão de fechamento</p>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
                         {displayRun?.expected_close_date
                           ? new Date(displayRun.expected_close_date).toLocaleDateString('pt-BR')
-                          : 'Não informado'}
+                          : 'Não informada'}
                       </p>
                     </div>
                   )}
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">Aberto desde</p>
-                    <p className="text-sm font-medium text-gray-900">
+                  <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
+                    <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Aberto desde</p>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
                       {new Date(contract.created_at).toLocaleDateString('pt-BR')}
                     </p>
                   </div>

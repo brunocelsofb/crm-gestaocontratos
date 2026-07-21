@@ -11,8 +11,17 @@ export type EmailAccountInfo = { connectionType: 'oauth_google' | 'smtp'; fromEm
 // explícitos — sem isso, cada cliente de e-mail (Gmail, Outlook,
 // etc.) aplica o próprio padrão, que costuma sair pequeno demais.
 export function wrapEmailHtml(body: string, signature: string | null, trackingPixelHtml: string): string {
-  const signatureBlock = signature ? `<br><br><div style="font-size: 13px; color: #444;">${signature}</div>` : ''
-  return `<div style="font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #1a1a1a;">${body}${signatureBlock}</div>${trackingPixelHtml}`
+  // Converte quebras de linha em <br> para que parágrafos do template
+  // apareçam corretamente no e-mail HTML (sem isso tudo fica numa linha só)
+  const htmlBody = body
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r\n|\r|\n/g, '<br>')
+  const signatureBlock = signature
+    ? `<br><br><div style="font-size: 13px; color: #444;">${signature}</div>`
+    : ''
+  return `<div style="font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #1a1a1a;">${htmlBody}${signatureBlock}</div>${trackingPixelHtml}`
 }
 
 export async function getEmailAccountInfo(userId: string): Promise<EmailAccountInfo | null> {
