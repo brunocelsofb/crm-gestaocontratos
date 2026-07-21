@@ -58,65 +58,72 @@ export default async function PipelinePage({
   }
   const typeBadge = TYPE_COLOR[pipelineType] ?? TYPE_COLOR.vendas
 
-  // PERFORMANCE: stages e runs não dependem uma da outra — rodam em
-  // paralelo em vez de uma esperar a outra terminar.
+  // Busca dados do funil selecionado (para o Kanban)
   const [{ data: stages }, { data: runs }] = await Promise.all([
     selectedPipeline
       ? supabase.from('stages').select('id, name, order_index, sla_days').eq('pipeline_id', selectedPipeline).order('order_index')
       : Promise.resolve({ data: [] as { id: string; name: string; order_index: number; sla_days: number | null }[] }),
     selectedPipeline
-      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status').eq('pipeline_id', selectedPipeline).in('status', ['open', 'won', 'lost'])
-      : Promise.resolve({ data: [] as { id: string; contract_id: string; stage_id: string; stage_entered_at: string; value: number; status: string }[] }),
+      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status, lost_reason_id').eq('pipeline_id', selectedPipeline).in('status', ['open', 'won', 'lost'])
+      : Promise.resolve({ data: [] as any[] }),
   ])
 
-  const contractIds = [...new Set((runs ?? []).map((r) => r.contract_id))]
-
-  // PERFORMANCE: contratos e "última atividade" também não dependem uma
-  // da outra (as duas só precisam da lista de contractIds), então saem
-  // juntas também.
-  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }] = await Promise.all([
-    contractIds.length
-      ? supabase.from('contracts').select('id, process_number, title, client_name, company_id, valid_until').in('id', contractIds)
-      : Promise.resolve({ data: [] as { id: string; process_number: string; title: string; client_name: string; company_id: string | null; valid_until: string | null }[] }),
-    contractIds.length
-      ? supabase.from('activities').select('contract_id, created_at').in('contract_id', contractIds).order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as { contract_id: string; created_at: string }[] }),
-    contractIds.length
-      ? supabase.from('contract_tags').select('contract_id, tags(id, name, color)').in('contract_id', contractIds)
-      : Promise.resolve({ data: [] as { contract_id: string; tags: { id: string; name: string; color: string } | { id: string; name: string; color: string }[] | null }[] }),
+  // Para o Dashboard: busca TODOS os runs de todos os funis de vendas
+  const salesPipelineIds = (pipelines ?? []).filter(p => p.type === 'vendas').map(p => p.id)
+  const [{ data: allSalesRuns }, { data: lostReasons }] = await Promise.all([
+    salesPipelineIds.length
+      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status, pipeline_id, lost_reason_id').in('pipeline_id', salesPipelineIds).in('status', ['open', 'won', 'lost'])
+      : Promise.resolve({ data: [] as any[] }),
+    supabase.from('lost_reasons').select('id, name').eq('active', true).order('display_order'),
   ])
 
-  const contractById = new Map((contractsData ?? []).map((c) => [c.id, c]))
+  const allContractIds = [...new Set([
+    ...(runs ?? []).map((r: any) => r.contract_id),
+    ...(allSalesRuns ?? []).map((r: any) => r.contract_id),
+  ])]
+
+  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }, { data: allStagesData }] = await Promise.all([
+    allContractIds.length
+      ? supabase.from('contracts').select('id, process_number, title, client_name, company_id, valid_until').in('id', allContractIds)
+      : Promise.resolve({ data: [] as any[] }),
+    allContractIds.length
+      ? supabase.from('activities').select('contract_id, created_at').in('contract_id', allContractIds).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as any[] }),
+    allContractIds.length
+      ? supabase.from('contract_tags').select('contract_id, tags(id, name, color)').in('contract_id', allContractIds)
+      : Promise.resolve({ data: [] as any[] }),
+    salesPipelineIds.length
+      ? supabase.from('stages').select('id, name, order_index, pipeline_id, sla_days').in('pipeline_id', salesPipelineIds).order('order_index')
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  const contractById = new Map((contractsData ?? []).map((c: any) => [c.id, c]))
   const stageById = new Map((stages ?? []).map((s) => [s.id, s]))
+  const allStagesById = new Map((allStagesData ?? []).map((s: any) => [s.id, s]))
+  const lostReasonById = new Map((lostReasons ?? []).map((r: any) => [r.id, r.name]))
 
-  // NOTA DE INCERTEZA: o embedding `tags(...)` através da tabela de
-  // ligação contract_tags pode vir como array (mesmo comportamento que
-  // já vimos antes em outros lugares) — trato os dois formatos possíveis
-  // aqui, em vez de assumir um só.
   const tagByContract = new Map<string, { id: string; name: string; color: string }>()
   for (const row of contractTagRows ?? []) {
-    const tagValue = Array.isArray(row.tags) ? row.tags[0] : row.tags
-    if (tagValue) tagByContract.set(row.contract_id, tagValue)
+    const tagValue = Array.isArray((row as any).tags) ? (row as any).tags[0] : (row as any).tags
+    if (tagValue) tagByContract.set((row as any).contract_id, tagValue)
   }
 
-  // Como veio ordenado por created_at desc, a primeira ocorrência de cada
-  // contract_id já é a atividade mais recente dele.
   const lastActivityByContract = new Map<string, string>()
   for (const a of latestActivityRows ?? []) {
-    if (!lastActivityByContract.has(a.contract_id)) lastActivityByContract.set(a.contract_id, a.created_at)
+    if (!lastActivityByContract.has((a as any).contract_id)) lastActivityByContract.set((a as any).contract_id, (a as any).created_at)
   }
 
   function computeFreshness(contractId: string, stageEnteredAt: string, stageId: string): 'fresh' | 'warning' | 'stale' {
     const lastInteraction = lastActivityByContract.get(contractId) ?? stageEnteredAt
     const daysSince = (Date.now() - new Date(lastInteraction).getTime()) / 86_400_000
-    const sla = stageById.get(stageId)?.sla_days ?? DEFAULT_SLA_DAYS
+    const sla = stageById.get(stageId)?.sla_days ?? allStagesById.get(stageId)?.sla_days ?? DEFAULT_SLA_DAYS
     const ratio = daysSince / sla
     if (ratio < 0.5) return 'fresh'
     if (ratio < 1) return 'warning'
     return 'stale'
   }
 
-  const cards: RunCard[] = (runs ?? []).map((r) => {
+  function makeCard(r: any): RunCard {
     const contract = contractById.get(r.contract_id)
     return {
       runId: r.id,
@@ -129,11 +136,16 @@ export default async function PipelinePage({
       title: contract?.title ?? '',
       value: Number(r.value) || 0,
       stageEnteredAt: r.stage_entered_at,
+      lastActivityAt: lastActivityByContract.get(r.contract_id) ?? null,
       validUntil: contract?.valid_until ?? null,
       freshness: computeFreshness(r.contract_id, r.stage_entered_at, r.stage_id),
       tag: tagByContract.get(r.contract_id) ?? null,
+      lostReasonName: r.lost_reason_id ? lostReasonById.get(r.lost_reason_id) ?? null : null,
     }
-  })
+  }
+
+  const cards: RunCard[] = (runs ?? []).map(makeCard)
+  const allSalesCards: RunCard[] = (allSalesRuns ?? []).map(makeCard)
 
   const openCards = cards.filter(c => c.status === 'open')
   const totalOpen = openCards.reduce((s, c) => s + c.value, 0)
@@ -197,8 +209,8 @@ export default async function PipelinePage({
             </Link>
           ) : (
             <Link href={`/pipeline?${selectedPipeline ? `pipeline=${selectedPipeline}&` : ''}dash=1`}
-              style={{ whiteSpace: 'nowrap', borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', padding: '7px 14px', fontSize: 12, fontWeight: 500, color: '#52514e', textDecoration: 'none' }}>
-              📊 Dash
+              style={{ whiteSpace: 'nowrap', borderRadius: 8, background: '#3b5bdb', padding: '7px 16px', fontSize: 12, fontWeight: 500, color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>📊</span> Gestão à vista
             </Link>
           )}
           {!showDash && (
@@ -218,9 +230,10 @@ export default async function PipelinePage({
           pipelineName={pipelineName}
           stages={stages ?? []}
           cards={cards}
-          allPipelines={(pipelines ?? []).filter(p => p.type === 'vendas').map(p => ({
-            id: p.id, name: p.name,
-          }))}
+          allSalesCards={allSalesCards}
+          allStages={allStagesData ?? []}
+          salesPipelines={(pipelines ?? []).filter(p => p.type === 'vendas')}
+          lostReasons={lostReasons ?? []}
           selectedPipeline={selectedPipeline as string}
         />
       ) : stages && stages.length > 0 ? (

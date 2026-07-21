@@ -40,9 +40,11 @@ export type RunCard = {
   title: string
   value: number
   stageEnteredAt: string
+  lastActivityAt: string | null
   validUntil: string | null
   freshness: 'fresh' | 'warning' | 'stale'
   tag: { id: string; name: string; color: string } | null
+  lostReasonName?: string | null
 }
 
 type Stage = {
