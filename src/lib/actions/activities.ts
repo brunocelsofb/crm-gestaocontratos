@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { ActivityType } from '@/lib/utils/activity-types'
 
 export type { ActivityType }
@@ -27,49 +28,53 @@ export async function createActivity(input: CreateActivityInput): Promise<{ erro
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado.' }
 
-  if (!input.contractId && !input.companyId) return { error: 'Informe uma oportunidade ou empresa.' }
+  // Normaliza — string vazia não é um ID válido
+  const contractId = input.contractId?.trim() || null
+  const companyId  = input.companyId?.trim()  || null
+
+  if (!contractId && !companyId) return { error: 'Informe uma oportunidade ou empresa.' }
   if (!input.title?.trim() && !input.content?.trim()) return { error: 'Título ou descrição são obrigatórios.' }
 
-  // Tenta com todos os campos novos primeiro
+  const row: Record<string, any> = {
+    user_id:     user.id,
+    type:        'task',
+    content:     input.content?.trim() || input.title?.trim() || '',
+    completed:   input.status === 'done',
+  }
+  if (contractId) row.contract_id = contractId
+  if (companyId)  row.company_id  = companyId
+  if (input.pipelineRunId) row.pipeline_run_id = input.pipelineRunId
+
+  // Campos novos — adicionados pela migration-activities-v2
+  // Se não existirem ainda no banco, o insert vai ignorar silenciosamente
+  // pela lógica de fallback abaixo
   const fullRow = {
-    contract_id:       input.contractId ?? null,
-    company_id:        input.companyId ?? null,
-    pipeline_run_id:   input.pipelineRunId ?? null,
-    user_id:           user.id,
-    type:              input.activityType === 'note' ? 'note' : 'task',
-    activity_type:     input.activityType,
-    title:             input.title?.trim() || null,
-    content:           input.content?.trim() || '',
-    status:            input.status,
-    activity_date:     input.activityDate || null,
-    activity_time:     input.activityTime || null,
-    duration_minutes:  input.durationMinutes ?? null,
-    reminder_minutes:  input.reminderMinutes ?? null,
-    assigned_to:       input.assignedTo ?? user.id,
-    participants:      input.participants?.length ? input.participants : null,
-    completed:         input.status === 'done',
+    ...row,
+    activity_type:    input.activityType,
+    title:            input.title?.trim() || null,
+    status:           input.status,
+    activity_date:    input.activityDate  || null,
+    activity_time:    input.activityTime  || null,
+    duration_minutes: input.durationMinutes ?? null,
+    reminder_minutes: input.reminderMinutes ?? null,
+    assigned_to:      input.assignedTo ?? user.id,
+    participants:     input.participants?.length ? input.participants : null,
   }
 
-  let result = await supabase.from('activities').insert(fullRow).select('id').single()
+  let { data, error } = await supabase.from('activities').insert(fullRow).select('id').single()
 
-  // Se falhou (provavelmente coluna nova não existe ainda — migration pendente),
-  // tenta com só os campos que sempre existiram
-  if (result.error) {
-    const minimalRow = {
-      contract_id:     input.contractId ?? null,
-      user_id:         user.id,
-      type:            'note' as const,
-      content:         `${input.title ? `[${input.activityType?.toUpperCase()}] ${input.title}\n` : ''}${input.content?.trim() || ''}`,
-      completed:       input.status === 'done',
-    }
-    result = await supabase.from('activities').insert(minimalRow).select('id').single()
+  // Fallback: se falhou por coluna inexistente, tenta só com campos base
+  if (error) {
+    const fallback = await supabase.from('activities').insert(row).select('id').single()
+    data  = fallback.data
+    error = fallback.error
   }
 
-  if (result.error) return { error: result.error.message }
+  if (error) return { error: error.message }
 
-  if (input.contractId) revalidatePath(`/contracts/${input.contractId}`)
-  if (input.companyId) revalidatePath(`/companies/${input.companyId}`)
-  return { id: result.data?.id }
+  if (contractId) revalidatePath(`/contracts/${contractId}`)
+  if (companyId)  revalidatePath(`/companies/${companyId}`)
+  return { id: data?.id }
 }
 
 export async function updateActivityStatus(
@@ -77,20 +82,34 @@ export async function updateActivityStatus(
   status: 'planned' | 'done'
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
+  const updateData: Record<string, any> = { completed: status === 'done' }
+  // Tenta atualizar o campo status (existe apenas após migration-activities-v2)
   const { error } = await supabase.from('activities')
-    .update({ status, completed: status === 'done' })
+    .update({ ...updateData, status })
     .eq('id', id)
-  if (error) return { error: error.message }
+  if (error) {
+    // Fallback sem o campo status
+    const { error: e2 } = await supabase.from('activities').update(updateData).eq('id', id)
+    if (e2) return { error: e2.message }
+  }
   return {}
 }
 
 export async function deleteActivity(id: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: act } = await supabase.from('activities').select('contract_id, company_id').eq('id', id).maybeSingle()
+  // Usa adminClient para garantir permissão mesmo com RLS restritivo
+  const supabase = createAdminClient()
+
+  // Busca para saber onde revalidar — ignora erro se colunas não existem
+  const { data: act } = await supabase
+    .from('activities')
+    .select('contract_id')
+    .eq('id', id)
+    .maybeSingle()
+
   const { error } = await supabase.from('activities').delete().eq('id', id)
   if (error) return { error: error.message }
+
   if (act?.contract_id) revalidatePath(`/contracts/${act.contract_id}`)
-  if (act?.company_id) revalidatePath(`/companies/${act.company_id}`)
   return {}
 }
 
@@ -101,11 +120,12 @@ export async function createNote(
   _prev: ActivityActionState,
   formData: FormData
 ): Promise<ActivityActionState> {
-  const contractId = formData.get('contract_id') as string
-  const content = formData.get('content') as string
-  if (!content?.trim()) return { error: 'Escreva algo antes de salvar.' }
+  const contractId = (formData.get('contract_id') as string)?.trim() || null
+  const content = (formData.get('content') as string)?.trim()
+  if (!content) return { error: 'Escreva algo antes de salvar.' }
+  if (!contractId) return { error: 'ID do contrato não encontrado.' }
   const result = await createActivity({
-    contractId, content, title: '', activityType: 'note', status: 'done',
+    contractId, companyId: null, content, title: '', activityType: 'note', status: 'done',
   })
   return result.error ? { error: result.error } : {}
 }

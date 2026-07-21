@@ -47,7 +47,9 @@ export function CreateActivityModal({ onClose, contractId, companyId, pipelineRu
     const result = await createActivity({ contractId, companyId, pipelineRunId, title, content, activityType: type, status, activityDate: date || null, activityTime: time || null, durationMinutes: duration, reminderMinutes: reminder, assignedTo, participants })
     setBusy(false)
     if (result.error) { setError(result.error); return }
-    router.refresh(); onClose()
+    // Fecha primeiro, depois recarrega — evita o modal travar
+    onClose()
+    router.refresh()
   }
 
   return (
