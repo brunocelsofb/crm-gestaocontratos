@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { ActivityFeed } from '@/components/activities/activity-feed'
+import { NoteForm } from '@/components/contracts/note-form'
 import { NpsSection } from '@/components/nps/nps-section'
 import { FilesSection } from '@/components/contracts/files-section'
 import { CustomSurveysSection } from '@/components/surveys/custom-surveys-section'
@@ -404,20 +405,31 @@ export default async function ContractDetailPage({
 
                 <ContractCustomFieldsSection contractId={contract.id} fields={customFields ?? []} values={customFieldValues} />
 
-                <div className="space-y-3">
-                  <h2 className="text-sm font-medium text-gray-900">Histórico e atividades</h2>
-                  <ActivityFeed
-                    activities={activities ?? []}
-                    contractId={contract.id}
-                    companyId={contract.company_id ?? null}
-                    pipelineRunId={displayRun?.id ?? null}
-                    profiles={allProfiles ?? []}
-                    currentUserId={currentProfile?.id ?? ''}
-                  />
-                  <Timeline activities={activities} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <p style={{ fontSize: 11, fontWeight: 500, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px' }}>Nota rápida</p>
+                  <NoteForm contractId={contract.id} />
                 </div>
               </div>
             ),
+          },
+          {
+            id: 'atividades',
+            label: 'Atividades',
+            content: (
+              <ActivityFeed
+                activities={(activities ?? []).filter((a: any) => !['stage_change','pipeline_change','automation_triggered','system','transfer'].includes(a.type))}
+                contractId={contract.id}
+                companyId={contract.company_id ?? null}
+                pipelineRunId={displayRun?.id ?? null}
+                profiles={allProfiles ?? []}
+                currentUserId={currentProfile?.id ?? ''}
+              />
+            ),
+          },
+          {
+            id: 'historico',
+            label: 'Histórico',
+            content: <Timeline activities={activities} />,
           },
           {
             id: 'responsavel',
@@ -459,12 +471,17 @@ export default async function ContractDetailPage({
                 },
               ]
             : []),
-          {
+          // Pesquisas & NPS: só em Gestão de Contratos (NPS + Pesquisa)
+          // e Serviço Avulso (só Pesquisa, ativada ao marcar Ganho)
+          // Funil de Vendas recorrente: NEM NPS NEM Pesquisa
+          ...(!isCurrentlyInSalesPipeline ? [{
             id: 'pesquisas',
-            label: 'Pesquisas & NPS',
+            label: isCurrentlyInContractsPipeline ? 'Pesquisas & NPS' : 'Pesquisa',
             content: (
               <div className="space-y-6">
-                <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
+                {isCurrentlyInContractsPipeline && (
+                  <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
+                )}
                 <CustomSurveysSection
                   contractId={contract.id}
                   templates={availableTemplates}
@@ -474,7 +491,7 @@ export default async function ContractDetailPage({
                 />
               </div>
             ),
-          },
+          }] : []),
           {
             id: 'arquivos',
             label: 'Arquivos',
