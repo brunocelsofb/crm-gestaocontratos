@@ -602,10 +602,13 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
     }
   }
 
-  // Automação por desfecho — Ganho/Perdido (Vendas) ou Renovado/Não
-  // renovado (Gestão de Contratos), dependendo do pipeline.
-  const { checkAndTriggerOutcomeAutomations } = await import('./automations')
-  await checkAndTriggerOutcomeAutomations(contractId, run.pipeline_id, run.id, outcome)
+  // Automação por desfecho — falhas aqui não devem bloquear o fechamento
+  try {
+    const { checkAndTriggerOutcomeAutomations } = await import('./automations')
+    await checkAndTriggerOutcomeAutomations(contractId, run.pipeline_id, run.id, outcome)
+  } catch (automationError) {
+    console.error('[closeRun] Automação falhou (não bloqueou o fechamento):', automationError)
+  }
 
   revalidatePath(`/contracts/${contractId}`)
   revalidatePath('/pipeline')
