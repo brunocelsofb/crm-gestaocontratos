@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ActivityType } from '@/lib/utils/activity-types'
 
-export type { ActivityType }
+// Não re-exportamos ActivityType aqui — importar tipos de 'use server'
+// quebra o bundle em runtime. Use @/lib/utils/activity-types diretamente.
 
 export type CreateActivityInput = {
   contractId?: string | null
