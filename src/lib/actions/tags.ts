@@ -37,8 +37,12 @@ export async function updateTag(tagId: string, name: string, color: string): Pro
 }
 
 export async function deleteTag(tagId: string): Promise<ActionState> {
-  // Usa adminClient para garantir que a RLS não bloqueie
   const supabase = createAdminClient()
+
+  // Limpa referências em tabelas que têm FK para tags (sem ON DELETE SET NULL)
+  await supabase.from('survey_templates').update({ tag_id: null }).eq('tag_id', tagId)
+  await supabase.from('contract_tags').delete().eq('tag_id', tagId)
+
   const { error } = await supabase.from('tags').delete().eq('id', tagId)
   if (error) return { error: error.message }
   revalidatePath('/tags')
