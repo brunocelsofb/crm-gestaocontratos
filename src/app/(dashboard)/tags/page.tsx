@@ -4,7 +4,7 @@ import { TagsManager } from '@/components/tags/tags-manager'
 
 export default async function TagsPage() {
   const supabase = await createClient()
-  const { data: tags } = await supabase.from('tags').select('id, name, color').order('name')
+  const { data: tags } = await supabase.from('tags').select('id, name, color, context').order('name')
 
   return (
     <div style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 20 }}>

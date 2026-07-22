@@ -49,7 +49,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('pipelines').select('id, name, is_default').eq('type', 'vendas').order('name'),
-    supabase.from('tags').select('id, name, color').order('name'),
+    supabase.from('tags').select('id, name, color, context').order('name'),
     supabase.from('company_tags').select('tag_id').eq('company_id', id).maybeSingle(),
   ])
 
@@ -92,7 +92,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <CompanyTagSelect
                 companyId={company.id}
                 currentTagId={(companyTagRow as any)?.tag_id ?? null}
-                tags={allTags ?? []}
+                tags={(allTags ?? []).filter((t: any) => t.context === 'empresa' || t.context === 'ambos' || !t.context)}
               />
               {segmentos.map(s => <span key={s} style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, background: '#f1f3f8', color: '#52514e' }}>{s}</span>)}
             </div>

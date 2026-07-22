@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 
-type KPI = { receita: number; meta: number; ticketMedio: number; ticketDelta: number | null; cicloMedio: number | null; churnPct: number | null }
+type KPI = { receita: number; meta: number; ticketMedio: number; ticketDelta: number | null; cicloMedio: number | null; churnPct: number | null; mrrCarteira?: number }
 type FunnelStage = { label: string; value: number; count: number }
 type MonthSeries = { month: string; realizado: number; meta: number }
 type LeadSource = { label: string; pct: number }
@@ -121,32 +121,28 @@ export function PremiumDashboard({ kpi, funnel, series, leadSources, team, perio
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5' }}>
-          <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Receita vs Meta</p>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5', borderLeft: '3px solid #3b5bdb' }}>
+          <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Ganhos no período</p>
           <p style={{ fontSize: 22, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{fmt(kpi.receita)}</p>
           <div style={{ height: 6, background: '#f1f3f8', borderRadius: 3, marginTop: 10, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${metaPct}%`, borderRadius: 3, background: 'linear-gradient(90deg, #4f86f7, #7c3aed)' }} />
+            <div style={{ height: '100%', width: `${metaPct}%`, borderRadius: 3, background: 'linear-gradient(90deg, #3b5bdb, #7c3aed)' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8892a4', marginTop: 4 }}>
             <span>{metaPct}% da meta</span><span>{fmt(kpi.meta)}</span>
           </div>
         </div>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5' }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5', borderLeft: '3px solid #1a7c3e' }}>
+          <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>MRR Carteira</p>
+          <p style={{ fontSize: 22, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{kpi.mrrCarteira ? fmt(kpi.mrrCarteira) : '—'}</p>
+          <p style={{ fontSize: 10, color: '#8892a4', marginTop: 4 }}>contratos ativos em gestão</p>
+        </div>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5', borderLeft: '3px solid #7c3aed' }}>
           <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Ticket Médio</p>
           <p style={{ fontSize: 22, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{kpi.ticketMedio > 0 ? fmt(kpi.ticketMedio) : '—'}</p>
-          {kpi.ticketDelta !== null && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, marginTop: 4, padding: '2px 7px', borderRadius: 20, background: kpi.ticketDelta >= 0 ? '#eaf5ee' : '#fdecea', color: kpi.ticketDelta >= 0 ? '#1a7c3e' : '#b91c1c' }}>
-              {kpi.ticketDelta >= 0 ? '↑' : '↓'} {Math.abs(kpi.ticketDelta)}% vs anterior
-            </span>
-          )}
+          {kpi.cicloMedio !== null && <p style={{ fontSize: 10, color: '#8892a4', marginTop: 4 }}>Ciclo médio: {kpi.cicloMedio} dias</p>}
         </div>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5' }}>
-          <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Ciclo Médio de Vendas</p>
-          <p style={{ fontSize: 22, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{kpi.cicloMedio !== null ? `${kpi.cicloMedio} dias` : '—'}</p>
-          {kpi.cicloMedio !== null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, marginTop: 4, padding: '2px 7px', borderRadius: 20, background: '#eaf5ee', color: '#1a7c3e' }}>↓ acima da média</span>}
-        </div>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5' }}>
-          <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Taxa de Churn</p>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '0.5px solid #e8edf5', borderLeft: `3px solid ${kpi.churnPct !== null && kpi.churnPct > 3 ? '#b91c1c' : '#92400e'}` }}>
+          <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Churn no período</p>
           <p style={{ fontSize: 22, fontWeight: 500, color: '#1a1f36', letterSpacing: '-0.5px' }}>{kpi.churnPct !== null ? `${kpi.churnPct}%` : '—'}</p>
           {kpi.churnPct !== null && kpi.churnPct > 3 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, marginTop: 4, padding: '2px 7px', borderRadius: 20, background: '#fff8e6', color: '#92400e' }}>⚠ atenção</span>}
         </div>

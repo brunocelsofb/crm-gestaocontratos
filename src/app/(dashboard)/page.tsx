@@ -44,27 +44,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { data: activities },
     { data: profiles },
     { data: leads },
+    { data: gestaoRuns },
   ] = await Promise.all([
-    mainPipelineId ? supabase.from('pipeline_stages').select('id, name, position').eq('pipeline_id', mainPipelineId).order('position') : Promise.resolve({ data: [] as any[] }),
+    mainPipelineId ? supabase.from('stages').select('id, name, order_index').eq('pipeline_id', mainPipelineId).order('order_index') : Promise.resolve({ data: [] as any[] }),
     mainPipelineId ? supabase.from('pipeline_runs').select('stage_id, value, started_at, ended_at').eq('pipeline_id', mainPipelineId).eq('status', 'open') : Promise.resolve({ data: [] as any[] }),
     mainPipelineId ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').eq('pipeline_id', mainPipelineId).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
     mainPipelineId ? supabase.from('pipeline_runs').select('value').eq('pipeline_id', mainPipelineId).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
     mainPipelineId ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').eq('pipeline_id', mainPipelineId).in('status', ['won', 'lost']) : Promise.resolve({ data: [] as any[] }),
-    // Só atividades criadas manualmente por pessoas — exclui 'system'
-    // (eventos automáticos do CRM: mudar etapa, ZapSign, etc.) e
-    // 'whatsapp'/'email' enviados por automação. O campo user_id nulo
-    // indica automação, então filtramos só onde tem user_id.
     supabase.from('activities').select('user_id, type, created_at')
       .not('type', 'eq', 'system')
       .not('user_id', 'is', null)
       .gte('created_at', `${periodFrom}T00:00:00`).lte('created_at', `${periodTo}T23:59:59`),
     supabase.from('profiles').select('id, full_name'),
     supabase.from('leads').select('source'),
+    // MRR da carteira de contratos ativos
+    gestaoPipeline ? supabase.from('pipeline_runs').select('contract_id, value').eq('pipeline_id', gestaoPipeline.id).eq('status', 'open') : Promise.resolve({ data: [] as any[] }),
   ])
 
   // Funil de vendas
   const stageMap = new Map((stages ?? []).map((s: any) => [s.id, s.name]))
   const stageOrder = (stages ?? []).map((s: any) => s.id)
+
+  // MRR da carteira — soma do monthly_value dos contratos ativos
+  const mrrCarteira = (gestaoRuns ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
   const funnelByStage = new Map<string, { value: number; count: number }>()
   for (const run of openRuns ?? []) {
     const cur = funnelByStage.get(run.stage_id) ?? { value: 0, count: 0 }
@@ -132,7 +134,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <PremiumDashboard
       period={period}
-      kpi={{ receita: receitaAtual, meta, ticketMedio: avgTicket, ticketDelta: null, cicloMedio: avgCycle, churnPct }}
+      kpi={{ receita: receitaAtual, meta, ticketMedio: avgTicket, ticketDelta: null, cicloMedio: avgCycle, churnPct, mrrCarteira }}
       funnel={funnel}
       series={series}
       leadSources={leadSources}

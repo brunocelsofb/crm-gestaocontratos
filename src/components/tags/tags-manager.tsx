@@ -4,27 +4,34 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateTag, deleteTag } from '@/lib/actions/tags'
 
-type Tag = { id: string; name: string; color: string }
+type Tag = { id: string; name: string; color: string; context?: string | null }
 
 const PRESET_COLORS = [
   '#3b5bdb','#1a7c3e','#b91c1c','#92400e','#6B7280',
   '#7c3aed','#0891b2','#be185d','#0f766e','#b45309',
 ]
 
+const CONTEXT_OPTIONS = [
+  { value: 'oportunidade', label: '🎯 Oportunidade' },
+  { value: 'empresa',      label: '🏢 Empresa' },
+  { value: 'ambos',        label: '🔗 Ambos' },
+]
+
 export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
+  const router = useRouter()
   const [tags, setTags] = useState<Tag[]>(initialTags)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('')
+  const [editContext, setEditContext] = useState('oportunidade')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const router = useRouter()
 
   function startEdit(tag: Tag) {
     setEditingId(tag.id)
     setEditName(tag.name)
     setEditColor(tag.color)
+    setEditContext(tag.context ?? 'oportunidade')
     setError(null)
   }
 
@@ -32,10 +39,10 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
 
   async function handleUpdate(id: string) {
     setBusy(true); setError(null)
-    const result = await updateTag(id, editName, editColor)
+    const result = await updateTag(id, editName, editColor, editContext)
     setBusy(false)
     if (result.error) { setError(result.error); return }
-    setTags(prev => prev.map(t => t.id === id ? { ...t, name: editName.trim(), color: editColor } : t))
+    setTags(prev => prev.map(t => t.id === id ? { ...t, name: editName.trim(), color: editColor, context: editContext } : t))
     setEditingId(null)
     router.refresh()
   }
@@ -56,10 +63,11 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+      {error && <p style={{ fontSize: 12, color: '#b91c1c', padding: '8px 16px' }}>{error}</p>}
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {['Tag', 'Cor', ''].map((h, i) => (
+            {['Tag', 'Uso', 'Cor', ''].map((h, i) => (
               <th key={i} style={{ padding: '10px 16px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: 'left', borderBottom: '0.5px solid #f1f3f8' }}>{h}</th>
             ))}
           </tr>
@@ -73,7 +81,12 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
                     <input value={editName} onChange={e => setEditName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleUpdate(tag.id); if (e.key === 'Escape') cancelEdit() }}
                       style={{ ...inp, width: '100%' }} autoFocus />
-                    {error && <p style={{ fontSize: 11, color: '#b91c1c', marginTop: 4 }}>{error}</p>}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <select value={editContext} onChange={e => setEditContext(e.target.value)}
+                      style={{ ...inp, cursor: 'pointer' }}>
+                      {CONTEXT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -104,6 +117,11 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, color: '#fff', background: tag.color }}>
                       {tag.name}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#f1f3f8', color: '#52514e' }}>
+                      {CONTEXT_OPTIONS.find(o => o.value === (tag.context ?? 'oportunidade'))?.label ?? '🎯 Oportunidade'}
                     </span>
                   </td>
                   <td style={{ padding: '12px 16px' }}>

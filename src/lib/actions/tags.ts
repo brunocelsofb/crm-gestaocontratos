@@ -27,10 +27,14 @@ export async function createTag(
   return {}
 }
 
-export async function updateTag(tagId: string, name: string, color: string): Promise<ActionState> {
+export async function updateTag(tagId: string, name: string, color: string, context?: string): Promise<ActionState> {
   if (!name?.trim()) return { error: 'Nome é obrigatório.' }
   const supabase = createAdminClient()
-  const { error } = await supabase.from('tags').update({ name: name.trim(), color }).eq('id', tagId)
+  const { error } = await supabase.from('tags').update({
+    name: name.trim(),
+    color,
+    ...(context ? { context } : {}),
+  }).eq('id', tagId)
   if (error) return { error: error.message }
   revalidatePath('/tags')
   return {}
