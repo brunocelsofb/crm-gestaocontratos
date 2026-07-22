@@ -144,6 +144,32 @@ export default function NewContractPage() {
           </div>
         )}
 
+        {show('classification') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Classificação {req('classification') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <select name="classification" required={req('classification')} className={inputCls}>
+              <option value="">Selecione...</option>
+              <option value="prospeccao">Prospecção</option>
+              <option value="ativo">Ativo</option>
+              <option value="renovacao">Renovação</option>
+              <option value="expansao">Expansão</option>
+              <option value="reativacao">Reativação</option>
+            </select>
+          </div>
+        )}
+
+        {show('segment') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Segmento {req('segment') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
+            <select name="segment" required={req('segment')} className={inputCls}>
+              <option value="">Selecione...</option>
+              <option value="hospitalar_geral">Grupo Hospitalar (Geral e especializado)</option>
+              <option value="diagnostico">Grupo Diagnóstico (imagem e laboratório)</option>
+              <option value="clinicas_outros">Grupo Clínicas e Outros</option>
+            </select>
+          </div>
+        )}
+
         {/* Valor */}
         {show('value') && (
           <div>

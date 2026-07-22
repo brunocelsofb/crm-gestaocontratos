@@ -3,44 +3,34 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-// Opções de múltipla escolha
 const REGIOES = ['Norte', 'Centro-Oeste', 'Sudeste', 'Sul', 'Nordeste']
 const UFS = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO']
 const ESFERAS = ['Pública Federal','Pública Estadual','Pública Municipal','Privado','Privado sem fins lucrativos']
 const SEGMENTOS = ['Grupo Hospitalar (Geral e especializado)','Grupo Diagnóstico (imagem e laboratório)','Grupo Clínicas e Outros (Prestadores de Serviço / Comércio)']
 
-// Fórmula ABC
-// Conta = (Faturamento × 0,5) + (Visibilidade × 0,3) + (Fidelidade × 0,2)
-// A ≥ 2,4 · B = 1,6–2,3 · C ≤ 1,5
-function calcABC(fat: number, vis: number, fid: number): { weight: number; curve: 'A' | 'B' | 'C' | null } {
+// Mapa UF → Região para preenchimento automático
+const UF_REGIAO: Record<string, string> = {
+  AC:'Norte',AM:'Norte',AP:'Norte',PA:'Norte',RO:'Norte',RR:'Norte',TO:'Norte',
+  AL:'Nordeste',BA:'Nordeste',CE:'Nordeste',MA:'Nordeste',PB:'Nordeste',PE:'Nordeste',PI:'Nordeste',RN:'Nordeste',SE:'Nordeste',
+  DF:'Centro-Oeste',GO:'Centro-Oeste',MS:'Centro-Oeste',MT:'Centro-Oeste',
+  ES:'Sudeste',MG:'Sudeste',RJ:'Sudeste',SP:'Sudeste',
+  PR:'Sul',RS:'Sul',SC:'Sul',
+}
+
+type AbcConfig = {
+  billing_tier1_max: number
+  billing_tier2_max: number
+  curve_a_min: number
+  curve_b_min: number
+}
+
+function calcABC(fat: number, vis: number, fid: number, cfg: AbcConfig): { weight: number; curve: 'A' | 'B' | 'C' | null } {
   if (!fat || !vis || !fid) return { weight: 0, curve: null }
   const w = fat * 0.5 + vis * 0.3 + fid * 0.2
   const weight = Math.round(w * 100) / 100
-  const curve = weight >= 2.4 ? 'A' : weight >= 1.6 ? 'B' : 'C'
+  const curve = weight >= cfg.curve_a_min ? 'A' : weight >= cfg.curve_b_min ? 'B' : 'C'
   return { weight, curve }
 }
-
-// Notas de faturamento por segmento
-const FAT_OPTIONS_ENGCLINICA = [
-  { value: 1, label: 'Até R$ 20K' },
-  { value: 2, label: 'R$ 20K – R$ 60K' },
-  { value: 3, label: 'Acima de R$ 60K' },
-]
-const FAT_OPTIONS_ENGHOSPITALAR = [
-  { value: 1, label: 'Até R$ 50K' },
-  { value: 2, label: 'R$ 50K – R$ 150K' },
-  { value: 3, label: 'Acima de R$ 150K' },
-]
-const VIS_OPTIONS = [
-  { value: 3, label: 'Ótima' },
-  { value: 2, label: 'Média' },
-  { value: 1, label: 'Indiferente' },
-]
-const FID_OPTIONS = [
-  { value: 3, label: '2+ anos' },
-  { value: 2, label: '1–2 anos' },
-  { value: 1, label: '0–1 ano' },
-]
 
 type PortfolioData = {
   contract_number?: string | null
@@ -50,8 +40,9 @@ type PortfolioData = {
   monthly_value?: number | null
   validity_months?: number | null
   valid_until?: string | null
-  engineer_name?: string | null     // nome livre, não FK
-  coordinator_name?: string | null  // nome livre, não FK
+  valid_from?: string | null
+  engineer_name?: string | null
+  coordinator_name?: string | null
   abc_curve?: string | null
   sphere?: string | null
   segment?: string | null
@@ -72,7 +63,7 @@ type PortfolioData = {
   internal_notes?: string | null
 }
 
-function MultiSelect({ options, value, onChange, placeholder }: { options: string[]; value: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
+function MultiSelect({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
   function toggle(opt: string) {
     onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
   }
@@ -91,41 +82,60 @@ function MultiSelect({ options, value, onChange, placeholder }: { options: strin
   )
 }
 
-export function PortfolioFieldsForm({ contractId, initial, contractNature }: {
+export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig }: {
   contractId: string
   initial: PortfolioData
-  contractNature?: string | null  // 'eng_clinica' | 'eng_hospitalar'
+  contractNature?: string | null
+  companyCity?: string | null    // cidade da empresa para pré-preencher localização
+  companyState?: string | null   // UF da empresa
+  abcConfig?: { clinica?: AbcConfig | null; hospitalar?: AbcConfig | null } | null
 }) {
   const router = useRouter()
-  const [data, setData] = useState<PortfolioData>(initial)
+  const [data, setData] = useState<PortfolioData>(() => ({
+    ...initial,
+    // Pré-preenche município/UF/região da empresa se não havia nada
+    municipality: initial.municipality || companyCity || null,
+    uf: initial.uf || (companyState ? JSON.stringify([companyState]) : null),
+    region: initial.region || (companyState && UF_REGIAO[companyState] ? JSON.stringify([UF_REGIAO[companyState]]) : null),
+  }))
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fatNota, setFatNota] = useState<number>(0)
-  const [visNota, setVisNota] = useState<number>(0)
-  const [fidNota, setFidNota] = useState<number>(0)
+  const [fatNota, setFatNota] = useState<number>(Number(initial.score_billing) || 0)
+  const [visNota, setVisNota] = useState<number>(Number(initial.score_visit) || 0)
+  const [fidNota, setFidNota] = useState<number>(Number(initial.score_loyalty) || 0)
 
-  const { weight, curve } = calcABC(fatNota, visNota, fidNota)
+  const isHospitalar = (data.nature ?? contractNature ?? '').includes('hospitalar')
 
-  // Quando as notas mudam, atualiza automaticamente o peso e a curva
+  // Configurações da curva ABC — usa do banco ou hardcoded como fallback
+  const cfgClinica: AbcConfig = abcConfig?.clinica ?? { billing_tier1_max: 20000, billing_tier2_max: 60000, curve_a_min: 2.40, curve_b_min: 1.60 }
+  const cfgHospitalar: AbcConfig = abcConfig?.hospitalar ?? { billing_tier1_max: 50000, billing_tier2_max: 150000, curve_a_min: 2.40, curve_b_min: 1.60 }
+  const cfg = isHospitalar ? cfgHospitalar : cfgClinica
+
+  // Opções de faturamento dinâmicas conforme configuração
+  const fatOptions = [
+    { value: 1, label: `Até ${fmt(cfg.billing_tier1_max)}` },
+    { value: 2, label: `${fmt(cfg.billing_tier1_max + 1)} – ${fmt(cfg.billing_tier2_max)}` },
+    { value: 3, label: `Acima de ${fmt(cfg.billing_tier2_max)}` },
+  ]
+
+  const { weight, curve } = calcABC(fatNota, visNota, fidNota, cfg)
+
   useEffect(() => {
-    if (curve) {
-      setData(prev => ({ ...prev, score_weight: weight, abc_curve: curve }))
-    }
+    if (curve) setData(prev => ({ ...prev, score_weight: weight, abc_curve: curve }))
   }, [weight, curve])
 
-  function set(key: keyof PortfolioData, value: any) {
-    setData(prev => ({ ...prev, [key]: value }))
-    setSaved(false)
-  }
-
+  function set(key: keyof PortfolioData, value: any) { setData(prev => ({ ...prev, [key]: value })); setSaved(false) }
   function parseMulti(val: string | null | undefined): string[] {
-    if (!val) return []
-    try { return JSON.parse(val) } catch { return [val] }
+    if (!val) return []; try { return JSON.parse(val) } catch { return [val] }
   }
+  function toMulti(arr: string[]): string { return JSON.stringify(arr) }
 
-  function toMulti(arr: string[]): string {
-    return JSON.stringify(arr)
+  // Quando UF muda, atualiza região automaticamente
+  function handleUfChange(ufArr: string[]) {
+    set('uf', toMulti(ufArr))
+    const regioes = [...new Set(ufArr.map(u => UF_REGIAO[u]).filter(Boolean))]
+    if (regioes.length > 0) set('region', toMulti(regioes))
   }
 
   async function handleSave() {
@@ -139,68 +149,72 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature }: {
       const json = await res.json()
       if (!res.ok || json.error) throw new Error(json.error ?? 'Erro ao salvar')
       setSaved(true); router.refresh()
-    } catch (e: any) { setError(e.message) }
-    finally { setBusy(false) }
+    } catch (e: any) { setError(e.message) } finally { setBusy(false) }
   }
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
-  const labelStyle: React.CSSProperties = { display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 4 }
-  const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }
-  const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }
-  const sectionTitle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#1a1f36', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px', paddingTop: 8 }
-
-  const isHospitalar = contractNature === 'eng_hospitalar' || (data.nature ?? '').toLowerCase().includes('hospitalar')
-  const fatOptions = isHospitalar ? FAT_OPTIONS_ENGHOSPITALAR : FAT_OPTIONS_ENGCLINICA
-
+  const inp: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
+  const lbl: React.CSSProperties = { display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 4 }
+  const g3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }
+  const g2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }
+  const sec: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#1a1f36', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px', paddingTop: 8 }
   const ABC_STYLE: Record<string, { bg: string; color: string }> = {
-    A: { bg: '#fdecea', color: '#b91c1c' },
-    B: { bg: '#fff8e6', color: '#92400e' },
-    C: { bg: '#f1f3f8', color: '#52514e' },
+    A: { bg: '#fdecea', color: '#b91c1c' }, B: { bg: '#fff8e6', color: '#92400e' }, C: { bg: '#f1f3f8', color: '#52514e' },
   }
+
+  // Itens de contrato condicionais por natureza
+  const ITENS_CLINICA = [
+    { key: 'has_parts',       label: '✅ Com peças incluídas' },
+    { key: 'has_measurement', label: '📐 Por medição' },
+    { key: 'has_audit',       label: '🔍 Auditoria incluída' },
+  ]
+  const ITENS_HOSPITALAR = [
+    { key: 'has_parts',       label: '📦 Com material incluído' },
+    { key: 'has_measurement', label: '📐 Por medição' },
+    // has_audit não aparece em hospitalar
+  ]
+  const itensContrato = isHospitalar ? ITENS_HOSPITALAR : ITENS_CLINICA
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
       {/* Identificação */}
-      <p style={sectionTitle}>Identificação</p>
-      <div style={grid3}>
-        <div><label style={labelStyle}>Nº Contrato</label><input style={inputStyle} value={data.contract_number ?? ''} onChange={e => set('contract_number', e.target.value)} placeholder="CT-2024-001" /></div>
-        <div><label style={labelStyle}>Cód. Sankhya</label><input style={inputStyle} value={data.sankhya_code ?? ''} onChange={e => set('sankhya_code', e.target.value)} /></div>
-        <div><label style={labelStyle}>CNPJ Faturamento</label><input style={inputStyle} value={data.cnpj_billing ?? ''} onChange={e => set('cnpj_billing', e.target.value)} placeholder="00.000.000/0000-00" /></div>
-        <div><label style={labelStyle}>Grupo Econômico</label><input style={inputStyle} value={data.economic_group ?? ''} onChange={e => set('economic_group', e.target.value)} placeholder="Ex: Grupo Saúde XYZ" /></div>
+      <p style={sec}>Identificação</p>
+      <div style={g3}>
+        <div><label style={lbl}>Nº Contrato</label><input style={inp} value={data.contract_number ?? ''} onChange={e => set('contract_number', e.target.value)} placeholder="CT-2024-001" /></div>
+        <div><label style={lbl}>Cód. Sankhya</label><input style={inp} value={data.sankhya_code ?? ''} onChange={e => set('sankhya_code', e.target.value)} /></div>
+        <div><label style={lbl}>CNPJ Faturamento</label><input style={inp} value={data.cnpj_billing ?? ''} onChange={e => set('cnpj_billing', e.target.value)} placeholder="00.000.000/0000-00" /></div>
+        <div><label style={lbl}>Grupo Econômico</label><input style={inp} value={data.economic_group ?? ''} onChange={e => set('economic_group', e.target.value)} /></div>
       </div>
 
       {/* Tipo e Valor */}
-      <p style={sectionTitle}>Tipo e Valor</p>
-      <div style={grid3}>
+      <p style={sec}>Tipo e Valor</p>
+      <div style={g3}>
         <div>
-          <label style={labelStyle}>Tipo de Contrato</label>
-          <select style={{ ...inputStyle, cursor: 'pointer' }} value={data.contract_type ?? ''} onChange={e => set('contract_type', e.target.value || null)}>
+          <label style={lbl}>Tipo de Contrato</label>
+          <select style={{ ...inp, cursor: 'pointer' }} value={data.contract_type ?? ''} onChange={e => set('contract_type', e.target.value || null)}>
             <option value="">Selecione...</option>
             <option value="fixo">Fixo</option>
             <option value="medicao">Por Medição</option>
           </select>
         </div>
-        <div><label style={labelStyle}>Valor Mensal (R$)</label><input style={inputStyle} type="number" value={data.monthly_value ?? ''} onChange={e => set('monthly_value', e.target.value ? Number(e.target.value) : null)} /></div>
-        <div><label style={labelStyle}>Vigência (meses)</label><input style={inputStyle} type="number" value={data.validity_months ?? ''} onChange={e => set('validity_months', e.target.value ? Number(e.target.value) : null)} /></div>
-        <div><label style={labelStyle}>Data de Vencimento</label><input style={inputStyle} type="date" value={data.valid_until ?? ''} onChange={e => set('valid_until', e.target.value || null)} /></div>
+        <div><label style={lbl}>Valor Mensal (R$)</label><input style={inp} type="number" value={data.monthly_value ?? ''} onChange={e => set('monthly_value', e.target.value ? Number(e.target.value) : null)} /></div>
         <div>
-          <label style={labelStyle}>Natureza</label>
-          <select style={{ ...inputStyle, cursor: 'pointer' }} value={data.nature ?? ''} onChange={e => set('nature', e.target.value || null)}>
+          <label style={lbl}>Natureza</label>
+          <select style={{ ...inp, cursor: 'pointer' }} value={data.nature ?? ''} onChange={e => set('nature', e.target.value || null)}>
             <option value="">Selecione...</option>
             <option value="eng_clinica">Engenharia Clínica</option>
             <option value="eng_hospitalar">Engenharia Hospitalar</option>
           </select>
         </div>
+        <div><label style={lbl}>Início da Vigência</label><input style={inp} type="date" value={data.valid_from ?? ''} onChange={e => set('valid_from', e.target.value || null)} /></div>
+        <div><label style={lbl}>Vencimento</label><input style={inp} type="date" value={data.valid_until ?? ''} onChange={e => set('valid_until', e.target.value || null)} /></div>
+        <div><label style={lbl}>Vigência (meses)</label><input style={inp} type="number" value={data.validity_months ?? ''} onChange={e => set('validity_months', e.target.value ? Number(e.target.value) : null)} /></div>
       </div>
 
-      {/* Itens do contrato */}
-      <p style={sectionTitle}>Itens do Contrato</p>
+      {/* Itens do contrato — condicionais por natureza */}
+      <p style={sec}>Itens do Contrato {isHospitalar ? '— Eng. Hospitalar' : '— Eng. Clínica'}</p>
       <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
-        {[
-          { key: 'has_parts', label: '✅ Com peças incluídas' },
-          { key: 'has_audit', label: '🔍 Auditoria incluída' },
-        ].map(({ key, label }) => (
+        {itensContrato.map(({ key, label }) => (
           <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#52514e', cursor: 'pointer' }}>
             <input type="checkbox" checked={(data as any)[key] ?? false} onChange={e => set(key as keyof PortfolioData, e.target.checked)} />
             {label}
@@ -218,87 +232,88 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature }: {
       </div>
 
       {/* Responsáveis */}
-      <p style={sectionTitle}>Responsáveis</p>
-      <div style={grid2}>
-        <div><label style={labelStyle}>Coordenador</label><input style={inputStyle} value={data.coordinator_name ?? ''} onChange={e => set('coordinator_name', e.target.value)} placeholder="Nome do coordenador" /></div>
-        <div><label style={labelStyle}>Engenheiro</label><input style={inputStyle} value={data.engineer_name ?? ''} onChange={e => set('engineer_name', e.target.value)} placeholder="Nome do engenheiro" /></div>
+      <p style={sec}>Responsáveis</p>
+      <div style={g2}>
+        <div><label style={lbl}>Coordenador</label><input style={inp} value={data.coordinator_name ?? ''} onChange={e => set('coordinator_name', e.target.value)} placeholder="Nome do coordenador" /></div>
+        <div><label style={lbl}>Engenheiro</label><input style={inp} value={data.engineer_name ?? ''} onChange={e => set('engineer_name', e.target.value)} placeholder="Nome do engenheiro" /></div>
       </div>
 
-      {/* Localização */}
-      <p style={sectionTitle}>Localização</p>
+      {/* Localização — UF preenche Região automaticamente */}
+      <p style={sec}>Localização</p>
+      <div style={g2}>
+        <div><label style={lbl}>Município</label><input style={inp} value={data.municipality ?? ''} onChange={e => set('municipality', e.target.value)} placeholder="Goiânia" /></div>
+      </div>
       <div style={{ marginBottom: 12 }}>
-        <div style={grid2}>
-          <div><label style={labelStyle}>Município</label><input style={inputStyle} value={data.municipality ?? ''} onChange={e => set('municipality', e.target.value)} placeholder="Goiânia" /></div>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>UF</label>
-          <MultiSelect options={UFS} value={parseMulti(data.uf)} onChange={v => set('uf', toMulti(v))} />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Região</label>
-          <MultiSelect options={REGIOES} value={parseMulti(data.region)} onChange={v => set('region', toMulti(v))} />
-        </div>
+        <label style={lbl}>UF <span style={{ fontSize: 9, color: '#b0b8c8', textTransform: 'none', letterSpacing: 0 }}>— selecione para preencher a Região automaticamente</span></label>
+        <MultiSelect options={UFS} value={parseMulti(data.uf)} onChange={handleUfChange} />
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={lbl}>Região</label>
+        <MultiSelect options={REGIOES} value={parseMulti(data.region)} onChange={v => set('region', toMulti(v))} />
       </div>
 
       {/* Classificação */}
-      <p style={sectionTitle}>Classificação</p>
+      <p style={sec}>Classificação</p>
       <div style={{ marginBottom: 12 }}>
-        <label style={labelStyle}>Esfera</label>
+        <label style={lbl}>Esfera</label>
         <MultiSelect options={ESFERAS} value={parseMulti(data.sphere)} onChange={v => set('sphere', toMulti(v))} />
       </div>
       <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>Segmento</label>
+        <label style={lbl}>Segmento</label>
         <MultiSelect options={SEGMENTOS} value={parseMulti(data.segment)} onChange={v => set('segment', toMulti(v))} />
       </div>
 
-      {/* Cálculo ABC */}
-      <p style={sectionTitle}>Cálculo da Curva ABC</p>
+      {/* Cálculo ABC — thresholds do banco */}
+      <p style={sec}>Cálculo da Curva ABC</p>
       <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 16, marginBottom: 16, border: '0.5px solid #e8edf5' }}>
-        <p style={{ fontSize: 11, color: '#8892a4', marginBottom: 12 }}>
-          Conta = (Faturamento × 0,5) + (Visibilidade × 0,3) + (Fidelidade × 0,2) · <strong>A ≥ 2,4 · B = 1,6–2,3 · C ≤ 1,5</strong>
+        <p style={{ fontSize: 11, color: '#8892a4', marginBottom: 4 }}>
+          Conta = (Faturamento × 0,5) + (Visibilidade × 0,3) + (Fidelidade × 0,2)
         </p>
-        <div style={grid3}>
+        <p style={{ fontSize: 10, color: '#b0b8c8', marginBottom: 12 }}>
+          {isHospitalar ? 'Eng. Hospitalar' : 'Eng. Clínica'}: A ≥ {cfg.curve_a_min} · B ≥ {cfg.curve_b_min} · C &lt; {cfg.curve_b_min}
+        </p>
+        <div style={g3}>
           <div>
-            <label style={labelStyle}>Faturamento {isHospitalar ? '(Eng. Hospitalar)' : '(Eng. Clínica)'}</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={fatNota} onChange={e => setFatNota(Number(e.target.value))}>
+            <label style={lbl}>Faturamento</label>
+            <select style={{ ...inp, cursor: 'pointer' }} value={fatNota} onChange={e => setFatNota(Number(e.target.value))}>
               <option value={0}>Selecione...</option>
               {fatOptions.map(o => <option key={o.value} value={o.value}>{o.label} = {o.value}</option>)}
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Visibilidade</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={visNota} onChange={e => setVisNota(Number(e.target.value))}>
+            <label style={lbl}>Visibilidade</label>
+            <select style={{ ...inp, cursor: 'pointer' }} value={visNota} onChange={e => setVisNota(Number(e.target.value))}>
               <option value={0}>Selecione...</option>
-              {VIS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label} = {o.value}</option>)}
+              <option value={3}>Ótima = 3</option>
+              <option value={2}>Média = 2</option>
+              <option value={1}>Indiferente = 1</option>
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Fidelidade</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={fidNota} onChange={e => setFidNota(Number(e.target.value))}>
+            <label style={lbl}>Fidelidade (início do contrato)</label>
+            <select style={{ ...inp, cursor: 'pointer' }} value={fidNota} onChange={e => setFidNota(Number(e.target.value))}>
               <option value={0}>Selecione...</option>
-              {FID_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label} = {o.value}</option>)}
+              <option value={3}>2+ anos = 3</option>
+              <option value={2}>1–2 anos = 2</option>
+              <option value={1}>0–1 ano = 1</option>
             </select>
           </div>
         </div>
-
         {weight > 0 && (
           <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#fff', border: '0.5px solid #e8edf5' }}>
-            <p style={{ fontSize: 11, color: '#8892a4', marginBottom: 4 }}>Memória de cálculo</p>
-            <p style={{ fontSize: 12, color: '#52514e', fontFamily: 'monospace' }}>
+            <p style={{ fontSize: 11, fontFamily: 'monospace', color: '#52514e', marginBottom: 6 }}>
               ({fatNota} × 0,5) + ({visNota} × 0,3) + ({fidNota} × 0,2) = <strong>{weight}</strong>
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-              <span style={{ fontSize: 12, color: '#52514e' }}>Conta / Peso:</span>
-              <strong style={{ fontSize: 15 }}>{weight}</strong>
-              <span style={{ fontSize: 12, color: '#8892a4' }}>→</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#52514e' }}>Conta:</span>
+              <strong>{weight}</strong>
+              <span style={{ color: '#8892a4' }}>→</span>
               <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, ...(curve ? ABC_STYLE[curve] : {}) }}>
                 Curva {curve}
               </span>
             </div>
           </div>
         )}
-
-        {/* Se não calculou agora, mostra o último salvo */}
         {weight === 0 && data.abc_curve && (
           <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, color: '#8892a4' }}>Último cálculo:</span>
@@ -309,8 +324,8 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature }: {
       </div>
 
       {/* Observação */}
-      <p style={sectionTitle}>Observação Interna</p>
-      <textarea style={{ ...inputStyle, minHeight: 64, resize: 'vertical', marginBottom: 16, fontFamily: 'inherit' }}
+      <p style={sec}>Observação Interna</p>
+      <textarea style={{ ...inp, minHeight: 64, resize: 'vertical', marginBottom: 16, fontFamily: 'inherit' }}
         value={data.internal_notes ?? ''} onChange={e => set('internal_notes', e.target.value)} placeholder="Notas internas..." />
 
       {error && <p style={{ fontSize: 12, color: '#b91c1c', marginBottom: 8 }}>{error}</p>}
@@ -323,4 +338,8 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature }: {
       </div>
     </div>
   )
+}
+
+function fmt(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
 }

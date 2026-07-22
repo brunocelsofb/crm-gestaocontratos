@@ -72,7 +72,7 @@ export default async function ContractDetailPage({
     { data: catalogItems },
   ] = await Promise.all([
     contract.company_id
-      ? supabase.from('companies').select('id, name').eq('id', contract.company_id).maybeSingle()
+      ? supabase.from('companies').select('id, name, city, state').eq('id', contract.company_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contract.contact_id
       ? supabase.from('contacts').select('id, name, role, email, phone').eq('id', contract.contact_id).maybeSingle()
@@ -548,6 +548,15 @@ export default async function ContractDetailPage({
             content: (
               <PortfolioFieldsForm
                 contractId={contract.id}
+                companyCity={(linkedCompany as any)?.city ?? null}
+                companyState={(linkedCompany as any)?.state ?? null}
+                abcConfig={await (async () => {
+                  const { data: cfgs } = await supabase.from('abc_config').select('*')
+                  return {
+                    clinica: cfgs?.find((c: any) => c.nature === 'eng_clinica') ?? null,
+                    hospitalar: cfgs?.find((c: any) => c.nature === 'eng_hospitalar') ?? null,
+                  }
+                })()}
                 initial={{
                   contract_number: (contract as any).contract_number ?? null,
                   sankhya_code: (contract as any).sankhya_code ?? null,
