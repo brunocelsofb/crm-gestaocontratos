@@ -27,6 +27,7 @@ export default async function CamposOportunidadePage({
 
   const activePipelineId = selectedPipelineId ?? pipelines?.[0]?.id
   const configs = activePipelineId ? await getPipelineFieldConfigs(activePipelineId) : []
+  const { data: customFields } = await supabase.from('custom_fields').select('id, name, field_key').order('name')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
@@ -61,6 +62,7 @@ export default async function CamposOportunidadePage({
           key={activePipelineId}
           pipelineId={activePipelineId}
           initialConfigs={configs}
+          customFields={customFields ?? []}
         />
       )}
     </div>

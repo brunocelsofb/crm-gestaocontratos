@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
+import { CompanyTagSelect } from '@/components/companies/company-tag-select'
 import { NewOpportunityButton } from '@/components/companies/new-opportunity-button'
 import { AddContactForm } from '@/components/companies/add-contact-form'
 import { RemoveContactButton } from '@/components/companies/remove-contact-button'
@@ -38,6 +39,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     { data: activities },
     { data: profiles },
     { data: salesPipelines },
+    { data: allTags },
+    { data: companyTagRow },
   ] = await Promise.all([
     isCurrentUserAdmin(),
     supabase.from('companies').select('*').eq('id', id).single(),
@@ -46,6 +49,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('pipelines').select('id, name, is_default').eq('type', 'vendas').order('name'),
+    supabase.from('tags').select('id, name, color').order('name'),
+    supabase.from('company_tags').select('tag_id').eq('company_id', id).maybeSingle(),
   ])
 
   if (!company) notFound()
@@ -84,6 +89,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
               <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{company.name}</h1>
               <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: st.bg, color: st.color }}>{st.label}</span>
+              <CompanyTagSelect
+                companyId={company.id}
+                currentTagId={(companyTagRow as any)?.tag_id ?? null}
+                tags={allTags ?? []}
+              />
               {segmentos.map(s => <span key={s} style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, background: '#f1f3f8', color: '#52514e' }}>{s}</span>)}
             </div>
             {(company as any).trade_name && <p style={{ fontSize: 13, color: '#52514e', marginBottom: 4 }}>{(company as any).trade_name}</p>}

@@ -17,6 +17,7 @@ const CONFIG_SECTIONS = [
       { href: '/settings/campos-oportunidade', label: 'Campos por Funil', description: 'Defina quais campos são obrigatórios/opcionais em cada funil' },
       { href: '/settings/motivos-perda', label: 'Motivos de Perda', description: 'Cadastre os motivos de perda que aparecem no dashboard de gestão à vista' },
       { href: '/settings/curva-abc', label: 'Curva ABC', description: 'Configure os intervalos de faturamento e thresholds A/B/C por natureza (Clínica e Hospitalar)' },
+      { href: '/settings/numeracao', label: 'Numeração de Oportunidades', description: 'Configure o prefixo e a sequência numérica gerada automaticamente ao criar uma oportunidade' },
       { href: '/custom-fields', label: 'Campos Customizados', description: 'Adicione campos personalizados às oportunidades' },
       { href: '/automations', label: 'Automações', description: 'Regras automáticas por gatilho ou tempo' },
       { href: '/tags', label: 'Tags', description: 'Organize e classifique com etiquetas' },

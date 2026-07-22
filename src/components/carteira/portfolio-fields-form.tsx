@@ -82,15 +82,18 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
   )
 }
 
-export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig }: {
+export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig, tags, currentTagId }: {
   contractId: string
   initial: PortfolioData
   contractNature?: string | null
-  companyCity?: string | null    // cidade da empresa para pré-preencher localização
-  companyState?: string | null   // UF da empresa
+  companyCity?: string | null
+  companyState?: string | null
   abcConfig?: { clinica?: AbcConfig | null; hospitalar?: AbcConfig | null } | null
+  tags?: { id: string; name: string; color: string }[]
+  currentTagId?: string | null
 }) {
   const router = useRouter()
+  const [tagId, setTagId] = useState(currentTagId ?? '')
   const [data, setData] = useState<PortfolioData>(() => ({
     ...initial,
     // Pré-preenche município/UF/região da empresa se não havia nada
@@ -148,6 +151,14 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
       })
       const json = await res.json()
       if (!res.ok || json.error) throw new Error(json.error ?? 'Erro ao salvar')
+      // Salva tag do contrato separadamente
+      if (tagId !== (currentTagId ?? '')) {
+        await fetch(`/api/contracts/${contractId}/tag`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag_id: tagId || null }),
+        })
+      }
       setSaved(true); router.refresh()
     } catch (e: any) { setError(e.message) } finally { setBusy(false) }
   }
@@ -184,6 +195,21 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
         <div><label style={lbl}>Cód. Sankhya</label><input style={inp} value={data.sankhya_code ?? ''} onChange={e => set('sankhya_code', e.target.value)} /></div>
         <div><label style={lbl}>CNPJ Faturamento</label><input style={inp} value={data.cnpj_billing ?? ''} onChange={e => set('cnpj_billing', e.target.value)} placeholder="00.000.000/0000-00" /></div>
         <div><label style={lbl}>Grupo Econômico</label><input style={inp} value={data.economic_group ?? ''} onChange={e => set('economic_group', e.target.value)} /></div>
+      {tags && tags.length > 0 && (
+        <div>
+          <label style={lbl}>Tag do Contrato</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {tagId && <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, color: '#fff', background: tags.find(t => t.id === tagId)?.color ?? '#888' }}>
+              {tags.find(t => t.id === tagId)?.name}
+            </span>}
+            <select value={tagId} onChange={e => setTagId(e.target.value)}
+              style={{ ...inp, cursor: 'pointer', flex: 1 }}>
+              <option value="">Sem tag</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Tipo e Valor */}

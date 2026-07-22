@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { PipelineFieldConfig } from '@/lib/pipeline-field-config'
 
 export async function savePipelineFieldConfigs(
@@ -22,5 +23,33 @@ export async function savePipelineFieldConfigs(
   if (error) return { error: error.message }
   revalidatePath('/settings/campos-oportunidade')
   revalidatePath('/contracts/new')
+  return {}
+}
+
+export async function deletePipelineField(pipelineId: string, fieldKey: string): Promise<{ error?: string }> {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('pipeline_field_configs')
+    .delete()
+    .eq('pipeline_id', pipelineId)
+    .eq('field_key', fieldKey)
+  if (error) return { error: error.message }
+  revalidatePath('/settings/campos-oportunidade')
+  return {}
+}
+
+export async function addPipelineField(
+  pipelineId: string,
+  fieldKey: string,
+  fieldLabel: string,
+  displayOrder: number
+): Promise<{ error?: string }> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('pipeline_field_configs').upsert(
+    { pipeline_id: pipelineId, field_key: fieldKey, field_label: fieldLabel, visibility: 'optional', display_order: displayOrder },
+    { onConflict: 'pipeline_id,field_key' }
+  )
+  if (error) return { error: error.message }
+  revalidatePath('/settings/campos-oportunidade')
   return {}
 }

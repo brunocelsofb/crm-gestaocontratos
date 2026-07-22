@@ -120,9 +120,16 @@ export async function createContract(
   // 3. Segue o fluxo original de criação do contrato, agora com
   //    empresa e contato já resolvidos
   // ------------------------------------------------------------
+  // process_number: tenta gerar número sequencial via função SQL,
+  // cai para OPP-timestamp se a tabela ainda não existir
+  let autoProcessNumber = `OPP-${Date.now()}`
+  try {
+    const { data: seqData } = await supabase.rpc('next_opportunity_number' as any)
+    if (seqData) autoProcessNumber = seqData as string
+  } catch { /* função não existe ainda — usa fallback */ }
+
   const raw = {
-    // process_number gerado automaticamente se não informado
-    process_number: (formData.get('process_number') as string)?.trim() || `OPP-${Date.now()}`,
+    process_number: (formData.get('process_number') as string)?.trim() || autoProcessNumber,
     title: formData.get('title') as string,
     client_name: companyName,
     value: Number(formData.get('value') || 0),

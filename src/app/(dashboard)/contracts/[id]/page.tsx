@@ -587,6 +587,8 @@ export default async function ContractDetailPage({
                   internal_notes: (contract as any).internal_notes ?? null,
                 }}
                 contractNature={(contract as any).nature ?? null}
+                tags={allTags ?? []}
+                currentTagId={(currentContractTags ?? [])[0]?.tag_id ?? null}
               />
             ),
           }] : []),
