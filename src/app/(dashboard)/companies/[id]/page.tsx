@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
 import { DeleteCompanyButton } from '@/components/companies/delete-company-button'
+import { NewOpportunityButton } from '@/components/companies/new-opportunity-button'
 import { AddContactForm } from '@/components/companies/add-contact-form'
 import { RemoveContactButton } from '@/components/companies/remove-contact-button'
 import { ActivityFeed } from '@/components/activities/activity-feed'
@@ -44,7 +45,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('contracts').select('id, process_number, title, created_at, value').eq('company_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
-    supabase.from('pipelines').select('id, is_default').eq('type', 'vendas'),
+    supabase.from('pipelines').select('id, name, is_default').eq('type', 'vendas').order('name'),
   ])
 
   if (!company) notFound()
@@ -64,6 +65,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const { data: companyLeads } = await leadsQuery
 
   const defaultSalesPipeline = (salesPipelines ?? []).find(p => p.is_default)?.id ?? salesPipelines?.[0]?.id
+  const salesPipelinesList = (salesPipelines ?? []).map(p => ({ id: p.id, name: p.name }))
 
   if (!company) notFound()
 
@@ -182,11 +184,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Oportunidades ({(contracts ?? []).length})</p>
-              <Link
-                href={`/contracts/new?company=${company.id}${defaultSalesPipeline ? `&pipeline=${defaultSalesPipeline}` : ''}`}
-                style={{ fontSize: 11, color: '#4f86f7', textDecoration: 'none' }}>
-                + Nova oportunidade
-              </Link>
+              <NewOpportunityButton
+                companyId={company.id}
+                pipelines={salesPipelinesList}
+                stagesByPipeline={{}}
+              />
             </div>
             <div>
               {(contracts ?? []).map(c => (

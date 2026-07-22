@@ -121,7 +121,8 @@ export async function createContract(
   //    empresa e contato já resolvidos
   // ------------------------------------------------------------
   const raw = {
-    process_number: formData.get('process_number') as string,
+    // process_number gerado automaticamente se não informado
+    process_number: (formData.get('process_number') as string)?.trim() || `OPP-${Date.now()}`,
     title: formData.get('title') as string,
     client_name: companyName,
     value: Number(formData.get('value') || 0),

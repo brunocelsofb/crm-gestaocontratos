@@ -9,29 +9,14 @@
 import { z } from 'zod'
 
 export const contractSchema = z.object({
-  process_number: z
-    .string()
-    .min(1, 'Número do processo é obrigatório'),
-  title: z
-    .string()
-    .min(1, 'Título é obrigatório'),
-  client_name: z
-    .string()
-    .min(1, 'Nome do cliente é obrigatório'),
-  company_id: z
-    .string()
-    .uuid()
-    .optional()
-    .or(z.literal('')),
-  value: z
-    .number()
-    .nonnegative('Valor não pode ser negativo')
-    .default(0),
-  stage_id: z
-    .string()
-    .uuid('Etapa inválida'),
+  process_number: z.string().optional().default(''),
+  title: z.string().min(1, 'Título é obrigatório'),
+  client_name: z.string().min(1, 'Nome do cliente é obrigatório'),
+  company_id: z.string().uuid().optional().or(z.literal('')),
+  value: z.number().nonnegative('Valor não pode ser negativo').default(0),
+  stage_id: z.string().uuid('Etapa inválida'),
   description: z.string().optional(),
-  expected_close_date: z.string().optional(), // formato ISO (yyyy-mm-dd)
+  expected_close_date: z.string().optional(),
 })
 
 export type ContractFormValues = z.infer<typeof contractSchema>

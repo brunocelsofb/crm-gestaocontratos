@@ -18,7 +18,7 @@ import { findCompanyByCnpj } from '@/lib/actions/companies'
 import { createClient } from '@/lib/supabase/client'
 
 type Contact = { id: string; name: string; role: string | null }
-type FoundCompany = { id: string; name: string; trade_name: string | null; contacts: Contact[] }
+type FoundCompany = { id: string; name: string; trade_name: string | null; cnpj?: string | null; contacts: Contact[] }
 
 export function CompanyContactSection({ preselectedCompanyId }: { preselectedCompanyId?: string }) {
   const [cnpj, setCnpj] = useState('')
@@ -45,7 +45,7 @@ export function CompanyContactSection({ preselectedCompanyId }: { preselectedCom
       const supabase = createClient()
       const { data: company } = await supabase
         .from('companies')
-        .select('id, name, trade_name')
+        .select('id, name, trade_name, cnpj')
         .eq('id', preselectedCompanyId!)
         .maybeSingle()
 
@@ -133,6 +133,7 @@ export function CompanyContactSection({ preselectedCompanyId }: { preselectedCom
       {checked && foundCompany && (
         <div>
           <input type="hidden" name="existing_company_id" value={foundCompany.id} />
+          {foundCompany.cnpj && <input type="hidden" name="company_cnpj" value={foundCompany.cnpj.replace(/\D/g, '')} />}
 
           {/* Empresa pré-selecionada: só mostra o nome fixo, não o aviso de "verificada" */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#eaf5ee', border: '0.5px solid #bbddc8' }}>

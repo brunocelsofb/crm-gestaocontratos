@@ -115,12 +115,6 @@ export default function NewContractPage() {
       </div>
 
       <form action={formAction} style={{ display: 'flex', flexDirection: 'column', gap: 16, background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 24 }}>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Número do Processo <span style={{ color: '#b91c1c' }}>*</span></label>
-          <input name="process_number" required className={inputCls} />
-          {state.fieldErrors?.process_number && <p style={{ marginTop: 4, fontSize: 11, color: '#b91c1c' }}>{state.fieldErrors.process_number[0]}</p>}
-        </div>
-
         {show('title') && (
           <div>
             <label className="block text-sm font-medium text-gray-700">Título {req('title') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
