@@ -45,7 +45,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     isCurrentUserAdmin(),
     supabase.from('companies').select('*').eq('id', id).single(),
     supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('is_primary', { ascending: false }),
-    supabase.from('contracts').select('id, process_number, title, created_at, value').eq('company_id', id).order('created_at', { ascending: false }),
+    supabase.from('contracts').select('id, process_number, title, created_at, value, company_id').eq('company_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('pipelines').select('id, name, is_default').eq('type', 'vendas').order('name'),
@@ -56,6 +56,16 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   if (!company) notFound()
 
   // Busca leads vinculados à empresa por CNPJ ou nome
+  // Busca todos os runs (oportunidades + contratos em gestão) vinculados à empresa
+  const contractIds = (contracts ?? []).map(c => c.id)
+  const { data: companyRuns } = contractIds.length
+    ? await supabase
+        .from('pipeline_runs')
+        .select('id, contract_id, status, value, started_at, ended_at, pipeline_id, pipelines(id, name, type)')
+        .in('contract_id', contractIds)
+        .order('started_at', { ascending: false })
+    : { data: [] as any[] }
+
   const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
   let leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source').order('created_at', { ascending: false }).limit(20)
   if (cnpjDigits) {
@@ -190,28 +200,45 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
           )}
 
-          {/* Oportunidades vinculadas */}
+          {/* Oportunidades e Contratos vinculados */}
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Oportunidades ({(contracts ?? []).length})</p>
-              <NewOpportunityButton
-                companyId={company.id}
-                pipelines={salesPipelinesList}
-                stagesByPipeline={{}}
-              />
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                Histórico de funis ({(companyRuns ?? []).length} passagens · {(contracts ?? []).length} registro{(contracts ?? []).length !== 1 ? 's' : ''})
+              </p>
+              <NewOpportunityButton companyId={company.id} pipelines={salesPipelinesList} stagesByPipeline={{}} />
             </div>
             <div>
-              {(contracts ?? []).map(c => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '0.5px solid #f8f9fb' }}>
-                  <div>
-                    <Link href={`/contracts/${c.id}`} style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', textDecoration: 'none' }}>{c.title || c.process_number}</Link>
-                    <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</p>
+              {(companyRuns ?? []).map((run: any) => {
+                const contract = (contracts ?? []).find(c => c.id === run.contract_id)
+                const pipeline = Array.isArray(run.pipelines) ? run.pipelines[0] : run.pipelines
+                const STATUS: Record<string, { label: string; bg: string; color: string }> = {
+                  open:  { label: 'Em andamento', bg: '#eef3ff', color: '#3b5bdb' },
+                  won:   { label: 'Ganho',        bg: '#eaf5ee', color: '#1a7c3e' },
+                  lost:  { label: 'Perdido',      bg: '#fdecea', color: '#b91c1c' },
+                  moved: { label: 'Movido',       bg: '#f1f3f8', color: '#8892a4' },
+                }
+                const s = STATUS[run.status] ?? STATUS.moved
+                return (
+                  <div key={run.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '0.5px solid #f8f9fb' }}>
+                    <div>
+                      <Link href={`/contracts/${run.contract_id}`} style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', textDecoration: 'none' }}>
+                        {contract?.title || contract?.process_number || '—'}
+                      </Link>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 3, alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, background: s.bg, color: s.color }}>{s.label}</span>
+                        {pipeline && <span style={{ fontSize: 10, color: '#8892a4' }}>{pipeline.name}</span>}
+                        <span style={{ fontSize: 10, color: '#b0b8c8' }}>{new Date(run.started_at).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>
+                      {Number(run.value) > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(run.value)) : '—'}
+                    </span>
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{Number(c.value) > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(c.value)) : '—'}</span>
-                </div>
-              ))}
-              {(contracts ?? []).length === 0 && (
-                <p style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#b0b8c8' }}>Nenhuma oportunidade vinculada ainda.</p>
+                )
+              })}
+              {(companyRuns ?? []).length === 0 && (
+                <p style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#b0b8c8' }}>Nenhuma oportunidade ou contrato vinculado ainda.</p>
               )}
             </div>
           </div>
