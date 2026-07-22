@@ -59,12 +59,40 @@ export default async function CarteiraPage({
   if (q?.trim())   contractQuery = contractQuery.or(`client_name.ilike.%${q.trim()}%,contract_number.ilike.%${q.trim()}%,coordinator_name.ilike.%${q.trim()}%`)
 
   const { data: contracts } = await contractQuery.order('client_name')
+  const contractIdsForTags = (contracts ?? []).map((c: any) => c.id)
+
+  // Busca tags dos contratos para exibir natureza (Eng. Clínica / Hospitalar)
+  const { data: contractTagRows } = contractIdsForTags.length
+    ? await supabase.from('contract_tags').select('contract_id, tags(id, name, color)').in('contract_id', contractIdsForTags)
+    : { data: [] as any[] }
+
+  const tagByContract = new Map<string, { name: string; color: string }>()
+  for (const row of contractTagRows ?? []) {
+    const tag = Array.isArray((row as any).tags) ? (row as any).tags[0] : (row as any).tags
+    if (tag) tagByContract.set((row as any).contract_id, tag)
+  }
+
   const valueByContract = new Map((activeRuns ?? []).map((r: any) => [r.contract_id, Number(r.value || 0)]))
 
-  const enriched = (contracts ?? []).map(c => ({
+  const enriched = (contracts ?? []).map((c: any) => ({
     ...c,
     pipelineValue: valueByContract.get(c.id) ?? 0,
     dias: diasAVencer(c.valid_until),
+    tag: tagByContract.get(c.id) ?? null,
+    // Natureza pelo campo nature ou pela tag
+    naturezaLabel: (() => {
+      const n = c.nature
+      if (n === 'eng_clinica') return 'Eng. Clínica'
+      if (n === 'eng_hospitalar') return 'Eng. Hospitalar'
+      const tag = tagByContract.get(c.id)
+      if (tag) {
+        const t = tag.name.toLowerCase()
+        if (t.includes('clínica') || t.includes('clinica')) return 'Eng. Clínica'
+        if (t.includes('hospitalar')) return 'Eng. Hospitalar'
+        return tag.name
+      }
+      return null
+    })(),
   }))
 
   const filtered = alerta
@@ -256,7 +284,7 @@ export default async function CarteiraPage({
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
             <thead>
               <tr>
-                {['Cliente', 'Nº Contrato', 'Tipo', 'Valor/mês', 'Coordenador', 'Engenheiro', 'ABC', 'Vencimento', 'Alerta', ''].map((h, i) => (
+                {['Cliente', 'Natureza', 'Nº Contrato', 'Tipo', 'Valor/mês', 'Coordenador', 'Engenheiro', 'ABC', 'Vencimento', 'Alerta', ''].map((h, i) => (
                   <th key={h + i} style={{ padding: '10px 12px', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', fontWeight: 500, textAlign: 'left', borderBottom: '0.5px solid #f1f3f8', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -274,6 +302,17 @@ export default async function CarteiraPage({
                         <p style={{ fontSize: 13, fontWeight: 500, color: isVencido ? '#b91c1c' : '#1a1f36', margin: 0 }}>{c.client_name}</p>
                         {c.municipality && <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>{c.municipality}</p>}
                       </Link>
+                    </td>
+                    <td style={{ padding: '12px 12px' }}>
+                      {c.naturezaLabel ? (
+                        <span style={{
+                          display: 'inline-flex', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500,
+                          background: c.naturezaLabel.includes('Hospit') ? '#eef3ff' : '#eaf5ee',
+                          color: c.naturezaLabel.includes('Hospit') ? '#3b5bdb' : '#1a7c3e',
+                        }}>
+                          {c.naturezaLabel}
+                        </span>
+                      ) : <span style={{ fontSize: 11, color: '#d1d8e8' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 12px', fontSize: 11, fontFamily: 'monospace', color: '#8892a4' }}>
                       {c.contract_number ?? c.process_number}

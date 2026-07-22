@@ -55,23 +55,22 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   if (!company) notFound()
 
-  // Busca contratos vinculados: por company_id (direto) OU por client_name/cnpj (legado sem vínculo)
+  // Busca contratos por company_id OU pelo CNPJ/nome no client_name (contratos legados)
   const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
-  let contractsQuery = supabase
+  const nameFragment = company.name.split(' ').slice(0, 3).join(' ')
+
+  let orClause = `company_id.eq.${id}`
+  if (cnpjDigits) orClause += `,client_name.ilike.%${cnpjDigits}%`
+  if (nameFragment) orClause += `,client_name.ilike.%${nameFragment}%`
+
+  const { data: allCompanyContracts } = await supabase
     .from('contracts')
     .select('id, process_number, title, client_name, created_at, value, company_id')
+    .or(orClause)
     .order('created_at', { ascending: false })
+    .limit(50)
 
-  if (cnpjDigits) {
-    // Busca por company_id OU pelo cnpj embutido no client_name (formato antigo)
-    contractsQuery = contractsQuery.or(`company_id.eq.${id},client_name.ilike.%${company.name.split(' ').slice(0, 2).join(' ')}%`)
-  } else {
-    contractsQuery = contractsQuery.eq('company_id', id)
-  }
-
-  const { data: allCompanyContracts } = await contractsQuery.limit(50)
-
-  // Atualiza company_id nos contratos legados que ainda não têm vínculo
+  // Auto-vincula contratos legados encontrados pelo nome/cnpj
   const legacyContracts = (allCompanyContracts ?? []).filter(c => !c.company_id)
   if (legacyContracts.length > 0) {
     await supabase.from('contracts').update({ company_id: id }).in('id', legacyContracts.map(c => c.id))
@@ -84,6 +83,16 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         .select('id, contract_id, status, value, started_at, ended_at, pipeline_id, pipelines(id, name, type)')
         .in('contract_id', contractIds)
         .order('started_at', { ascending: false })
+    : { data: [] as any[] }
+
+  // Busca atividades também pelo contract_id (além das da empresa)
+  const { data: contractActivities } = contractIds.length
+    ? await supabase
+        .from('activities')
+        .select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to')
+        .in('contract_id', contractIds)
+        .order('created_at', { ascending: false })
+        .limit(50)
     : { data: [] as any[] }
 
   const cnpjDigitsForLeads = cnpjDigits
@@ -160,29 +169,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
             <div style={{ padding: 16 }}>
               <ActivityFeed
-              activities={activities ?? []}
+              activities={[...(activities ?? []), ...(contractActivities ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
               companyId={company.id}
               profiles={profiles ?? []}
               currentUserId={user?.id ?? ''}
             />
-              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(activities ?? []).map(a => (
-                  <div key={a.id} style={{ display: 'flex', gap: 10, paddingBottom: 10, borderBottom: '0.5px solid #f8f9fb' }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0, color: '#52514e' }}>
-                      {a.type === 'note' ? '📝' : a.type === 'email' ? '✉' : '🔔'}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 12, color: '#1a1f36', margin: 0 }}>{a.content}</p>
-                      <p style={{ fontSize: 10, color: '#b0b8c8', marginTop: 3 }}>
-                        {a.user_id ? profileById.get(a.user_id) : 'Sistema'} · {new Date(a.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {(activities ?? []).length === 0 && (
-                  <p style={{ fontSize: 12, color: '#b0b8c8', textAlign: 'center', padding: '24px 0' }}>Nenhuma atividade registrada ainda.</p>
-                )}
-              </div>
             </div>
           </div>
 
