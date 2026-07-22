@@ -279,6 +279,8 @@ export default async function ContractDetailPage({
           lostLabel={pipelineById.get(displayRun.pipeline_id)?.lost_label ?? 'Perdido'}
           canChangeStage={canChangeStage}
           pipelineType={pipelineById.get(displayRun.pipeline_id)?.type}
+          contractNature={(contract as any).nature ?? null}
+          contractValue={Number(displayRun.value) || 0}
         />
       ) : (
         <p style={{ borderRadius: 10, background: '#f8f9fb', padding: 16, fontSize: 13, color: '#8892a4' }}>

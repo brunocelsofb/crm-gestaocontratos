@@ -511,6 +511,8 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
           stage_entered_at: now,
           previous_run_id: run.id,
           created_by: user.id,
+          value: run.value ?? 0,          // preserva o valor da oportunidade
+          revenue_type: (run as any).revenue_type ?? null,
         })
         .select()
         .single()
@@ -542,6 +544,20 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
         if (!currentContract?.contract_type && (run as any).revenue_type) {
           const typeMap: Record<string, string> = { mrr: 'fixo', spot: 'spot' }
           carteiraPatch.contract_type = typeMap[(run as any).revenue_type] ?? null
+        }
+        // Natureza: pega da tag do run se disponível
+        if (!(currentContract as any)?.nature) {
+          const { data: runTag } = await supabase
+            .from('pipeline_runs').select('tag_id').eq('id', run.id).maybeSingle()
+          if (runTag?.tag_id) {
+            const { data: tag } = await supabase
+              .from('tags').select('name').eq('id', runTag.tag_id).maybeSingle()
+            if (tag?.name) {
+              const nameLow = tag.name.toLowerCase()
+              if (nameLow.includes('clínica') || nameLow.includes('clinica')) carteiraPatch.nature = 'eng_clinica'
+              else if (nameLow.includes('hospitalar')) carteiraPatch.nature = 'eng_hospitalar'
+            }
+          }
         }
 
         if (Object.keys(carteiraPatch).length > 0) {
