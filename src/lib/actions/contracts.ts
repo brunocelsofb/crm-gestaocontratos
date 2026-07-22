@@ -199,6 +199,22 @@ export async function createContract(
     return { error: 'Falha ao iniciar o contrato no funil. Tente novamente.' }
   }
 
+  // Salva tag da oportunidade
+  const tagId = (formData.get('tag_id') as string) || null
+  if (tagId) {
+    await supabase.from('contract_tags').insert({ contract_id: contract.id, tag_id: tagId })
+  }
+
+  // Salva classificação e segmento no contrato
+  const classification = (formData.get('classification') as string) || null
+  const segment = (formData.get('segment') as string) || null
+  if (classification || segment) {
+    const patch: Record<string, string | null> = {}
+    if (classification) patch.team_type = classification
+    if (segment) patch.segment = segment
+    await supabase.from('contracts').update(patch).eq('id', contract.id)
+  }
+
   await supabase.from('stage_history').insert({
     pipeline_run_id: run.id,
     stage_id: stage.id,

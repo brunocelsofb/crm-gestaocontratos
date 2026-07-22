@@ -108,6 +108,15 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
   const [visNota, setVisNota] = useState<number>(Number(initial.score_visit) || 0)
   const [fidNota, setFidNota] = useState<number>(Number(initial.score_loyalty) || 0)
 
+  // Calcula fidelidade automaticamente pela data de início do contrato
+  function calcFidelidadeByDate(startDate: string): number {
+    if (!startDate) return 0
+    const years = (Date.now() - new Date(startDate).getTime()) / (365.25 * 24 * 3600 * 1000)
+    if (years >= 2) return 3
+    if (years >= 1) return 2
+    return 1
+  }
+
   const isHospitalar = (data.nature ?? contractNature ?? '').includes('hospitalar')
 
   // Configurações da curva ABC — usa do banco ou hardcoded como fallback
@@ -232,7 +241,20 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
             <option value="eng_hospitalar">Engenharia Hospitalar</option>
           </select>
         </div>
-        <div><label style={lbl}>Início da Vigência</label><input style={inp} type="date" value={data.valid_from ?? ''} onChange={e => set('valid_from', e.target.value || null)} /></div>
+        <div>
+          <label style={lbl}>Início da Vigência</label>
+          <input style={inp} type="date" value={data.valid_from ?? ''} onChange={e => {
+            set('valid_from', e.target.value || null)
+            if (e.target.value) setFidNota(calcFidelidadeByDate(e.target.value))
+          }} />
+          {data.valid_from && (
+            <p style={{ fontSize: 10, color: '#3b5bdb', marginTop: 3 }}>
+              ↳ Fidelidade calculada: nota {calcFidelidadeByDate(data.valid_from)} — {
+                (() => { const y = (Date.now() - new Date(data.valid_from).getTime()) / (365.25*24*3600*1000); return y >= 2 ? '2+ anos' : y >= 1 ? '1–2 anos' : 'menos de 1 ano' })()
+              }
+            </p>
+          )}
+        </div>
         <div><label style={lbl}>Vencimento</label><input style={inp} type="date" value={data.valid_until ?? ''} onChange={e => set('valid_until', e.target.value || null)} /></div>
         <div><label style={lbl}>Vigência (meses)</label><input style={inp} type="number" value={data.validity_months ?? ''} onChange={e => set('validity_months', e.target.value ? Number(e.target.value) : null)} /></div>
       </div>
