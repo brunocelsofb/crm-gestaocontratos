@@ -55,9 +55,29 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   if (!company) notFound()
 
-  // Busca leads vinculados à empresa por CNPJ ou nome
-  // Busca todos os runs (oportunidades + contratos em gestão) vinculados à empresa
-  const contractIds = (contracts ?? []).map(c => c.id)
+  // Busca contratos vinculados: por company_id (direto) OU por client_name/cnpj (legado sem vínculo)
+  const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
+  let contractsQuery = supabase
+    .from('contracts')
+    .select('id, process_number, title, client_name, created_at, value, company_id')
+    .order('created_at', { ascending: false })
+
+  if (cnpjDigits) {
+    // Busca por company_id OU pelo cnpj embutido no client_name (formato antigo)
+    contractsQuery = contractsQuery.or(`company_id.eq.${id},client_name.ilike.%${company.name.split(' ').slice(0, 2).join(' ')}%`)
+  } else {
+    contractsQuery = contractsQuery.eq('company_id', id)
+  }
+
+  const { data: allCompanyContracts } = await contractsQuery.limit(50)
+
+  // Atualiza company_id nos contratos legados que ainda não têm vínculo
+  const legacyContracts = (allCompanyContracts ?? []).filter(c => !c.company_id)
+  if (legacyContracts.length > 0) {
+    await supabase.from('contracts').update({ company_id: id }).in('id', legacyContracts.map(c => c.id))
+  }
+
+  const contractIds = (allCompanyContracts ?? []).map(c => c.id)
   const { data: companyRuns } = contractIds.length
     ? await supabase
         .from('pipeline_runs')
@@ -66,11 +86,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         .order('started_at', { ascending: false })
     : { data: [] as any[] }
 
-  const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
+  const cnpjDigitsForLeads = cnpjDigits
   let leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source').order('created_at', { ascending: false }).limit(20)
-  if (cnpjDigits) {
+  if (cnpjDigitsForLeads) {
     leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source')
-      .or(`cnpj.eq.${cnpjDigits},company_name.ilike.${company.name}`)
+      .or(`cnpj.eq.${cnpjDigitsForLeads},company_name.ilike.${company.name}`)
       .order('created_at', { ascending: false }).limit(20)
   } else if (company.name) {
     leadsQuery = supabase.from('leads').select('id, name, email, status, score, created_at, source')

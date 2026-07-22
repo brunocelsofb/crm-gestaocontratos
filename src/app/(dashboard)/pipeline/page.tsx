@@ -11,9 +11,9 @@ const DEFAULT_SLA_DAYS = 7 // usado quando a etapa não tem SLA configurado
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ pipeline?: string; dash?: string }>
+  searchParams: Promise<{ pipeline?: string; dash?: string; tag?: string }>
 }) {
-  const { pipeline: pipelineIdParam, dash } = await searchParams
+  const { pipeline: pipelineIdParam, dash, tag: tagFilter } = await searchParams
   const showDash = dash === '1'
   const supabase = await createClient()
   const isAdmin = await isCurrentUserAdmin()
@@ -147,6 +147,16 @@ export default async function PipelinePage({
   const cards: RunCard[] = (runs ?? []).map(makeCard)
   const allSalesCards: RunCard[] = (allSalesRuns ?? []).map(makeCard)
 
+  // Filtro por tag — aplica nos cards do Kanban atual
+  const filteredCards = tagFilter
+    ? cards.filter(c => c.tag?.id === tagFilter)
+    : cards
+
+  // Tags disponíveis nos cards do pipeline atual (para o seletor de filtro)
+  const availableTags = [...new Map(
+    cards.filter(c => c.tag).map(c => [c.tag!.id, c.tag!])
+  ).values()]
+
   const openCards = cards.filter(c => c.status === 'open')
   const totalOpen = openCards.reduce((s, c) => s + c.value, 0)
   const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
@@ -189,16 +199,31 @@ export default async function PipelinePage({
       )}
 
       {/* Header do funil ativo */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: 18, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{pipelineName}</h1>
           <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: typeBadge.bg, color: typeBadge.color }}>
             {TYPE_LABEL[pipelineType]}
           </span>
-          {pipelines && pipelines.length === 1 && (
-            <span style={{ fontSize: 12, color: '#8892a4' }}>
-              {openCards.length} aberta{openCards.length !== 1 ? 's' : ''} · {fmtCurrency(totalOpen)}
-            </span>
+          {/* Filtro por tag */}
+          {availableTags.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <Link href={`/pipeline?${selectedPipeline ? `pipeline=${selectedPipeline}&` : ''}`}
+                style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, border: '0.5px solid', textDecoration: 'none', background: !tagFilter ? '#1a1f36' : '#fff', color: !tagFilter ? '#fff' : '#8892a4', borderColor: !tagFilter ? '#1a1f36' : '#d1d8e8' }}>
+                Todos
+              </Link>
+              {availableTags.map(tag => (
+                <Link key={tag.id} href={`/pipeline?${selectedPipeline ? `pipeline=${selectedPipeline}&` : ''}tag=${tag.id}`}
+                  style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, border: '0.5px solid', textDecoration: 'none', fontWeight: 500, background: tagFilter === tag.id ? tag.color : '#fff', color: tagFilter === tag.id ? '#fff' : tag.color, borderColor: tag.color }}>
+                  {tag.name}
+                </Link>
+              ))}
+              {tagFilter && (
+                <span style={{ fontSize: 11, color: '#8892a4' }}>
+                  {filteredCards.filter(c => c.status === 'open').length} de {cards.filter(c => c.status === 'open').length} oportunidades
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -240,7 +265,7 @@ export default async function PipelinePage({
         <KanbanBoard
           pipelineId={selectedPipeline as string}
           stages={stages}
-          initialCards={cards}
+          initialCards={filteredCards}
           showValidity={pipelineType === 'gestao_contratos'}
           wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
           lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
