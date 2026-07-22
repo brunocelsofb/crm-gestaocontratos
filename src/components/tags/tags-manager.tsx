@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateTag, deleteTag } from '@/lib/actions/tags'
 
 type Tag = { id: string; name: string; color: string }
@@ -18,6 +19,8 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const router = useRouter()
+
   function startEdit(tag: Tag) {
     setEditingId(tag.id)
     setEditName(tag.name)
@@ -34,6 +37,7 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
     if (result.error) { setError(result.error); return }
     setTags(prev => prev.map(t => t.id === id ? { ...t, name: editName.trim(), color: editColor } : t))
     setEditingId(null)
+    router.refresh()
   }
 
   async function handleDelete(id: string, name: string) {
@@ -43,6 +47,7 @@ export function TagsManager({ initialTags }: { initialTags: Tag[] }) {
     setBusy(false)
     if (result?.error) { setError(result.error); return }
     setTags(prev => prev.filter(t => t.id !== id))
+    router.refresh()
   }
 
   const inp: React.CSSProperties = { padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
