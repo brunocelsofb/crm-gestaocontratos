@@ -141,6 +141,11 @@ export function CompanyContactSection({ preselectedCompanyId }: { preselectedCom
             <div>
               <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>{foundCompany.name}</p>
               {foundCompany.trade_name && <p style={{ fontSize: 11, color: '#52514e', marginTop: 1 }}>{foundCompany.trade_name}</p>}
+              {foundCompany.cnpj && (
+                <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2, fontFamily: 'monospace' }}>
+                  CNPJ: {foundCompany.cnpj}
+                </p>
+              )}
             </div>
             {!preselectedCompanyId && (
               <button type="button" onClick={() => { setFoundCompany(null); setChecked(false); setCnpj('') }}

@@ -28,7 +28,7 @@ export default function NewContractPage() {
   const [state, formAction, pending] = useActionState(createContract, initialState)
   const searchParams = useSearchParams()
   const pipelineParam = searchParams.get('pipeline')
-  const companyIdParam = searchParams.get('company_id')
+  const companyIdParam = searchParams.get('company') ?? searchParams.get('company_id')
 
   const [pipelineId, setPipelineId] = useState<string | null>(pipelineParam)
   const [pipelineName, setPipelineName] = useState<string>('')
