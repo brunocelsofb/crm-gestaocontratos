@@ -61,11 +61,16 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   // Remove CNPJ do início do nome (formato "66.378.147 NOME DA EMPRESA")
   const namePart = company.name.replace(/^\d{2}\.\d{3}\.\d{3}\s*/, '').split(' ').slice(0, 3).join(' ')
 
-  const [{ data: byCompanyId }, { data: byCnpj }, { data: byName }] = await Promise.all([
+  const [{ data: byCompanyId, error: e1 }, { data: byCnpj, error: e2 }, { data: byName, error: e3 }] = await Promise.all([
     supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').eq('company_id', id).limit(50),
-    cnpjRoot ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${cnpjRoot}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
-    namePart.length > 3 ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${namePart}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
+    cnpjRoot ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${cnpjRoot}%`).limit(20) : Promise.resolve({ data: [] as any[], error: null }),
+    namePart.length > 3 ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${namePart}%`).limit(20) : Promise.resolve({ data: [] as any[], error: null }),
   ])
+
+  if (e1) console.error('[empresa] byCompanyId error:', e1.message)
+  if (e2) console.error('[empresa] byCnpj error:', e2.message)
+  if (e3) console.error('[empresa] byName error:', e3.message)
+  console.log('[empresa] byCompanyId:', byCompanyId?.length, 'byCnpj:', byCnpj?.length, 'byName:', byName?.length)
 
   // Une sem duplicatas
   const seenIds = new Set<string>()
