@@ -59,16 +59,20 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
   const nameFragment = company.name.split(' ').slice(0, 3).join(' ')
 
-  let orClause = `company_id.eq.${id}`
-  if (cnpjDigits) orClause += `,client_name.ilike.%${cnpjDigits}%`
-  if (nameFragment) orClause += `,client_name.ilike.%${nameFragment}%`
+  // Busca separada e une os resultados para evitar problemas com OR complexo
+  const [{ data: byCompanyId }, { data: byCnpj }, { data: byName }] = await Promise.all([
+    supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').eq('company_id', id).limit(50),
+    cnpjDigits ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${cnpjDigits}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
+    nameFragment ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${nameFragment}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
+  ])
 
-  const { data: allCompanyContracts } = await supabase
-    .from('contracts')
-    .select('id, process_number, title, client_name, created_at, value, company_id')
-    .or(orClause)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  // Une sem duplicatas
+  const seenIds = new Set<string>()
+  const allCompanyContracts = [...(byCompanyId ?? []), ...(byCnpj ?? []), ...(byName ?? [])].filter(c => {
+    if (seenIds.has(c.id)) return false
+    seenIds.add(c.id)
+    return true
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   // Auto-vincula contratos legados encontrados pelo nome/cnpj
   const legacyContracts = (allCompanyContracts ?? []).filter(c => !c.company_id)
