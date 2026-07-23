@@ -53,11 +53,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // Oportunidades abertas — todos os funis de vendas
     allSalesPipelineIds.length ? supabase.from('pipeline_runs').select('stage_id, value, started_at, pipeline_id').in('pipeline_id', allSalesPipelineIds).eq('status', 'open') : Promise.resolve({ data: [] as any[] }),
     // Ganhos no período — todos os funis de vendas
-    allSalesPipelineIds.length ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').in('pipeline_id', allSalesPipelineIds).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
+    allSalesPipelineIds.length ? supabase.from('pipeline_runs').select('value, started_at, ended_at, created_by').in('pipeline_id', allSalesPipelineIds).eq('status', 'won').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
     // Perdidos no período
     allSalesPipelineIds.length ? supabase.from('pipeline_runs').select('value').in('pipeline_id', allSalesPipelineIds).eq('status', 'lost').gte('ended_at', `${periodFrom}T00:00:00`).lte('ended_at', `${periodTo}T23:59:59`) : Promise.resolve({ data: [] as any[] }),
     // Histórico completo de ganhos/perdidos (últimos 6 meses para o gráfico)
-    allSalesPipelineIds.length ? supabase.from('pipeline_runs').select('value, started_at, ended_at, owner_id').in('pipeline_id', allSalesPipelineIds).in('status', ['won', 'lost']).gte('ended_at', new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString().slice(0, 10)) : Promise.resolve({ data: [] as any[] }),
+    allSalesPipelineIds.length ? supabase.from('pipeline_runs').select('value, started_at, ended_at, created_by').in('pipeline_id', allSalesPipelineIds).in('status', ['won', 'lost']).gte('ended_at', new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString().slice(0, 10)) : Promise.resolve({ data: [] as any[] }),
     supabase.from('activities').select('user_id, type, created_at').not('type', 'eq', 'system').not('user_id', 'is', null).gte('created_at', `${periodFrom}T00:00:00`).lte('created_at', `${periodTo}T23:59:59`),
     supabase.from('profiles').select('id, full_name'),
     supabase.from('leads').select('source'),
@@ -126,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   }
   const revByUser = new Map<string, number>()
   for (const r of wonInPeriod ?? []) {
-    if (r.owner_id) revByUser.set(r.owner_id, (revByUser.get(r.owner_id) ?? 0) + Number(r.value || 0))
+    if (r.created_by) revByUser.set(r.created_by, (revByUser.get(r.created_by) ?? 0) + Number(r.value || 0))
   }
   const allUserIds = [...new Set([...actByUser.keys(), ...revByUser.keys()])]
   const team = allUserIds.slice(0, 3).map(id => {

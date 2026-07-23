@@ -64,7 +64,7 @@ export default async function PipelinePage({
       ? supabase.from('stages').select('id, name, order_index, sla_days').eq('pipeline_id', selectedPipeline).order('order_index')
       : Promise.resolve({ data: [] as { id: string; name: string; order_index: number; sla_days: number | null }[] }),
     selectedPipeline
-      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status, lost_reason_id').eq('pipeline_id', selectedPipeline).in('status', ['open', 'won', 'lost'])
+      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status').eq('pipeline_id', selectedPipeline).in('status', ['open', 'won', 'lost'])
       : Promise.resolve({ data: [] as any[] }),
   ])
 
@@ -72,7 +72,7 @@ export default async function PipelinePage({
   const salesPipelineIds = (pipelines ?? []).filter(p => p.type === 'vendas').map(p => p.id)
   const [{ data: allSalesRuns }, { data: lostReasons }] = await Promise.all([
     salesPipelineIds.length
-      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status, pipeline_id, lost_reason_id').in('pipeline_id', salesPipelineIds).in('status', ['open', 'won', 'lost'])
+      ? supabase.from('pipeline_runs').select('id, contract_id, stage_id, stage_entered_at, value, status, pipeline_id').in('pipeline_id', salesPipelineIds).in('status', ['open', 'won', 'lost'])
       : Promise.resolve({ data: [] as any[] }),
     supabase.from('lost_reasons').select('id, name').eq('active', true).order('display_order'),
   ])
@@ -84,7 +84,7 @@ export default async function PipelinePage({
 
   const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }, { data: allStagesData }] = await Promise.all([
     allContractIds.length
-      ? supabase.from('contracts').select('id, process_number, title, client_name, company_id, valid_until').in('id', allContractIds)
+      ? supabase.from('contracts').select('id, process_number, title, client_name, company_id').in('id', allContractIds)
       : Promise.resolve({ data: [] as any[] }),
     allContractIds.length
       ? supabase.from('activities').select('contract_id, created_at').in('contract_id', allContractIds).order('created_at', { ascending: false })
@@ -137,7 +137,7 @@ export default async function PipelinePage({
       value: Number(r.value) || 0,
       stageEnteredAt: r.stage_entered_at,
       lastActivityAt: lastActivityByContract.get(r.contract_id) ?? null,
-      validUntil: contract?.valid_until ?? null,
+      validUntil: null,
       freshness: computeFreshness(r.contract_id, r.stage_entered_at, r.stage_id),
       tag: tagByContract.get(r.contract_id) ?? null,
       lostReasonName: r.lost_reason_id ? lostReasonById.get(r.lost_reason_id) ?? null : null,
