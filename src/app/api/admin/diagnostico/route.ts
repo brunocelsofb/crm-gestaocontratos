@@ -1,30 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
-  const supabase = createAdminClient()
+  const admin = createAdminClient()
+  const user_supabase = await createClient()
   const checks: Record<string, any> = {}
 
-  const companyId = '255598e0-36e8-4e29-b253-70faee08987b'
+  // Testa com createClient (usuário autenticado) — mesmo client usado pelas páginas
+  const { data: pipelines, error: pe } = await user_supabase.from('pipelines').select('id, type, name').limit(5)
+  checks.pipelines = pipelines?.map(p => ({ id: p.id.slice(0,8), type: p.type, name: p.name }))
+  checks.pipelines_error = pe?.message
 
-  // Empresa
-  const { data: company } = await supabase.from('companies').select('id, name, cnpj').eq('id', companyId).single()
-  checks.company = company
+  const { data: runs, error: re } = await user_supabase.from('pipeline_runs').select('id, status, pipeline_id').limit(5)
+  checks.runs_sample = runs?.map(r => ({ status: r.status, pid: r.pipeline_id?.slice(0,8) }))
+  checks.runs_error = re?.message
 
-  // Contratos por company_id
-  const { data: byId } = await supabase.from('contracts').select('id, client_name, company_id').eq('company_id', companyId).limit(5)
-  checks.contracts_by_company_id = byId
+  const { data: stages, error: se } = await user_supabase.from('stages').select('id, name, pipeline_id').limit(5)
+  checks.stages_sample = stages?.map(s => ({ name: s.name, pid: s.pipeline_id?.slice(0,8) }))
+  checks.stages_error = se?.message
 
-  // Contratos por nome
-  const { data: byName } = await supabase.from('contracts').select('id, client_name, company_id').ilike('client_name', '%MATHEUS LUIZ%').limit(5)
-  checks.contracts_by_name = byName
-
-  // Runs por contract_id
-  if (byId?.length || byName?.length) {
-    const ids = [...new Set([...(byId ?? []), ...(byName ?? [])].map(c => c.id))]
-    const { data: runs } = await supabase.from('pipeline_runs').select('id, status, contract_id, pipeline_id').in('contract_id', ids)
-    checks.runs = runs
-  }
+  // Verifica colunas reais de pipeline_runs via admin
+  const { data: cols } = await admin.rpc('exec_sql' as any, {
+    sql: `SELECT column_name FROM information_schema.columns WHERE table_schema='contract_crm' AND table_name='pipeline_runs' ORDER BY ordinal_position`
+  }).catch(() => ({ data: null }))
+  checks.pipeline_runs_columns = cols
 
   return NextResponse.json(checks, { headers: { 'Cache-Control': 'no-store' } })
 }
