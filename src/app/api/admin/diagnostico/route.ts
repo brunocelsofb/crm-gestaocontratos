@@ -20,11 +20,10 @@ export async function GET() {
   checks.stages_sample = stages?.map(s => ({ name: s.name, pid: s.pipeline_id?.slice(0,8) }))
   checks.stages_error = se?.message
 
-  // Verifica colunas reais de pipeline_runs via admin
-  const { data: cols } = await admin.rpc('exec_sql' as any, {
-    sql: `SELECT column_name FROM information_schema.columns WHERE table_schema='contract_crm' AND table_name='pipeline_runs' ORDER BY ordinal_position`
-  }).catch(() => ({ data: null }))
-  checks.pipeline_runs_columns = cols
+  try {
+    const { data: cols } = await admin.from('pipeline_runs').select('id').limit(1)
+    checks.pipeline_runs_readable = !!cols
+  } catch { checks.pipeline_runs_readable = false }
 
   return NextResponse.json(checks, { headers: { 'Cache-Control': 'no-store' } })
 }
