@@ -68,6 +68,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   console.log('[dash] allSalesPipelineIds:', allSalesPipelineIds)
   console.log('[dash] openRuns:', openRuns?.length, 'wonInPeriod:', wonInPeriod?.length, 'gestaoRuns:', gestaoRuns?.length)
   console.log('[dash] wonInPeriod errors - period:', periodFrom, 'to', periodTo)
+  const stageMap = new Map((stages ?? []).map((s: any) => [s.id, s.name]))
   const stageOrder = (stages ?? []).map((s: any) => s.id)
   const mrrCarteira = (gestaoRuns ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
 
