@@ -43,5 +43,24 @@ export async function GET() {
     .from('contracts').select('id, client_name, company_id').ilike('client_name', '%MATHEUS LUIZ BARBOSA%').limit(5)
   checks.by_name = byName?.map(d => ({ name: d.client_name, co_id: d.company_id?.slice(0,8) ?? 'NULL' }))
 
+  // Debug específico da empresa do Matheus
+  const companyId = '255598e0-36e8-4e29-b253-70faee08987b'
+  const { data: byCompanyId } = await supabase
+    .from('contracts').select('id, client_name, company_id').eq('company_id', companyId).limit(10)
+  checks.matheus_by_company_id = byCompanyId?.map(d => ({ name: d.client_name, co_id: d.company_id?.slice(0,8) }))
+
+  const { data: allRuns } = await supabase
+    .from('pipeline_runs')
+    .select('id, status, contract_id, pipeline_id, pipelines(name, type)')
+    .in('contract_id', ['519cb8fb-' + '0000-0000-0000-000000000000'])
+    .limit(10)
+  // Busca pelos runs do contrato 519cb8fb completo
+  const { data: mRuns } = await supabase
+    .from('pipeline_runs')
+    .select('id, status, started_at, pipeline_id, pipelines(name, type)')
+    .eq('contract_id', '519cb8fb-' + (byCompanyId?.[0]?.id?.slice(9) ?? ''))
+    .limit(10)
+  checks.all_runs_for_matheus = mRuns
+
   return NextResponse.json(checks, { headers: { 'Cache-Control': 'no-store' } })
 }

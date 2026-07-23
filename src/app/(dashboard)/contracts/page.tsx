@@ -23,24 +23,38 @@ export default async function ContractsPage({
 
   let query = salesPipelineIds.length
     ? supabase
-        .from('contracts_with_current_run')
-        .select('id, process_number, title, client_name, value, run_status, stage_id, pipeline_id')
+        .from('pipeline_runs')
+        .select('contract_id, status, value, stage_id, pipeline_id, started_at, ended_at')
         .in('pipeline_id', salesPipelineIds)
-        .order('created_at', { ascending: false })
+        .order('started_at', { ascending: false })
     : supabase
-        .from('contracts_with_current_run')
-        .select('id, process_number, title, client_name, value, run_status, stage_id, pipeline_id')
-        .eq('pipeline_id', '00000000-0000-0000-0000-000000000000') // retorna vazio se não tem funil de vendas
+        .from('pipeline_runs')
+        .select('contract_id, status, value, stage_id, pipeline_id, started_at, ended_at')
+        .eq('pipeline_id', '00000000-0000-0000-0000-000000000000')
 
-  if (q?.trim()) {
-    const term = q.trim().replace(/[%_]/g, '')
-    query = query.or(`process_number.ilike.%${term}%,title.ilike.%${term}%,client_name.ilike.%${term}%`)
-  }
-  if (status && status !== 'all') query = query.eq('run_status', status)
+  if (status && status !== 'all') query = query.eq('status', status)
 
-  const { data: contracts, error } = await query
-  const stageIds = [...new Set((contracts ?? []).map((c) => c.stage_id).filter(Boolean))]
-  const contractIds = (contracts ?? []).map((c) => c.id)
+  const { data: runs } = await query
+
+  // Pega os contratos correspondentes
+  const runContractIds = [...new Set((runs ?? []).map(r => r.contract_id))]
+  const { data: contractsData } = runContractIds.length
+    ? await supabase.from('contracts').select('id, process_number, title, client_name, created_at').in('id', runContractIds)
+    : { data: [] as any[] }
+
+  const contractById = new Map((contractsData ?? []).map(c => [c.id, c]))
+
+  // Filtra por texto se necessário
+  const filteredRuns = q?.trim()
+    ? (runs ?? []).filter(r => {
+        const c = contractById.get(r.contract_id)
+        const term = q.trim().toLowerCase()
+        return c?.client_name?.toLowerCase().includes(term) || c?.title?.toLowerCase().includes(term) || c?.process_number?.toLowerCase().includes(term)
+      })
+    : (runs ?? [])
+
+  const stageIds = [...new Set(filteredRuns.map(r => r.stage_id).filter(Boolean))]
+  const contractIds = [...new Set(filteredRuns.map(r => r.contract_id))]
 
   const [{ data: stages }, { data: validityData }] = await Promise.all([
     stageIds.length ? supabase.from('stages').select('id, name, color').in('id', stageIds) : Promise.resolve({ data: [] as any[] }),
@@ -50,11 +64,21 @@ export default async function ContractsPage({
   const stageById = new Map((stages ?? []).map((s: any) => [s.id, s]))
   const validUntilById = new Map((validityData ?? []).map((c: any) => [c.id, c.valid_until]))
 
-  const enriched = (contracts ?? []).map(c => ({
-    ...c,
-    stage: c.stage_id ? stageById.get(c.stage_id) ?? null : null,
-    valid_until: validUntilById.get(c.id) ?? null,
-  }))
+  const enriched = filteredRuns.map(r => {
+    const c = contractById.get(r.contract_id) ?? { id: r.contract_id, process_number: '', title: '', client_name: '', created_at: '' }
+    return {
+      id: c.id,
+      process_number: c.process_number,
+      title: c.title,
+      client_name: c.client_name,
+      value: r.value,
+      run_status: r.status,
+      stage_id: r.stage_id,
+      pipeline_id: r.pipeline_id,
+      stage: r.stage_id ? stageById.get(r.stage_id) ?? null : null,
+      valid_until: validUntilById.get(c.id) ?? null,
+    }
+  })
 
   const total = enriched.reduce((s, c) => s + Number(c.value || 0), 0)
   const open = enriched.filter(c => c.run_status === 'open').length
@@ -118,7 +142,6 @@ export default async function ContractsPage({
           </form>
         </div>
 
-        {error && <p style={{ padding: '12px 16px', fontSize: 12, color: '#b91c1c' }}>Erro: {error.message}</p>}
         <ContractsTable contracts={enriched} q={q} />
       </div>
     </div>
