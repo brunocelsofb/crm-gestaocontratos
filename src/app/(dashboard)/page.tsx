@@ -65,7 +65,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     gestaoPipeline ? supabase.from('pipeline_runs').select('contract_id, value').eq('pipeline_id', gestaoPipeline.id).eq('status', 'open') : Promise.resolve({ data: [] as any[] }),
   ])
 
-  const stageMap = new Map((stages ?? []).map((s: any) => [s.id, s.name]))
+  console.log('[dash] allSalesPipelineIds:', allSalesPipelineIds)
+  console.log('[dash] openRuns:', openRuns?.length, 'wonInPeriod:', wonInPeriod?.length, 'gestaoRuns:', gestaoRuns?.length)
+  console.log('[dash] wonInPeriod errors - period:', periodFrom, 'to', periodTo)
   const stageOrder = (stages ?? []).map((s: any) => s.id)
   const mrrCarteira = (gestaoRuns ?? []).reduce((s: number, r: any) => s + Number(r.value || 0), 0)
 
