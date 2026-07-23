@@ -57,13 +57,14 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   // Busca contratos por company_id OU pelo CNPJ/nome no client_name (contratos legados)
   const cnpjDigits = company?.cnpj?.replace(/\D/g, '') ?? null
-  const nameFragment = company.name.split(' ').slice(0, 3).join(' ')
+  const cnpjRoot = cnpjDigits ? cnpjDigits.slice(0, 8) : null // primeiros 8 dígitos ex: "66378147"
+  // Remove CNPJ do início do nome (formato "66.378.147 NOME DA EMPRESA")
+  const namePart = company.name.replace(/^\d{2}\.\d{3}\.\d{3}\s*/, '').split(' ').slice(0, 3).join(' ')
 
-  // Busca separada e une os resultados para evitar problemas com OR complexo
   const [{ data: byCompanyId }, { data: byCnpj }, { data: byName }] = await Promise.all([
     supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').eq('company_id', id).limit(50),
-    cnpjDigits ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${cnpjDigits}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
-    nameFragment ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${nameFragment}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
+    cnpjRoot ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${cnpjRoot}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
+    namePart.length > 3 ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${namePart}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
   ])
 
   // Une sem duplicatas
