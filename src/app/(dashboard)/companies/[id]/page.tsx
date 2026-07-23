@@ -45,7 +45,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     isCurrentUserAdmin(),
     supabase.from('companies').select('*').eq('id', id).single(),
     supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('is_primary', { ascending: false }),
-    supabase.from('contracts').select('id, process_number, title, created_at, value, company_id').eq('company_id', id).order('created_at', { ascending: false }),
+    supabase.from('contracts').select('id, process_number, title, created_at, company_id').eq('company_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('pipelines').select('id, name, is_default').eq('type', 'vendas').order('name'),
@@ -62,9 +62,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const namePart = company.name.replace(/^\d{2}\.\d{3}\.\d{3}\s*/, '').split(' ').slice(0, 3).join(' ')
 
   const [{ data: byCompanyId, error: e1 }, { data: byCnpj, error: e2 }, { data: byName, error: e3 }] = await Promise.all([
-    supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').eq('company_id', id).limit(50),
-    cnpjRoot ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${cnpjRoot}%`).limit(20) : Promise.resolve({ data: [] as any[], error: null }),
-    namePart.length > 3 ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, value, company_id').ilike('client_name', `%${namePart}%`).limit(20) : Promise.resolve({ data: [] as any[], error: null }),
+    supabase.from('contracts').select('id, process_number, title, client_name, created_at, company_id').eq('company_id', id).limit(50),
+    cnpjRoot ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, company_id').ilike('client_name', `%${cnpjRoot}%`).limit(20) : Promise.resolve({ data: [] as any[], error: null }),
+    namePart.length > 3 ? supabase.from('contracts').select('id, process_number, title, client_name, created_at, company_id').ilike('client_name', `%${namePart}%`).limit(20) : Promise.resolve({ data: [] as any[], error: null }),
   ])
 
   if (e1) console.error('[empresa] byCompanyId error:', e1.message)
