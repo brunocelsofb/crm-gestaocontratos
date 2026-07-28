@@ -788,18 +788,19 @@ export async function transferRunToPipeline(
 
   const now = new Date().toISOString()
 
-  // Busca o run aberto atual
+  // Busca o run mais recente (aberto ou fechado)
   const { data: run } = await supabase
     .from('pipeline_runs')
-    .select('id, value, pipeline_id, stage_id')
+    .select('id, value, pipeline_id, stage_id, status')
     .eq('contract_id', contractId)
-    .eq('status', 'open')
+    .order('started_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
-  if (!run) return { error: 'Nenhuma passagem aberta encontrada.' }
+  if (!run) return { error: 'Nenhuma passagem encontrada.' }
   if (run.pipeline_id === targetPipelineId) return { error: 'O contrato já está neste funil.' }
 
-  // Fecha o run atual como 'moved'
+  // Fecha o run atual como 'moved' (independente do status atual)
   await supabase.from('pipeline_runs')
     .update({ status: 'moved', ended_at: now })
     .eq('id', run.id)

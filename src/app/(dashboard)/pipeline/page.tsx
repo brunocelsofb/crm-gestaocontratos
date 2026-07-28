@@ -82,7 +82,7 @@ export default async function PipelinePage({
     ...(allSalesRuns ?? []).map((r: any) => r.contract_id),
   ])]
 
-  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }, { data: allStagesData }] = await Promise.all([
+  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }, { data: allStagesData }, { data: allPipelineStages }] = await Promise.all([
     allContractIds.length
       ? supabase.from('contracts').select('id, process_number, title, client_name, company_id').in('id', allContractIds)
       : Promise.resolve({ data: [] as any[] }),
@@ -95,6 +95,8 @@ export default async function PipelinePage({
     salesPipelineIds.length
       ? supabase.from('stages').select('id, name, order_index, pipeline_id, sla_days').in('pipeline_id', salesPipelineIds).order('order_index')
       : Promise.resolve({ data: [] as any[] }),
+    // Stages de TODOS os funis para transferência entre funis (avulso pode ir para qualquer um)
+    supabase.from('stages').select('id, name, order_index, pipeline_id').in('pipeline_id', (pipelines ?? []).map(p => p.id)).order('order_index'),
   ])
 
   const contractById = new Map((contractsData ?? []).map((c: any) => [c.id, c]))
@@ -270,15 +272,25 @@ export default async function PipelinePage({
           wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
           lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
           isAdmin={isAdmin}
-          otherPipelines={pipelineType === 'vendas'
-            ? (pipelines ?? [])
-                .filter(p => p.type === 'vendas' && p.id !== selectedPipeline)
-                .map(p => ({
-                  id: p.id,
-                  name: p.name,
-                  stages: (allStagesData ?? []).filter((s: any) => s.pipeline_id === p.id).sort((a: any, b: any) => a.order_index - b.order_index),
-                }))
-            : undefined
+          otherPipelines={
+            (() => {
+              const allPipelines = pipelines ?? []
+              let targets: typeof allPipelines = []
+              if (pipelineType === 'vendas') {
+                // MRR: pode mover para qualquer outro funil de vendas
+                targets = allPipelines.filter(p => p.type === 'vendas' && p.id !== selectedPipeline)
+              } else if (pipelineType === 'servico_avulso') {
+                // Avulso: pode mover para qualquer funil
+                targets = allPipelines.filter(p => p.id !== selectedPipeline)
+              }
+              return targets.length > 0
+                ? targets.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    stages: (allPipelineStages ?? allStagesData ?? []).filter((s: any) => s.pipeline_id === p.id).sort((a: any, b: any) => a.order_index - b.order_index),
+                  }))
+                : undefined
+            })()
           }
         />
       ) : (
