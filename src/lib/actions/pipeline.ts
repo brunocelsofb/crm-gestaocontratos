@@ -820,11 +820,14 @@ export async function transferRunToPipeline(
   if (insertError) return { error: insertError.message }
 
   // Registra atividade
+  const { data: sourcePipeline } = await supabase.from('pipelines').select('name').eq('id', run.pipeline_id).maybeSingle()
+  const { data: targetPipeline } = await supabase.from('pipelines').select('name').eq('id', targetPipelineId).maybeSingle()
+
   await supabase.from('activities').insert({
     contract_id: contractId,
     user_id: user.id,
     type: 'transfer',
-    content: 'Oportunidade transferida para outro funil.',
+    content: `Transferido do funil "${sourcePipeline?.name ?? run.pipeline_id.slice(0,8)}" para "${targetPipeline?.name ?? targetPipelineId.slice(0,8)}".`,
   })
 
   revalidatePath(`/contracts/${contractId}`)
