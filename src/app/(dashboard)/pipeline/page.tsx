@@ -282,6 +282,9 @@ export default async function PipelinePage({
               } else if (pipelineType === 'servico_avulso') {
                 // Avulso: pode mover para qualquer funil
                 targets = allPipelines.filter(p => p.id !== selectedPipeline)
+              } else if (pipelineType === 'gestao_contratos') {
+                // Gestão de contratos: pode mover para qualquer outro funil
+                targets = allPipelines.filter(p => p.id !== selectedPipeline)
               }
               return targets.length > 0
                 ? targets.map(p => ({
