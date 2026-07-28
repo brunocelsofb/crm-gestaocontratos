@@ -36,12 +36,18 @@ export default async function ContractsPage({
 
   const { data: runs } = await query
 
-  // Deduplica por contract_id — mantém apenas o run mais recente por contrato
-  // (evita duplicatas quando há runs moved + open/won para o mesmo contrato)
+  // Deduplica por contract_id — prioriza open/won/lost sobre moved
   const latestRunByContract = new Map<string, any>()
   for (const r of (runs ?? [])) {
     const existing = latestRunByContract.get(r.contract_id)
-    if (!existing || new Date(r.started_at) > new Date(existing.started_at)) {
+    const rActive = r.status !== 'moved'
+    const exActive = existing?.status !== 'moved'
+    if (!existing) { latestRunByContract.set(r.contract_id, r); continue }
+    // Ativo sempre vence moved
+    if (rActive && !exActive) { latestRunByContract.set(r.contract_id, r); continue }
+    if (!rActive && exActive) continue
+    // Entre dois do mesmo tipo, pega o mais recente
+    if (new Date(r.started_at) > new Date(existing.started_at)) {
       latestRunByContract.set(r.contract_id, r)
     }
   }
