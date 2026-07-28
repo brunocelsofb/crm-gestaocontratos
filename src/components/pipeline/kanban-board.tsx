@@ -202,19 +202,17 @@ const TRASH_ZONE_ID = '__trash__'
 function TrashDropzone() {
   const { setNodeRef, isOver } = useDroppable({ id: TRASH_ZONE_ID })
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        borderRadius: 10, border: `1.5px dashed ${isOver ? '#ef4444' : '#d1d8e8'}`,
-        padding: '10px', fontSize: 12, marginBottom: 4,
-        background: isOver ? '#fdecea' : 'transparent',
-        color: isOver ? '#b91c1c' : '#8892a4',
-        transition: 'all 0.15s',
-      }}
-    >
-      <Trash2 size={14} />
-      Arraste aqui para excluir permanentemente (admin)
+    <div ref={setNodeRef} style={{
+      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+      borderRadius: 12, border: `2px dashed ${isOver ? '#ef4444' : '#d1d8e8'}`,
+      padding: '20px 16px', fontSize: 12, fontWeight: 500,
+      background: isOver ? '#fdecea' : 'rgba(255,255,255,0.8)',
+      color: isOver ? '#b91c1c' : '#8892a4',
+      transition: 'all 0.15s', cursor: 'copy',
+      minWidth: 160,
+    }}>
+      <Trash2 size={22} />
+      Excluir permanentemente
     </div>
   )
 }
@@ -241,6 +239,7 @@ export function KanbanBoard({
   isGestao?: boolean
 }) {
   const [cards, setCards] = useState(initialCards)
+  const [isDraggingAny, setIsDraggingAny] = useState(false)
   const [transferCard, setTransferCard] = useState<RunCard | null>(null)
   const [transferPipelineId, setTransferPipelineId] = useState('')
   const [transferStageId, setTransferStageId] = useState('')
@@ -429,8 +428,7 @@ export function KanbanBoard({
           Mostrar encerrados ({closedCount})
         </label>
       </div>
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        {isAdmin && <TrashDropzone />}
+      <DndContext sensors={sensors} onDragStart={() => setIsDraggingAny(true)} onDragEnd={(event) => { setIsDraggingAny(false); handleDragEnd(event) }}>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
           {stages.map((stage) => (
             <Column
@@ -448,6 +446,19 @@ export function KanbanBoard({
             />
           ))}
         </div>
+
+        {/* Barra inferior estilo PipeRun — só aparece ao arrastar */}
+        {isDraggingAny && (
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500,
+            padding: '12px 24px',
+            background: 'rgba(26,31,54,0.97)',
+            display: 'flex', gap: 12, alignItems: 'stretch',
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.25)',
+          }}>
+            {isAdmin && <TrashDropzone />}
+          </div>
+        )}
       </DndContext>
     </div>
     </>
