@@ -228,6 +228,7 @@ export function KanbanBoard({
   lostLabel,
   isAdmin,
   otherPipelines,
+  isGestao,
 }: {
   pipelineId: string
   stages: Stage[]
@@ -237,6 +238,7 @@ export function KanbanBoard({
   lostLabel: string
   isAdmin: boolean
   otherPipelines?: { id: string; name: string; stages: { id: string; name: string }[] }[]
+  isGestao?: boolean
 }) {
   const [cards, setCards] = useState(initialCards)
   const [transferCard, setTransferCard] = useState<RunCard | null>(null)
@@ -370,9 +372,17 @@ export function KanbanBoard({
         <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
           <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', marginBottom: 4 }}>Transferir para outro funil</p>
           <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 12 }}>{transferCard.clientName || transferCard.title}</p>
-          <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: '#fff8e6', border: '0.5px solid #fde68a', fontSize: 12, color: '#92400e' }}>
-            ⚠ <strong>Atenção:</strong> a oportunidade será movida para o funil de destino. O histórico é preservado. Você autoriza a transferência?
-          </div>
+          {isGestao
+            ? (
+              <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 8, background: '#fdecea', border: '1.5px solid #fca5a5', fontSize: 12, color: '#b91c1c' }}>
+                🚨 <strong>Atenção redobrada:</strong> este contrato está em gestão ativa — já passou pelo funil de vendas e foi ganho. Transferi-lo irá movê-lo para outro funil e criará uma nova passagem. O histórico é preservado, mas o contrato sairá da gestão atual. <strong>Você confirma?</strong>
+              </div>
+            ) : (
+              <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: '#fff8e6', border: '0.5px solid #fde68a', fontSize: 12, color: '#92400e' }}>
+                ⚠ <strong>Atenção:</strong> a oportunidade será movida para o funil de destino. O histórico é preservado. <strong>Você autoriza?</strong>
+              </div>
+            )
+          }
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             <div>
               <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Funil de destino</p>

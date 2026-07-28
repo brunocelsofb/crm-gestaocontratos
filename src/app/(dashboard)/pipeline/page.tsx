@@ -272,6 +272,7 @@ export default async function PipelinePage({
           wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
           lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
           isAdmin={isAdmin}
+          isGestao={pipelineType === 'gestao_contratos'}
           otherPipelines={
             (() => {
               const allPipelines = pipelines ?? []
