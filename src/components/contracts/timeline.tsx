@@ -34,7 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
   pipeline_change: 'Funil alterado',
   automation_triggered: 'Automação disparada',
   system: 'Evento do sistema',
-  transfer: 'Transferência entre times',
+  transfer: 'Transferência entre funis',
 }
 
 const EMAIL_KIND_LABEL: Record<string, string> = {
