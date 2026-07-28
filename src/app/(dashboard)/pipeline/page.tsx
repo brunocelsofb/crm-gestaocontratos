@@ -278,7 +278,7 @@ export default async function PipelinePage({
                   name: p.name,
                   stages: (allStagesData ?? []).filter((s: any) => s.pipeline_id === p.id).sort((a: any, b: any) => a.order_index - b.order_index),
                 }))
-            : []
+            : undefined
           }
         />
       ) : (
