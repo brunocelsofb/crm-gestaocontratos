@@ -276,16 +276,8 @@ export default async function PipelinePage({
             (() => {
               const allPipelines = pipelines ?? []
               let targets: typeof allPipelines = []
-              if (pipelineType === 'vendas') {
-                // MRR: pode mover para qualquer outro funil de vendas
-                targets = allPipelines.filter(p => p.type === 'vendas' && p.id !== selectedPipeline)
-              } else if (pipelineType === 'servico_avulso') {
-                // Avulso: pode mover para qualquer funil
-                targets = allPipelines.filter(p => p.id !== selectedPipeline)
-              } else if (pipelineType === 'gestao_contratos') {
-                // Gestão de contratos: pode mover para qualquer outro funil
-                targets = allPipelines.filter(p => p.id !== selectedPipeline)
-              }
+              // Qualquer funil pode transferir para qualquer outro funil
+              targets = allPipelines.filter(p => p.id !== selectedPipeline)
               return targets.length > 0
                 ? targets.map(p => ({
                     id: p.id,
