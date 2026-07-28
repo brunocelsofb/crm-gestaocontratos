@@ -270,6 +270,16 @@ export default async function PipelinePage({
           wonLabel={pipelines?.find((p) => p.id === selectedPipeline)?.won_label ?? 'Ganho'}
           lostLabel={pipelines?.find((p) => p.id === selectedPipeline)?.lost_label ?? 'Perdido'}
           isAdmin={isAdmin}
+          otherPipelines={pipelineType === 'vendas'
+            ? (pipelines ?? [])
+                .filter(p => p.type === 'vendas' && p.id !== selectedPipeline)
+                .map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  stages: (allStagesData ?? []).filter((s: any) => s.pipeline_id === p.id).sort((a: any, b: any) => a.order_index - b.order_index),
+                }))
+            : []
+          }
         />
       ) : (
         <p style={{ fontSize: 13, color: '#8892a4' }}>Nenhuma etapa cadastrada para este pipeline.</p>

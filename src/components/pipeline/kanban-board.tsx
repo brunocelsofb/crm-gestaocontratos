@@ -68,7 +68,10 @@ const FRESHNESS_STYLES = {
   stale:   { border: '0.5px solid #fca5a5', background: '#fff5f5', borderLeft: '3px solid #ef4444' },
 } as const
 
-function Card({ card, sla, showValidity, wonLabel, lostLabel }: { card: RunCard; sla: number | null; showValidity: boolean; wonLabel: string; lostLabel: string }) {
+function Card({ card, sla, showValidity, wonLabel, lostLabel, onTransfer }: {
+  card: RunCard; sla: number | null; showValidity: boolean; wonLabel: string; lostLabel: string
+  onTransfer?: (card: RunCard) => void
+}) {
   const router = useRouter()
   const isClosed = card.status !== 'open'
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -141,15 +144,28 @@ function Card({ card, sla, showValidity, wonLabel, lostLabel }: { card: RunCard;
 
       <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f1f3f8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>{fmt(card.value)}</span>
-        <span style={{ borderRadius: 20, padding: '2px 7px', fontSize: 10, fontWeight: 500, background: overdue ? '#fdecea' : '#f1f3f8', color: overdue ? '#b91c1c' : '#8892a4' }}>
-          {days === 0 ? '< 1 dia' : `${days}d`}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {onTransfer && !isClosed && (
+            <button
+              onClick={e => { e.stopPropagation(); onTransfer(card) }}
+              title="Transferir para outro funil"
+              style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+              ↔ Funil
+            </button>
+          )}
+          <span style={{ borderRadius: 20, padding: '2px 7px', fontSize: 10, fontWeight: 500, background: overdue ? '#fdecea' : '#f1f3f8', color: overdue ? '#b91c1c' : '#8892a4' }}>
+            {days === 0 ? '< 1 dia' : `${days}d`}
+          </span>
+        </div>
       </div>
     </div>
   )
 }
 
-function Column({ stage, cards, showValidity, wonLabel, lostLabel }: { stage: Stage; cards: RunCard[]; showValidity: boolean; wonLabel: string; lostLabel: string }) {
+function Column({ stage, cards, showValidity, wonLabel, lostLabel, onTransfer }: {
+  stage: Stage; cards: RunCard[]; showValidity: boolean; wonLabel: string; lostLabel: string
+  onTransfer?: (card: RunCard) => void
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const total = cards.reduce((sum, c) => sum + c.value, 0)
 
@@ -172,7 +188,7 @@ function Column({ stage, cards, showValidity, wonLabel, lostLabel }: { stage: St
       </div>
       <p style={{ fontSize: 11, color: '#8892a4', padding: '0 4px', marginBottom: 10 }}>{fmt(total)}</p>
       {cards.map((c) => (
-        <Card key={c.runId} card={c} sla={stage.sla_days} showValidity={showValidity} wonLabel={wonLabel} lostLabel={lostLabel} />
+        <Card key={c.runId} card={c} sla={stage.sla_days} showValidity={showValidity} wonLabel={wonLabel} lostLabel={lostLabel} onTransfer={onTransfer} />
       ))}
       {cards.length === 0 && (
         <p style={{ padding: '32px 0', textAlign: 'center', fontSize: 11, color: '#c8cdd8' }}>Vazio</p>
@@ -211,6 +227,7 @@ export function KanbanBoard({
   wonLabel,
   lostLabel,
   isAdmin,
+  otherPipelines,
 }: {
   pipelineId: string
   stages: Stage[]
@@ -219,8 +236,12 @@ export function KanbanBoard({
   wonLabel: string
   lostLabel: string
   isAdmin: boolean
+  otherPipelines?: { id: string; name: string; stages: { id: string; name: string }[] }[]
 }) {
   const [cards, setCards] = useState(initialCards)
+  const [transferCard, setTransferCard] = useState<RunCard | null>(null)
+  const [transferPipelineId, setTransferPipelineId] = useState('')
+  const [transferStageId, setTransferStageId] = useState('')
 
   // CORREÇÃO: sem isso, o botão "Atualizar" (router.refresh()) buscaria
   // dados novos do servidor, mas o estado local dos cards continuaria
@@ -322,7 +343,66 @@ export function KanbanBoard({
     })
   }
 
+  function handleTransfer() {
+    if (!transferCard || !transferPipelineId || !transferStageId) return
+    const card = transferCard
+    setCards(prev => prev.filter(c => c.runId !== card.runId))
+    setTransferCard(null)
+    startTransition(async () => {
+      const { transferRunToPipeline } = await import('@/lib/actions/pipeline')
+      const result = await transferRunToPipeline(card.contractId, transferPipelineId, transferStageId)
+      if (result.error) {
+        setError(result.error)
+        setCards(prev => [...prev, card])
+      } else {
+        router.refresh()
+      }
+    })
+  }
+
+  const inp: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
+
   return (
+    <>
+    {/* Modal de transferência entre funis */}
+    {transferCard && otherPipelines && otherPipelines.length > 0 && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
+          <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', marginBottom: 4 }}>Transferir para outro funil</p>
+          <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 16 }}>{transferCard.clientName || transferCard.title}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+            <div>
+              <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Funil de destino</p>
+              <select value={transferPipelineId} style={{ ...inp, cursor: 'pointer' }}
+                onChange={e => {
+                  setTransferPipelineId(e.target.value)
+                  setTransferStageId(otherPipelines.find(p => p.id === e.target.value)?.stages[0]?.id ?? '')
+                }}>
+                <option value="">Selecione...</option>
+                {otherPipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            {transferPipelineId && (
+              <div>
+                <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Etapa inicial</p>
+                <select value={transferStageId} onChange={e => setTransferStageId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                  {(otherPipelines.find(p => p.id === transferPipelineId)?.stages ?? []).map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => setTransferCard(null)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={handleTransfer} disabled={!transferPipelineId || !transferStageId}
+              style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: !transferPipelineId ? '#d1d8e8' : '#1a1f36', color: '#fff', cursor: 'pointer' }}>
+              Transferir
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {error && <p style={{ fontSize: 12, color: '#b91c1c' }}>{error}</p>}
@@ -347,10 +427,16 @@ export function KanbanBoard({
               showValidity={showValidity}
               wonLabel={wonLabel}
               lostLabel={lostLabel}
+              onTransfer={otherPipelines && otherPipelines.length > 0 ? (card: RunCard) => {
+                setTransferCard(card)
+                setTransferPipelineId(otherPipelines![0]?.id ?? '')
+                setTransferStageId(otherPipelines![0]?.stages[0]?.id ?? '')
+              } : undefined}
             />
           ))}
         </div>
       </DndContext>
     </div>
+    </>
   )
 }
