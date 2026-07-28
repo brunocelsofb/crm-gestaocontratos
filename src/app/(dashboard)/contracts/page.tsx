@@ -36,8 +36,19 @@ export default async function ContractsPage({
 
   const { data: runs } = await query
 
+  // Deduplica por contract_id — mantém apenas o run mais recente por contrato
+  // (evita duplicatas quando há runs moved + open/won para o mesmo contrato)
+  const latestRunByContract = new Map<string, any>()
+  for (const r of (runs ?? [])) {
+    const existing = latestRunByContract.get(r.contract_id)
+    if (!existing || new Date(r.started_at) > new Date(existing.started_at)) {
+      latestRunByContract.set(r.contract_id, r)
+    }
+  }
+  const deduplicatedRuns = Array.from(latestRunByContract.values())
+
   // Pega os contratos correspondentes
-  const runContractIds = [...new Set((runs ?? []).map(r => r.contract_id))]
+  const runContractIds = [...new Set(deduplicatedRuns.map(r => r.contract_id))]
   const { data: contractsData } = runContractIds.length
     ? await supabase.from('contracts').select('id, process_number, title, client_name, created_at').in('id', runContractIds)
     : { data: [] as any[] }
@@ -46,12 +57,12 @@ export default async function ContractsPage({
 
   // Filtra por texto se necessário
   const filteredRuns = q?.trim()
-    ? (runs ?? []).filter(r => {
+    ? deduplicatedRuns.filter(r => {
         const c = contractById.get(r.contract_id)
         const term = q.trim().toLowerCase()
         return c?.client_name?.toLowerCase().includes(term) || c?.title?.toLowerCase().includes(term) || c?.process_number?.toLowerCase().includes(term)
       })
-    : (runs ?? [])
+    : deduplicatedRuns
 
   const stageIds = [...new Set(filteredRuns.map(r => r.stage_id).filter(Boolean))]
   const contractIds = [...new Set(filteredRuns.map(r => r.contract_id))]
