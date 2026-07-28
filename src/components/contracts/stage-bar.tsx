@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { moveContractStage, reopenRun, closeRun } from '@/lib/actions/pipeline'
+import { moveContractStage, reopenRun, closeRun, transferRunToPipeline } from '@/lib/actions/pipeline'
 import { addMonthsToDateString } from '@/lib/utils/date'
 
 type Stage = {
@@ -9,6 +9,7 @@ type Stage = {
   is_won: boolean; is_lost: boolean; sla_days: number | null; color: string | null
 }
 type StageTiming = { stageId: string; days: number | null; isOverdue: boolean }
+type OtherPipeline = { id: string; name: string; stages: { id: string; name: string }[] }
 
 const MONTH_SHORTCUTS = [1, 2, 3, 6, 12, 24, 36, 48, 60]
 const CNPJS_ORBIS = [
@@ -23,17 +24,21 @@ const CONTRACT_TYPES = [
 export function StageBar({
   contractId, stages, currentStageId, timings, status,
   wonLabel, lostLabel, canChangeStage, pipelineType,
-  contractNature, contractValue,
+  contractNature, contractValue, otherPipelines,
 }: {
   contractId: string; stages: Stage[]; currentStageId: string
   timings: StageTiming[]; status: string; wonLabel: string; lostLabel: string
   canChangeStage: boolean; pipelineType?: string
   contractNature?: string | null
   contractValue?: number
+  otherPipelines?: OtherPipeline[]
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showWonModal, setShowWonModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferPipelineId, setTransferPipelineId] = useState('')
+  const [transferStageId, setTransferStageId] = useState('')
   const [validFrom, setValidFrom] = useState('')
   const [validUntil, setValidUntil] = useState('')
   const [cnpjBilling, setCnpjBilling] = useState(CNPJS_ORBIS[0].value)
@@ -50,6 +55,23 @@ export function StageBar({
   const inp: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#f8f9fb', color: '#1a1f36', outline: 'none' }
   const lbl: React.CSSProperties = { display: 'block', fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }
   const modalValid = !!validFrom && !!validUntil && (isGestaoContratos || !!contractType)
+
+  const selectedTransferPipeline = (otherPipelines ?? []).find(p => p.id === transferPipelineId)
+
+  function handleTransferPipelineChange(pid: string) {
+    setTransferPipelineId(pid)
+    setTransferStageId(((otherPipelines ?? []).find(p => p.id === pid)?.stages ?? [])[0]?.id ?? '')
+  }
+
+  function handleTransfer() {
+    if (!transferPipelineId || !transferStageId) return
+    setError(null)
+    startTransition(async () => {
+      const result = await transferRunToPipeline(contractId, transferPipelineId, transferStageId)
+      if (result.error) setError(result.error)
+      else setShowTransferModal(false)
+    })
+  }
 
   function timingFor(stageId: string) { return timings.find((t) => t.stageId === stageId) }
 
@@ -224,6 +246,13 @@ export function StageBar({
         </p>
         {status === 'open' && (
           <div className="flex gap-2">
+            {(otherPipelines ?? []).length > 0 && (
+              <button onClick={() => { setShowTransferModal(true); handleTransferPipelineChange((otherPipelines ?? [])[0]?.id ?? '') }}
+                disabled={isPending}
+                style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                ↔ Transferir funil
+              </button>
+            )}
             <button onClick={handleWonClick} disabled={isPending || !canMarkWon}
               title={canMarkWon ? undefined : `Só é possível marcar "${wonLabel}" numa etapa habilitada`}
               className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:cursor-not-allowed disabled:opacity-40">
@@ -248,6 +277,53 @@ export function StageBar({
           </div>
         )}
       </div>
+
+      {/* Modal de transferência entre funis */}
+      {showTransferModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 420, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 500, color: '#1a1f36', marginBottom: 4 }}>Transferir para outro funil</h2>
+            <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 20 }}>
+              A oportunidade será movida para o funil selecionado. O histórico é preservado.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Funil de destino <span style={{ color: '#b91c1c' }}>*</span></label>
+                <select value={transferPipelineId} onChange={e => handleTransferPipelineChange(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                  <option value="">Selecione...</option>
+                  {(otherPipelines ?? []).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedTransferPipeline && (
+                <div>
+                  <label style={lbl}>Etapa inicial <span style={{ color: '#b91c1c' }}>*</span></label>
+                  <select value={transferStageId} onChange={e => setTransferStageId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                    {selectedTransferPipeline.stages.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {error && <p style={{ fontSize: 12, color: '#b91c1c', marginTop: 12 }}>{error}</p>}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button onClick={() => setShowTransferModal(false)}
+                style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={handleTransfer} disabled={isPending || !transferPipelineId || !transferStageId}
+                style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: !transferPipelineId ? '#d1d8e8' : '#1a1f36', color: '#fff', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+                {isPending ? 'Transferindo...' : 'Confirmar transferência'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

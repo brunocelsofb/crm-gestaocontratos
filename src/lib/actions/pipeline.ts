@@ -775,3 +775,58 @@ export async function reopenRun(contractId: string): Promise<MoveResult> {
   revalidatePath('/contracts')
   return { success: true }
 }
+
+// Transfere uma oportunidade de um funil de vendas para outro
+export async function transferRunToPipeline(
+  contractId: string,
+  targetPipelineId: string,
+  targetStageId: string
+): Promise<MoveResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const now = new Date().toISOString()
+
+  // Busca o run aberto atual
+  const { data: run } = await supabase
+    .from('pipeline_runs')
+    .select('id, value, pipeline_id, stage_id')
+    .eq('contract_id', contractId)
+    .eq('status', 'open')
+    .maybeSingle()
+
+  if (!run) return { error: 'Nenhuma passagem aberta encontrada.' }
+  if (run.pipeline_id === targetPipelineId) return { error: 'O contrato já está neste funil.' }
+
+  // Fecha o run atual como 'moved'
+  await supabase.from('pipeline_runs')
+    .update({ status: 'moved', ended_at: now })
+    .eq('id', run.id)
+
+  // Cria novo run no funil de destino
+  const { error: insertError } = await supabase.from('pipeline_runs').insert({
+    contract_id: contractId,
+    pipeline_id: targetPipelineId,
+    stage_id: targetStageId,
+    stage_entered_at: now,
+    started_at: now,
+    value: run.value,
+    created_by: user.id,
+    previous_run_id: run.id,
+  })
+
+  if (insertError) return { error: insertError.message }
+
+  // Registra atividade
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'transfer',
+    content: 'Oportunidade transferida para outro funil.',
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  revalidatePath('/pipeline')
+  return { success: true }
+}

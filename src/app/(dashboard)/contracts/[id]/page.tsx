@@ -140,6 +140,12 @@ export default async function ContractDetailPage({
   const isCurrentlyInSalesPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'vendas' : false
   const isCurrentlyInContractsPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'gestao_contratos' : false
 
+  // Stages de todos os funis de vendas (para botão de transferência)
+  const salesPipelineIds = (pipelines ?? []).filter(p => p.type === 'vendas').map(p => p.id)
+  const { data: allStagesData } = salesPipelineIds.length > 1
+    ? await supabase.from('stages').select('id, name, order_index, pipeline_id').in('pipeline_id', salesPipelineIds).order('order_index')
+    : { data: [] as any[] }
+
   const activities = (activitiesRaw ?? []).map((a) => ({
     ...a,
     profiles: a.user_id ? { full_name: profileById.get(a.user_id) ?? '' } : null,
@@ -281,6 +287,16 @@ export default async function ContractDetailPage({
           pipelineType={pipelineById.get(displayRun.pipeline_id)?.type}
           contractNature={(contract as any).nature ?? null}
           contractValue={Number(displayRun.value) || 0}
+          otherPipelines={pipelineById.get(displayRun.pipeline_id)?.type === 'vendas'
+            ? (pipelines ?? [])
+                .filter(p => p.type === 'vendas' && p.id !== displayRun.pipeline_id)
+                .map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  stages: (allStagesData ?? []).filter((s: any) => s.pipeline_id === p.id).sort((a: any, b: any) => a.order_index - b.order_index),
+                }))
+            : []
+          }
         />
       ) : (
         <p style={{ borderRadius: 10, background: '#f8f9fb', padding: 16, fontSize: 13, color: '#8892a4' }}>
