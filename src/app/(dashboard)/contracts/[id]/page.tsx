@@ -262,28 +262,6 @@ export default async function ContractDetailPage({
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {/* Botão de integração com ORBIS Price */}
-            {(() => {
-              const companyCnpj = (linkedCompany as any)?.cnpj
-                ?? contract.client_name?.match(/^\d{2}\.\d{3}\.\d{3}[\/\d.\-]+/)?.[0]?.replace(/\D/g, '')
-                ?? null
-              const nature = (contract as any).nature ?? null
-              const beds = (contract as any).hospital_beds ?? null
-              const params = new URLSearchParams({
-                company: contract.client_name ?? '',
-                ...(companyCnpj ? { cnpj: companyCnpj } : {}),
-                ...(beds ? { beds: String(beds) } : {}),
-                ...(nature === 'eng_clinica' ? { type: 'clinica' } : nature === 'eng_hospitalar' ? { type: 'hospitalar' } : {}),
-                project: contract.title || contract.process_number || '',
-                crm_id: contract.id,
-              })
-              return (
-                <a href={`https://orbis-price.vercel.app/?${params.toString()}`} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', textDecoration: 'none', cursor: 'pointer', boxShadow: '0 1px 4px rgba(50,175,157,0.3)' }}>
-                  <span style={{ fontSize: 14 }}>💰</span> Precificar
-                </a>
-              )
-            })()}
             <Link href={`/contracts/${contract.id}/edit`} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', textDecoration: 'none' }}>
               {isCurrentlyInContractsPipeline ? 'Editar contrato' : 'Editar oportunidade'}
             </Link>
