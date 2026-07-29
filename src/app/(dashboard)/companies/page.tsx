@@ -15,14 +15,27 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
 
   const { data: companies, error } = await query
   const companyIds = (companies ?? []).map(c => c.id)
-  const { data: contractCounts } = companyIds.length
-    ? await supabase.from('contracts').select('company_id').in('company_id', companyIds)
-    : { data: [] }
+  // Conta contratos ATIVOS em funil de gestão de contratos (não oportunidades em vendas)
+  const gestaoPipelineIds = (companyIds.length
+    ? await supabase.from('pipelines').select('id').eq('type', 'gestao_contratos')
+    : { data: [] as any[] }
+  ).data?.map((p: any) => p.id) ?? []
+
+  const { data: activeContractRuns } = companyIds.length && gestaoPipelineIds.length
+    ? await supabase
+        .from('pipeline_runs')
+        .select('contract_id, contracts(company_id)')
+        .in('pipeline_id', gestaoPipelineIds)
+        .eq('status', 'open')
+    : { data: [] as any[] }
 
   const countByCompany = new Map<string, number>()
-  for (const c of contractCounts ?? []) {
-    if (!c.company_id) continue
-    countByCompany.set(c.company_id, (countByCompany.get(c.company_id) ?? 0) + 1)
+  for (const r of activeContractRuns ?? []) {
+    const companyId = Array.isArray((r as any).contracts)
+      ? (r as any).contracts[0]?.company_id
+      : (r as any).contracts?.company_id
+    if (!companyId) continue
+    countByCompany.set(companyId, (countByCompany.get(companyId) ?? 0) + 1)
   }
 
   const total = companies?.length ?? 0
