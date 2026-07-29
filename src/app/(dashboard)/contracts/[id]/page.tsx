@@ -72,7 +72,7 @@ export default async function ContractDetailPage({
     { data: catalogItems },
   ] = await Promise.all([
     contract.company_id
-      ? supabase.from('companies').select('id, name, city, state').eq('id', contract.company_id).maybeSingle()
+      ? supabase.from('companies').select('id, name, city, state, cnpj').eq('id', contract.company_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contract.contact_id
       ? supabase.from('contacts').select('id, name, role, email, phone').eq('id', contract.contact_id).maybeSingle()
@@ -263,7 +263,9 @@ export default async function ContractDetailPage({
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             {/* Botão de integração com ORBIS Price */}
             {(() => {
-              const companyCnpj = (linkedCompany as any)?.cnpj ?? null
+              const companyCnpj = (linkedCompany as any)?.cnpj
+                ?? contract.client_name?.match(/^\d{2}\.\d{3}\.\d{3}[\/\d.\-]+/)?.[0]?.replace(/\D/g, '')
+                ?? null
               const nature = (contract as any).nature ?? null
               const beds = (contract as any).hospital_beds ?? null
               const params = new URLSearchParams({
