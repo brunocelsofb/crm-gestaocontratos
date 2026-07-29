@@ -581,6 +581,8 @@ export default async function ContractDetailPage({
                   contractId={contract.id}
                   initialData={proposalStatus as any}
                   priceUrl={priceUrl}
+                  currentUserRole={currentProfile?.role ?? 'member'}
+                  currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
                 />
               )
             })(),

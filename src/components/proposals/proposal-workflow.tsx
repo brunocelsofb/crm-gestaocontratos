@@ -23,7 +23,7 @@ const STATUS_INFO: Record<ProposalStatus, { label: string; bg: string; color: st
   rascunho:               { label: 'Rascunho',                   bg: '#f1f3f8', color: '#8892a4', icon: '📝' },
   em_aprovacao_tecnica:   { label: 'Em Aprovação Técnica',       bg: '#fff8e6', color: '#92400e', icon: '⏳' },
   aprovado_tecnico:       { label: 'Aprovado Tecnicamente',      bg: '#eef3ff', color: '#3b5bdb', icon: '🔧' },
-  reprovado_tecnico:      { label: 'Reprovado Tecnicamente',     bg: '#fdecea', color: '#b91c1c', icon: '❌' },
+  reprovado_tecnico:      { label: 'Reprovado — Em Revisão',     bg: '#fdecea', color: '#b91c1c', icon: '❌' },
   em_aprovacao_comercial: { label: 'Em Aprovação Comercial',     bg: '#fff8e6', color: '#92400e', icon: '⏳' },
   aprovado_comercial:     { label: 'Aprovado Comercialmente',    bg: '#eaf5ee', color: '#1a7c3e', icon: '✅' },
 }
@@ -35,103 +35,85 @@ const STEPS = [
   { key: 'em_aprovacao_comercial', label: 'Aprov. Comercial',icon: '⏳' },
   { key: 'aprovado_comercial',     label: 'OK Comercial',    icon: '✅' },
 ]
-
 const STEP_ORDER = STEPS.map(s => s.key)
 
-async function updateProposalStatus(
-  contractId: string,
-  status: ProposalStatus,
-  actorName: string,
-  actorEmail: string,
-  proposalValue?: number | null,
-) {
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  member: 'Membro',
+  aprovador_tecnico: 'Aprovador Técnico',
+  aprovador_comercial: 'Aprovador Comercial',
+}
+
+async function updateStatus(contractId: string, status: ProposalStatus) {
   const res = await fetch('/api/proposals/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contract_id: contractId,
-      status,
-      actor_name: actorName,
-      actor_email: actorEmail,
-      proposal_value: proposalValue,
-    }),
+    body: JSON.stringify({ contract_id: contractId, status }),
   })
   return res.ok
 }
 
-function ActorModal({ title, onConfirm, onCancel }: {
-  title: string
-  onConfirm: (name: string, email: string) => void
-  onCancel: () => void
-}) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const valid = name.trim().length > 0 && email.includes('@')
-  const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '0.5px solid #d1d8e8', outline: 'none', color: '#1a1f36' }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
-        <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', marginBottom: 16 }}>{title}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#8892a4', marginBottom: 4 }}>Seu nome</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Carlos Mendes" style={inp} autoFocus />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#8892a4', marginBottom: 4 }}>Seu e-mail</label>
-            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="carlos@orbis.com.br" style={inp} type="email" />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
-            Cancelar
-          </button>
-          <button onClick={() => valid && onConfirm(name.trim(), email.trim())} disabled={!valid}
-            style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: valid ? '#1a1f36' : '#d1d8e8', color: '#fff', cursor: valid ? 'pointer' : 'not-allowed' }}>
-            Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function ProposalWorkflow({ contractId, initialData, priceUrl }: {
+export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUserRole, currentUserName }: {
   contractId: string
   initialData: ProposalData | null
   priceUrl: string
+  currentUserRole: string
+  currentUserName: string
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [data, setData] = useState<ProposalData>(initialData ?? { status: 'rascunho', proposal_value: null, actor_name: null, actor_email: null, updated_at: null })
-  const [modal, setModal] = useState<{ title: string; nextStatus: ProposalStatus } | null>(null)
+  const [data, setData] = useState<ProposalData>(
+    initialData ?? { status: 'rascunho', proposal_value: null, actor_name: null, actor_email: null, updated_at: null }
+  )
+  const [confirm, setConfirm] = useState<{ label: string; nextStatus: ProposalStatus } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const si = STATUS_INFO[data.status]
   const currentIdx = STEP_ORDER.indexOf(data.status)
+  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
-  function handleAction(nextStatus: ProposalStatus, title: string) {
-    setModal({ title, nextStatus })
+  const canApproveTechnical = currentUserRole === 'aprovador_tecnico' || currentUserRole === 'admin'
+  const canApproveCommercial = currentUserRole === 'aprovador_comercial' || currentUserRole === 'admin'
+  const canSubmit = currentUserRole === 'admin' || currentUserRole === 'member' || currentUserRole === 'aprovador_comercial'
+
+  function handleAction(nextStatus: ProposalStatus, label: string) {
+    setConfirm({ label, nextStatus })
   }
 
-  function handleConfirm(name: string, email: string) {
-    const nextStatus = modal!.nextStatus
-    setModal(null)
+  function handleConfirm() {
+    const nextStatus = confirm!.nextStatus
+    setConfirm(null)
     setError(null)
     startTransition(async () => {
-      const ok = await updateProposalStatus(contractId, nextStatus, name, email, data.proposal_value)
-      if (!ok) { setError('Erro ao atualizar status. Tente novamente.'); return }
-      setData(prev => ({ ...prev, status: nextStatus, actor_name: name, actor_email: email, updated_at: new Date().toISOString() }))
+      const ok = await updateStatus(contractId, nextStatus)
+      if (!ok) { setError('Erro ao atualizar. Tente novamente.'); return }
+      setData(prev => ({ ...prev, status: nextStatus, actor_name: currentUserName, updated_at: new Date().toISOString() }))
       router.refresh()
     })
   }
 
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {modal && <ActorModal title={modal.title} onConfirm={handleConfirm} onCancel={() => setModal(null)} />}
+
+      {/* Modal de confirmação */}
+      {confirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 380, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
+            <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', marginBottom: 8 }}>{confirm.label}</p>
+            <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 20 }}>
+              Ação registrada como <strong>{currentUserName}</strong> ({ROLE_LABELS[currentUserRole] ?? currentUserRole})
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirm(null)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={handleConfirm} style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status atual */}
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
@@ -157,57 +139,81 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl }: {
           </div>
         </div>
 
-        {data.proposal_value && (
+        {/* Valor — visível só para admin e aprovador_comercial */}
+        {data.proposal_value && (currentUserRole === 'admin' || currentUserRole === 'aprovador_comercial') && (
           <div style={{ background: '#f8f9fb', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: '#8892a4' }}>Valor da proposta</span>
             <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1f36' }}>{fmt(data.proposal_value)}/mês</span>
           </div>
         )}
+        {data.proposal_value && currentUserRole === 'aprovador_tecnico' && (
+          <div style={{ background: '#f8f9fb', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#8892a4' }}>
+            💡 Sua aprovação é sobre a viabilidade técnica e operacional — o valor comercial é gerenciado pela equipe comercial.
+          </div>
+        )}
       </div>
 
-      {/* Ações disponíveis */}
+      {/* Ações */}
       {data.status !== 'aprovado_comercial' && (
         <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Ações</p>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Ações disponíveis</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {data.status === 'rascunho' && (
-              <button onClick={() => handleAction('em_aprovacao_tecnica', 'Enviar para Aprovação Técnica')} disabled={isPending || !data.proposal_value}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: data.proposal_value ? '#1b556b' : '#d1d8e8', color: '#fff', cursor: data.proposal_value ? 'pointer' : 'not-allowed', opacity: isPending ? 0.6 : 1 }}>
+
+            {data.status === 'rascunho' && canSubmit && (
+              <button onClick={() => handleAction('em_aprovacao_tecnica', 'Enviar para Aprovação Técnica')}
+                disabled={isPending || !data.proposal_value}
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: data.proposal_value ? '#1b556b' : '#d1d8e8', color: '#fff', cursor: data.proposal_value ? 'pointer' : 'not-allowed' }}>
                 ⏳ Enviar para Aprovação Técnica
               </button>
             )}
-            {data.status === 'em_aprovacao_tecnica' && (<>
+
+            {data.status === 'em_aprovacao_tecnica' && canApproveTechnical && (<>
               <button onClick={() => handleAction('aprovado_tecnico', 'Confirmar Aprovação Técnica')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer' }}>
                 🔧 Aprovar Tecnicamente
               </button>
-              <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar Tecnicamente')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+              <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar — Retornar para Revisão')} disabled={isPending}
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
                 ❌ Reprovar
               </button>
             </>)}
-            {data.status === 'aprovado_tecnico' && (
+
+            {data.status === 'em_aprovacao_tecnica' && !canApproveTechnical && (
+              <p style={{ fontSize: 12, color: '#8892a4', padding: '8px 0' }}>
+                ⏳ Aguardando aprovação de um <strong>Aprovador Técnico</strong>.
+              </p>
+            )}
+
+            {data.status === 'aprovado_tecnico' && canApproveCommercial && (
               <button onClick={() => handleAction('em_aprovacao_comercial', 'Enviar para Aprovação Comercial')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer' }}>
                 ⏳ Enviar para Aprovação Comercial
               </button>
             )}
-            {data.status === 'reprovado_tecnico' && (
+
+            {data.status === 'reprovado_tecnico' && canSubmit && (
               <button onClick={() => handleAction('rascunho', 'Retornar para Rascunho')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
                 📝 Voltar para Rascunho
               </button>
             )}
-            {data.status === 'em_aprovacao_comercial' && (<>
+
+            {data.status === 'em_aprovacao_comercial' && canApproveCommercial && (<>
               <button onClick={() => handleAction('aprovado_comercial', 'Confirmar Aprovação Comercial')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer' }}>
                 ✅ Aprovar Comercialmente
               </button>
               <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar — Retornar para Revisão')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer', opacity: isPending ? 0.6 : 1 }}>
+                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
                 ❌ Reprovar
               </button>
             </>)}
+
+            {data.status === 'em_aprovacao_comercial' && !canApproveCommercial && (
+              <p style={{ fontSize: 12, color: '#8892a4', padding: '8px 0' }}>
+                ⏳ Aguardando aprovação de um <strong>Aprovador Comercial</strong>.
+              </p>
+            )}
           </div>
           {!data.proposal_value && data.status === 'rascunho' && (
             <p style={{ fontSize: 11, color: '#b91c1c', marginTop: 8 }}>⚠ Envie o valor do Price antes de iniciar a aprovação.</p>
@@ -218,7 +224,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl }: {
 
       {data.status === 'aprovado_comercial' && (
         <div style={{ padding: '12px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', fontSize: 12, color: '#1a7c3e' }}>
-          ✅ Proposta aprovada comercialmente. Você pode agora dar <strong>Ganho</strong> na oportunidade para iniciar a gestão do contrato.
+          ✅ Proposta aprovada comercialmente. Você pode agora dar <strong>Ganho</strong> na oportunidade.
         </div>
       )}
 
@@ -252,28 +258,6 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl }: {
         </div>
       </div>
 
-      {/* Histórico de audit log */}
-      {data.actor_name && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Última Ação</p>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: si.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-              {si.icon}
-            </div>
-            <div>
-              <p style={{ fontSize: 13, color: '#1a1f36', margin: 0, fontWeight: 500 }}>{si.label}</p>
-              <p style={{ fontSize: 11, color: '#8892a4', marginTop: 2 }}>
-                {data.actor_name} · {data.actor_email}
-              </p>
-              {data.updated_at && (
-                <p style={{ fontSize: 10, color: '#b0b8c8', marginTop: 2 }}>
-                  {new Date(data.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

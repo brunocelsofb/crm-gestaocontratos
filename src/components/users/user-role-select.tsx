@@ -17,6 +17,8 @@ export function UserRoleSelect({
       >
         <option value="member">Membro</option>
         <option value="admin">Admin</option>
+        <option value="aprovador_tecnico">Aprovador Técnico</option>
+        <option value="aprovador_comercial">Aprovador Comercial</option>
       </select>
     </form>
   )
