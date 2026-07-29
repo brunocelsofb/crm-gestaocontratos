@@ -190,7 +190,7 @@ export default async function ContractDetailPage({
     return { stageId: stage.id, days, isOverdue }
   })
 
-  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }, contractContacts, { data: companyAllContacts }, { data: zapsignTemplates }, { data: zapsignDocuments }, { data: orgZapSignSettings }] = await Promise.all([
+  const [{ data: emailTemplates }, { data: contractEmails }, connectedEmailAccount, { data: orgEmailSettings }, { data: customFields }, customFieldValues, { data: orgWhatsAppSettings }, { data: whatsappTemplates }, { data: whatsappMessages }, contractContacts, { data: companyAllContacts }, { data: zapsignTemplates }, { data: zapsignDocuments }, { data: orgZapSignSettings }, { data: proposalStatus }] = await Promise.all([
     supabase.from('email_templates').select('id, name').eq('context', 'contract').eq('channel', 'email').order('name'),
     supabase.from('contract_emails').select('id, from_email, to_email, cc_email, bcc_email, subject, body, sent_at, status, triggered_automatically, error_message, opened_at, direction').eq('contract_id', contract.id).order('sent_at', { ascending: false }),
     getConnectedEmailAccount().catch(() => null),
@@ -207,6 +207,7 @@ export default async function ContractDetailPage({
     supabase.from('zapsign_templates').select('id, name, type').order('name'),
     supabase.from('zapsign_documents').select('id, name, status, sent_at, signed_at, pdf_url, signed_pdf_url').eq('contract_id', contract.id).order('created_at', { ascending: false }),
     supabase.from('organization_settings').select('zapsign_api_token').eq('id', 'default').maybeSingle(),
+    supabase.from('proposal_status').select('*').eq('contract_id', contract.id).maybeSingle(),
   ])
 
   const inboundEmailAddress =
@@ -579,6 +580,122 @@ export default async function ContractDetailPage({
                 isConnected={!!orgZapSignSettings?.zapsign_api_token}
               />
             ),
+          },
+          {
+            id: 'proposta',
+            label: '📄 Proposta',
+            content: (() => {
+              const ps = proposalStatus as any
+              const STATUS_INFO: Record<string, { label: string; bg: string; color: string; icon: string }> = {
+                rascunho:               { label: 'Rascunho',                  bg: '#f1f3f8', color: '#8892a4', icon: '📝' },
+                em_aprovacao_tecnica:   { label: 'Em Aprovação Técnica',      bg: '#fff8e6', color: '#92400e', icon: '⏳' },
+                aprovado_tecnico:       { label: 'Aprovado Técnico',          bg: '#eaf5ee', color: '#1a7c3e', icon: '🔧' },
+                reprovado_tecnico:      { label: 'Reprovado Técnico',         bg: '#fdecea', color: '#b91c1c', icon: '❌' },
+                em_aprovacao_comercial: { label: 'Em Aprovação Comercial',    bg: '#fff8e6', color: '#92400e', icon: '⏳' },
+                aprovado_comercial:     { label: 'Aprovado Comercialmente',   bg: '#eaf5ee', color: '#1a7c3e', icon: '✅' },
+              }
+              const si = ps ? (STATUS_INFO[ps.status] ?? STATUS_INFO.rascunho) : null
+
+              // Monta URL do Price para abrir a proposta
+              const companyCnpj2 = (linkedCompany as any)?.cnpj
+                ?? contract.client_name?.match(/^\d{2}\.\d{3}\.\d{3}[\/\d.\-]+/)?.[0]?.replace(/\D/g, '')
+                ?? null
+              const nature2 = (contract as any).nature ?? null
+              const priceParams = new URLSearchParams({
+                company: contract.client_name ?? '',
+                ...(companyCnpj2 ? { cnpj: companyCnpj2 } : {}),
+                ...(nature2 === 'eng_clinica' ? { type: 'clinica' } : nature2 === 'eng_hospitalar' ? { type: 'hospitalar' } : {}),
+                project: contract.title || contract.process_number || '',
+                crm_id: contract.id,
+              })
+              const priceUrl = `https://orbis-price.vercel.app/?${priceParams.toString()}`
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Status da Proposta */}
+                  <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Status da Proposta</p>
+                      <a href={priceUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', textDecoration: 'none' }}>
+                        💰 {ps ? 'Abrir no Price' : 'Criar proposta no Price'}
+                      </a>
+                    </div>
+                    {ps ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 22 }}>{si?.icon}</span>
+                          <div>
+                            <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: si?.bg, color: si?.color }}>
+                              {si?.label}
+                            </span>
+                            {ps.actor_name && (
+                              <p style={{ fontSize: 11, color: '#8892a4', marginTop: 4 }}>
+                                por {ps.actor_name} · {new Date(ps.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {ps.proposal_value && (
+                          <div style={{ background: '#f8f9fb', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 12, color: '#8892a4' }}>Valor da proposta</span>
+                            <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1f36' }}>
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(ps.proposal_value)}/mês
+                            </span>
+                          </div>
+                        )}
+                        {ps.status === 'aprovado_comercial' && (
+                          <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eaf5ee', border: '0.5px solid #bbddc8', fontSize: 12, color: '#1a7c3e' }}>
+                            ✅ Proposta aprovada. Agora você pode dar <strong>Ganho</strong> na oportunidade para iniciar a gestão do contrato.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                        <p style={{ fontSize: 13, color: '#8892a4', marginBottom: 8 }}>Nenhuma proposta criada ainda.</p>
+                        <p style={{ fontSize: 12, color: '#b0b8c8' }}>Clique em "Criar proposta no Price" para dimensionar e precificar.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fluxo de aprovação visual */}
+                  <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 16 }}>Fluxo de Aprovação</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto' }}>
+                      {[
+                        { key: 'rascunho',               label: 'Rascunho',        icon: '📝' },
+                        { key: 'em_aprovacao_tecnica',   label: 'Aprov. Técnica',  icon: '⏳' },
+                        { key: 'aprovado_tecnico',       label: 'OK Técnico',      icon: '🔧' },
+                        { key: 'em_aprovacao_comercial', label: 'Aprov. Comercial',icon: '⏳' },
+                        { key: 'aprovado_comercial',     label: 'OK Comercial',    icon: '✅' },
+                      ].map((step, i) => {
+                        const current = ps?.status ?? 'rascunho'
+                        const steps = ['rascunho','em_aprovacao_tecnica','aprovado_tecnico','em_aprovacao_comercial','aprovado_comercial']
+                        const currentIdx = steps.indexOf(current)
+                        const stepIdx = steps.indexOf(step.key)
+                        const isDone = stepIdx < currentIdx
+                        const isActive = step.key === current
+                        return (
+                          <div key={step.key} style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 80 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                                background: isDone ? '#eaf5ee' : isActive ? '#1b556b' : '#f1f3f8',
+                                border: isActive ? '2px solid #32af9d' : '2px solid transparent' }}>
+                                {step.icon}
+                              </div>
+                              <p style={{ fontSize: 10, color: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#b0b8c8', textAlign: 'center', fontWeight: isActive ? 600 : 400, margin: 0 }}>
+                                {step.label}
+                              </p>
+                            </div>
+                            {i < 4 && <div style={{ width: 24, height: 2, background: isDone ? '#32af9d' : '#e8edf5', marginBottom: 20 }} />}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )
+            })(),
           },
           ...(isCurrentlyInContractsPipeline ? [{
             id: 'carteira',
