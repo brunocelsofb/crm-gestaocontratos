@@ -276,7 +276,7 @@ export default async function ContractDetailPage({
               })
               return (
                 <a href={`https://orbis-price.vercel.app/?${params.toString()}`} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1a1f36,#2d3561)', color: '#fff', textDecoration: 'none', cursor: 'pointer' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', textDecoration: 'none', cursor: 'pointer', boxShadow: '0 1px 4px rgba(50,175,157,0.3)' }}>
                   <span style={{ fontSize: 14 }}>💰</span> Precificar
                 </a>
               )
