@@ -1,17 +1,26 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS })
+}
+
 export async function POST(req: Request) {
   const body = await req.json()
   const { contract_id, status, proposal_value, actor_name, actor_email, proposal_id, price_url } = body
 
   if (!contract_id || !status) {
-    return NextResponse.json({ error: 'contract_id e status são obrigatórios' }, { status: 400 })
+    return NextResponse.json({ error: 'contract_id e status são obrigatórios' }, { status: 400, headers: CORS })
   }
 
   const supabase = createAdminClient()
 
-  // Salva/atualiza o status da proposta
   await supabase.from('proposal_status').upsert({
     contract_id,
     status,
@@ -23,7 +32,6 @@ export async function POST(req: Request) {
     updated_at: new Date().toISOString(),
   }, { onConflict: 'contract_id' })
 
-  // Atualiza o valor do run se tiver valor
   if (proposal_value) {
     await supabase.from('pipeline_runs')
       .update({ value: proposal_value })
@@ -31,12 +39,11 @@ export async function POST(req: Request) {
       .eq('status', 'open')
   }
 
-  // Registra atividade
   const statusLabel: Record<string, string> = {
-    aprovado_comercial: '✅ Proposta aprovada comercialmente',
-    aprovado_tecnico: '🔧 Proposta aprovada tecnicamente',
-    reprovado_tecnico: '❌ Proposta reprovada tecnicamente',
-    em_aprovacao_tecnica: '⏳ Proposta enviada para aprovação técnica',
+    aprovado_comercial:     '✅ Proposta aprovada comercialmente',
+    aprovado_tecnico:       '🔧 Proposta aprovada tecnicamente',
+    reprovado_tecnico:      '❌ Proposta reprovada tecnicamente',
+    em_aprovacao_tecnica:   '⏳ Proposta enviada para aprovação técnica',
     em_aprovacao_comercial: '⏳ Proposta enviada para aprovação comercial',
   }
 
@@ -46,5 +53,5 @@ export async function POST(req: Request) {
     content: `${statusLabel[status] ?? status}${actor_name ? ` por ${actor_name}` : ''}${proposal_value ? ` · Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}.`,
   })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true }, { headers: CORS })
 }
