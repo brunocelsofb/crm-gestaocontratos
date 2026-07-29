@@ -27,6 +27,14 @@ export async function POST(req: Request) {
     .eq('contract_id', contract_id)
     .eq('status', 'open')
 
+  // Salva/atualiza proposal_status para que a aba Proposta no CRM mostre o valor
+  await supabase.from('proposal_status').upsert({
+    contract_id,
+    status: 'rascunho',
+    proposal_value,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'contract_id', ignoreDuplicates: false })
+
   await supabase.from('activities').insert({
     contract_id,
     type: 'price',
