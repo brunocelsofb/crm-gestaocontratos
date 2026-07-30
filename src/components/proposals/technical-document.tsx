@@ -117,16 +117,16 @@ export function TechnicalDocument({ snapshot, showFinancials, isHospitalar = fal
               </tr>
             </thead>
             <tbody>
-              {dim.familias.map((f, i) => (
+              {dim.familias.filter(f => f.familia?.trim()).map((f, i) => (
                 <tr key={i} style={{ borderBottom: '0.5px solid #f1f3f8' }}>
                   <td style={{ padding: '6px 8px', color: '#1a1f36' }}>{f.familia}</td>
                   <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, color: '#1a1f36' }}>{f.qty}</td>
                 </tr>
               ))}
               <tr style={{ borderTop: '1px solid #e8edf5' }}>
-                <td style={{ padding: '7px 8px', fontWeight: 600, color: '#1a1f36' }}>Total</td>
+                <td style={{ padding: '7px 8px', fontWeight: 600, color: '#1a1f36' }}>Total inventariado</td>
                 <td style={{ padding: '7px 8px', textAlign: 'right', fontWeight: 600, color: '#1a1f36' }}>
-                  {dim.familias.reduce((s, f) => s + f.qty, 0)}
+                  {dim.totalEquipamentos}
                 </td>
               </tr>
             </tbody>
@@ -165,7 +165,7 @@ export function TechnicalDocument({ snapshot, showFinancials, isHospitalar = fal
             </tr>
           </thead>
           <tbody>
-            {snapshot.professionals.map((p, i) => (
+            {snapshot.professionals.filter(p => p.role?.trim()).map((p, i) => (
               <tr key={i} style={{ borderBottom: '0.5px solid #f1f3f8' }}>
                 <td style={{ padding: '6px 8px', color: '#1a1f36' }}>{p.role}</td>
                 <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 500, color: '#1a1f36' }}>{p.quantity}</td>
@@ -177,7 +177,7 @@ export function TechnicalDocument({ snapshot, showFinancials, isHospitalar = fal
                   </span>
                 </td>
                 <td style={{ padding: '6px 8px', textAlign: 'right', color: '#52514e' }}>
-                  {fmtCarga(p.hoursPerMonth)}
+                  {p.hoursPerMonth ? fmtCarga(p.hoursPerMonth) : '—'}
                 </td>
               </tr>
             ))}
