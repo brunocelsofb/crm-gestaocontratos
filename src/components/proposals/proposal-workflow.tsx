@@ -195,21 +195,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         )}
       </div>
 
-      {/* Documento técnico — aparece quando há snapshot */}
-      {(initialData as any)?.technical_snapshot && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #e8edf5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Documento Técnico</p>
-            <span style={{ fontSize: 11, color: '#8892a4' }}>Gerado pelo ORBIS Price</span>
-          </div>
-          <div style={{ padding: 20 }}>
-            <TechnicalDocument
-              snapshot={(initialData as any).technical_snapshot}
-              showFinancials={currentUserRole === 'admin' || currentUserRole === 'aprovador_comercial'}
-            />
-          </div>
-        </div>
-      )}
+      {/* Documento técnico — visível apenas na página de revisão do aprovador */}
 
       {/* Ações */}
       {data.status !== 'aprovado_comercial' && (
