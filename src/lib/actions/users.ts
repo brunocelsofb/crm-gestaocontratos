@@ -65,7 +65,7 @@ export async function updateUserDepartment(targetUserId: string, formData: FormD
   if (currentProfile?.role !== 'admin') return
 
   const department = (formData.get('department') as string) || null
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   await supabase.from('profiles').update({ department }).eq('id', targetUserId)
 
   revalidatePath('/users')
