@@ -95,7 +95,7 @@ export default async function ProposalReviewPage({
             snapshot={snapshot}
             showFinancials={false}
             isHospitalar={isHospitalar}
-            readonly
+
           />
         ) : (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 32, textAlign: 'center' }}>
