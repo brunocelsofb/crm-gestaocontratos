@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS })
+}
+
 export async function POST(req: Request) {
   const body = await req.json()
   const { token, status, technical_comment, technical_restrictions, actor_name } = body
@@ -53,5 +63,5 @@ export async function POST(req: Request) {
     content: `${statusLabel} por ${actor_name}. Parecer: "${technical_comment}"${restricoesText}`,
   })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true }, { headers: CORS })
 }
