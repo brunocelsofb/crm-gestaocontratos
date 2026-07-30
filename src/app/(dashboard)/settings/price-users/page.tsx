@@ -8,6 +8,7 @@ type PriceUser = {
   full_name: string
   role: 'admin' | 'reviewer'
   created_at: string
+  is_banned?: boolean
 }
 
 export default function PriceUsersPage() {
@@ -57,8 +58,18 @@ export default function PriceUsersPage() {
     loadUsers()
   }
 
+  async function handleToggleActive(id: string, currentlyBanned: boolean) {
+    if (!confirm(currentlyBanned ? 'Reativar este usuário?' : 'Desativar este usuário? Ele não conseguirá mais fazer login no Price.')) return
+    await fetch('/api/price-users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'toggle_active', active: currentlyBanned }),
+    })
+    loadUsers()
+  }
+
   async function handleDelete(id: string, email: string) {
-    if (!confirm(`Excluir o usuário ${email} do ORBIS Price?`)) return
+    if (!confirm(`Excluir o usuário ${email} do ORBIS Price permanentemente?`)) return
     await fetch('/api/price-users', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -127,12 +138,13 @@ export default function PriceUsersPage() {
               <tr style={{ borderBottom: '0.5px solid #e8edf5' }}>
                 <th style={{ textAlign: 'left', padding: '10px 16px', color: '#8892a4', fontWeight: 500, fontSize: 11 }}>USUÁRIO</th>
                 <th style={{ textAlign: 'left', padding: '10px 16px', color: '#8892a4', fontWeight: 500, fontSize: 11 }}>PERFIL</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', color: '#8892a4', fontWeight: 500, fontSize: 11 }}>STATUS</th>
                 <th style={{ padding: '10px 16px' }} />
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} style={{ borderBottom: '0.5px solid #f1f3f8' }}>
+                <tr key={u.id} style={{ borderBottom: '0.5px solid #f1f3f8', opacity: u.is_banned ? 0.5 : 1 }}>
                   <td style={{ padding: '12px 16px' }}>
                     <p style={{ fontWeight: 500, color: '#1a1f36', margin: 0 }}>{u.full_name}</p>
                     <p style={{ fontSize: 11, color: '#8892a4', margin: '2px 0 0' }}>{u.email}</p>
@@ -147,11 +159,24 @@ export default function PriceUsersPage() {
                       <span style={{ fontSize: 11, color: '#1a7c3e', fontWeight: 500 }}>✅ Salvo</span>
                     )}
                   </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                      background: u.is_banned ? '#fdecea' : '#eaf5ee',
+                      color: u.is_banned ? '#b91c1c' : '#1a7c3e' }}>
+                      {u.is_banned ? 'Inativo' : 'Ativo'}
+                    </span>
+                  </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <button onClick={() => handleDelete(u.id, u.email)}
-                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
-                      Remover
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={() => handleToggleActive(u.id, !!u.is_banned)}
+                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                        {u.is_banned ? 'Reativar' : 'Desativar'}
+                      </button>
+                      <button onClick={() => handleDelete(u.id, u.email)}
+                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
+                        Excluir
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -78,8 +78,16 @@ export async function PATCH(req: Request) {
   const user = await checkAdmin()
   if (!user) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
-  const { id, role } = await req.json()
+  const { id, role, action, active } = await req.json()
   const price = createPriceAdminClient()
+
+  if (action === 'toggle_active') {
+    await price.auth.admin.updateUserById(id, {
+      ban_duration: active ? 'none' : '87600h'
+    })
+    return NextResponse.json({ ok: true })
+  }
+
   await price.from('price_profiles').update({ role }).eq('id', id)
   return NextResponse.json({ ok: true })
 }
