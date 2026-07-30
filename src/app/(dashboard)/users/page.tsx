@@ -55,10 +55,10 @@ export default async function UsersPage() {
                     <p className="text-xs text-gray-400">{p.email}</p>
                   </td>
                   <td className="px-4 py-3">
-                    {isMe ? (
+                    {p.id === currentProfile.id ? (
                       <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-700">Admin (você)</span>
                     ) : (
-                      <UserRoleSelect defaultValue={p.role} action={updateUserRole.bind(null, p.id)} />
+                      <UserRoleSelect key={`${p.id}-${p.role}`} defaultValue={p.role} action={updateUserRole.bind(null, p.id)} />
                     )}
                   </td>
                   <td className="px-4 py-3">

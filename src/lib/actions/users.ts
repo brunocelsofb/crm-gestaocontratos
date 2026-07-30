@@ -74,14 +74,13 @@ export async function updateUserDepartment(targetUserId: string, formData: FormD
 export async function updateUserRole(targetUserId: string, formData: FormData) {
   const currentProfile = await getCurrentProfile()
   if (currentProfile?.role !== 'admin') return
-
-  // Proteção extra: não deixa o admin remover o próprio acesso de admin
-  // por engano, ficando sem ninguém com permissão para reverter.
   if (targetUserId === currentProfile.id) return
 
-  const newRole = (formData.get('role') as string) === 'admin' ? 'admin' : 'member'
+  const newRole = formData.get('role') as string
+  const validRoles = ['admin', 'member', 'aprovador_tecnico', 'aprovador_comercial']
+  if (!validRoles.includes(newRole)) return
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   await supabase.from('profiles').update({ role: newRole }).eq('id', targetUserId)
 
   revalidatePath('/users')
