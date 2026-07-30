@@ -73,7 +73,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   const [confirm, setConfirm] = useState<{ label: string; nextStatus: ProposalStatus } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reviewLink, setReviewLink] = useState<string | null>(initialData?.review_token
-    ? `${window?.location?.origin}/proposals/review/${initialData.review_token}`
+    ? `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`
     : null)
   const [copyDone, setCopyDone] = useState(false)
   const [generatingLink, setGeneratingLink] = useState(false)
