@@ -96,8 +96,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
       })
       const json = await res.json()
       if (json.token) {
-        const origin = window.location.origin
-        const link = `${origin}/proposals/review/${json.token}`
+        const link = `https://orbis-price.vercel.app?snapshot_id=${json.token}`
         setReviewLink(link)
         setData(prev => ({ ...prev, status: 'em_aprovacao_tecnica' }))
         await fetch('/api/proposals/status', {
