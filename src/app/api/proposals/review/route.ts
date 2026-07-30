@@ -4,25 +4,27 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { token, contract_id, status, technical_comment, technical_restrictions, actor_name } = body
+  const { token, status, technical_comment, technical_restrictions, actor_name } = body
 
-  if (!token || !contract_id || !status) {
-    return NextResponse.json({ error: 'Parâmetros obrigatórios ausentes' }, { status: 400 })
+  if (!token || !status) {
+    return NextResponse.json({ error: 'token e status são obrigatórios' }, { status: 400 })
   }
 
-  // Verifica usuário logado
-  const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  // Verifica usuário logado no CRM (opcional — pode vir do Price sem sessão CRM)
+  let loggedUserId: string | null = null
+  try {
+    const userClient = await createClient()
+    const { data: { user } } = await userClient.auth.getUser()
+    loggedUserId = user?.id ?? null
+  } catch { /* chamado do Price sem sessão CRM */ }
 
   const admin = createAdminClient()
 
-  // Verifica se o token é válido
+  // Busca o contrato pelo review_token
   const { data: proposal } = await admin
     .from('proposal_status')
     .select('id, status, contract_id')
     .eq('review_token', token)
-    .eq('contract_id', contract_id)
     .maybeSingle()
 
   if (!proposal) return NextResponse.json({ error: 'Token inválido' }, { status: 404 })
@@ -30,22 +32,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Proposta não está em aprovação técnica' }, { status: 400 })
   }
 
+  const contract_id = proposal.contract_id
+
   // Registra o parecer
   await admin.from('proposal_status').update({
     status,
     technical_comment,
     technical_restrictions: technical_restrictions || null,
     actor_name,
-    technical_approved_by: user.id,
+    technical_approved_by: loggedUserId,
     updated_at: new Date().toISOString(),
   }).eq('contract_id', contract_id)
 
-  // Registra atividade no contrato
+  // Registra atividade
   const statusLabel = status === 'aprovado_tecnico' ? '🔧 Aprovado tecnicamente' : '❌ Reprovado tecnicamente'
   const restricoesText = technical_restrictions ? ` · Restrições: ${technical_restrictions}` : ''
   await admin.from('activities').insert({
     contract_id,
-    user_id: user.id,
     type: 'proposal',
     content: `${statusLabel} por ${actor_name}. Parecer: "${technical_comment}"${restricoesText}`,
   })
