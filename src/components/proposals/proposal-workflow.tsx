@@ -161,7 +161,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <p style={{ fontSize: 14, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Status da Proposta</p>
-          <a href={priceUrl} target="_blank" rel="noopener noreferrer"
+          <a href="https://orbis-price.vercel.app" target="_blank" rel="noopener noreferrer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', textDecoration: 'none' }}>
             💰 Ver no Price
           </a>
