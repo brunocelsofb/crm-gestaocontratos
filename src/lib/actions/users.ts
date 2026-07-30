@@ -86,3 +86,28 @@ export async function updateUserRole(targetUserId: string, formData: FormData) {
 
   revalidatePath('/users')
 }
+
+export async function deleteUser(targetUserId: string) {
+  const currentProfile = await getCurrentProfile()
+  if (currentProfile?.role !== 'admin') return
+  if (currentProfile.id === targetUserId) return // não pode excluir a si mesmo
+
+  const supabase = createAdminClient()
+  // Remove o perfil (o auth.users é gerenciado separadamente)
+  await supabase.from('profiles').delete().eq('id', targetUserId)
+  // Remove o usuário do auth
+  await supabase.auth.admin.deleteUser(targetUserId)
+
+  revalidatePath('/users')
+}
+
+export async function toggleUserActive(targetUserId: string, active: boolean) {
+  const currentProfile = await getCurrentProfile()
+  if (currentProfile?.role !== 'admin') return
+  if (currentProfile.id === targetUserId) return
+
+  const supabase = createAdminClient()
+  await supabase.auth.admin.updateUserById(targetUserId, { ban_duration: active ? 'none' : '87600h' })
+
+  revalidatePath('/users')
+}
