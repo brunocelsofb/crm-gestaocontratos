@@ -21,29 +21,51 @@ export async function POST(req: Request) {
   }
 
   const supabase = createAdminClient()
+  const now = new Date().toISOString()
 
-  // Tenta pegar o usuário logado (quando chamado internamente pelo CRM)
-  let loggedUserId: string | null = null
+  // Tenta pegar usuário logado
+  let loggedName = actor_name ?? null
   try {
     const userClient = await createClient()
     const { data: { user } } = await userClient.auth.getUser()
-    loggedUserId = user?.id ?? null
-  } catch { /* chamado externamente, sem sessão */ }
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      if (profile?.full_name) loggedName = profile.full_name
+    }
+  } catch { /* externo */ }
 
-  // Monta o patch de aprovação
+  // Monta patch com campos de auditoria por etapa
   const patch: Record<string, unknown> = {
     status,
-    updated_at: new Date().toISOString(),
+    actor_name: loggedName,
+    actor_email: actor_email ?? null,
+    updated_at: now,
   }
   if (proposal_value)  patch.proposal_value = proposal_value
   if (proposal_id)     patch.proposal_id = proposal_id
   if (price_url)       patch.price_url = price_url
-  if (actor_name)      patch.actor_name = actor_name
-  if (actor_email)     patch.actor_email = actor_email
-  if (loggedUserId) {
-    if (status === 'em_aprovacao_tecnica') patch.submitted_by = loggedUserId
-    if (status === 'aprovado_tecnico')     patch.technical_approved_by = loggedUserId
-    if (status === 'aprovado_comercial')   patch.commercial_approved_by = loggedUserId
+
+  // Registra timestamp e nome por etapa
+  if (status === 'em_aprovacao_tecnica') {
+    patch.submitted_at = now
+    patch.submitted_by_name = loggedName
+  }
+  if (status === 'aprovado_tecnico') {
+    patch.technical_approved_at = now
+    patch.technical_approved_by_name = loggedName
+  }
+  if (status === 'aprovado_comercial') {
+    patch.commercial_approved_at = now
+    patch.commercial_approved_by_name = loggedName
+  }
+  if (status === 'rascunho') {
+    // Reset dos campos de auditoria ao voltar para rascunho
+    patch.submitted_at = null
+    patch.submitted_by_name = null
+    patch.technical_approved_at = null
+    patch.technical_approved_by_name = null
+    patch.commercial_approved_at = null
+    patch.commercial_approved_by_name = null
   }
 
   await supabase.from('proposal_status').upsert(
@@ -67,51 +89,11 @@ export async function POST(req: Request) {
     rascunho:               '📝 Proposta retornada para rascunho',
   }
 
-  // Registra atividade
-  const actorLabel = actor_name ?? (loggedUserId ? 'usuário do CRM' : null)
   await supabase.from('activities').insert({
     contract_id,
     type: 'proposal',
-    content: `${statusLabel[status] ?? status}${actorLabel ? ` por ${actorLabel}` : ''}${proposal_value ? ` · Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}.`,
+    content: `${statusLabel[status] ?? status}${loggedName ? ` por ${loggedName}` : ''}${proposal_value ? ` · Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}.`,
   })
-
-  // Envia e-mail de alerta para aprovadores quando muda de estado
-  if (status === 'em_aprovacao_tecnica' || status === 'em_aprovacao_comercial') {
-    const targetRole = status === 'em_aprovacao_tecnica' ? 'aprovador_tecnico' : 'aprovador_comercial'
-    const { data: approvers } = await supabase
-      .from('profiles')
-      .select('id, full_name, email:id')
-      .eq('role', targetRole)
-
-    if (approvers && approvers.length > 0) {
-      // Busca o contrato para obter o nome do cliente
-      const { data: contract } = await supabase
-        .from('contracts')
-        .select('client_name, title, process_number')
-        .eq('id', contract_id)
-        .maybeSingle()
-
-      const clientName = contract?.client_name ?? 'Cliente'
-      const projectName = contract?.title || contract?.process_number || contract_id
-
-      // Busca e-mails dos aprovadores via auth
-      for (const approver of approvers) {
-        const { data: authUser } = await supabase.auth.admin.getUserById(approver.id)
-        const approverEmail = authUser.user?.email
-        if (!approverEmail) continue
-
-        // Envia e-mail via Gmail integrado (organização)
-        try {
-          await supabase.from('email_queue').insert({
-            to: approverEmail,
-            subject: `[ORBIS CRM] Proposta aguardando sua aprovação — ${clientName}`,
-            body: `Olá ${approver.full_name},\n\nA proposta para <strong>${clientName}</strong> (${projectName}) está aguardando sua aprovação ${status === 'em_aprovacao_tecnica' ? 'técnica' : 'comercial'}.\n\nAcesse o CRM para aprovar ou reprovar:\nhttps://crm-gestaocontratos-pi.vercel.app/contracts/${contract_id}\n\nEquipe ORBIS`,
-            contract_id,
-          })
-        } catch { /* email_queue pode não existir — ok, não bloqueia */ }
-      }
-    }
-  }
 
   return NextResponse.json({ ok: true }, { headers: CORS })
 }

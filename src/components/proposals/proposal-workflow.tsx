@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { TechnicalDocument } from './technical-document'
 
 type ProposalStatus = 
   | 'rascunho'
@@ -16,12 +15,20 @@ type ProposalData = {
   status: ProposalStatus
   proposal_value: number | null
   actor_name: string | null
-  actor_email: string | null
   updated_at: string | null
   technical_comment?: string | null
   technical_restrictions?: string | null
   review_token?: string | null
   technical_snapshot?: any
+  submitted_at?: string | null
+  submitted_by_name?: string | null
+  technical_approved_at?: string | null
+  technical_approved_by_name?: string | null
+  commercial_approved_at?: string | null
+  commercial_approved_by_name?: string | null
+  client_status?: string | null
+  client_approved_by_name?: string | null
+  client_approved_at?: string | null
 }
 
 const STATUS_INFO: Record<ProposalStatus, { label: string; bg: string; color: string; icon: string }> = {
@@ -49,6 +56,10 @@ const ROLE_LABELS: Record<string, string> = {
   aprovador_comercial: 'Aprovador Comercial',
 }
 
+const fmtDate = (d: string | null | undefined) => d
+  ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  : null
+
 async function updateStatus(contractId: string, status: ProposalStatus) {
   const res = await fetch('/api/proposals/status', {
     method: 'POST',
@@ -68,13 +79,13 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [data, setData] = useState<ProposalData>(
-    initialData ?? { status: 'rascunho', proposal_value: null, actor_name: null, actor_email: null, updated_at: null }
+    initialData ?? { status: 'rascunho', proposal_value: null, actor_name: null, updated_at: null }
   )
   const [confirm, setConfirm] = useState<{ label: string; nextStatus: ProposalStatus } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [reviewLink, setReviewLink] = useState<string | null>(initialData?.review_token
-    ? `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`
-    : null)
+  const [reviewLink, setReviewLink] = useState<string | null>(
+    initialData?.review_token ? `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}` : null
+  )
   const [copyDone, setCopyDone] = useState(false)
   const [generatingLink, setGeneratingLink] = useState(false)
 
@@ -84,7 +95,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
 
   const canApproveTechnical = currentUserRole === 'aprovador_tecnico' || currentUserRole === 'admin'
   const canApproveCommercial = currentUserRole === 'aprovador_comercial' || currentUserRole === 'admin'
-  const canSubmit = currentUserRole === 'admin' || currentUserRole === 'member' || currentUserRole === 'aprovador_comercial'
+  const canSubmit = ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole)
 
   async function handleGenerateLink() {
     setGeneratingLink(true)
@@ -106,9 +117,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         })
         router.refresh()
       }
-    } finally {
-      setGeneratingLink(false)
-    }
+    } finally { setGeneratingLink(false) }
   }
 
   function copyLink() {
@@ -134,6 +143,8 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
     })
   }
 
+  const card: React.CSSProperties = { background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20, marginBottom: 0 }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -146,19 +157,15 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
               Ação registrada como <strong>{currentUserName}</strong> ({ROLE_LABELS[currentUserRole] ?? currentUserRole})
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirm(null)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
-                Cancelar
-              </button>
-              <button onClick={handleConfirm} style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
-                Confirmar
-              </button>
+              <button onClick={() => setConfirm(null)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleConfirm} style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Status atual */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+      {/* Status atual + Ver no Price */}
+      <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <p style={{ fontSize: 14, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Status da Proposta</p>
           <a href="https://orbis-price.vercel.app" target="_blank" rel="noopener noreferrer"
@@ -167,135 +174,179 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
           </a>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: data.proposal_value ? 12 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 28 }}>{si.icon}</span>
-          <div>
-            <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: si.bg, color: si.color }}>
-              {si.label}
-            </span>
-            {data.actor_name && (
-              <p style={{ fontSize: 11, color: '#8892a4', marginTop: 4 }}>
-                por {data.actor_name} · {data.updated_at ? new Date(data.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-              </p>
-            )}
-          </div>
+          <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: si.bg, color: si.color }}>{si.label}</span>
         </div>
 
-        {/* Valor — visível só para admin e aprovador_comercial */}
+        {/* Valor — só admin e comercial */}
         {data.proposal_value && (currentUserRole === 'admin' || currentUserRole === 'aprovador_comercial') && (
           <div style={{ background: '#f8f9fb', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: '#8892a4' }}>Valor da proposta</span>
             <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1f36' }}>{fmt(data.proposal_value)}/mês</span>
           </div>
         )}
-        {data.proposal_value && currentUserRole === 'aprovador_tecnico' && (
-          <div style={{ background: '#f8f9fb', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#8892a4' }}>
-            💡 Sua aprovação é sobre a viabilidade técnica e operacional — o valor comercial é gerenciado pela equipe comercial.
-          </div>
-        )}
       </div>
 
-      {/* Documento técnico — visível apenas na página de revisão do aprovador */}
+      {/* Histórico de aprovações */}
+      {(data.submitted_by_name || data.technical_approved_by_name || data.commercial_approved_by_name) && (
+        <div style={card}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 16 }}>Histórico de Aprovações</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {[
+              data.submitted_by_name && {
+                icon: '📤', label: 'Enviada para aprovação técnica',
+                by: data.submitted_by_name, at: data.submitted_at,
+                bg: '#f8f9fb', color: '#52514e',
+              },
+              data.technical_approved_by_name && {
+                icon: '🔧', label: 'Aprovada tecnicamente',
+                by: data.technical_approved_by_name, at: data.technical_approved_at,
+                bg: '#eef3ff', color: '#3b5bdb',
+              },
+              data.commercial_approved_by_name && {
+                icon: '✅', label: 'Aprovada comercialmente',
+                by: data.commercial_approved_by_name, at: data.commercial_approved_at,
+                bg: '#eaf5ee', color: '#1a7c3e',
+              },
+              data.client_approved_by_name && {
+                icon: data.client_status === 'aprovado' ? '🤝' : '❌',
+                label: data.client_status === 'aprovado' ? 'Aceita pelo cliente' : 'Declinada pelo cliente',
+                by: data.client_approved_by_name, at: data.client_approved_at,
+                bg: data.client_status === 'aprovado' ? '#eaf5ee' : '#fdecea',
+                color: data.client_status === 'aprovado' ? '#1a7c3e' : '#b91c1c',
+              },
+            ].filter(Boolean).map((step: any, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f1f3f8' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: step.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
+                  {step.icon}
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: step.color, margin: 0 }}>{step.label}</p>
+                  <p style={{ fontSize: 11, color: '#8892a4', margin: '2px 0 0' }}>
+                    por <strong>{step.by}</strong>
+                    {step.at && ` · ${fmtDate(step.at)}`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Parecer técnico */}
+          {data.technical_comment && (
+            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
+              <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 4px', fontWeight: 500 }}>Parecer técnico</p>
+              <p style={{ fontSize: 13, color: '#52514e', margin: 0 }}>{data.technical_comment}</p>
+              {data.technical_restrictions && (
+                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 6, background: '#fff8e6', border: '0.5px solid #fde68a' }}>
+                  <p style={{ fontSize: 11, color: '#92400e', fontWeight: 500, margin: '0 0 2px' }}>⚠ Restrições apontadas</p>
+                  <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>{data.technical_restrictions}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Ações */}
       {data.status !== 'aprovado_comercial' && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Ações disponíveis</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={card}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Ações</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-            {data.status === 'rascunho' && canSubmit && (
-              <button onClick={handleGenerateLink}
-                disabled={isPending || generatingLink || !data.proposal_value}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: data.proposal_value ? '#1b556b' : '#d1d8e8', color: '#fff', cursor: data.proposal_value ? 'pointer' : 'not-allowed' }}>
-                {generatingLink ? 'Gerando link...' : '🔗 Gerar link de revisão técnica'}
+            {data.status === 'rascunho' && canSubmit && (<>
+              <button onClick={handleGenerateLink} disabled={isPending || generatingLink || !data.proposal_value}
+                style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: data.proposal_value ? '#1b556b' : '#d1d8e8', color: '#fff', cursor: data.proposal_value ? 'pointer' : 'not-allowed', textAlign: 'left' as const }}>
+                {generatingLink ? 'Gerando...' : '🔗 Gerar link de revisão técnica'}
               </button>
-            )}
+              {!data.proposal_value && <p style={{ fontSize: 11, color: '#b91c1c' }}>⚠ Envie o valor do Price antes de iniciar.</p>}
+            </>)}
 
-            {/* Link gerado para enviar ao aprovador */}
             {reviewLink && data.status === 'em_aprovacao_tecnica' && (
-              <div style={{ width: '100%', padding: '12px 14px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
-                <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 8px' }}>Link de revisão técnica — envie para o aprovador:</p>
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
+                <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 8px' }}>Envie ao aprovador técnico (precisa de login no Price):</p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input readOnly value={reviewLink} style={{ flex: 1, padding: '7px 10px', fontSize: 11, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', fontFamily: 'monospace' }} />
-                  <button onClick={copyLink} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  <input readOnly value={reviewLink} style={{ flex: 1, padding: '7px 10px', fontSize: 11, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', fontFamily: 'monospace' }} />
+                  <button onClick={copyLink} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
                     {copyDone ? '✅ Copiado' : '📋 Copiar'}
                   </button>
                 </div>
-                <p style={{ fontSize: 10, color: '#b0b8c8', margin: '6px 0 0' }}>
-                  O aprovador precisa estar logado no CRM para acessar este link.
-                </p>
               </div>
             )}
 
-            {data.status === 'em_aprovacao_tecnica' && (
-              <p style={{ fontSize: 12, color: '#8892a4', padding: '8px 0' }}>
-                ⏳ Aguardando aprovação técnica pelo link de revisão. Ao aprovar, o status atualiza automaticamente.
-              </p>
+            {data.status === 'em_aprovacao_tecnica' && !reviewLink && (
+              <p style={{ fontSize: 12, color: '#8892a4' }}>⏳ Aguardando aprovação técnica no Price.</p>
             )}
 
             {data.status === 'aprovado_tecnico' && canApproveCommercial && (
               <button onClick={() => handleAction('em_aprovacao_comercial', 'Enviar para Aprovação Comercial')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer' }}>
+                style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer', textAlign: 'left' as const }}>
                 ⏳ Enviar para Aprovação Comercial
               </button>
             )}
 
             {data.status === 'reprovado_tecnico' && canSubmit && (
               <button onClick={() => handleAction('rascunho', 'Retornar para Rascunho')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer', textAlign: 'left' as const }}>
                 📝 Voltar para Rascunho
               </button>
             )}
 
-            {data.status === 'em_aprovacao_comercial' && canApproveCommercial && (<>
-              <button onClick={() => handleAction('aprovado_comercial', 'Confirmar Aprovação Comercial')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer' }}>
-                ✅ Aprovar Comercialmente
-              </button>
-              <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar — Retornar para Revisão')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
-                ❌ Reprovar
-              </button>
-            </>)}
+            {data.status === 'em_aprovacao_comercial' && canApproveCommercial && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => handleAction('aprovado_comercial', 'Confirmar Aprovação Comercial')} disabled={isPending}
+                  style={{ flex: 1, padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer' }}>
+                  ✅ Aprovar Comercialmente
+                </button>
+                <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar')} disabled={isPending}
+                  style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
+                  ❌ Reprovar
+                </button>
+              </div>
+            )}
 
             {data.status === 'em_aprovacao_comercial' && !canApproveCommercial && (
-              <p style={{ fontSize: 12, color: '#8892a4', padding: '8px 0' }}>
-                ⏳ Aguardando aprovação de um <strong>Aprovador Comercial</strong>.
-              </p>
+              <p style={{ fontSize: 12, color: '#8892a4' }}>⏳ Aguardando aprovação de um Aprovador Comercial.</p>
             )}
+
+            {error && <p style={{ fontSize: 12, color: '#b91c1c' }}>{error}</p>}
           </div>
-          {!data.proposal_value && data.status === 'rascunho' && (
-            <p style={{ fontSize: 11, color: '#b91c1c', marginTop: 8 }}>⚠ Envie o valor do Price antes de iniciar a aprovação.</p>
-          )}
-          {error && <p style={{ fontSize: 12, color: '#b91c1c', marginTop: 8 }}>{error}</p>}
         </div>
       )}
 
+      {/* Após aprovação comercial — gerar proposta */}
       {data.status === 'aprovado_comercial' && (
-        <div style={{ padding: '12px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', fontSize: 12, color: '#1a7c3e' }}>
-          ✅ Proposta aprovada comercialmente. Você pode agora dar <strong>Ganho</strong> na oportunidade.
-        </div>
-      )}
-
-      {/* Parecer técnico registrado */}
-      {(data as any).technical_comment && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Parecer Técnico</p>
-          <p style={{ fontSize: 13, color: '#52514e', lineHeight: 1.6, margin: '0 0 8px' }}>
-            {(data as any).technical_comment}
-          </p>
-          {(data as any).technical_restrictions && (
-            <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fff8e6', border: '0.5px solid #fde68a', marginTop: 8 }}>
-              <p style={{ fontSize: 11, color: '#92400e', fontWeight: 500, margin: '0 0 4px' }}>⚠ Restrições apontadas:</p>
-              <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>{(data as any).technical_restrictions}</p>
-            </div>
-          )}
-          <p style={{ fontSize: 11, color: '#b0b8c8', marginTop: 8 }}>por {data.actor_name}</p>
+        <div style={card}>
+          <div style={{ padding: '14px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: '#1a7c3e', margin: '0 0 2px' }}>✅ Proposta aprovada internamente</p>
+            <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Gere o documento de proposta para enviar ao cliente.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a href={`/api/proposals/generate-pdf/${contractId}`} target="_blank" rel="noopener noreferrer"
+              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none', cursor: 'pointer' }}>
+              📄 Gerar Proposta PDF
+            </a>
+            <button
+              onClick={async () => {
+                const res = await fetch('/api/proposals/client-token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ contract_id: contractId }),
+                })
+                const { token } = await res.json()
+                const link = `${window.location.origin}/proposals/client/${token}`
+                await navigator.clipboard.writeText(link)
+                alert(`✅ Link copiado!\n\n${link}`)
+              }}
+              style={{ flex: 1, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer' }}>
+              🔗 Gerar link para cliente
+            </button>
+          </div>
         </div>
       )}
 
       {/* Fluxo visual */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+      <div style={card}>
         <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 16 }}>Fluxo de Aprovação</p>
         <div style={{ display: 'flex', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
           {STEPS.map((step, i) => {
@@ -315,9 +366,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
                     {step.label}
                   </p>
                 </div>
-                {i < STEPS.length - 1 && (
-                  <div style={{ width: 28, height: 2, background: isDone ? '#32af9d' : '#e8edf5', marginBottom: 20, flexShrink: 0 }} />
-                )}
+                {i < STEPS.length - 1 && <div style={{ width: 28, height: 2, background: isDone ? '#32af9d' : '#e8edf5', marginBottom: 20, flexShrink: 0 }} />}
               </div>
             )
           })}

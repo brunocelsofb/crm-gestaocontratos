@@ -208,7 +208,7 @@ export default async function ContractDetailPage({
     supabase.from('zapsign_templates').select('id, name, type').order('name'),
     supabase.from('zapsign_documents').select('id, name, status, sent_at, signed_at, pdf_url, signed_pdf_url').eq('contract_id', contract.id).order('created_at', { ascending: false }),
     supabase.from('organization_settings').select('zapsign_api_token').eq('id', 'default').maybeSingle(),
-    supabase.from('proposal_status').select('status, proposal_value, actor_name, actor_email, updated_at, technical_snapshot, technical_comment, technical_restrictions, review_token').eq('contract_id', contract.id).maybeSingle(),
+    supabase.from('proposal_status').select('status, proposal_value, actor_name, actor_email, updated_at, technical_snapshot, technical_comment, technical_restrictions, review_token, submitted_at, submitted_by_name, technical_approved_at, technical_approved_by_name, commercial_approved_at, commercial_approved_by_name, client_status, client_approved_at, client_approved_by_name, client_review_token').eq('contract_id', contract.id).maybeSingle(),
   ])
 
   const inboundEmailAddress =
