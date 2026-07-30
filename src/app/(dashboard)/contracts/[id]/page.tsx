@@ -467,29 +467,15 @@ export default async function ContractDetailPage({
             content: <ActionPlanSection contractId={contract.id} items={actionPlanItems ?? []} />,
           },
           {
-            id: 'propostas',
-            label: 'Propostas',
-            content: (
-              <div className="space-y-6">
-                <ProposalsSection contractId={contract.id} proposals={proposals ?? []} catalogItems={catalogItems ?? []} />
-                {isCurrentlyInSalesPipeline && (
-                  <DimensioningSection contractId={contract.id} reviews={dimensioningReviews ?? []} />
-                )}
-              </div>
-            ),
+            id: 'arquivos',
+            label: 'Arquivos',
+            content: <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />,
           },
-          ...(isCurrentlyInContractsPipeline
-            ? [
-                {
-                  id: 'faturamento',
-                  label: 'Faturamento',
-                  content: <BillingSection contractId={contract.id} billingType={contract.billing_type} records={billingRecords ?? []} />,
-                },
-              ]
-            : []),
-          // Pesquisas & NPS: só em Gestão de Contratos (NPS + Pesquisa)
-          // e Serviço Avulso (só Pesquisa, ativada ao marcar Ganho)
-          // Funil de Vendas recorrente: NEM NPS NEM Pesquisa
+          ...(isCurrentlyInContractsPipeline ? [{
+            id: 'faturamento',
+            label: 'Faturamento',
+            content: <BillingSection contractId={contract.id} billingType={contract.billing_type} records={billingRecords ?? []} />,
+          }] : []),
           ...(!isCurrentlyInSalesPipeline ? [{
             id: 'pesquisas',
             label: isCurrentlyInContractsPipeline ? 'Pesquisas & NPS' : 'Pesquisa',
@@ -508,11 +494,6 @@ export default async function ContractDetailPage({
               </div>
             ),
           }] : []),
-          {
-            id: 'arquivos',
-            label: 'Arquivos',
-            content: <FilesSection contractId={contract.id} initialFiles={contractFiles ?? []} />,
-          },
           {
             id: 'atendimento',
             label: 'Atendimento',
