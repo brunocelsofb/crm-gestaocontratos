@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     .eq('contract_id', contract_id)
     .eq('status', 'open')
 
-  // Salva em proposal_status (cria ou atualiza mantendo o status atual)
+  // Salva em proposal_status — sempre atualiza snapshot e valor, preserva o status atual
   const { data: existing } = await supabase
     .from('proposal_status')
     .select('status')

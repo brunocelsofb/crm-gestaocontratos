@@ -33,9 +33,11 @@ type Snapshot = {
 
 const h2 = (s: string) => `Horas ${s}/ano`
 
-export function TechnicalDocument({ snapshot, showFinancials }: {
+export function TechnicalDocument({ snapshot, showFinancials, isHospitalar = false, readonly = false }: {
   snapshot: Snapshot
   showFinancials: boolean
+  isHospitalar?: boolean
+  readonly?: boolean
 }) {
   const card: React.CSSProperties = { background: '#fff', borderRadius: 10, border: '0.5px solid #e8edf5', padding: 16, marginBottom: 12 }
   const muted: React.CSSProperties = { fontSize: 11, color: '#8892a4' }
@@ -72,8 +74,8 @@ export function TechnicalDocument({ snapshot, showFinancials }: {
         </p>
       </div>
 
-      {/* Dimensionamento por complexidade */}
-      {dim && (
+      {/* Dimensionamento por complexidade — só Clínica */}
+      {dim && !isHospitalar && (
         <div style={card}>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: '0 0 12px' }}>📊 Dimensionamento por Complexidade</p>
 
@@ -128,8 +130,8 @@ export function TechnicalDocument({ snapshot, showFinancials }: {
         </div>
       )}
 
-      {/* Famílias de equipamento */}
-      {dim && dim.familias.length > 0 && (
+      {/* Famílias de equipamento — só Clínica */}
+      {dim && !isHospitalar && dim.familias.length > 0 && (
         <div style={card}>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: '0 0 12px' }}>🏥 Inventário por Família</p>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

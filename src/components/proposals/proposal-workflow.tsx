@@ -18,6 +18,10 @@ type ProposalData = {
   actor_name: string | null
   actor_email: string | null
   updated_at: string | null
+  technical_comment?: string | null
+  technical_restrictions?: string | null
+  review_token?: string | null
+  technical_snapshot?: any
 }
 
 const STATUS_INFO: Record<ProposalStatus, { label: string; bg: string; color: string; icon: string }> = {
@@ -68,6 +72,11 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   )
   const [confirm, setConfirm] = useState<{ label: string; nextStatus: ProposalStatus } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reviewLink, setReviewLink] = useState<string | null>(initialData?.review_token
+    ? `${window?.location?.origin}/proposals/review/${initialData.review_token}`
+    : null)
+  const [copyDone, setCopyDone] = useState(false)
+  const [generatingLink, setGeneratingLink] = useState(false)
 
   const si = STATUS_INFO[data.status]
   const currentIdx = STEP_ORDER.indexOf(data.status)
@@ -76,6 +85,38 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   const canApproveTechnical = currentUserRole === 'aprovador_tecnico' || currentUserRole === 'admin'
   const canApproveCommercial = currentUserRole === 'aprovador_comercial' || currentUserRole === 'admin'
   const canSubmit = currentUserRole === 'admin' || currentUserRole === 'member' || currentUserRole === 'aprovador_comercial'
+
+  async function handleGenerateLink() {
+    setGeneratingLink(true)
+    try {
+      const res = await fetch('/api/proposals/generate-review-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_id: contractId }),
+      })
+      const json = await res.json()
+      if (json.review_url) {
+        setReviewLink(json.review_url)
+        setData(prev => ({ ...prev, status: 'em_aprovacao_tecnica' }))
+        // Atualiza status para em_aprovacao_tecnica
+        await fetch('/api/proposals/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contract_id: contractId, status: 'em_aprovacao_tecnica' }),
+        })
+        router.refresh()
+      }
+    } finally {
+      setGeneratingLink(false)
+    }
+  }
+
+  function copyLink() {
+    if (!reviewLink) return
+    navigator.clipboard.writeText(reviewLink)
+    setCopyDone(true)
+    setTimeout(() => setCopyDone(false), 2000)
+  }
 
   function handleAction(nextStatus: ProposalStatus, label: string) {
     setConfirm({ label, nextStatus })
@@ -177,11 +218,27 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
 
             {data.status === 'rascunho' && canSubmit && (
-              <button onClick={() => handleAction('em_aprovacao_tecnica', 'Enviar para Aprovação Técnica')}
-                disabled={isPending || !data.proposal_value}
+              <button onClick={handleGenerateLink}
+                disabled={isPending || generatingLink || !data.proposal_value}
                 style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: data.proposal_value ? '#1b556b' : '#d1d8e8', color: '#fff', cursor: data.proposal_value ? 'pointer' : 'not-allowed' }}>
-                ⏳ Enviar para Aprovação Técnica
+                {generatingLink ? 'Gerando link...' : '🔗 Gerar link de revisão técnica'}
               </button>
+            )}
+
+            {/* Link gerado para enviar ao aprovador */}
+            {reviewLink && data.status === 'em_aprovacao_tecnica' && (
+              <div style={{ width: '100%', padding: '12px 14px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
+                <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 8px' }}>Link de revisão técnica — envie para o aprovador:</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input readOnly value={reviewLink} style={{ flex: 1, padding: '7px 10px', fontSize: 11, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', fontFamily: 'monospace' }} />
+                  <button onClick={copyLink} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    {copyDone ? '✅ Copiado' : '📋 Copiar'}
+                  </button>
+                </div>
+                <p style={{ fontSize: 10, color: '#b0b8c8', margin: '6px 0 0' }}>
+                  O aprovador precisa estar logado no CRM para acessar este link.
+                </p>
+              </div>
             )}
 
             {data.status === 'em_aprovacao_tecnica' && canApproveTechnical && (<>
@@ -242,6 +299,23 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
       {data.status === 'aprovado_comercial' && (
         <div style={{ padding: '12px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', fontSize: 12, color: '#1a7c3e' }}>
           ✅ Proposta aprovada comercialmente. Você pode agora dar <strong>Ganho</strong> na oportunidade.
+        </div>
+      )}
+
+      {/* Parecer técnico registrado */}
+      {(data as any).technical_comment && (
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Parecer Técnico</p>
+          <p style={{ fontSize: 13, color: '#52514e', lineHeight: 1.6, margin: '0 0 8px' }}>
+            {(data as any).technical_comment}
+          </p>
+          {(data as any).technical_restrictions && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fff8e6', border: '0.5px solid #fde68a', marginTop: 8 }}>
+              <p style={{ fontSize: 11, color: '#92400e', fontWeight: 500, margin: '0 0 4px' }}>⚠ Restrições apontadas:</p>
+              <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>{(data as any).technical_restrictions}</p>
+            </div>
+          )}
+          <p style={{ fontSize: 11, color: '#b0b8c8', marginTop: 8 }}>por {data.actor_name}</p>
         </div>
       )}
 
