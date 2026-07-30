@@ -95,10 +95,11 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         body: JSON.stringify({ contract_id: contractId }),
       })
       const json = await res.json()
-      if (json.review_url) {
-        setReviewLink(json.review_url)
+      if (json.token) {
+        // Link abre o Price em modo revisão técnica
+        const priceReviewUrl = `https://orbis-price.vercel.app?snapshot_id=${json.token}&mode=review&role=tecnico`
+        setReviewLink(priceReviewUrl)
         setData(prev => ({ ...prev, status: 'em_aprovacao_tecnica' }))
-        // Atualiza status para em_aprovacao_tecnica
         await fetch('/api/proposals/status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
