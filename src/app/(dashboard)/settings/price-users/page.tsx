@@ -44,12 +44,16 @@ export default function PriceUsersPage() {
     setSaving(false)
   }
 
+  const [savedId, setSavedId] = useState<string | null>(null)
+
   async function handleRoleChange(id: string, role: string) {
     await fetch('/api/price-users', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, role }),
     })
+    setSavedId(id)
+    setTimeout(() => setSavedId(null), 2000)
     loadUsers()
   }
 
@@ -133,12 +137,15 @@ export default function PriceUsersPage() {
                     <p style={{ fontWeight: 500, color: '#1a1f36', margin: 0 }}>{u.full_name}</p>
                     <p style={{ fontSize: 11, color: '#8892a4', margin: '2px 0 0' }}>{u.email}</p>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
                       style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer' }}>
                       <option value="reviewer">👁 Somente leitura</option>
                       <option value="admin">✏️ Editor</option>
                     </select>
+                    {savedId === u.id && (
+                      <span style={{ fontSize: 11, color: '#1a7c3e', fontWeight: 500 }}>✅ Salvo</span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <button onClick={() => handleDelete(u.id, u.email)}
