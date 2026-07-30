@@ -227,20 +227,9 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
               </div>
             )}
 
-            {data.status === 'em_aprovacao_tecnica' && canApproveTechnical && (<>
-              <button onClick={() => handleAction('aprovado_tecnico', 'Confirmar Aprovação Técnica')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer' }}>
-                🔧 Aprovar Tecnicamente
-              </button>
-              <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar — Retornar para Revisão')} disabled={isPending}
-                style={{ padding: '9px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
-                ❌ Reprovar
-              </button>
-            </>)}
-
-            {data.status === 'em_aprovacao_tecnica' && !canApproveTechnical && (
+            {data.status === 'em_aprovacao_tecnica' && (
               <p style={{ fontSize: 12, color: '#8892a4', padding: '8px 0' }}>
-                ⏳ Aguardando aprovação de um <strong>Aprovador Técnico</strong>.
+                ⏳ Aguardando aprovação técnica pelo link de revisão. Ao aprovar, o status atualiza automaticamente.
               </p>
             )}
 
