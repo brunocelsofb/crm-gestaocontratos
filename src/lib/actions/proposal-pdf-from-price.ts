@@ -38,6 +38,25 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
+
+function sanitize(s: string | null | undefined): string {
+  if (!s) return ''
+  const map: Record<string, string> = {
+    'á':'a','à':'a','ã':'a','â':'a',
+    'á':'a','à':'a','ã':'a','â':'a','ä':'a',
+    'Á':'A','À':'A','Ã':'A','Â':'A',
+    'é':'e','è':'e','ê':'e','ë':'e',
+    'É':'E','È':'E','Ê':'E',
+    'í':'i','ì':'i','î':'i','ï':'i','Í':'I',
+    'ó':'o','ò':'o','õ':'o','ô':'o','ö':'o',
+    'Ó':'O','Ô':'O','Õ':'O',
+    'ú':'u','ù':'u','û':'u','ü':'u','Ú':'U',
+    'ç':'c','Ç':'C','ñ':'n','Ñ':'N',
+    '→':'>','─':'-','✓':'OK','✅':'OK',
+  }
+  return Array.from(s).map(c => map[c] ?? (c.charCodeAt(0) > 127 ? '' : c)).join('')
+}
+
 export async function buildPriceProposalPage(params: {
   snapshot: Snapshot
   proposalValue: number
@@ -84,14 +103,14 @@ export async function buildPriceProposalPage(params: {
 
     // Header
     rect(page, 0, H, W, 44, TEAL)
-    text(page, 'PROPOSTA TÉCNICA E COMERCIAL', ml, H - 16, 8, boldFont, WHITE)
-    text(page, `${contract?.client_name ?? snapshot.clientName}  ·  ${snapshot.projectName}`, ml, H - 28, 10, boldFont, WHITE)
-    text(page, `Emitido em ${fmtDate(new Date().toISOString())}`, W - mr - 100, H - 28, 7, font, rgb(0.8, 0.9, 0.9))
+    text(page, sanitize('PROPOSTA TÉCNICA E COMERCIAL'), ml, H - 16, 8, boldFont, WHITE)
+    text(page, sanitize(`${contract?.client_name ?? snapshot.clientName}  ·  ${snapshot.projectName}`), ml, H - 28, 10, boldFont, WHITE)
+    text(page, sanitize(`Emitido em ${fmtDate(new Date().toISOString())}`), W - mr - 100, H - 28, 7, font, rgb(0.8, 0.9, 0.9))
     y -= 60
 
     // Seção: Dimensionamento
     if (dim) {
-      text(page, 'DIMENSIONAMENTO', ml, y, 7, boldFont, GRAY)
+      text(page, sanitize('DIMENSIONAMENTO'), ml, y, 7, boldFont, GRAY)
       line(page, y - 4)
       y -= 20
 
@@ -105,37 +124,37 @@ export async function buildPriceProposalPage(params: {
       cards.forEach((c, i) => {
         const x = ml + i * (kpiW + 8)
         rect(page, x, y, kpiW, 44, c.bg)
-        text(page, c.label, x + 8, y - 12, 7, font, GRAY)
-        text(page, c.value, x + 8, y - 28, 18, boldFont, DARK)
+        text(page, sanitize(c.label), x + 8, y - 12, 7, font, GRAY)
+        text(page, sanitize(c.value), x + 8, y - 28, 18, boldFont, DARK)
       })
       y -= 56
-      text(page, `Demanda: ${dim.horasMensaisDemandadas}h/mês  ·  Base: ${dim.hhLiquidoMes}h líquidas/técnico (produtividade 70%, absenteísmo 10%)`, ml, y, 7, font, GRAY)
+      text(page, sanitize(`Demanda: ${dim.horasMensaisDemandadas}h/mes  Base: ${dim.hhLiquidoMes}h liq/tecnico (prod 70%, absent 10%)`), ml, y, 7, font, GRAY)
       y -= 28
     }
 
     // Seção: Inventário por família
     if (dim?.familias?.length) {
-      text(page, 'INVENTÁRIO POR FAMÍLIA DE EQUIPAMENTOS', ml, y, 7, boldFont, GRAY)
+      text(page, sanitize('INVENTÁRIO POR FAMÍLIA DE EQUIPAMENTOS'), ml, y, 7, boldFont, GRAY)
       line(page, y - 4)
       y -= 18
 
       // Header tabela
       rect(page, ml, y, W - ml - mr, 16, TEAL)
-      text(page, 'Família', ml + 8, y - 11, 7, boldFont, WHITE)
-      text(page, 'Quantidade', W - mr - 60, y - 11, 7, boldFont, WHITE)
+      text(page, sanitize('Família'), ml + 8, y - 11, 7, boldFont, WHITE)
+      text(page, sanitize('Quantidade'), W - mr - 60, y - 11, 7, boldFont, WHITE)
       y -= 16
 
       dim.familias.forEach((f, i) => {
         if (y < 80) return // evita overflow
         if (i % 2 === 0) rect(page, ml, y, W - ml - mr, 14, LIGHT)
-        text(page, f.familia, ml + 8, y - 10, 8, font, DARK)
+        text(page, sanitize(f.familia), ml + 8, y - 10, 8, font, DARK)
         text(page, String(f.qty), W - mr - 40, y - 10, 8, font, DARK)
         y -= 14
       })
 
       // Total
       rect(page, ml, y, W - ml - mr, 16, rgb(0.94, 0.96, 0.94))
-      text(page, 'Total inventariado', ml + 8, y - 11, 8, boldFont, DARK)
+      text(page, sanitize('Total inventariado'), ml + 8, y - 11, 8, boldFont, DARK)
       text(page, String(dim.totalEquipamentos), W - mr - 40, y - 11, 8, boldFont, DARK)
       y -= 24
     }
@@ -148,14 +167,14 @@ export async function buildPriceProposalPage(params: {
 
     // Header
     rect(page, 0, H, W, 44, TEAL)
-    text(page, 'PROPOSTA TÉCNICA E COMERCIAL', ml, H - 16, 8, boldFont, WHITE)
-    text(page, `${contract?.client_name ?? snapshot.clientName}`, ml, H - 28, 10, boldFont, WHITE)
+    text(page, sanitize('PROPOSTA TÉCNICA E COMERCIAL'), ml, H - 16, 8, boldFont, WHITE)
+    text(page, sanitize(`${contract?.client_name ?? snapshot.clientName}`), ml, H - 28, 10, boldFont, WHITE)
     y -= 60
 
     // Equipe
     const profs = snapshot.professionals.filter(p => p.role?.trim())
     if (profs.length) {
-      text(page, 'EQUIPE DO PROJETO', ml, y, 7, boldFont, GRAY)
+      text(page, sanitize('EQUIPE DO PROJETO'), ml, y, 7, boldFont, GRAY)
       line(page, y - 4)
       y -= 18
 
@@ -168,8 +187,8 @@ export async function buildPriceProposalPage(params: {
       ].forEach((c, i) => {
         const x = ml + i * (ew + 8)
         rect(page, x, y, ew, 36, c.bg)
-        text(page, c.label, x + 8, y - 10, 7, font, GRAY)
-        text(page, c.value, x + 8, y - 24, 16, boldFont, DARK)
+        text(page, sanitize(c.label), x + 8, y - 10, 7, font, GRAY)
+        text(page, sanitize(c.value), x + 8, y - 24, 16, boldFont, DARK)
       })
       y -= 46
 
@@ -177,16 +196,16 @@ export async function buildPriceProposalPage(params: {
       rect(page, ml, y, W - ml - mr, 16, TEAL)
       ;['Função', 'Qtd', 'Regime', 'H/mês'].forEach((h, i) => {
         const xs = [ml + 8, ml + 220, ml + 280, ml + 340]
-        text(page, h, xs[i], y - 11, 7, boldFont, WHITE)
+        text(page, sanitize(h), xs[i], y - 11, 7, boldFont, WHITE)
       })
       y -= 16
 
       profs.forEach((p, i) => {
         if (i % 2 === 0) rect(page, ml, y, W - ml - mr, 14, LIGHT)
-        text(page, p.role, ml + 8, y - 10, 8, font, DARK)
+        text(page, sanitize(p.role), ml + 8, y - 10, 8, font, DARK)
         text(page, String(p.quantity), ml + 220, y - 10, 8, font, DARK)
-        text(page, p.contractType, ml + 280, y - 10, 8, font, DARK)
-        text(page, p.hoursPerMonth ? `${p.hoursPerMonth}h` : '—', ml + 340, y - 10, 8, font, DARK)
+        text(page, sanitize(p.contractType), ml + 280, y - 10, 8, font, DARK)
+        text(page, sanitize(p.hoursPerMonth ? `${p.hoursPerMonth}h` : '—'), ml + 340, y - 10, 8, font, DARK)
         y -= 14
       })
       y -= 12
@@ -195,11 +214,11 @@ export async function buildPriceProposalPage(params: {
     // Escopo
     const escopoList = dim?.escopo ?? snapshot.escopoServicos ?? []
     if (escopoList.length) {
-      text(page, 'ESCOPO DE SERVIÇOS', ml, y, 7, boldFont, GRAY)
+      text(page, sanitize('ESCOPO DE SERVIÇOS'), ml, y, 7, boldFont, GRAY)
       line(page, y - 4)
       y -= 18
       escopoList.forEach((s: string, i: number) => {
-        text(page, `✓  ${s}`, ml + (i % 2 === 0 ? 0 : 240), y - (i % 2 === 0 ? 0 : -14), 9, font, rgb(0.1, 0.48, 0.24))
+        text(page, sanitize(`>>  ${s}`), ml + (i % 2 === 0 ? 0 : 240), y - (i % 2 === 0 ? 0 : -14), 9, font, rgb(0.1, 0.48, 0.24))
         if (i % 2 === 1) y -= 18
       })
       if (escopoList.length % 2 !== 0) y -= 18
@@ -207,13 +226,13 @@ export async function buildPriceProposalPage(params: {
     }
 
     // Investimento
-    text(page, 'INVESTIMENTO', ml, y, 7, boldFont, GRAY)
+    text(page, sanitize('INVESTIMENTO'), ml, y, 7, boldFont, GRAY)
     line(page, y - 4)
     y -= 18
 
     rect(page, ml, y, W - ml - mr, 40, DARK)
-    text(page, 'Investimento mensal', ml + 12, y - 14, 8, font, rgb(0.8, 0.85, 0.9))
-    text(page, fmt(proposalValue), W - mr - 130, y - 26, 14, boldFont, rgb(0.2, 0.69, 0.62))
+    text(page, sanitize('Investimento mensal'), ml + 12, y - 14, 8, font, rgb(0.8, 0.85, 0.9))
+    text(page, sanitize(fmt(proposalValue)), W - mr - 130, y - 26, 14, boldFont, rgb(0.2, 0.69, 0.62))
     y -= 50
 
     // Validade
@@ -227,33 +246,33 @@ export async function buildPriceProposalPage(params: {
     validCols.forEach((c, i) => {
       const x = ml + i * vw
       rect(page, x, y, vw - 4, 36, LIGHT)
-      text(page, c.l, x + 8, y - 10, 7, font, GRAY)
-      text(page, c.v, x + 8, y - 24, 9, boldFont, DARK)
+      text(page, sanitize(c.l), x + 8, y - 10, 7, font, GRAY)
+      text(page, sanitize(c.v), x + 8, y - 24, 9, boldFont, DARK)
     })
     y -= 46
 
     // Aprovações internas
     const aprovacoes = [
-      params.submittedByName && { icon: '>', label: 'Enviada para aprovação técnica', by: params.submittedByName, at: null },
+      params.submittedByName && { icon: '>>', label: 'Enviada para aprovacao técnica', by: params.submittedByName, at: null },
       params.technicalApprovedByName && {
-        icon: '✓', label: 'Aprovada tecnicamente', by: params.technicalApprovedByName,
+        icon: 'OK', label: 'Aprovada tecnicamente', by: params.technicalApprovedByName,
         at: params.technicalApprovedAt, comment: params.technicalComment
       },
       params.commercialApprovedByName && {
-        icon: '✓', label: 'Aprovada comercialmente', by: params.commercialApprovedByName, at: params.commercialApprovedAt
+        icon: 'OK', label: 'Aprovada comercialmente', by: params.commercialApprovedByName, at: params.commercialApprovedAt
       },
     ].filter(Boolean) as any[]
 
     if (aprovacoes.length) {
-      text(page, 'APROVAÇÕES INTERNAS', ml, y, 7, boldFont, GRAY)
+      text(page, sanitize('APROVAÇÕES INTERNAS'), ml, y, 7, boldFont, GRAY)
       line(page, y - 4)
       y -= 18
 
       aprovacoes.forEach(a => {
-        text(page, a.label, ml + 8, y, 9, boldFont, DARK)
+        text(page, sanitize(a.label), ml + 8, y, 9, boldFont, DARK)
         const meta = `por ${a.by}${a.at ? `  ·  ${fmtDate(a.at)}` : ''}`
-        text(page, meta, ml + 8, y - 12, 7, font, GRAY)
-        if (a.comment) text(page, `"${a.comment}"`, ml + 8, y - 22, 7, font, GRAY)
+        text(page, sanitize(meta), ml + 8, y - 12, 7, font, GRAY)
+        if (a.comment) text(page, sanitize(`"${a.comment}"`), ml + 8, y - 22, 7, font, GRAY)
         y -= (a.comment ? 34 : 24)
       })
     }
