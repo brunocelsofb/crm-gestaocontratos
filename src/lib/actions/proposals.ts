@@ -653,7 +653,7 @@ export async function createProposalFromPrice(contractId: string): Promise<{ err
 
     // Capas
     for (const t of capas) {
-      pages.push({ proposal_id: proposal.id, position: position++, template_id: t.id })
+      pages.push({ proposal_id: proposal.id, position: position++, template_id: t.id, is_standard_proposal: false })
     }
 
     // Miolo (proposta padrão com dados do Price)
@@ -661,7 +661,7 @@ export async function createProposalFromPrice(contractId: string): Promise<{ err
 
     // Finais
     for (const t of finais) {
-      pages.push({ proposal_id: proposal.id, position: position++, template_id: t.id })
+      pages.push({ proposal_id: proposal.id, position: position++, template_id: t.id, is_standard_proposal: false })
     }
   } else {
     // Sem templates — só o miolo
