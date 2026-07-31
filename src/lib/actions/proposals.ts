@@ -668,7 +668,8 @@ export async function createProposalFromPrice(contractId: string): Promise<{ err
     pages.push({ proposal_id: proposal.id, position: 0, is_standard_proposal: true })
   }
 
-  await supabase.from('proposal_pages').insert(pages)
+  const { error: pagesError } = await admin.from('proposal_pages').insert(pages)
+  if (pagesError) return { error: `Falha ao criar páginas: ${pagesError.message}` }
 
   await supabase.from('activities').insert({
     contract_id: contractId,
