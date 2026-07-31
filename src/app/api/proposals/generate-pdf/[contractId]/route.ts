@@ -15,38 +15,41 @@ export async function GET(
   const admin = createAdminClient()
 
   const [{ data: contract }, { data: proposal }, { data: templates }] = await Promise.all([
-    admin.from('contracts').select('client_name, title, process_number, cnpj, company_id, contact_id').eq('id', contractId).maybeSingle(),
+    admin.from('contracts').select('client_name, title, process_number, cnpj').eq('id', contractId).maybeSingle(),
     admin.from('proposal_status').select('*').eq('contract_id', contractId).maybeSingle(),
-    admin.from('proposal_templates').select('*').order('created_at').limit(10),
+    admin.from('proposal_templates').select('*').order('created_at'),
   ])
 
-  if (!proposal) return NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 })
+  if (!proposal?.technical_snapshot) {
+    return NextResponse.json({ error: 'Snapshot do Price não encontrado. Reenvie o valor do Price.' }, { status: 400 })
+  }
 
-  const snapshot = proposal.technical_snapshot as any
-  if (!snapshot) return NextResponse.json({ error: 'Snapshot do Price não encontrado. Reenvie o valor do Price.' }, { status: 400 })
-
-  // Tenta usar o pdf-lib para mesclar capa + miolo
   try {
     const { PDFDocument } = await import('pdf-lib')
     const { buildPriceProposalPage } = await import('@/lib/actions/proposal-pdf-from-price')
 
     const mergedPdf = await PDFDocument.create()
 
-    // 1. Adiciona capas do template (se houver)
-    const template = templates?.[0]
-    if (template?.file_storage_path) {
-      const { data: fileData } = await admin.storage.from('proposal-files').download(template.file_storage_path)
-      if (fileData) {
-        const templateBytes = new Uint8Array(await fileData.arrayBuffer())
-        const templateDoc = await PDFDocument.load(templateBytes)
-        const copied = await mergedPdf.copyPages(templateDoc, templateDoc.getPageIndices())
-        copied.forEach(p => mergedPdf.addPage(p))
-      }
+    // Separa capas e finais
+    const capas = (templates ?? []).filter(t => !t.name.toLowerCase().startsWith('final'))
+    const finais = (templates ?? []).filter(t => t.name.toLowerCase().startsWith('final'))
+
+    async function addTemplate(t: any) {
+      if (!t?.file_storage_path) return
+      const { data: fileData } = await admin.storage.from('proposal-files').download(t.file_storage_path)
+      if (!fileData) return
+      const bytes = new Uint8Array(await fileData.arrayBuffer())
+      const doc = await PDFDocument.load(bytes)
+      const copied = await mergedPdf.copyPages(doc, doc.getPageIndices())
+      copied.forEach(p => mergedPdf.addPage(p))
     }
 
-    // 2. Gera o miolo com dados do Price
+    // 1. Todas as capas
+    for (const t of capas) await addTemplate(t)
+
+    // 2. Miolo gerado do Price
     const mioloBytes = await buildPriceProposalPage({
-      snapshot,
+      snapshot: proposal.technical_snapshot as any,
       proposalValue: Number(proposal.proposal_value) || 0,
       validityDays: proposal.proposal_validity_days ?? 30,
       submittedByName: proposal.submitted_by_name ?? null,
@@ -63,15 +66,19 @@ export async function GET(
     })
 
     const mioloDoc = await PDFDocument.load(mioloBytes)
-    const copied = await mergedPdf.copyPages(mioloDoc, mioloDoc.getPageIndices())
-    copied.forEach(p => mergedPdf.addPage(p))
+    const mioloCopied = await mergedPdf.copyPages(mioloDoc, mioloDoc.getPageIndices())
+    mioloCopied.forEach(p => mergedPdf.addPage(p))
 
-    // 3. Retorna o PDF
+    // 3. Páginas finais
+    for (const t of finais) await addTemplate(t)
+
     const pdfBytes = await mergedPdf.save()
+    const clientName = contract?.client_name?.replace(/\s+/g, '-') ?? contractId
+
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="proposta-${contract?.client_name?.replace(/\s+/g, '-') ?? contractId}.pdf"`,
+        'Content-Disposition': `inline; filename="proposta-${clientName}.pdf"`,
       }
     })
   } catch (e) {

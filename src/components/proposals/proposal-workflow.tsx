@@ -324,20 +324,10 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={async () => {
-                const res = await fetch('/api/proposals/create-from-price', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ contract_id: contractId }),
-                })
-                const json = await res.json()
-                if (json.proposal_id) {
-                  window.location.href = `/contracts/${contractId}/proposals/${json.proposal_id}`
-                } else {
-                  alert(json.error ?? 'Erro ao criar proposta')
-                }
+                window.open(`/api/proposals/generate-pdf/${contractId}`, '_blank')
               }}
               style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
-              📄 Montar e Gerar Proposta PDF
+              📄 Gerar Proposta PDF
             </button>
             <button
               onClick={async () => {
