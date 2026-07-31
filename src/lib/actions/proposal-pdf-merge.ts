@@ -81,25 +81,57 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
   try {
     const mergedPdf = await PDFDocument.create()
 
+    // Busca snapshot do Price para usar no miolo
+    const { data: proposalStatus } = await supabase
+      .from('proposal_status')
+      .select('*')
+      .eq('contract_id', proposal.contract_id)
+      .maybeSingle()
+
     for (const page of pages) {
       if (page.is_standard_proposal) {
-        const standardPageBytes = await buildStandardProposalPage({
-          proposal,
-          items: items ?? [],
-          company,
-          contact,
-          org: {
-            companyName: orgSettings?.company_name ?? null,
-            logoBytes,
-            logoIsPng,
-            createdByName: createdByProfile?.full_name ?? null,
-            createdByEmail: createdByProfile?.email ?? null,
-            headerText: orgSettings?.proposal_header_text ?? null,
-            footerText: orgSettings?.proposal_footer_text ?? null,
-            brandColor: orgSettings?.proposal_brand_color ?? '#1B556B',
-          },
-          contentBlocks,
-        })
+        let standardPageBytes: Uint8Array
+
+        if (proposalStatus?.technical_snapshot) {
+          // Usa dados do Price
+          const { buildPriceProposalPage } = await import('./proposal-pdf-from-price')
+          standardPageBytes = await buildPriceProposalPage({
+            snapshot: proposalStatus.technical_snapshot as any,
+            proposalValue: Number(proposalStatus.proposal_value) || 0,
+            validityDays: proposalStatus.proposal_validity_days ?? 30,
+            submittedByName: proposalStatus.submitted_by_name ?? null,
+            technicalApprovedByName: proposalStatus.technical_approved_by_name ?? null,
+            technicalApprovedAt: proposalStatus.technical_approved_at ?? null,
+            technicalComment: proposalStatus.technical_comment ?? null,
+            commercialApprovedByName: proposalStatus.commercial_approved_by_name ?? null,
+            commercialApprovedAt: proposalStatus.commercial_approved_at ?? null,
+            contract: contract ? {
+              client_name: contract.client_name,
+              process_number: (contract as any).process_number ?? null,
+              cnpj: (contract as any).cnpj ?? null,
+            } : null,
+          })
+        } else {
+          // Fallback: usa builder original com proposal_items
+          standardPageBytes = await buildStandardProposalPage({
+            proposal,
+            items: items ?? [],
+            company,
+            contact,
+            org: {
+              companyName: orgSettings?.company_name ?? null,
+              logoBytes,
+              logoIsPng,
+              createdByName: createdByProfile?.full_name ?? null,
+              createdByEmail: createdByProfile?.email ?? null,
+              headerText: orgSettings?.proposal_header_text ?? null,
+              footerText: orgSettings?.proposal_footer_text ?? null,
+              brandColor: orgSettings?.proposal_brand_color ?? '#1B556B',
+            },
+            contentBlocks,
+          })
+        }
+
         const standardDoc = await PDFDocument.load(standardPageBytes)
         const copied = await mergedPdf.copyPages(standardDoc, standardDoc.getPageIndices())
         copied.forEach((p) => mergedPdf.addPage(p))

@@ -595,3 +595,88 @@ export async function submitClientDecision(
 
   return {}
 }
+
+export async function createProposalFromPrice(contractId: string): Promise<{ error?: string; proposalId?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const admin = createAdminClient()
+
+  // Busca o snapshot do Price
+  const { data: proposalStatus } = await admin
+    .from('proposal_status')
+    .select('proposal_value, proposal_validity_days')
+    .eq('contract_id', contractId)
+    .maybeSingle()
+
+  if (!proposalStatus?.proposal_value) return { error: 'Envie o valor do Price antes de gerar a proposta.' }
+
+  // Gera código de controle
+  const controlCode = await generateControlCode()
+
+  // Calcula data de validade
+  const validDays = proposalStatus.proposal_validity_days ?? 30
+  const validUntil = new Date(Date.now() + validDays * 86400000).toISOString().split('T')[0]
+
+  // Cria a proposta
+  const { data: proposal, error: propError } = await supabase
+    .from('proposals')
+    .insert({
+      contract_id: contractId,
+      control_code: controlCode,
+      currency: 'BRL',
+      valid_until: validUntil,
+      is_recurring: true,
+      created_by: user.id,
+    })
+    .select('id, control_code')
+    .single()
+
+  if (propError || !proposal) return { error: propError?.message ?? 'Falha ao criar proposta.' }
+
+  // Busca todos os templates na ordem
+  const { data: templates } = await admin
+    .from('proposal_templates')
+    .select('id, name, page_count')
+    .order('created_at')
+
+  // Monta as páginas: todos os templates em ordem, com miolo após o penúltimo
+  // (antes das páginas "Final")
+  const pages: { proposal_id: string; position: number; template_id?: string; is_standard_proposal?: boolean }[] = []
+  let position = 0
+
+  if (templates && templates.length > 0) {
+    // Separa finais (nome começa com "Final") dos demais
+    const capas = templates.filter(t => !t.name.toLowerCase().startsWith('final'))
+    const finais = templates.filter(t => t.name.toLowerCase().startsWith('final'))
+
+    // Capas
+    for (const t of capas) {
+      pages.push({ proposal_id: proposal.id, position: position++, template_id: t.id })
+    }
+
+    // Miolo (proposta padrão com dados do Price)
+    pages.push({ proposal_id: proposal.id, position: position++, is_standard_proposal: true })
+
+    // Finais
+    for (const t of finais) {
+      pages.push({ proposal_id: proposal.id, position: position++, template_id: t.id })
+    }
+  } else {
+    // Sem templates — só o miolo
+    pages.push({ proposal_id: proposal.id, position: 0, is_standard_proposal: true })
+  }
+
+  await supabase.from('proposal_pages').insert(pages)
+
+  await supabase.from('activities').insert({
+    contract_id: contractId,
+    user_id: user.id,
+    type: 'proposal',
+    content: `Proposta ${controlCode} criada automaticamente a partir do ORBIS Price.`,
+  })
+
+  revalidatePath(`/contracts/${contractId}`)
+  return { proposalId: proposal.id }
+}

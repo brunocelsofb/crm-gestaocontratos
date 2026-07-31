@@ -322,21 +322,42 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
             <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Gere o documento de proposta para enviar ao cliente.</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <a href={`/api/proposals/generate-pdf/${contractId}`} target="_blank" rel="noopener noreferrer"
-              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none', cursor: 'pointer' }}>
-              📄 Gerar Proposta PDF
-            </a>
             <button
               onClick={async () => {
-                const res = await fetch('/api/proposals/client-token', {
+                const res = await fetch('/api/proposals/create-from-price', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ contract_id: contractId }),
                 })
-                const { token } = await res.json()
-                const link = `${window.location.origin}/proposals/client/${token}`
-                await navigator.clipboard.writeText(link)
-                alert(`✅ Link copiado!\n\n${link}`)
+                const json = await res.json()
+                if (json.proposal_id) {
+                  window.location.href = `/contracts/${contractId}/proposals/${json.proposal_id}`
+                } else {
+                  alert(json.error ?? 'Erro ao criar proposta')
+                }
+              }}
+              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
+              📄 Montar e Gerar Proposta PDF
+            </button>
+            <button
+              onClick={async () => {
+                // Busca a proposta gerada para este contrato
+                const res = await fetch(`/api/proposals/client-token`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ contract_id: contractId }),
+                })
+                const json = await res.json()
+                if (json.proposal_url) {
+                  await navigator.clipboard.writeText(json.proposal_url)
+                  alert(`✅ Link copiado!\n\n${json.proposal_url}`)
+                } else if (json.token) {
+                  const link = `${window.location.origin}/proposals/client/${json.token}`
+                  await navigator.clipboard.writeText(link)
+                  alert(`✅ Link copiado!\n\n${link}`)
+                } else {
+                  alert(json.error ?? 'Gere o PDF primeiro antes de enviar ao cliente.')
+                }
               }}
               style={{ flex: 1, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer' }}>
               🔗 Gerar link para cliente
