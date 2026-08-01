@@ -37,8 +37,8 @@ export async function GET(
     const { buildPriceProposalPage } = await import('@/lib/actions/proposal-pdf-from-price')
 
     const mergedPdf = await PDFDocument.create()
-    const capas = (templates ?? []).filter((t: any) => !t.name.toLowerCase().startsWith('final'))
-    const finais = (templates ?? []).filter((t: any) => t.name.toLowerCase().startsWith('final'))
+    const ordered = [...(templates ?? [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const mioloAfterIdx = ordered.findIndex((t: any) => t.is_miolo_after)
 
     async function addTemplate(t: any) {
       if (!t?.file_storage_path) return
@@ -52,7 +52,12 @@ export async function GET(
       } catch {}
     }
 
-    for (const t of capas) await addTemplate(t)
+    if (mioloAfterIdx === -1) {
+      const capas = ordered.filter((t: any) => !t.name.toLowerCase().startsWith('final'))
+      for (const t of capas) await addTemplate(t)
+    } else {
+      for (let i = 0; i <= mioloAfterIdx; i++) await addTemplate(ordered[i])
+    }
 
     const mioloBytes = await buildPriceProposalPage({
       snapshot: proposal.technical_snapshot as any,
@@ -76,7 +81,12 @@ export async function GET(
     const mioloDoc = await PDFDocument.load(mioloBytes)
     const copied = await mergedPdf.copyPages(mioloDoc, mioloDoc.getPageIndices())
     copied.forEach(p => mergedPdf.addPage(p))
-    for (const t of finais) await addTemplate(t)
+    if (mioloAfterIdx === -1) {
+      const finais = ordered.filter((t: any) => t.name.toLowerCase().startsWith('final'))
+      for (const t of finais) await addTemplate(t)
+    } else {
+      for (let i = mioloAfterIdx + 1; i < ordered.length; i++) await addTemplate(ordered[i])
+    }
 
     const pdfBytes = await mergedPdf.save()
     return new NextResponse(Buffer.from(pdfBytes), {

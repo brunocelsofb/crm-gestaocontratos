@@ -45,8 +45,9 @@ export async function GET(
 
     const mergedPdf = await PDFDocument.create()
 
-    const capas = (templates ?? []).filter((t: any) => !t.name.toLowerCase().startsWith('final'))
-    const finais = (templates ?? []).filter((t: any) => t.name.toLowerCase().startsWith('final'))
+    // Ordena templates por sort_order
+    const ordered = [...(templates ?? [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const mioloAfterIdx = ordered.findIndex((t: any) => t.is_miolo_after)
 
     async function addTemplate(t: any) {
       if (!t?.file_storage_path) return
@@ -60,10 +61,17 @@ export async function GET(
       } catch { /* ignora templates corrompidos */ }
     }
 
-    // 1. Capas
-    for (const t of capas) await addTemplate(t)
+    if (mioloAfterIdx === -1) {
+      // Sem posição definida: capas (não-Final) → miolo → Final
+      const capas = ordered.filter((t: any) => !t.name.toLowerCase().startsWith('final'))
+      const finais = ordered.filter((t: any) => t.name.toLowerCase().startsWith('final'))
+      for (const t of capas) await addTemplate(t)
+    } else {
+      // Adiciona templates antes do miolo
+      for (let i = 0; i <= mioloAfterIdx; i++) await addTemplate(ordered[i])
+    }
 
-    // 2. Miolo
+    // Miolo
     const mioloBytes = await buildPriceProposalPage({
       snapshot: proposal.technical_snapshot as any,
       proposalValue: Number(proposal.proposal_value) || 0,
@@ -103,8 +111,14 @@ export async function GET(
     const mioloCopied = await mergedPdf.copyPages(mioloDoc, mioloDoc.getPageIndices())
     mioloCopied.forEach(p => mergedPdf.addPage(p))
 
-    // 3. Finais
-    for (const t of finais) await addTemplate(t)
+    // Páginas após o miolo
+    if (mioloAfterIdx === -1) {
+      // Finais
+      const finais = ordered.filter((t: any) => t.name.toLowerCase().startsWith('final'))
+      for (const t of finais) await addTemplate(t)
+    } else {
+      for (let i = mioloAfterIdx + 1; i < ordered.length; i++) await addTemplate(ordered[i])
+    }
 
     const pdfBytes = await mergedPdf.save()
     const clientName = contract?.client_name?.replace(/\s+/g, '-') ?? contractId
