@@ -89,14 +89,14 @@ export async function GET(
         name: companyRes.data.name,
         cnpj: companyRes.data.cnpj ?? undefined,
         tradeName: companyRes.data.trade_name ?? undefined,
+        email: companyRes.data.email ?? undefined,
+        phone: companyRes.data.phone ?? undefined,
         address: [
           companyRes.data.street && `${companyRes.data.street}${companyRes.data.street_number ? ', ' + companyRes.data.street_number : ''}`,
           companyRes.data.neighborhood,
           companyRes.data.city && companyRes.data.state ? `${companyRes.data.city}/${companyRes.data.state}` : companyRes.data.city,
           companyRes.data.zip_code,
         ].filter(Boolean).join(' - ') || undefined,
-        email: companyRes.data.email ?? undefined,
-        phone: companyRes.data.phone ?? undefined,
       } : { name: contractData?.client_name ?? '' },
       contact: contactRes?.data ? {
         name: contactRes.data.name,

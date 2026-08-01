@@ -30,8 +30,8 @@ export async function buildPriceProposalPage(params: {
   commercialApprovedByName: string | null
   commercialApprovedAt: string | null
   contract: { client_name: string; process_number: string | null; cnpj: string | null } | null
-  company?: { name?: string; cnpj?: string; address?: string } | null
-  contact?: { name?: string; email?: string } | null
+  company?: { name?: string; cnpj?: string; address?: string; tradeName?: string; email?: string; phone?: string } | null
+  contact?: { name?: string; email?: string; phone?: string; cpf?: string } | null
   org?: {
     companyName?: string
     cnpj?: string
