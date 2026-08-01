@@ -45,7 +45,7 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
           <div style={{ padding: '12px 20px', borderBottom: '0.5px solid #e8edf5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Documento da Proposta</p>
             <a
-              href={`/api/proposals/public-pdf/`}
+              href={`/api/proposals/public-pdf/${token}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ fontSize: 11, color: '#1b556b', textDecoration: 'none', fontWeight: 500 }}>
@@ -53,7 +53,7 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
             </a>
           </div>
           <iframe
-            src={`/api/proposals/public-pdf/`}
+            src={`/api/proposals/public-pdf/${token}`}
             style={{ width: '100%', height: '70vh', border: 'none', display: 'block' }}
             title="Proposta Comercial"
           />
