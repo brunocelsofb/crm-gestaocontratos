@@ -95,10 +95,18 @@ export async function buildPriceProposalPage(params: {
 
   const addTextBlock = (titulo: string, texto: string | null | undefined) => {
     if (!texto?.trim()) return
+    // Quebra o texto em linhas para renderizar no builder de julho
+    const linhas = san(texto).split('\n').filter(l => l.trim())
     contentBlocks.push({
-      block_type: 'text',
+      block_type: 'table',
       image_storage_path: null,
-      table_data: { rows: [[titulo], [san(texto)]] },
+      table_data: {
+        rows: [
+          [titulo],
+          ...linhas.map(l => [l]),
+          [''], // espaço após o bloco
+        ]
+      },
     })
   }
 
@@ -116,9 +124,9 @@ export async function buildPriceProposalPage(params: {
 
   if (aprovLines.length > 0) {
     contentBlocks.push({
-      block_type: 'text',
+      block_type: 'table',
       image_storage_path: null,
-      table_data: { rows: [['APROVACOES INTERNAS'], ...aprovLines.map(l => [l])] },
+      table_data: { rows: [['APROVACOES INTERNAS'], ...aprovLines.map(l => [l]), ['']] },
     })
   }
 
