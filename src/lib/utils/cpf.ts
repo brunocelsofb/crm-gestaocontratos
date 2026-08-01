@@ -1,40 +1,18 @@
-// Validação de CPF pelo algoritmo padrão (dígitos verificadores) —
-// mesma lógica usada pela Receita Federal. Funciona tanto no navegador
-// quanto no servidor (função pura, sem dependências externas).
-export function isValidCPF(rawCpf: string): boolean {
-  const cpf = rawCpf.replace(/\D/g, '')
+// Validação de CPF — algoritmo Módulo 11 (Receita Federal)
+export function isValidCpf(cpf: string): boolean {
+  const digits = cpf.replace(/\D/g, '')
+  if (digits.length !== 11) return false
+  // Rejeita sequências iguais (111.111.111-11, etc.)
+  if (/^(\d)\1{10}$/.test(digits)) return false
 
-  if (cpf.length !== 11) return false
-  // Rejeita sequências repetidas (111.111.111-11 etc.) — matematicamente
-  // "válidas" pelo algoritmo, mas nunca são CPFs reais.
-  if (/^(\d)\1{10}$/.test(cpf)) return false
-
-  const digits = cpf.split('').map(Number)
-
-  function checkDigit(base: number[]): number {
+  const calc = (mod: number) => {
     let sum = 0
-    let weight = base.length + 1
-    for (const d of base) {
-      sum += d * weight
-      weight--
+    for (let i = 0; i < mod - 1; i++) {
+      sum += parseInt(digits[i]) * (mod - i)
     }
-    const remainder = sum % 11
-    return remainder < 2 ? 0 : 11 - remainder
+    const rem = (sum * 10) % 11
+    return rem === 10 || rem === 11 ? 0 : rem
   }
 
-  const firstCheck = checkDigit(digits.slice(0, 9))
-  if (firstCheck !== digits[9]) return false
-
-  const secondCheck = checkDigit(digits.slice(0, 10))
-  if (secondCheck !== digits[10]) return false
-
-  return true
-}
-
-export function formatCPF(rawCpf: string): string {
-  const cpf = rawCpf.replace(/\D/g, '').slice(0, 11)
-  return cpf
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+  return calc(10) === parseInt(digits[9]) && calc(11) === parseInt(digits[10])
 }

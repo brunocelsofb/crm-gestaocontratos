@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
-type ProposalStatus = 
+type ProposalStatus =
   | 'rascunho'
   | 'em_aprovacao_tecnica'
   | 'aprovado_tecnico'
@@ -31,36 +31,44 @@ type ProposalData = {
   client_approved_at?: string | null
 }
 
-const STATUS_INFO: Record<ProposalStatus, { label: string; bg: string; color: string; icon: string }> = {
-  rascunho:               { label: 'Rascunho',                   bg: '#f1f3f8', color: '#8892a4', icon: '📝' },
-  em_aprovacao_tecnica:   { label: 'Em Aprovação Técnica',       bg: '#fff8e6', color: '#92400e', icon: '⏳' },
-  aprovado_tecnico:       { label: 'Aprovado Tecnicamente',      bg: '#eef3ff', color: '#3b5bdb', icon: '🔧' },
-  reprovado_tecnico:      { label: 'Reprovado — Em Revisão',     bg: '#fdecea', color: '#b91c1c', icon: '❌' },
-  em_aprovacao_comercial: { label: 'Em Aprovação Comercial',     bg: '#fff8e6', color: '#92400e', icon: '⏳' },
-  aprovado_comercial:     { label: 'Aprovado Comercialmente',    bg: '#eaf5ee', color: '#1a7c3e', icon: '✅' },
+const STATUS_CONFIG: Record<ProposalStatus, { label: string; color: string; bg: string; dot: string }> = {
+  rascunho:               { label: 'Rascunho',                bg: '#f1f3f8', color: '#52514e', dot: '#b0b8c8' },
+  em_aprovacao_tecnica:   { label: 'Em Análise Técnica',      bg: '#fff8e6', color: '#92400e', dot: '#f59e0b' },
+  aprovado_tecnico:       { label: 'Aprovado Tecnicamente',   bg: '#eef3ff', color: '#3b5bdb', dot: '#3b5bdb' },
+  reprovado_tecnico:      { label: 'Reprovado — Em Revisão',  bg: '#fdecea', color: '#b91c1c', dot: '#b91c1c' },
+  em_aprovacao_comercial: { label: 'Em Aprovação Comercial',  bg: '#fff8e6', color: '#92400e', dot: '#f59e0b' },
+  aprovado_comercial:     { label: 'Aprovado Comercialmente', bg: '#eaf5ee', color: '#1a7c3e', dot: '#22c55e' },
 }
 
 const STEPS = [
-  { key: 'rascunho',               label: 'Rascunho',        icon: '📝' },
-  { key: 'em_aprovacao_tecnica',   label: 'Aprov. Técnica',  icon: '⏳' },
-  { key: 'aprovado_tecnico',       label: 'OK Técnico',      icon: '🔧' },
-  { key: 'em_aprovacao_comercial', label: 'Aprov. Comercial',icon: '⏳' },
-  { key: 'aprovado_comercial',     label: 'OK Comercial',    icon: '✅' },
+  { key: 'rascunho',               label: 'Rascunho',       short: '1' },
+  { key: 'em_aprovacao_tecnica',   label: 'Análise Técnica',short: '2' },
+  { key: 'aprovado_tecnico',       label: 'OK Técnico',     short: '3' },
+  { key: 'em_aprovacao_comercial', label: 'Aprov. Comercial',short: '4' },
+  { key: 'aprovado_comercial',     label: 'Aprovado',       short: '5' },
 ]
 const STEP_ORDER = STEPS.map(s => s.key)
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: 'Admin',
-  member: 'Membro',
+  admin: 'Administrador',
+  member: 'Comercial',
   aprovador_tecnico: 'Aprovador Técnico',
   aprovador_comercial: 'Aprovador Comercial',
 }
 
-const fmtDate = (d: string | null | undefined) => d
-  ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  : null
+function fmt(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+}
 
-async function updateStatus(contractId: string, status: ProposalStatus) {
+function fmtDt(d: string | null | undefined) {
+  if (!d) return null
+  return new Date(d).toLocaleString('pt-BR', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  })
+}
+
+async function postStatus(contractId: string, status: ProposalStatus) {
   const res = await fetch('/api/proposals/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -69,6 +77,122 @@ async function updateStatus(contractId: string, status: ProposalStatus) {
   return res.ok
 }
 
+// ── Subcomponente: Badge de status ─────────────────────────────────────────
+function StatusBadge({ status }: { status: ProposalStatus }) {
+  const c = STATUS_CONFIG[status]
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+      background: c.bg, color: c.color, letterSpacing: '0.3px',
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />
+      {c.label}
+    </span>
+  )
+}
+
+// ── Subcomponente: Auditoria ────────────────────────────────────────────────
+function AuditRow({ icon, label, by, role, at, comment, restriction }: {
+  icon: string; label: string; by: string; role?: string; at?: string | null; comment?: string | null; restriction?: string | null
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '0.5px solid #f1f3f8' }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%', background: '#f8f9fb',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, flexShrink: 0, border: '0.5px solid #e8edf5'
+      }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1f36', margin: '0 0 2px' }}>{label}</p>
+        <p style={{ fontSize: 11, color: '#8892a4', margin: 0 }}>
+          <strong style={{ color: '#52514e' }}>{by}</strong>
+          {role && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 10, background: '#f1f3f8', fontSize: 10 }}>{role}</span>}
+          {at && <span style={{ marginLeft: 8 }}>· {at}</span>}
+        </p>
+        {comment && (
+          <p style={{ fontSize: 12, color: '#52514e', margin: '8px 0 0', padding: '8px 12px', background: '#f8f9fb', borderRadius: 6, borderLeft: '2px solid #d1d8e8', lineHeight: 1.5 }}>
+            "{comment}"
+          </p>
+        )}
+        {restriction && (
+          <p style={{ fontSize: 11, color: '#92400e', margin: '6px 0 0', padding: '6px 10px', background: '#fff8e6', borderRadius: 6, borderLeft: '2px solid #f59e0b' }}>
+            ⚠ {restriction}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Subcomponente: Modal de confirmação com comentário ──────────────────────
+function ConfirmModal({ title, subtitle, requireComment = false, onConfirm, onCancel, confirmLabel, confirmColor, role, name }: {
+  title: string; subtitle?: string; requireComment?: boolean
+  onConfirm: (comment: string) => void; onCancel: () => void
+  confirmLabel: string; confirmColor: string; role: string; name: string
+}) {
+  const [comment, setComment] = useState('')
+  const canConfirm = !requireComment || comment.trim().length >= 5
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(10,12,20,0.6)',
+      zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)'
+      }}>
+        <p style={{ fontSize: 16, fontWeight: 600, color: '#1a1f36', margin: '0 0 6px' }}>{title}</p>
+        {subtitle && <p style={{ fontSize: 12, color: '#8892a4', margin: '0 0 20px' }}>{subtitle}</p>}
+
+        <div style={{ background: '#f8f9fb', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+          <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 2px' }}>REGISTRADO COMO</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1f36', margin: 0 }}>{name}</p>
+          <p style={{ fontSize: 11, color: '#8892a4', margin: '2px 0 0' }}>{ROLE_LABELS[role] ?? role}</p>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#52514e', marginBottom: 6, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            {requireComment ? 'Parecer / Comentário *' : 'Comentário (opcional)'}
+          </label>
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            rows={3}
+            placeholder={requireComment ? 'Descreva seu parecer sobre esta proposta...' : 'Observações adicionais...'}
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8,
+              border: `1.5px solid ${comment.length > 0 ? '#1b556b' : '#d1d8e8'}`,
+              outline: 'none', color: '#1a1f36', resize: 'vertical', fontFamily: 'inherit',
+              lineHeight: 1.5, boxSizing: 'border-box', transition: 'border-color 0.15s'
+            }}
+          />
+          {requireComment && comment.trim().length < 5 && comment.length > 0 && (
+            <p style={{ fontSize: 11, color: '#b91c1c', margin: '4px 0 0' }}>Mínimo de 5 caracteres</p>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '10px', fontSize: 13, fontWeight: 500, borderRadius: 8,
+            border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer'
+          }}>Cancelar</button>
+          <button
+            onClick={() => canConfirm && onConfirm(comment)}
+            disabled={!canConfirm}
+            style={{
+              flex: 2, padding: '10px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+              border: 'none', background: canConfirm ? confirmColor : '#d1d8e8',
+              color: '#fff', cursor: canConfirm ? 'pointer' : 'not-allowed', transition: 'background 0.15s'
+            }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Componente principal ────────────────────────────────────────────────────
 export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUserRole, currentUserName }: {
   contractId: string
   initialData: ProposalData | null
@@ -81,7 +205,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   const [data, setData] = useState<ProposalData>(
     initialData ?? { status: 'rascunho', proposal_value: null, actor_name: null, updated_at: null }
   )
-  const [confirm, setConfirm] = useState<{ label: string; nextStatus: ProposalStatus } | null>(null)
+  const [modal, setModal] = useState<{ action: 'approve_tech' | 'reject_tech' | 'approve_comm' | 'reject_comm' | 'send_tech' | 'send_comm' } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reviewLink, setReviewLink] = useState<string | null>(
     initialData?.review_token ? `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}` : null
@@ -89,13 +213,25 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   const [copyDone, setCopyDone] = useState(false)
   const [generatingLink, setGeneratingLink] = useState(false)
 
-  const si = STATUS_INFO[data.status]
+  const isAdmin = currentUserRole === 'admin'
+  const isTech  = currentUserRole === 'aprovador_tecnico' || isAdmin
+  const isComm  = currentUserRole === 'aprovador_comercial' || isAdmin
+  const isCommMember = ['member', 'admin', 'aprovador_comercial'].includes(currentUserRole)
   const currentIdx = STEP_ORDER.indexOf(data.status)
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
-  const canApproveTechnical = currentUserRole === 'aprovador_tecnico' || currentUserRole === 'admin'
-  const canApproveCommercial = currentUserRole === 'aprovador_comercial' || currentUserRole === 'admin'
-  const canSubmit = ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole)
+  async function doAction(nextStatus: ProposalStatus, comment?: string) {
+    setError(null)
+    startTransition(async () => {
+      const res = await fetch('/api/proposals/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_id: contractId, status: nextStatus, comment }),
+      })
+      if (!res.ok) { setError('Erro ao atualizar. Tente novamente.'); return }
+      setData(prev => ({ ...prev, status: nextStatus, actor_name: currentUserName, updated_at: new Date().toISOString() }))
+      router.refresh()
+    })
+  }
 
   async function handleGenerateLink() {
     setGeneratingLink(true)
@@ -109,272 +245,357 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
       if (json.token) {
         const link = `https://orbis-price.vercel.app?snapshot_id=${json.token}`
         setReviewLink(link)
-        setData(prev => ({ ...prev, status: 'em_aprovacao_tecnica' }))
-        await fetch('/api/proposals/status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contract_id: contractId, status: 'em_aprovacao_tecnica' }),
-        })
-        router.refresh()
+        await doAction('em_aprovacao_tecnica')
       }
     } finally { setGeneratingLink(false) }
   }
 
-  function copyLink() {
-    if (!reviewLink) return
-    navigator.clipboard.writeText(reviewLink)
-    setCopyDone(true)
-    setTimeout(() => setCopyDone(false), 2000)
-  }
+  const card = (children: React.ReactNode, noPad = false) => (
+    <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', ...(noPad ? {} : { padding: '20px 24px' }) }}>
+      {children}
+    </div>
+  )
 
-  function handleAction(nextStatus: ProposalStatus, label: string) {
-    setConfirm({ label, nextStatus })
-  }
-
-  function handleConfirm() {
-    const nextStatus = confirm!.nextStatus
-    setConfirm(null)
-    setError(null)
-    startTransition(async () => {
-      const ok = await updateStatus(contractId, nextStatus)
-      if (!ok) { setError('Erro ao atualizar. Tente novamente.'); return }
-      setData(prev => ({ ...prev, status: nextStatus, actor_name: currentUserName, updated_at: new Date().toISOString() }))
-      router.refresh()
-    })
-  }
-
-  const card: React.CSSProperties = { background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 20, marginBottom: 0 }
+  const sectionLabel = (t: string) => (
+    <p style={{ fontSize: 9, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '1.5px', margin: '0 0 14px' }}>{t}</p>
+  )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* Modal de confirmação */}
-      {confirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 380, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
-            <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', marginBottom: 8 }}>{confirm.label}</p>
-            <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 20 }}>
-              Ação registrada como <strong>{currentUserName}</strong> ({ROLE_LABELS[currentUserRole] ?? currentUserRole})
-            </p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirm(null)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleConfirm} style={{ padding: '8px 20px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>Confirmar</button>
-            </div>
-          </div>
-        </div>
+      {/* Modal */}
+      {modal?.action === 'send_tech' && (
+        <ConfirmModal
+          title="Enviar para Análise Técnica"
+          subtitle="A proposta será encaminhada para o aprovador técnico."
+          requireComment={false}
+          onConfirm={async (comment) => {
+            setModal(null)
+            await handleGenerateLink()
+          }}
+          onCancel={() => setModal(null)}
+          confirmLabel="Confirmar envio"
+          confirmColor="#1b556b"
+          role={currentUserRole}
+          name={currentUserName}
+        />
+      )}
+      {modal?.action === 'approve_tech' && (
+        <ConfirmModal
+          title="Aprovar Tecnicamente"
+          subtitle="Confirme que o dimensionamento e o escopo estão corretos."
+          requireComment
+          onConfirm={async (comment) => {
+            setModal(null)
+            setData(prev => ({ ...prev, technical_comment: comment, technical_approved_by_name: currentUserName, technical_approved_at: new Date().toISOString() }))
+            await doAction('aprovado_tecnico', comment)
+          }}
+          onCancel={() => setModal(null)}
+          confirmLabel="✅ Confirmar Aprovação Técnica"
+          confirmColor="#1a7c3e"
+          role={currentUserRole}
+          name={currentUserName}
+        />
+      )}
+      {modal?.action === 'reject_tech' && (
+        <ConfirmModal
+          title="Reprovar Dimensionamento"
+          subtitle="O processo retornará ao rascunho para revisão."
+          requireComment
+          onConfirm={async (comment) => {
+            setModal(null)
+            await doAction('reprovado_tecnico', comment)
+          }}
+          onCancel={() => setModal(null)}
+          confirmLabel="❌ Confirmar Reprovação"
+          confirmColor="#b91c1c"
+          role={currentUserRole}
+          name={currentUserName}
+        />
+      )}
+      {modal?.action === 'send_comm' && (
+        <ConfirmModal
+          title="Enviar para Aprovação Comercial"
+          subtitle="A proposta será encaminhada ao gerente comercial para aprovação final."
+          requireComment={false}
+          onConfirm={async () => { setModal(null); await doAction('em_aprovacao_comercial') }}
+          onCancel={() => setModal(null)}
+          confirmLabel="Enviar"
+          confirmColor="#1b556b"
+          role={currentUserRole}
+          name={currentUserName}
+        />
+      )}
+      {modal?.action === 'approve_comm' && (
+        <ConfirmModal
+          title="Aprovação Comercial"
+          subtitle="Confirme os termos e valores antes de liberar a proposta ao cliente."
+          requireComment
+          onConfirm={async (comment) => {
+            setModal(null)
+            setData(prev => ({ ...prev, commercial_approved_by_name: currentUserName, commercial_approved_at: new Date().toISOString() }))
+            await doAction('aprovado_comercial', comment)
+          }}
+          onCancel={() => setModal(null)}
+          confirmLabel="✅ Aprovar Comercialmente"
+          confirmColor="#1a7c3e"
+          role={currentUserRole}
+          name={currentUserName}
+        />
+      )}
+      {modal?.action === 'reject_comm' && (
+        <ConfirmModal
+          title="Reprovar Proposta Comercial"
+          subtitle="A proposta retornará para revisão."
+          requireComment
+          onConfirm={async (comment) => { setModal(null); await doAction('reprovado_tecnico', comment) }}
+          onCancel={() => setModal(null)}
+          confirmLabel="❌ Reprovar"
+          confirmColor="#b91c1c"
+          role={currentUserRole}
+          name={currentUserName}
+        />
       )}
 
-      {/* Status atual + Ver no Price */}
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <p style={{ fontSize: 14, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Status da Proposta</p>
-          <a href={`https://orbis-price.vercel.app?crm_id=${contractId}`} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', textDecoration: 'none' }}>
-            💰 Ver no Price
-          </a>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <span style={{ fontSize: 28 }}>{si.icon}</span>
-          <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: si.bg, color: si.color }}>{si.label}</span>
-        </div>
-
-        {/* Valor — só admin e comercial */}
-        {data.proposal_value && (currentUserRole === 'admin' || currentUserRole === 'aprovador_comercial') && (
-          <div style={{ background: '#f8f9fb', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, color: '#8892a4' }}>Valor da proposta</span>
-            <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1f36' }}>{fmt(data.proposal_value)}/mês</span>
+      {/* ── Cabeçalho: Status + Valor + Price ────────────────────── */}
+      {card(
+        <div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              {sectionLabel('Status da Proposta')}
+              <StatusBadge status={data.status} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <a href={`https://orbis-price.vercel.app?crm_id=${contractId}`} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px',
+                  fontSize: 11, fontWeight: 600, borderRadius: 7, border: 'none',
+                  background: 'linear-gradient(135deg,#1b556b,#2a8a7a)', color: '#fff',
+                  textDecoration: 'none', letterSpacing: '0.3px'
+                }}>
+                <span style={{ fontSize: 14 }}>⚡</span> Abrir Price
+              </a>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Histórico de aprovações */}
-      {(data.submitted_by_name || data.technical_approved_by_name || data.commercial_approved_by_name) && (
-        <div style={card}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 16 }}>Histórico de Aprovações</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {[
-              data.submitted_by_name && {
-                icon: '📤', label: 'Enviada para aprovação técnica',
-                by: data.submitted_by_name, at: data.submitted_at,
-                bg: '#f8f9fb', color: '#52514e',
-              },
-              data.technical_approved_by_name && {
-                icon: '🔧', label: 'Aprovada tecnicamente',
-                by: data.technical_approved_by_name, at: data.technical_approved_at,
-                bg: '#eef3ff', color: '#3b5bdb',
-              },
-              data.commercial_approved_by_name && {
-                icon: '✅', label: 'Aprovada comercialmente',
-                by: data.commercial_approved_by_name, at: data.commercial_approved_at,
-                bg: '#eaf5ee', color: '#1a7c3e',
-              },
-              data.client_approved_by_name && {
-                icon: data.client_status === 'aprovado' ? '🤝' : '❌',
-                label: data.client_status === 'aprovado' ? 'Aceita pelo cliente' : 'Declinada pelo cliente',
-                by: data.client_approved_by_name, at: data.client_approved_at,
-                bg: data.client_status === 'aprovado' ? '#eaf5ee' : '#fdecea',
-                color: data.client_status === 'aprovado' ? '#1a7c3e' : '#b91c1c',
-              },
-            ].filter(Boolean).map((step: any, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f1f3f8' }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: step.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
-                  {step.icon}
-                </div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: step.color, margin: 0 }}>{step.label}</p>
-                  <p style={{ fontSize: 11, color: '#8892a4', margin: '2px 0 0' }}>
-                    por <strong>{step.by}</strong>
-                    {step.at && ` · ${fmtDate(step.at)}`}
-                  </p>
-                </div>
+          {data.proposal_value && (isAdmin || isComm) && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'linear-gradient(135deg,#0f1b2d,#1b3050)', borderRadius: 10,
+              padding: '14px 18px'
+            }}>
+              <div>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '1px' }}>Valor Aprovado</p>
+                <p style={{ fontSize: 20, fontWeight: 700, color: '#32af9d', margin: 0 }}>{fmt(data.proposal_value)}<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>/mês</span></p>
               </div>
-            ))}
-          </div>
-
-          {/* Parecer técnico */}
-          {data.technical_comment && (
-            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
-              <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 4px', fontWeight: 500 }}>Parecer técnico</p>
-              <p style={{ fontSize: 13, color: '#52514e', margin: 0 }}>{data.technical_comment}</p>
-              {data.technical_restrictions && (
-                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 6, background: '#fff8e6', border: '0.5px solid #fde68a' }}>
-                  <p style={{ fontSize: 11, color: '#92400e', fontWeight: 500, margin: '0 0 2px' }}>⚠ Restrições apontadas</p>
-                  <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>{data.technical_restrictions}</p>
-                </div>
-              )}
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', margin: '0 0 2px' }}>ATUALIZADO EM</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', margin: 0 }}>{fmtDt(data.updated_at)}</p>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Ações */}
-      {data.status !== 'aprovado_comercial' && (
-        <div style={card}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 12 }}>Ações</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-            {data.status === 'rascunho' && canSubmit && (<>
-              <button onClick={handleGenerateLink} disabled={isPending || generatingLink || !data.proposal_value}
-                style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: data.proposal_value ? '#1b556b' : '#d1d8e8', color: '#fff', cursor: data.proposal_value ? 'pointer' : 'not-allowed', textAlign: 'left' as const }}>
-                {generatingLink ? 'Gerando...' : '🔗 Gerar link de revisão técnica'}
-              </button>
-              {!data.proposal_value && <p style={{ fontSize: 11, color: '#b91c1c' }}>⚠ Envie o valor do Price antes de iniciar.</p>}
-            </>)}
-
-            {reviewLink && data.status === 'em_aprovacao_tecnica' && (
-              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
-                <p style={{ fontSize: 11, color: '#8892a4', margin: '0 0 8px' }}>Envie ao aprovador técnico (precisa de login no Price):</p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input readOnly value={reviewLink} style={{ flex: 1, padding: '7px 10px', fontSize: 11, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', fontFamily: 'monospace' }} />
-                  <button onClick={copyLink} style={{ padding: '7px 14px', fontSize: 12, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
-                    {copyDone ? '✅ Copiado' : '📋 Copiar'}
-                  </button>
+      {/* ── Fluxo visual ──────────────────────────────────────────── */}
+      {card(
+        <div>
+          {sectionLabel('Progresso de Aprovação')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {STEPS.map((step, i) => {
+              const stepIdx = STEP_ORDER.indexOf(step.key)
+              const isDone = stepIdx < currentIdx
+              const isActive = step.key === data.status
+              return (
+                <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 'none' }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
+                      background: isActive ? '#1b556b' : isDone ? '#eaf5ee' : '#f1f3f8',
+                      color: isActive ? '#fff' : isDone ? '#1a7c3e' : '#b0b8c8',
+                      border: isActive ? '2px solid #32af9d' : '2px solid transparent',
+                      boxShadow: isActive ? '0 0 0 4px rgba(50,175,157,0.15)' : 'none',
+                      transition: 'all 0.2s'
+                    }}>
+                      {isDone ? '✓' : step.short}
+                    </div>
+                    <p style={{ fontSize: 9, color: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#b0b8c8', fontWeight: isActive ? 700 : 400, margin: 0, textAlign: 'center', lineHeight: 1.3, maxWidth: 60 }}>
+                      {step.label}
+                    </p>
+                  </div>
+                  {i < STEPS.length - 1 && (
+                    <div style={{ flex: 1, height: 2, background: isDone ? '#32af9d' : '#f1f3f8', margin: '0 4px', marginBottom: 20, borderRadius: 1 }} />
+                  )}
                 </div>
-              </div>
-            )}
-
-            {data.status === 'em_aprovacao_tecnica' && !reviewLink && (
-              <p style={{ fontSize: 12, color: '#8892a4' }}>⏳ Aguardando aprovação técnica no Price.</p>
-            )}
-
-            {data.status === 'aprovado_tecnico' && canApproveCommercial && (
-              <button onClick={() => handleAction('em_aprovacao_comercial', 'Enviar para Aprovação Comercial')} disabled={isPending}
-                style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer', textAlign: 'left' as const }}>
-                ⏳ Enviar para Aprovação Comercial
-              </button>
-            )}
-
-            {data.status === 'reprovado_tecnico' && canSubmit && (
-              <button onClick={() => handleAction('rascunho', 'Retornar para Rascunho')} disabled={isPending}
-                style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer', textAlign: 'left' as const }}>
-                📝 Voltar para Rascunho
-              </button>
-            )}
-
-            {data.status === 'em_aprovacao_comercial' && canApproveCommercial && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleAction('aprovado_comercial', 'Confirmar Aprovação Comercial')} disabled={isPending}
-                  style={{ flex: 1, padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer' }}>
-                  ✅ Aprovar Comercialmente
-                </button>
-                <button onClick={() => handleAction('reprovado_tecnico', 'Reprovar')} disabled={isPending}
-                  style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
-                  ❌ Reprovar
-                </button>
-              </div>
-            )}
-
-            {data.status === 'em_aprovacao_comercial' && !canApproveCommercial && (
-              <p style={{ fontSize: 12, color: '#8892a4' }}>⏳ Aguardando aprovação de um Aprovador Comercial.</p>
-            )}
-
-            {error && <p style={{ fontSize: 12, color: '#b91c1c' }}>{error}</p>}
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Após aprovação comercial — gerar proposta */}
-      {data.status === 'aprovado_comercial' && (
-        <div style={card}>
-          <div style={{ padding: '14px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', marginBottom: 16 }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: '#1a7c3e', margin: '0 0 2px' }}>✅ Proposta aprovada internamente</p>
-            <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Monte a proposta com os dados do cliente e envie para aprovação.</p>
+      {/* ── Histórico de aprovações ───────────────────────────────── */}
+      {(data.submitted_by_name || data.technical_approved_by_name || data.commercial_approved_by_name || data.client_approved_by_name) && card(
+        <div>
+          {sectionLabel('Histórico de Aprovações')}
+          <div style={{ marginTop: -4 }}>
+            {data.submitted_by_name && (
+              <AuditRow icon="📤" label="Enviada para Análise Técnica"
+                by={data.submitted_by_name} role={ROLE_LABELS['member']}
+                at={fmtDt(data.submitted_at) ?? undefined} />
+            )}
+            {data.technical_approved_by_name && (
+              <AuditRow icon="🔧" label="Aprovada Tecnicamente"
+                by={data.technical_approved_by_name} role={ROLE_LABELS['aprovador_tecnico']}
+                at={fmtDt(data.technical_approved_at) ?? undefined}
+                comment={data.technical_comment ?? undefined}
+                restriction={data.technical_restrictions ?? undefined} />
+            )}
+            {data.commercial_approved_by_name && (
+              <AuditRow icon="✅" label="Aprovada Comercialmente"
+                by={data.commercial_approved_by_name} role={ROLE_LABELS['aprovador_comercial']}
+                at={fmtDt(data.commercial_approved_at) ?? undefined} />
+            )}
+            {data.client_approved_by_name && (
+              <AuditRow
+                icon={data.client_status === 'aprovado' ? '🤝' : '❌'}
+                label={data.client_status === 'aprovado' ? 'Aceita pelo Cliente' : 'Declinada pelo Cliente'}
+                by={data.client_approved_by_name}
+                at={fmtDt(data.client_approved_at) ?? undefined} />
+            )}
           </div>
+        </div>
+      )}
+
+      {/* ── Link de revisão técnica (quando em análise) ───────────── */}
+      {reviewLink && data.status === 'em_aprovacao_tecnica' && card(
+        <div>
+          {sectionLabel('Link de Revisão Técnica')}
+          <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 10 }}>
+            Envie ao aprovador técnico. Ele deve ter login no ORBIS Price com perfil <strong>Somente Leitura</strong>.
+          </p>
           <div style={{ display: 'flex', gap: 8 }}>
-            <a
-              href={`/contracts/${contractId}#propostas`}
-              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none' }}>
-              📄 Montar Proposta
-            </a>
-            <button
-              onClick={async () => {
-                const res = await fetch('/api/proposals/client-token', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ contract_id: contractId }),
-                })
-                const json = await res.json()
-                if (json.token) {
-                  window.open(`${window.location.origin}/proposals/client/${json.token}`, '_blank')
-                } else {
-                  alert(json.error ?? 'Erro ao gerar link')
-                }
-              }}
-              style={{ flex: 1, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer' }}>
-              🔗 Abrir proposta para cliente
+            <input readOnly value={reviewLink} style={{
+              flex: 1, padding: '8px 12px', fontSize: 11, borderRadius: 7,
+              border: '0.5px solid #e8edf5', background: '#f8f9fb', fontFamily: 'monospace', color: '#52514e'
+            }} />
+            <button onClick={() => { navigator.clipboard.writeText(reviewLink); setCopyDone(true); setTimeout(() => setCopyDone(false), 2000) }}
+              style={{ padding: '8px 14px', fontSize: 12, borderRadius: 7, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}>
+              {copyDone ? '✅ Copiado' : '📋 Copiar'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Fluxo visual */}
-      <div style={card}>
-        <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', marginBottom: 16 }}>Fluxo de Aprovação</p>
-        <div style={{ display: 'flex', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
-          {STEPS.map((step, i) => {
-            const stepIdx = STEP_ORDER.indexOf(step.key)
-            const isDone = stepIdx < currentIdx
-            const isActive = step.key === data.status
-            return (
-              <div key={step.key} style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 80 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                    background: isActive ? '#1b556b' : isDone ? '#eaf5ee' : '#f1f3f8',
-                    border: isActive ? '2px solid #32af9d' : '2px solid transparent',
-                    boxShadow: isActive ? '0 0 0 4px rgba(50,175,157,0.15)' : 'none' }}>
-                    {step.icon}
-                  </div>
-                  <p style={{ fontSize: 10, color: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#b0b8c8', textAlign: 'center', fontWeight: isActive ? 600 : 400, margin: 0, lineHeight: 1.3 }}>
-                    {step.label}
-                  </p>
-                </div>
-                {i < STEPS.length - 1 && <div style={{ width: 28, height: 2, background: isDone ? '#32af9d' : '#e8edf5', marginBottom: 20, flexShrink: 0 }} />}
+      {/* ── Ações ─────────────────────────────────────────────────── */}
+      {data.status !== 'aprovado_comercial' && card(
+        <div>
+          {sectionLabel('Ações Disponíveis')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+            {/* Rascunho → Enviar para análise técnica */}
+            {data.status === 'rascunho' && isCommMember && (
+              <button
+                onClick={() => data.proposal_value ? setModal({ action: 'send_tech' }) : setError('Envie o valor do Price antes de iniciar.')}
+                disabled={isPending || generatingLink}
+                style={{ padding: '11px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer', textAlign: 'left' as const, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>📋</span> Enviar para Análise Técnica
+              </button>
+            )}
+            {data.status === 'rascunho' && !data.proposal_value && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fff8e6', border: '0.5px solid #fde68a' }}>
+                <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>⚠ Abra o Price pelo botão acima, dimensione e envie o valor ao CRM antes de iniciar o fluxo de aprovação.</p>
               </div>
-            )
-          })}
+            )}
+
+            {/* Em análise → Aprovação técnica */}
+            {data.status === 'em_aprovacao_tecnica' && isTech && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setModal({ action: 'approve_tech' })} disabled={isPending}
+                  style={{ flex: 1, padding: '11px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer' }}>
+                  ✅ Aprovar Tecnicamente
+                </button>
+                <button onClick={() => setModal({ action: 'reject_tech' })} disabled={isPending}
+                  style={{ flex: 1, padding: '11px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
+                  ❌ Reprovar
+                </button>
+              </div>
+            )}
+            {data.status === 'em_aprovacao_tecnica' && !isTech && (
+              <div style={{ padding: '12px 16px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
+                <p style={{ fontSize: 12, color: '#8892a4', margin: 0 }}>⏳ Aguardando aprovação técnica. Apenas usuários com o cargo <strong>Aprovador Técnico</strong> podem prosseguir.</p>
+              </div>
+            )}
+
+            {/* Reprovado → Voltar ao rascunho */}
+            {data.status === 'reprovado_tecnico' && isCommMember && (
+              <button onClick={() => doAction('rascunho')} disabled={isPending}
+                style={{ padding: '11px', fontSize: 13, fontWeight: 500, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer' }}>
+                📝 Retornar para Rascunho
+              </button>
+            )}
+
+            {/* Aprovado técnico → Enviar para comercial */}
+            {data.status === 'aprovado_tecnico' && isCommMember && (
+              <button onClick={() => setModal({ action: 'send_comm' })} disabled={isPending}
+                style={{ padding: '11px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', background: '#1b556b', color: '#fff', cursor: 'pointer', textAlign: 'left' as const, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>💼</span> Enviar para Aprovação Comercial
+              </button>
+            )}
+
+            {/* Em aprovação comercial */}
+            {data.status === 'em_aprovacao_comercial' && isComm && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setModal({ action: 'approve_comm' })} disabled={isPending}
+                  style={{ flex: 1, padding: '11px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', background: '#1a7c3e', color: '#fff', cursor: 'pointer' }}>
+                  ✅ Aprovar Comercialmente
+                </button>
+                <button onClick={() => setModal({ action: 'reject_comm' })} disabled={isPending}
+                  style={{ flex: 1, padding: '11px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
+                  ❌ Reprovar
+                </button>
+              </div>
+            )}
+            {data.status === 'em_aprovacao_comercial' && !isComm && (
+              <div style={{ padding: '12px 16px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
+                <p style={{ fontSize: 12, color: '#8892a4', margin: 0 }}>⏳ Aguardando aprovação comercial. Apenas <strong>Aprovadores Comerciais</strong> podem prosseguir.</p>
+              </div>
+            )}
+
+            {error && <p style={{ fontSize: 12, color: '#b91c1c', margin: 0 }}>{error}</p>}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Pós-aprovação comercial ──────────────────────────────── */}
+      {data.status === 'aprovado_comercial' && card(
+        <div>
+          {sectionLabel('Próxima Etapa')}
+          <div style={{ padding: '14px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#1a7c3e', margin: '0 0 3px' }}>✅ Aprovação interna concluída</p>
+            <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Monte a proposta comercial e gere o link para o cliente assinar.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a href={`/contracts/${contractId}#propostas`}
+              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none' }}>
+              📄 Montar Proposta
+            </a>
+            <button
+              onClick={async () => {
+                const res = await fetch('/api/proposals/client-token', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ contract_id: contractId }),
+                })
+                const json = await res.json()
+                if (json.token) window.open(`${window.location.origin}/proposals/client/${json.token}`, '_blank')
+                else alert(json.error ?? 'Erro ao gerar link')
+              }}
+              style={{ flex: 1, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer' }}>
+              🔗 Portal do Cliente
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )

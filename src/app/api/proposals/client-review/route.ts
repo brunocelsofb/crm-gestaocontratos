@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isValidCpf } from '@/lib/utils/cpf'
 
 export async function POST(req: Request) {
   const { token, contract_id, status, name, role, cpf, comment } = await req.json()
-  if (!token || !contract_id || !status) return NextResponse.json({ error: 'Parâmetros obrigatórios ausentes' }, { status: 400 })
+  if (!token || !contract_id || !status || !name?.trim()) {
+    return NextResponse.json({ error: 'Parametros obrigatorios ausentes' }, { status: 400 })
+  }
+
+  // Valida CPF se fornecido (obrigatório para aceite)
+  if (status === 'aprovado') {
+    if (!cpf?.trim()) {
+      return NextResponse.json({ error: 'CPF obrigatorio para aceitar a proposta' }, { status: 400 })
+    }
+    if (!isValidCpf(cpf)) {
+      return NextResponse.json({ error: 'CPF invalido. Verifique o numero informado.' }, { status: 400 })
+    }
+  }
 
   const admin = createAdminClient()
   const now = new Date().toISOString()
