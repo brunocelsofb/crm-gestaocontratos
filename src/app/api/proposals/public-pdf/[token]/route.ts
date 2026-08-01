@@ -15,8 +15,12 @@ export async function GET(
     .eq('client_review_token', token)
     .maybeSingle()
 
-  if (!proposal?.technical_snapshot) {
-    return NextResponse.json({ error: 'Proposta nao encontrada' }, { status: 404 })
+  if (!proposal) {
+    return NextResponse.json({ error: 'Token invalido' }, { status: 404 })
+  }
+
+  if (!proposal.technical_snapshot) {
+    return NextResponse.json({ error: 'Snapshot nao encontrado. Reenvie o valor do Price.' }, { status: 400 })
   }
 
   const contract = (proposal as any).contracts
