@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { addProposalTemplate, removeProposalTemplate } from '@/lib/actions/proposals'
 
 type Template = {
   id: string
@@ -26,6 +25,30 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
     initialTemplates.find(t => t.is_miolo_after)?.id ?? null
   )
   const dragRef = useRef<number | null>(null)
+
+  const inp = 'rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none'
+
+  function handleDragStart(i: number) { dragRef.current = i }
+  function handleDrop(i: number) {
+    if (dragRef.current === null || dragRef.current === i) return
+    const arr = [...templates]
+    const [moved] = arr.splice(dragRef.current, 1)
+    arr.splice(i, 0, moved)
+    setTemplates(arr)
+    dragRef.current = null
+  }
+
+  async function handleSaveOrder() {
+  function handleDrop(i: number) {
+    if (dragRef.current === null || dragRef.current === i) return
+    const arr = [...templates]
+    const [moved] = arr.splice(dragRef.current, 1)
+    arr.splice(i, 0, moved)
+    setTemplates(arr)
+    dragRef.current = null
+  }
+
+  const inp = 'rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none'
 
   function handleDragStart(i: number) { dragRef.current = i }
   function handleDrop(i: number) {
@@ -65,8 +88,6 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
     setUploading(false)
     window.location.reload()
   }
-
-  const inp = 'rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none'
 
   return (
     <div className="space-y-6">
@@ -144,7 +165,7 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
                 </div>
                 <button
                   onClick={async () => {
-                    await removeProposalTemplate(t.id)
+                    await fetch(`/api/proposals/templates?id=${t.id}`, { method: 'DELETE' })
                     setTemplates(prev => prev.filter(x => x.id !== t.id))
                   }}
                   className="text-xs text-gray-400 hover:text-red-500">
