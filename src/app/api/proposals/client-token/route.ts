@@ -25,8 +25,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ proposal_url: `${baseUrl}/proposal/${proposal.token}` })
   }
 
-  // Fallback: gera client_review_token para a página simples
+  // Gera client_review_token e garante que o registro existe
   const token = randomBytes(24).toString('hex')
-  await admin.from('proposal_status').update({ client_review_token: token }).eq('contract_id', contract_id)
+  await admin.from('proposal_status').upsert(
+    { contract_id, client_review_token: token, status: 'aprovado_comercial', updated_at: new Date().toISOString() },
+    { onConflict: 'contract_id' }
+  )
   return NextResponse.json({ token })
 }
