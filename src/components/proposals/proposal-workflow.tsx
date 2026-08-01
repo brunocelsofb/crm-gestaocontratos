@@ -339,18 +339,15 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
                 })
                 const json = await res.json()
                 if (json.proposal_url) {
-                  await navigator.clipboard.writeText(json.proposal_url)
-                  alert(`✅ Link copiado!\n\n${json.proposal_url}`)
+                  window.open(json.proposal_url, '_blank')
                 } else if (json.token) {
-                  const link = `${window.location.origin}/proposals/client/${json.token}`
-                  await navigator.clipboard.writeText(link)
-                  alert(`✅ Link copiado!\n\n${link}`)
+                  window.open(`${window.location.origin}/proposals/client/${json.token}`, '_blank')
                 } else {
-                  alert(json.error ?? 'Gere o PDF primeiro antes de enviar ao cliente.')
+                  alert(json.error ?? 'Erro ao gerar link.')
                 }
               }}
               style={{ flex: 1, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer' }}>
-              🔗 Gerar link para cliente
+              🔗 Abrir proposta para cliente
             </button>
           </div>
         </div>
