@@ -1,9 +1,23 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 
 export function ContractTabs({ tabs }: { tabs: { id: string; label: string; content: ReactNode }[] }) {
   const [activeId, setActiveId] = useState(tabs[0]?.id)
+
+  // Lê ?tab= da URL ao montar
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tabParam = params.get('tab')
+    if (tabParam && tabs.find(t => t.id === tabParam)) {
+      setActiveId(tabParam)
+      // Remove o parâmetro da URL sem reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete('tab')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
+
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
 
   return (

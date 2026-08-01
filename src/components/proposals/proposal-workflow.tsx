@@ -577,7 +577,9 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => {
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
                 document.getElementById('montagem-proposta')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }}
               style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
