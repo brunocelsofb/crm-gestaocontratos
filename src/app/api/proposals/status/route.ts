@@ -14,7 +14,7 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { contract_id, status, proposal_value, actor_name, actor_email, proposal_id, price_url } = body
+  const { contract_id, status, proposal_value, actor_name, actor_email, proposal_id, price_url, comment } = body
 
   if (!contract_id || !status) {
     return NextResponse.json({ error: 'contract_id e status são obrigatórios' }, { status: 400, headers: CORS })
@@ -53,10 +53,12 @@ export async function POST(req: Request) {
   if (status === 'aprovado_tecnico') {
     patch.technical_approved_at = now
     patch.technical_approved_by_name = loggedName
+    if (comment) patch.technical_comment = comment
   }
   if (status === 'aprovado_comercial') {
     patch.commercial_approved_at = now
     patch.commercial_approved_by_name = loggedName
+    if (comment) patch.commercial_comment = comment
   }
   if (status === 'rascunho') {
     // Reset dos campos de auditoria ao voltar para rascunho

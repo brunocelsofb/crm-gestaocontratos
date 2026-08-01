@@ -68,11 +68,11 @@ function fmtDt(d: string | null | undefined) {
   })
 }
 
-async function postStatus(contractId: string, status: ProposalStatus) {
+async function postStatus(contractId: string, status: ProposalStatus, actorName?: string, comment?: string) {
   const res = await fetch('/api/proposals/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contract_id: contractId, status }),
+    body: JSON.stringify({ contract_id: contractId, status, actor_name: actorName, comment }),
   })
   return res.ok
 }
@@ -222,13 +222,17 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   async function doAction(nextStatus: ProposalStatus, comment?: string) {
     setError(null)
     startTransition(async () => {
-      const res = await fetch('/api/proposals/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contract_id: contractId, status: nextStatus, comment }),
-      })
-      if (!res.ok) { setError('Erro ao atualizar. Tente novamente.'); return }
-      setData(prev => ({ ...prev, status: nextStatus, actor_name: currentUserName, updated_at: new Date().toISOString() }))
+      const ok = await postStatus(contractId, nextStatus, currentUserName, comment)
+      if (!ok) { setError('Erro ao atualizar. Tente novamente.'); return }
+      setData(prev => ({
+        ...prev,
+        status: nextStatus,
+        actor_name: currentUserName,
+        updated_at: new Date().toISOString(),
+        ...(nextStatus === 'em_aprovacao_tecnica' ? { submitted_by_name: currentUserName, submitted_at: new Date().toISOString() } : {}),
+        ...(nextStatus === 'aprovado_tecnico' ? { technical_approved_by_name: currentUserName, technical_approved_at: new Date().toISOString(), technical_comment: comment ?? null } : {}),
+        ...(nextStatus === 'aprovado_comercial' ? { commercial_approved_by_name: currentUserName, commercial_approved_at: new Date().toISOString() } : {}),
+      }))
       router.refresh()
     })
   }

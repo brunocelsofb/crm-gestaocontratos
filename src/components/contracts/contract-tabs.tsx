@@ -1,19 +1,27 @@
 'use client'
 
 import { useState, useEffect, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 
 export function ContractTabs({ tabs }: { tabs: { id: string; label: string; content: ReactNode }[] }) {
   const [activeId, setActiveId] = useState(tabs[0]?.id)
+  const router = useRouter()
 
-  // Lê ?tab= da URL ao montar
+  // Lê ?tab= da URL ao montar — ao retornar do Price, força refresh dos dados
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const tabParam = params.get('tab')
+    const fromPrice = params.get('from') === 'price'
+
     if (tabParam && tabs.find(t => t.id === tabParam)) {
       setActiveId(tabParam)
-      // Remove o parâmetro da URL sem reload
+      if (fromPrice) {
+        // Recarrega dados do servidor para mostrar snapshot recém enviado
+        router.refresh()
+      }
       const url = new URL(window.location.href)
       url.searchParams.delete('tab')
+      url.searchParams.delete('from')
       window.history.replaceState({}, '', url.toString())
     }
   }, [])
