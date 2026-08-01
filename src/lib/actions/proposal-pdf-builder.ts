@@ -227,46 +227,105 @@ export async function buildStandardProposalPage({
   // ---- Tabela de itens ----
   newPageIfNeeded(40)
   text('Produtos / Serviços', margin, y, { size: 10, bold: true })
-  y -= 18
+  y -= 6
 
-  const colX = { qty: margin, cat: margin + 35, item: margin + 100, type: margin + 240, unit: margin + 300, disc: margin + 370, sub: margin + 440 }
-  newPageIfNeeded(16)
-  text('Qtd', colX.qty, y, { size: 8, bold: true })
-  text('Categoria', colX.cat, y, { size: 8, bold: true })
-  text('Item', colX.item, y, { size: 8, bold: true })
-  text('Tipo', colX.type, y, { size: 8, bold: true })
-  text('Vlr. Unit.', colX.unit, y, { size: 8, bold: true })
-  text('Desc.', colX.disc, y, { size: 8, bold: true })
-  text('Subtotal', colX.sub, y, { size: 8, bold: true })
+  // Linha decorativa abaixo do título
+  page.drawLine({ start: { x: margin, y: y }, end: { x: pageWidth - margin, y: y }, thickness: 0.5, color: rgb(...brandRgb) })
   y -= 14
 
+  const tableW = pageWidth - margin * 2
+  // Colunas: Qtd | Categoria | Item (maior) | Tipo | Vlr.Unit. | Desc. | Subtotal
+  const col = {
+    qty:  { x: margin,            w: 26 },
+    cat:  { x: margin + 28,       w: 70 },
+    item: { x: margin + 100,      w: 165 },
+    type: { x: margin + 267,      w: 38 },
+    unit: { x: margin + 307,      w: 72 },
+    disc: { x: margin + 381,      w: 52 },
+    sub:  { x: margin + 435,      w: tableW - 435 },
+  }
+
+  // Header com fundo cinza
+  newPageIfNeeded(16)
+  page.drawRectangle({ x: margin, y: y - 14, width: tableW, height: 16, color: rgb(0.95, 0.96, 0.97) })
+  const headers = [
+    { label: 'Qtd',      x: col.qty.x },
+    { label: 'Categoria',x: col.cat.x },
+    { label: 'Item',     x: col.item.x },
+    { label: 'Tipo',     x: col.type.x },
+    { label: 'Vlr. Unit.',x: col.unit.x },
+    { label: 'Desc.',    x: col.disc.x },
+    { label: 'Subtotal', x: col.sub.x },
+  ]
+  headers.forEach(h => text(h.label, h.x + 3, y - 10, { size: 7.5, bold: true, color: [0.25, 0.28, 0.38] }))
+  y -= 16
+
+  // Linha separadora do header
+  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.3, color: rgb(0.85, 0.87, 0.90) })
+  y -= 2
+
   let total = 0
-  for (const it of items) {
-    newPageIfNeeded(28)
-    text(String(it.quantity), colX.qty, y, { size: 8 })
-    text((it.category ?? '—').slice(0, 12), colX.cat, y, { size: 8 })
-    text(it.item.slice(0, 28), colX.item, y, { size: 8 })
-    text((it.type ?? '—').slice(0, 10), colX.type, y, { size: 8 })
-    text(fmtCurrency(it.unit_value, proposal.currency), colX.unit, y, { size: 8 })
-    text(fmtCurrency(it.discount, proposal.currency), colX.disc, y, { size: 8 })
-    text(fmtCurrency(it.subtotal, proposal.currency), colX.sub, y, { size: 8 })
-    y -= 12
-    if (it.characteristics) {
-      text(`  ${it.characteristics.slice(0, 90)}`, colX.item, y, { size: 7, color: [0.45, 0.45, 0.45] })
+  for (const [idx, it] of items.entries()) {
+    // Calcula altura necessária para o item
+    const charLines = it.characteristics
+      ? Math.ceil(it.characteristics.length / 80)
+      : 0
+    const rowH = 16 + (charLines > 0 ? charLines * 10 + 4 : 0) + (it.delivery_forecast ? 10 : 0)
+    newPageIfNeeded(rowH + 8)
+
+    // Fundo alternado
+    if (idx % 2 === 0) {
+      page.drawRectangle({ x: margin, y: y - rowH + 4, width: tableW, height: rowH - 4, color: rgb(0.985, 0.988, 0.992) })
+    }
+
+    // Dados da linha
+    text(String(it.quantity), col.qty.x + 3, y, { size: 8.5 })
+    // Categoria com wrap suave
+    const catStr = (it.category ?? '—').slice(0, 16)
+    text(catStr, col.cat.x + 3, y, { size: 8, color: [0.35, 0.38, 0.48] })
+    // Item — permite até 2 linhas
+    const itemStr = it.item
+    const itemLine1 = itemStr.slice(0, 40)
+    const itemLine2 = itemStr.length > 40 ? itemStr.slice(40, 76) : null
+    text(itemLine1, col.item.x + 3, y, { size: 8.5, bold: true })
+    if (itemLine2) {
+      text(itemLine2, col.item.x + 3, y - 10, { size: 8.5, bold: true })
       y -= 10
+    }
+    text((it.type ?? '—'), col.type.x + 3, y, { size: 8 })
+    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 3, y, { size: 8.5 })
+    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 3, y, { size: 8, color: [0.5, 0.5, 0.5] })
+    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 3, y, { size: 8.5, bold: true })
+    y -= 14
+
+    // Características em até 3 linhas
+    if (it.characteristics) {
+      const maxCharsPerLine = 80
+      const chars = it.characteristics
+      for (let i = 0; i < chars.length && i < maxCharsPerLine * 3; i += maxCharsPerLine) {
+        text(`  ${chars.slice(i, i + maxCharsPerLine)}`, col.item.x + 3, y, { size: 7, color: [0.45, 0.48, 0.55] })
+        y -= 10
+      }
+      y -= 2
     }
     if (it.delivery_forecast) {
-      text(`  Previsão de entrega: ${it.delivery_forecast}`, colX.item, y, { size: 7, color: [0.45, 0.45, 0.45] })
+      text(`  Previsão: ${it.delivery_forecast}`, col.item.x + 3, y, { size: 7, color: [0.45, 0.45, 0.45] })
       y -= 10
     }
+
+    // Linha divisória entre itens
+    page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.2, color: rgb(0.88, 0.90, 0.93) })
     y -= 4
     total += it.subtotal
   }
 
-  y -= 8
-  newPageIfNeeded(20)
-  text(`TOTAL: ${fmtCurrency(total, proposal.currency)}`, colX.sub - 60, y, { size: 12, bold: true })
-  y -= 20
+  // Total com destaque
+  y -= 4
+  newPageIfNeeded(24)
+  page.drawRectangle({ x: col.unit.x, y: y - 18, width: tableW - (col.unit.x - margin), height: 20, color: rgb(...brandRgb) })
+  text('TOTAL:', col.unit.x + 8, y - 12, { size: 9, bold: true, color: [1, 1, 1] })
+  text(fmtCurrency(total, proposal.currency), col.sub.x + 3, y - 12, { size: 9, bold: true, color: [1, 1, 1] })
+  y -= 26
 
   // ---- Desconto, condição de pagamento e parcelas ----
   newPageIfNeeded(60)
