@@ -29,15 +29,6 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
   const inp = 'rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none'
 
   function handleDragStart(i: number) { dragRef.current = i }
-  function handleDrop(i: number) {
-    if (dragRef.current === null || dragRef.current === i) return
-    const arr = [...templates]
-    const [moved] = arr.splice(dragRef.current, 1)
-    arr.splice(i, 0, moved)
-    setTemplates(arr)
-    dragRef.current = null
-  }
-
   async function handleSaveOrder() {
   function handleDrop(i: number) {
     if (dragRef.current === null || dragRef.current === i) return
