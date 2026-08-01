@@ -39,8 +39,8 @@ export async function GET(
 
   // Busca empresa, contato e templates
   const [companyRes, contactRes, { data: templates }, { data: orgSettings }] = await Promise.all([
-    contract?.company_id ? admin.from('companies').select('name, cnpj, address').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
-    contract?.contact_id ? admin.from('contacts').select('name, email').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
+    contract?.company_id ? admin.from('companies').select('name, cnpj, trade_name, street, street_number, neighborhood, city, state, zip_code, email, phone').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
+    contract?.contact_id ? admin.from('contacts').select('name, email, phone, cpf').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
     admin.from('proposal_templates').select('*').order('created_at'),
     admin.from('organization_settings').select('company_name, company_cnpj, logo_storage_path, proposal_brand_color, proposal_header_text, proposal_footer_text').maybeSingle(),
   ])
@@ -85,8 +85,25 @@ export async function GET(
       commercialApprovedByName: proposal.commercial_approved_by_name ?? null,
       commercialApprovedAt: proposal.commercial_approved_at ?? null,
       contract: contract ? { client_name: contract.client_name, process_number: contract.process_number ?? null, cnpj: contract.cnpj ?? null } : null,
-      company: companyRes?.data ? { name: companyRes.data.name, cnpj: companyRes.data.cnpj ?? undefined, address: companyRes.data.address ?? undefined } : { name: contract?.client_name ?? '' },
-      contact: contactRes?.data ? { name: contactRes.data.name, email: contactRes.data.email ?? undefined } : null,
+      company: companyRes?.data ? {
+        name: companyRes.data.name,
+        cnpj: companyRes.data.cnpj ?? undefined,
+        tradeName: companyRes.data.trade_name ?? undefined,
+        address: [
+          companyRes.data.street && `${companyRes.data.street}${companyRes.data.street_number ? ', ' + companyRes.data.street_number : ''}`,
+          companyRes.data.neighborhood,
+          companyRes.data.city && companyRes.data.state ? `${companyRes.data.city}/${companyRes.data.state}` : companyRes.data.city,
+          companyRes.data.zip_code,
+        ].filter(Boolean).join(' - ') || undefined,
+        email: companyRes.data.email ?? undefined,
+        phone: companyRes.data.phone ?? undefined,
+      } : { name: contractData?.client_name ?? '' },
+      contact: contactRes?.data ? {
+        name: contactRes.data.name,
+        email: contactRes.data.email ?? undefined,
+        phone: contactRes.data.phone ?? undefined,
+        cpf: contactRes.data.cpf ?? undefined,
+      } : null,
       org: { companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA', cnpj: orgSettings?.company_cnpj ?? '23.129.279/0001-03', proposalCode },
       textoObjetivos: (proposal as any).texto_objetivos ?? null,
       textoAtividades: (proposal as any).texto_atividades ?? null,

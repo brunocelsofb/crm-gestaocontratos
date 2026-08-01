@@ -150,10 +150,10 @@ export async function buildPriceProposalPage(params: {
     items,
     company: params.company ? {
       name: san(params.company.name ?? ''),
-      trade_name: null,
+      trade_name: san((params.company as any).tradeName ?? params.company.name ?? null),
       cnpj: san(params.company.cnpj ?? params.contract?.cnpj ?? null),
-      legal_name: san(params.company.name ?? params.contract?.client_name ?? null),
-      nf_email: null,
+      legal_name: san((params.company as any).tradeName ?? params.company.name ?? params.contract?.client_name ?? null),
+      nf_email: san((params.company as any).email ?? null),
       address: san(params.company.address ?? null),
     } : {
       name: san(params.contract?.client_name ?? ''),
@@ -165,9 +165,9 @@ export async function buildPriceProposalPage(params: {
     },
     contact: params.contact ? {
       name: san(params.contact.name ?? ''),
-      cpf: null,
+      cpf: san((params.contact as any).cpf ?? null),
       email: san(params.contact.email ?? null),
-      phone: null,
+      phone: san((params.contact as any).phone ?? null),
       address: null,
     } : null,
     org: {

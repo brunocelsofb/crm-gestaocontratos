@@ -32,8 +32,8 @@ export async function GET(
 
   // Busca empresa e contato do contrato
   const [companyRes, contactRes] = await Promise.all([
-    contract?.company_id ? admin.from('companies').select('name, cnpj, address').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
-    contract?.contact_id ? admin.from('contacts').select('name, email').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
+    contract?.company_id ? admin.from('companies').select('name, cnpj, trade_name, street, street_number, neighborhood, city, state, zip_code, email, phone').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
+    contract?.contact_id ? admin.from('contacts').select('name, email, phone, cpf').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
 
   // Busca também o usuário responsável pelo contrato para código da proposta
@@ -90,11 +90,21 @@ export async function GET(
       company: companyRes?.data ? {
         name: companyRes.data.name,
         cnpj: companyRes.data.cnpj ?? undefined,
-        address: companyRes.data.address ?? undefined,
+        address: [
+          companyRes.data.street && `${companyRes.data.street}${companyRes.data.street_number ? ', ' + companyRes.data.street_number : ''}`,
+          companyRes.data.neighborhood,
+          companyRes.data.city && companyRes.data.state ? `${companyRes.data.city}/${companyRes.data.state}` : companyRes.data.city,
+          companyRes.data.zip_code,
+        ].filter(Boolean).join(' - ') || undefined,
+        tradeName: companyRes.data.trade_name ?? undefined,
+        email: companyRes.data.email ?? undefined,
+        phone: companyRes.data.phone ?? undefined,
       } : { name: contract?.client_name ?? '' },
       contact: contactRes?.data ? {
         name: contactRes.data.name,
         email: contactRes.data.email ?? undefined,
+        phone: contactRes.data.phone ?? undefined,
+        cpf: contactRes.data.cpf ?? undefined,
       } : null,
       org: {
         companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA',
