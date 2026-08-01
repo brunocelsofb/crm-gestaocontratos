@@ -366,7 +366,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
               <StatusBadge status={data.status} />
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <a href={`https://orbis-price.vercel.app?crm_id=${contractId}`} target="_blank" rel="noopener noreferrer"
+              <a href={priceUrl} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px',
                   fontSize: 11, fontWeight: 600, borderRadius: 7, border: 'none',
