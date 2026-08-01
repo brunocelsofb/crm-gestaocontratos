@@ -11,9 +11,39 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })
 }
 
+function san(s: string | null | undefined): string {
+  if (!s) return ''
+  const map: Record<string, string> = {
+    '\u00e1':'a','\u00e0':'a','\u00e3':'a','\u00e2':'a',
+    '\u00c1':'A','\u00c0':'A','\u00c3':'A','\u00c2':'A',
+    '\u00e9':'e','\u00e8':'e','\u00ea':'e',
+    '\u00c9':'E','\u00ca':'E',
+    '\u00ed':'i','\u00ee':'i','\u00cd':'I',
+    '\u00f3':'o','\u00f5':'o','\u00f4':'o',
+    '\u00d3':'O','\u00d4':'O','\u00d5':'O',
+    '\u00fa':'u','\u00fb':'u','\u00da':'U',
+    '\u00e7':'c','\u00c7':'C',
+  }
+  return Array.from(s).map(c => map[c] ?? (c.charCodeAt(0) > 127 ? '' : c)).join('')
+}
+
+async function generateControlCode(supabase: any): Promise<string> {
+  const year = new Date().getFullYear()
+  const prefix = `PROP-${year}-`
+  const { data } = await supabase
+    .from('proposals')
+    .select('control_code')
+    .ilike('control_code', `${prefix}%`)
+    .order('control_code', { ascending: false })
+    .limit(1)
+  const last = data?.[0]?.control_code
+  const lastNum = last ? parseInt(last.replace(prefix, ''), 10) : 0
+  return `${prefix}${String((isNaN(lastNum) ? 0 : lastNum) + 1).padStart(4, '0')}`
+}
+
 export async function POST(req: Request) {
   const body = await req.json()
-  const { contract_id, proposal_value, margem_pct, technical_snapshot } = body
+  const { contract_id, proposal_value, margem_pct, technical_snapshot: snap } = body
 
   if (!contract_id || !proposal_value) {
     return NextResponse.json({ error: 'contract_id e proposal_value são obrigatórios' }, { status: 400, headers: CORS })
@@ -21,14 +51,14 @@ export async function POST(req: Request) {
 
   const supabase = createAdminClient()
 
-  // Atualiza o run aberto com o valor
+  // 1. Atualiza o run com o valor
   await supabase
     .from('pipeline_runs')
     .update({ value: proposal_value })
     .eq('contract_id', contract_id)
     .eq('status', 'open')
 
-  // Salva em proposal_status — sempre atualiza snapshot e valor, preserva o status atual
+  // 2. Salva proposal_status com snapshot
   const { data: existing } = await supabase
     .from('proposal_status')
     .select('status')
@@ -39,15 +69,148 @@ export async function POST(req: Request) {
     contract_id,
     status: existing?.status ?? 'rascunho',
     proposal_value,
-    technical_snapshot: technical_snapshot ?? null,
+    technical_snapshot: snap ?? null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'contract_id' })
 
-  // Registra atividade
+  // 3. Cria/atualiza proposta no sistema de julho com itens do Price
+  if (snap) {
+    const dur = snap.contractDuration ?? 12
+    const escopo = (snap.escopoSanitizado ?? snap.escopoServicos ?? []).map(san).join(' - ')
+    const profs = (snap.professionals ?? []).filter((p: any) => p.role?.trim())
+    const equipeDesc = profs.map((p: any) => {
+      const carga = p.hoursPerMonth === 220 ? '44h/sem' : p.hoursPerMonth === 180 ? '12x36h' : `${p.hoursPerMonth}h/mes`
+      return `0${p.quantity} ${san(p.role)} (${san(p.contractType)}, ${carga})`
+    }).join(' | ')
+
+    const characteristics = [
+      escopo && `Escopo: ${escopo}`,
+      equipeDesc && `Equipe: ${equipeDesc}`,
+      snap.dimensionamento?.totalEquipamentos > 0 && `${snap.dimensionamento.totalEquipamentos} equipamentos gerenciados`,
+      snap.hospitalBeds > 0 && `${snap.hospitalBeds} leitos`,
+    ].filter(Boolean).join(' · ')
+
+    // Monta itens da proposta
+    const items = [
+      // Item 1: Serviço MRR
+      {
+        position: 0,
+        quantity: 1,
+        category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
+        item: san(snap.tituloItemServico ?? 'Servico Continuo de Engenharia'),
+        characteristics: characteristics.slice(0, 500),
+        type: 'MRR',
+        delivery_forecast: null,
+        unit_value: Number(proposal_value),
+        discount: 0,
+        subtotal: Number(proposal_value),
+      },
+      // Item 2: Peças e Insumos (se houver)
+      snap.tituloItemPecas && {
+        position: 1,
+        quantity: 1,
+        category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
+        item: san(snap.tituloItemPecas),
+        characteristics: 'Fornecimento de pecas e insumos sob demanda',
+        type: 'MRR',
+        delivery_forecast: null,
+        unit_value: 0,
+        discount: 0,
+        subtotal: 0,
+      },
+      // Item 3: Serviços Externos (se houver)
+      snap.tituloItemServicosExternos && {
+        position: 2,
+        quantity: 1,
+        category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
+        item: san(snap.tituloItemServicosExternos),
+        characteristics: 'Servicos especializados externos sob demanda',
+        type: 'Pontual',
+        delivery_forecast: null,
+        unit_value: 0,
+        discount: 0,
+        subtotal: 0,
+      },
+    ].filter(Boolean) as any[]
+
+    const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+    const controlCode = await generateControlCode(supabase)
+
+    // Verifica se já existe proposta em rascunho para este contrato
+    const { data: existingProposal } = await supabase
+      .from('proposals')
+      .select('id')
+      .eq('contract_id', contract_id)
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let proposalId = existingProposal?.id
+
+    if (proposalId) {
+      // Atualiza itens da proposta existente
+      await supabase.from('proposal_items').delete().eq('proposal_id', proposalId)
+      await supabase.from('proposal_items').insert(
+        items.map(it => ({ ...it, proposal_id: proposalId }))
+      )
+      // Atualiza validade
+      await supabase.from('proposals').update({
+        valid_until: validUntil,
+        is_recurring: true,
+        installments: dur,
+        payment_terms: `${dur} parcelas mensais`,
+        updated_at: new Date().toISOString(),
+      }).eq('id', proposalId)
+    } else {
+      // Cria nova proposta
+      const { data: newProposal } = await supabase
+        .from('proposals')
+        .insert({
+          contract_id,
+          control_code: controlCode,
+          currency: 'BRL',
+          valid_until: validUntil,
+          is_recurring: true,
+          installments: dur,
+          payment_terms: `${dur} parcelas mensais`,
+          discount_type: null,
+          discount_value: 0,
+        })
+        .select('id')
+        .single()
+
+      proposalId = newProposal?.id
+
+      if (proposalId) {
+        // Insere itens
+        await supabase.from('proposal_items').insert(
+          items.map(it => ({ ...it, proposal_id: proposalId }))
+        )
+        // Adiciona página padrão
+        await supabase.from('proposal_pages').insert({
+          proposal_id: proposalId,
+          position: 0,
+          is_standard_proposal: true,
+        })
+      }
+    }
+
+    // Atualiza texto de introdução com objetoContrato + escopo
+    const textoAtividades = snap.objetoContrato
+      ? `${san(snap.objetoContrato)}\n\n${escopo}`
+      : escopo
+
+    await supabase.from('proposal_status').update({
+      texto_atividades: textoAtividades || null,
+    }).eq('contract_id', contract_id)
+  }
+
+  // 4. Atividade
   await supabase.from('activities').insert({
     contract_id,
     type: 'price',
-    content: `Proposta precificada no ORBIS Price: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês${margem_pct ? ` · Margem: ${Number(margem_pct).toFixed(1)}%` : ''}.`,
+    content: `Proposta precificada no ORBIS Price: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mes${margem_pct ? ` · Margem: ${Number(margem_pct).toFixed(1)}%` : ''}. Itens preenchidos automaticamente.`,
   })
 
   return NextResponse.json({ ok: true }, { headers: CORS })
