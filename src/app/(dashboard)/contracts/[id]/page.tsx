@@ -22,6 +22,7 @@ import { ContractContactsSection } from '@/components/contracts/contract-contact
 import { ContractZapSignSection } from '@/components/zapsign/contract-zapsign-section'
 import { PortfolioFieldsForm } from '@/components/carteira/portfolio-fields-form'
 import { ProposalWorkflow } from '@/components/proposals/proposal-workflow'
+import { ProposalTextsEditor } from '@/components/proposals/proposal-texts-editor'
 import { getContractContacts } from '@/lib/actions/contract-contacts'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { getConnectedEmailAccount } from '@/lib/actions/email'
@@ -208,7 +209,7 @@ export default async function ContractDetailPage({
     supabase.from('zapsign_templates').select('id, name, type').order('name'),
     supabase.from('zapsign_documents').select('id, name, status, sent_at, signed_at, pdf_url, signed_pdf_url').eq('contract_id', contract.id).order('created_at', { ascending: false }),
     supabase.from('organization_settings').select('zapsign_api_token').eq('id', 'default').maybeSingle(),
-    supabase.from('proposal_status').select('status, proposal_value, actor_name, actor_email, updated_at, technical_snapshot, technical_comment, technical_restrictions, review_token, submitted_at, submitted_by_name, technical_approved_at, technical_approved_by_name, commercial_approved_at, commercial_approved_by_name, client_status, client_approved_at, client_approved_by_name, client_review_token').eq('contract_id', contract.id).maybeSingle(),
+    supabase.from('proposal_status').select('status, proposal_value, actor_name, actor_email, updated_at, technical_snapshot, technical_comment, technical_restrictions, review_token, submitted_at, submitted_by_name, technical_approved_at, technical_approved_by_name, commercial_approved_at, commercial_approved_by_name, client_status, client_approved_at, client_approved_by_name, client_review_token, texto_objetivos, texto_atividades, texto_estrutura_apoio').eq('contract_id', contract.id).maybeSingle(),
   ])
 
   const inboundEmailAddress =
@@ -558,13 +559,19 @@ export default async function ContractDetailPage({
               })
               const priceUrl = `https://orbis-price.vercel.app/?${priceParams.toString()}`
               return (
-                <ProposalWorkflow
-                  contractId={contract.id}
-                  initialData={proposalStatus as any}
-                  priceUrl={priceUrl}
-                  currentUserRole={currentProfile?.role ?? 'member'}
-                  currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <ProposalWorkflow
+                    contractId={contract.id}
+                    initialData={proposalStatus as any}
+                    priceUrl={priceUrl}
+                    currentUserRole={currentProfile?.role ?? 'member'}
+                    currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
+                  />
+                  <ProposalTextsEditor
+                    contractId={contract.id}
+                    initialData={proposalStatus as any}
+                  />
+                </div>
               )
             })(),
           },

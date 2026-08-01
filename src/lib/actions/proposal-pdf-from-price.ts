@@ -1,16 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
-// Paleta de cores
-const TEAL  = rgb(0.11, 0.34, 0.42)  // #1b556b
-const MINT  = rgb(0.20, 0.69, 0.62)  // #32af9d
-const DARK  = rgb(0.10, 0.12, 0.21)  // #1a1f36
-const GRAY  = rgb(0.53, 0.54, 0.64)  // #8892a4
-const WHITE = rgb(1, 1, 1)
-const LIGHT = rgb(0.97, 0.98, 0.98)
-const GREEN = rgb(0.10, 0.49, 0.24)  // #1a7c3e
-const BLUE  = rgb(0.23, 0.36, 0.86)  // #3b5bdb
-const ORANGE = rgb(1.0, 0.40, 0.00)  // #FF6600
-
 function sanitize(s: string | null | undefined): string {
   if (!s) return ''
   const map: Record<string, string> = {
@@ -23,17 +12,48 @@ function sanitize(s: string | null | undefined): string {
     '\u00d3':'O','\u00d4':'O','\u00d5':'O',
     '\u00fa':'u','\u00f9':'u','\u00fb':'u','\u00fc':'u','\u00da':'U',
     '\u00e7':'c','\u00c7':'C','\u00f1':'n','\u00d1':'N',
-    '\u2019':"'",'`':"'",'\'':'\''
+    '\u2019':"'",'`':"'"
   }
   return Array.from(s).map(c => map[c] ?? (c.charCodeAt(0) > 127 ? '' : c)).join('')
 }
 
-function fmt(v: number) {
+function fmtMoney(v: number) {
   return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+  return new Date(d).toLocaleDateString('pt-BR')
+}
+
+// Quebra texto em linhas de largura máxima
+function wrapText(text: string, font: any, size: number, maxWidth: number): string[] {
+  const words = sanitize(text).split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const test = current ? current + ' ' + word : word
+    if (font.widthOfTextAtSize(test, size) <= maxWidth) {
+      current = test
+    } else {
+      if (current) lines.push(current)
+      current = word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+// Quebra textarea em linhas respeitando \n e wrap
+function wrapParagraphs(text: string, font: any, size: number, maxWidth: number): string[] {
+  if (!text?.trim()) return []
+  const paragraphs = sanitize(text).split('\n')
+  const lines: string[] = []
+  for (const para of paragraphs) {
+    if (!para.trim()) { lines.push(''); continue }
+    const wrapped = wrapText(para, font, size, maxWidth)
+    lines.push(...wrapped)
+  }
+  return lines
 }
 
 export async function buildPriceProposalPage(params: {
@@ -47,208 +67,343 @@ export async function buildPriceProposalPage(params: {
   commercialApprovedByName: string | null
   commercialApprovedAt: string | null
   contract: { client_name: string; process_number: string | null; cnpj: string | null } | null
+  company?: { name?: string; cnpj?: string; address?: string } | null
+  contact?: { name?: string; email?: string } | null
+  org?: { companyName?: string; cnpj?: string; address?: string; proposalCode?: string } | null
+  textoObjetivos?: string | null
+  textoAtividades?: string | null
+  textoEstruturaApoio?: string | null
 }): Promise<Uint8Array> {
-  const { snapshot, proposalValue, validityDays, contract } = params
-  const s = snapshot
+  const { snapshot: s, proposalValue, validityDays, contract, textoObjetivos, textoAtividades, textoEstruturaApoio } = params
+  const org = params.org
 
   const pdfDoc = await PDFDocument.create()
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await pdfDoc.embedFont(StandardFonts.Helvetica)
 
   const W = 595.28, H = 841.89
-  const ml = 44, mr = 44
+  const ml = 50, mr = 50
+  const contentW = W - ml - mr
+
+  const TEAL  = rgb(0.08, 0.33, 0.41)
+  const DARK  = rgb(0.10, 0.12, 0.21)
+  const GRAY  = rgb(0.45, 0.46, 0.55)
+  const WHITE = rgb(1, 1, 1)
+  const LIGHT = rgb(0.96, 0.97, 0.98)
+  const MINT  = rgb(0.20, 0.69, 0.62)
+
+  let pageNum = 0
 
   function newPage() {
+    pageNum++
     const page = pdfDoc.addPage([W, H])
-    // Header teal
-    page.drawRectangle({ x: 0, y: H - 44, width: W, height: 44, color: TEAL })
-    page.drawText(sanitize(contract?.client_name ?? s.clientName), { x: ml, y: H - 16, size: 10, font: bold, color: WHITE })
-    page.drawText(sanitize(s.projectName ?? ''), { x: ml, y: H - 30, size: 8, font: reg, color: rgb(0.7, 0.85, 0.85) })
-    page.drawText('ORBIS Engenharia', { x: W - mr - 90, y: H - 28, size: 7, font: bold, color: rgb(0.7, 0.85, 0.85) })
-    return { page, y: H - 60 }
+
+    // Header linha teal
+    page.drawRectangle({ x: 0, y: H - 2, width: W, height: 2, color: TEAL })
+
+    // Footer
+    page.drawLine({ start: { x: ml, y: 28 }, end: { x: W - mr, y: 28 }, thickness: 0.3, color: GRAY })
+    const today = new Date().toLocaleDateString('pt-BR')
+    const validDate = new Date(Date.now() + validityDays * 86400000).toLocaleDateString('pt-BR')
+    page.drawText(`${today} - Validade: ${validDate}`, { x: ml, y: 16, size: 7, font: reg, color: GRAY })
+    const propCode = sanitize(org?.proposalCode ?? '')
+    page.drawText(propCode, { x: W - mr - bold.widthOfTextAtSize(propCode, 7), y: 16, size: 7, font: bold, color: GRAY })
+    page.drawText(String(pageNum), { x: W / 2, y: 16, size: 7, font: reg, color: GRAY })
+
+    return { page, y: H - 20 }
   }
 
-  function secTitle(page: any, label: string, y: number) {
-    page.drawRectangle({ x: ml, y: y - 14, width: W - ml - mr, height: 16, color: rgb(0.95, 0.97, 0.97) })
-    page.drawText(sanitize(label), { x: ml + 6, y: y - 10, size: 7, font: bold, color: TEAL })
+  function drawSectionTitle(page: any, title: string, y: number): number {
+    page.drawText(sanitize(title), { x: ml, y: y - 10, size: 8, font: bold, color: DARK })
+    page.drawRectangle({ x: ml, y: y - 14, width: 30, height: 1.5, color: TEAL })
     return y - 24
   }
 
-  function kpiBox(page: any, x: number, y: number, w: number, label: string, value: string, bg: any, fg: any) {
-    page.drawRectangle({ x, y: y - 36, width: w, height: 36, color: bg })
-    page.drawText(sanitize(label), { x: x + 6, y: y - 12, size: 7, font: reg, color: GRAY })
-    page.drawText(sanitize(value), { x: x + 6, y: y - 28, size: 14, font: bold, color: fg })
+  function drawText(page: any, text: string, x: number, y: number, size = 9, font = reg, color = DARK): number {
+    page.drawText(sanitize(text), { x, y, size, font, color })
+    return y - size - 4
   }
 
-  // ── PÁGINA 1: Escopo + Equipamentos + Equipe ────────────────────────────
-  {
-    const { page, y: yStart } = newPage()
-    let y = yStart
-
-    // Objeto do contrato
-    if (s.objetoContrato) {
-      y = secTitle(page, 'OBJETO DO CONTRATO', y)
-      const obj = sanitize(s.objetoContrato)
-      page.drawText(obj.slice(0, 100), { x: ml, y, size: 9, font: reg, color: DARK })
-      if (obj.length > 100) page.drawText(obj.slice(100, 200), { x: ml, y: y - 12, size: 9, font: reg, color: DARK })
-      y -= obj.length > 100 ? 30 : 18
-    }
-
-    // Escopo
-    y = secTitle(page, 'ESCOPO DO CONTRATO', y)
-    const escopo: string[] = s.escopoSanitizado ?? s.escopoServicos ?? []
-    const col2Start = ml + (W - ml - mr) / 2 + 4
-    escopo.forEach((item: string, i: number) => {
-      const x = i % 2 === 0 ? ml : col2Start
-      const yPos = y - Math.floor(i / 2) * 14
-      page.drawText('-', { x, y: yPos, size: 8, font: bold, color: TEAL })
-      page.drawText(sanitize(item), { x: x + 10, y: yPos, size: 8, font: reg, color: DARK })
-    })
-    y -= (Math.ceil(escopo.length / 2)) * 14 + 10
-
-    // Equipamentos
-    if (s.equipamentos?.total > 0) {
-      y = secTitle(page, 'EQUIPAMENTOS GERENCIADOS', y)
-      const eq = s.equipamentos
-      kpiBox(page, ml, y, 120, 'Total de Equipamentos', String(eq.total), LIGHT, DARK)
-      let xOff = ml + 128
-      if (eq.proprios > 0)   { kpiBox(page, xOff, y, 80, 'Proprios',   String(eq.proprios),   rgb(0.93,0.96,0.93), GREEN); xOff += 88 }
-      if (eq.locados > 0)    { kpiBox(page, xOff, y, 80, 'Locados',    String(eq.locados),    LIGHT, DARK); xOff += 88 }
-      if (eq.comodatos > 0)  { kpiBox(page, xOff, y, 80, 'Comodatados',String(eq.comodatos),  LIGHT, DARK); xOff += 88 }
-      y -= 48
-    } else if (s.dimensionamento?.totalEquipamentos > 0) {
-      y = secTitle(page, 'EQUIPAMENTOS GERENCIADOS', y)
-      kpiBox(page, ml, y, 150, 'Total de Equipamentos', String(s.dimensionamento.totalEquipamentos), LIGHT, DARK)
-      if (s.dimensionamento.fteDemandado > 0) {
-        kpiBox(page, ml + 158, y, 120, 'FTE Demandado', String(s.dimensionamento.fteDemandado), rgb(0.93,0.95,1), BLUE)
+  function drawParagraphs(page: any, text: string | null | undefined, y: number, size = 8.5): { y: number; page: any } {
+    if (!text?.trim()) return { y, page }
+    const lines = wrapParagraphs(text, reg, size, contentW)
+    for (const line of lines) {
+      if (y < 50) {
+        const np = newPage()
+        page = np.page
+        y = np.y
       }
-      y -= 48
+      if (line === '') {
+        y -= size + 2
+      } else {
+        page.drawText(line, { x: ml, y, size, font: reg, color: DARK })
+        y -= size + 3
+      }
     }
-
-    // Equipe
-    y = secTitle(page, 'EQUIPE DO PROJETO', y)
-    const profs = (s.professionals ?? []).filter((p: any) => p.role?.trim())
-    const totalEquipe = s.totalFTE ?? profs.reduce((acc: number, p: any) => acc + p.quantity, 0)
-
-    // KPIs equipe
-    kpiBox(page, ml, y, 100, 'Total', String(totalEquipe), LIGHT, DARK)
-    if ((s.gestores ?? 0) > 0) kpiBox(page, ml + 108, y, 80, 'Gestores', String(s.gestores), rgb(0.93,0.95,1), BLUE)
-    if ((s.tecnicosDiurno ?? 0) > 0) kpiBox(page, ml + 196, y, 80, 'Diurno', String(s.tecnicosDiurno), LIGHT, DARK)
-    if ((s.tecnicosNoturno ?? 0) > 0) kpiBox(page, ml + 284, y, 80, 'Noturno', String(s.tecnicosNoturno), LIGHT, DARK)
-    if (s.cltCount > 0) kpiBox(page, ml + 372, y, 60, 'CLT', String(s.cltCount), rgb(0.93,0.95,1), BLUE)
-    if (s.pjCount > 0)  kpiBox(page, ml + 440, y, 60, 'PJ', String(s.pjCount), LIGHT, DARK)
-    y -= 46
-
-    // Tabela de profissionais
-    page.drawRectangle({ x: ml, y: y - 14, width: W - ml - mr, height: 14, color: TEAL })
-    ;['Funcao', 'Qtd', 'Regime', 'Carga'].forEach((h, i) => {
-      const xs = [ml + 4, ml + 240, ml + 290, ml + 360]
-      page.drawText(h, { x: xs[i], y: y - 10, size: 6, font: bold, color: WHITE })
-    })
-    y -= 14
-
-    profs.forEach((p: any, i: number) => {
-      if (i % 2 === 0) page.drawRectangle({ x: ml, y: y - 12, width: W - ml - mr, height: 12, color: LIGHT })
-      page.drawText(sanitize(p.role), { x: ml + 4, y: y - 9, size: 8, font: reg, color: DARK })
-      page.drawText(String(p.quantity), { x: ml + 240, y: y - 9, size: 8, font: bold, color: DARK })
-      page.drawText(sanitize(p.contractType), { x: ml + 290, y: y - 9, size: 8, font: reg, color: p.contractType === 'CLT' ? BLUE : DARK })
-      page.drawText(p.hoursPerMonth ? `${p.hoursPerMonth}h/mes` : '-', { x: ml + 360, y: y - 9, size: 8, font: reg, color: DARK })
-      y -= 12
-    })
-    y -= 6
+    return { y: y - 4, page }
   }
 
-  // ── PÁGINA 2: Dimensionamento + Investimento + Aprovações ──────────────
+  function drawBulletLines(page: any, text: string | null | undefined, y: number): { y: number; page: any } {
+    if (!text?.trim()) return { y, page }
+    const lines = sanitize(text).split('\n').filter(l => l.trim())
+    for (const line of lines) {
+      if (y < 50) {
+        const np = newPage()
+        page = np.page
+        y = np.y
+      }
+      const wrapped = wrapText(line.replace(/^[-•*]\s*/, ''), reg, 8.5, contentW - 12)
+      for (let i = 0; i < wrapped.length; i++) {
+        page.drawText(i === 0 ? '-' : ' ', { x: ml + 2, y, size: 8.5, font: bold, color: TEAL })
+        page.drawText(wrapped[i], { x: ml + 12, y, size: 8.5, font: reg, color: DARK })
+        y -= 13
+      }
+    }
+    return { y: y - 4, page }
+  }
+
+  // ── PÁGINA 1: Cabeçalho + Empresa + Cliente ─────────────────────────────
   {
-    const { page, y: yStart } = newPage()
-    let y = yStart
-
-    // Dimensionamento (se Clínica)
-    const dim = s.dimensionamento
-    if (dim && dim.totalEquipamentos > 0) {
-      y = secTitle(page, 'DIMENSIONAMENTO', y)
-      kpiBox(page, ml,       y, 120, 'Equipamentos',       String(dim.totalEquipamentos),          LIGHT, DARK)
-      kpiBox(page, ml + 128, y, 120, 'Horas/mes demandadas', `${dim.horasMensaisDemandadas}h`,     LIGHT, DARK)
-      kpiBox(page, ml + 256, y, 100, 'FTE Demandado',       String(dim.fteDemandado),              rgb(0.93,0.95,1), BLUE)
-      kpiBox(page, ml + 364, y, 100, 'FTE Alocado',         String(s.totalFTE),                    rgb(0.91,0.96,0.93), GREEN)
-      y -= 46
-      page.drawText(sanitize(`Base: ${dim.hhLiquidoMes}h liquidas/tecnico (produtividade 70%, absenteismo 10%)`), { x: ml, y, size: 7, font: reg, color: GRAY })
-      y -= 18
-    }
-
-    // Inventário resumido
-    if (dim?.familias?.length > 0) {
-      y = secTitle(page, 'PRINCIPAIS FAMILIAS DE EQUIPAMENTOS', y)
-      const top = dim.familias.slice(0, 10)
-      const colW = (W - ml - mr - 8) / 2
-      top.forEach((f: any, i: number) => {
-        const x = i % 2 === 0 ? ml : ml + colW + 8
-        const yPos = y - Math.floor(i / 2) * 12
-        page.drawText(sanitize(f.familia), { x, y: yPos, size: 7.5, font: reg, color: DARK })
-        page.drawText(String(f.qty), { x: x + colW - 20, y: yPos, size: 7.5, font: bold, color: TEAL })
-      })
-      y -= (Math.ceil(top.length / 2)) * 12 + 10
-    }
-
-    // Investimento
-    y = secTitle(page, 'INVESTIMENTO', y)
-    const dur = s.contractDuration ?? 24
-    const valorTotal = proposalValue * dur
-
-    page.drawRectangle({ x: ml, y: y - 48, width: W - ml - mr, height: 48, color: DARK })
-    page.drawText('Investimento Mensal Global', { x: ml + 12, y: y - 16, size: 8, font: reg, color: rgb(0.7, 0.8, 0.85) })
-    page.drawText(sanitize(fmt(proposalValue)), { x: ml + 12, y: y - 34, size: 18, font: bold, color: MINT })
-    page.drawText(sanitize(`Contrato de ${dur} meses`), { x: W - mr - 150, y: y - 16, size: 7, font: reg, color: rgb(0.6, 0.75, 0.8) })
-    page.drawText(sanitize(`Total: ${fmt(valorTotal)}`), { x: W - mr - 150, y: y - 30, size: 9, font: bold, color: rgb(0.85, 0.95, 0.9) })
-    y -= 60
-
-    // Validade
-    const validDate = new Date(Date.now() + validityDays * 86400000)
-    const colV = (W - ml - mr) / 3
-    ;[
-      { l: 'Validade da Proposta', v: `${validityDays} dias` },
-      { l: 'Data de Emissao', v: fmtDate(new Date().toISOString()) },
-      { l: 'Valida ate', v: fmtDate(validDate.toISOString()) },
-    ].forEach((c, i) => {
-      const x = ml + i * colV
-      page.drawRectangle({ x, y: y - 30, width: colV - 4, height: 30, color: LIGHT })
-      page.drawText(sanitize(c.l), { x: x + 6, y: y - 10, size: 7, font: reg, color: GRAY })
-      page.drawText(sanitize(c.v), { x: x + 6, y: y - 22, size: 9, font: bold, color: DARK })
-    })
-    y -= 42
-
-    // Itens da proposta
-    y = secTitle(page, 'COMPOSICAO DA PROPOSTA', y)
-    const itens = [
-      { num: 'ITEM 1', titulo: s.tituloItemServico ?? 'Servico Continuo de Engenharia' },
-      { num: 'ITEM 2', titulo: s.tituloItemPecas ?? 'Fornecimento de Pecas e Insumos' },
-      { num: 'ITEM 3', titulo: s.tituloItemServicosExternos ?? 'Servicos Especializados sob Demanda' },
-    ]
-    itens.forEach((item, i) => {
-      if (i % 2 === 0) page.drawRectangle({ x: ml, y: y - 14, width: W - ml - mr, height: 14, color: LIGHT })
-      page.drawText(item.num, { x: ml + 4, y: y - 10, size: 7, font: bold, color: TEAL })
-      page.drawText(sanitize(item.titulo), { x: ml + 50, y: y - 10, size: 8, font: reg, color: DARK })
-      y -= 14
-    })
+    let { page, y } = newPage()
     y -= 10
 
-    // Aprovações internas
-    const aprovacoes = [
-      params.submittedByName && { label: 'Enviada para aprovacao tecnica', by: params.submittedByName, at: null },
-      params.technicalApprovedByName && { label: 'Aprovada tecnicamente', by: params.technicalApprovedByName, at: params.technicalApprovedAt, comment: params.technicalComment },
-      params.commercialApprovedByName && { label: 'Aprovada comercialmente', by: params.commercialApprovedByName, at: params.commercialApprovedAt },
+    // Bloco Orbis
+    page.drawRectangle({ x: ml, y: y - 80, width: contentW, height: 80, color: LIGHT })
+    // Logo placeholder
+    page.drawRectangle({ x: ml + 8, y: y - 68, width: 80, height: 56, color: TEAL })
+    page.drawText('ORBIS', { x: ml + 20, y: y - 38, size: 12, font: bold, color: WHITE })
+    page.drawText('Engenharia', { x: ml + 12, y: y - 52, size: 7, font: reg, color: WHITE })
+
+    // Dados Orbis
+    const companyName = sanitize(org?.companyName ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA')
+    page.drawText(companyName, { x: ml + 100, y: y - 16, size: 9, font: bold, color: DARK })
+    if (org?.cnpj) page.drawText(`CNPJ: ${sanitize(org.cnpj)}`, { x: ml + 100, y: y - 28, size: 8, font: reg, color: DARK })
+    if (org?.address) {
+      const addrLines = wrapText(sanitize(org.address), reg, 8, 250)
+      addrLines.forEach((l, i) => page.drawText(l, { x: ml + 100, y: y - 40 - i * 11, size: 8, font: reg, color: DARK }))
+    }
+
+    // Contato comercial (lado direito)
+    const contactName = sanitize(params.contact?.name ?? '')
+    const contactEmail = sanitize(params.contact?.email ?? '')
+    page.drawText('Contato', { x: W - mr - 150, y: y - 16, size: 8, font: bold, color: DARK })
+    page.drawText(contactName, { x: W - mr - 150, y: y - 28, size: 8, font: reg, color: DARK })
+    if (contactEmail) page.drawText(contactEmail, { x: W - mr - 150, y: y - 40, size: 7, font: reg, color: GRAY })
+
+    y -= 92
+
+    // Box dados da pessoa + empresa
+    const boxH = 70
+    page.drawRectangle({ x: ml, y: y - boxH, width: contentW / 2 - 4, height: boxH, color: WHITE })
+    page.drawRectangle({ x: ml, y: y - boxH, width: contentW / 2 - 4, height: boxH, color: rgb(0, 0, 0) })
+    // Usa border trick com linha
+    ;[
+      [ml, y, contentW / 2 - 4],
+      [ml + contentW / 2 + 4, y, contentW / 2 - 4],
+    ].forEach(([x, yy, w]) => {
+      page.drawRectangle({ x, y: yy - boxH, width: w, height: boxH, color: LIGHT })
+      page.drawLine({ start: { x, y: yy }, end: { x: x + w, y: yy }, thickness: 0.5, color: GRAY })
+      page.drawLine({ start: { x, y: yy - boxH }, end: { x: x + w, y: yy - boxH }, thickness: 0.5, color: GRAY })
+      page.drawLine({ start: { x, y: yy }, end: { x, y: yy - boxH }, thickness: 0.5, color: GRAY })
+      page.drawLine({ start: { x: x + w, y: yy }, end: { x: x + w, y: yy - boxH }, thickness: 0.5, color: GRAY })
+    })
+
+    // Dados da pessoa (contratante)
+    page.drawText('Dados da pessoa', { x: ml + 6, y: y - 12, size: 7, font: reg, color: GRAY })
+    const personName = sanitize(params.contact?.name ?? '')
+    page.drawText(personName, { x: ml + 6, y: y - 24, size: 9, font: bold, color: DARK })
+    if (params.contact?.email) {
+      page.drawText(`E-mails: ${sanitize(params.contact.email)}`, { x: ml + 6, y: y - 38, size: 7.5, font: reg, color: DARK })
+    }
+
+    // Dados da empresa
+    const x2 = ml + contentW / 2 + 4
+    page.drawText('Dados da empresa', { x: x2 + 6, y: y - 12, size: 7, font: reg, color: GRAY })
+    const compName = sanitize(params.company?.name ?? contract?.client_name ?? '')
+    page.drawText(compName, { x: x2 + 6, y: y - 24, size: 9, font: bold, color: DARK })
+    if (params.company?.cnpj || contract?.cnpj) {
+      page.drawText(`CNPJ: ${sanitize(params.company?.cnpj ?? contract?.cnpj ?? '')}`, { x: x2 + 6, y: y - 38, size: 7.5, font: reg, color: DARK })
+    }
+    if (params.company?.address) {
+      const addrL = wrapText(sanitize(params.company.address), reg, 7.5, contentW / 2 - 20)
+      addrL.slice(0, 2).forEach((l, i) => page.drawText(l, { x: x2 + 6, y: y - 50 - i * 10, size: 7.5, font: reg, color: DARK }))
+    }
+
+    y -= boxH + 20
+
+    // OBJETIVOS
+    y = drawSectionTitle(page, 'OBJETIVOS', y)
+    const res1 = drawParagraphs(page, textoObjetivos, y)
+    page = res1.page; y = res1.y
+
+    y -= 8
+
+    // ATIVIDADES A SEREM DESENVOLVIDAS
+    if (y < 150) { const np = newPage(); page = np.page; y = np.y }
+    y = drawSectionTitle(page, 'ATIVIDADES A SEREM DESENVOLVIDAS', y)
+    const res2 = drawBulletLines(page, textoAtividades, y)
+    page = res2.page; y = res2.y
+  }
+
+  // ── PÁGINA seguinte: Equipe + Estrutura de Apoio + Escopo ───────────────
+  {
+    let { page, y } = newPage()
+    y -= 10
+
+    // EQUIPE ALOCADA
+    const profs = (s.professionals ?? []).filter((p: any) => p.role?.trim())
+    if (profs.length > 0) {
+      y = drawSectionTitle(page, 'EQUIPE ALOCADA', y)
+
+      // Header tabela
+      page.drawRectangle({ x: ml, y: y - 14, width: contentW, height: 14, color: TEAL })
+      page.drawText('QUANT.', { x: ml + 4, y: y - 10, size: 6.5, font: bold, color: WHITE })
+      page.drawText('PROFISSIONAL', { x: ml + 44, y: y - 10, size: 6.5, font: bold, color: WHITE })
+      page.drawText('ESCALA DE TRABALHO', { x: ml + 240, y: y - 10, size: 6.5, font: bold, color: WHITE })
+      page.drawText('OBSERVACAO', { x: ml + 370, y: y - 10, size: 6.5, font: bold, color: WHITE })
+      y -= 14
+
+      profs.forEach((p: any, i: number) => {
+        const rowH = 20
+        if (i % 2 === 0) page.drawRectangle({ x: ml, y: y - rowH, width: contentW, height: rowH, color: LIGHT })
+        page.drawText(`0${p.quantity}`, { x: ml + 4, y: y - 13, size: 8, font: reg, color: DARK })
+        page.drawText(sanitize(p.role), { x: ml + 44, y: y - 13, size: 8, font: reg, color: DARK })
+        const carga = p.hoursPerMonth === 220 ? '44h semanais' : p.hoursPerMonth === 180 ? '12x36' : `${p.hoursPerMonth}h/mes`
+        page.drawText(carga, { x: ml + 240, y: y - 13, size: 8, font: reg, color: DARK })
+        y -= rowH
+      })
+      y -= 16
+    }
+
+    // ESTRUTURA DE APOIO
+    if (textoEstruturaApoio?.trim()) {
+      if (y < 120) { const np = newPage(); page = np.page; y = np.y }
+      y = drawSectionTitle(page, 'ESTRUTURA DE APOIO', y)
+      const res = drawBulletLines(page, textoEstruturaApoio, y)
+      page = res.page; y = res.y
+      y -= 8
+    }
+
+    // ESCOPO DE SERVIÇO
+    const escopo: string[] = s.escopoSanitizado ?? s.escopoServicos ?? []
+    if (escopo.length > 0) {
+      if (y < 120) { const np = newPage(); page = np.page; y = np.y }
+      y = drawSectionTitle(page, 'ESCOPO DE SERVICO', y)
+
+      escopo.forEach(item => {
+        if (y < 50) { const np = newPage(); page = np.page; y = np.y }
+        page.drawText('-', { x: ml + 2, y, size: 8.5, font: bold, color: TEAL })
+        page.drawText(sanitize(item), { x: ml + 12, y, size: 8.5, font: reg, color: DARK })
+        y -= 14
+      })
+      y -= 8
+    }
+  }
+
+  // ── PÁGINA: Itens MRR + Resumo Financeiro ───────────────────────────────
+  {
+    let { page, y } = newPage()
+    y -= 10
+
+    // Título itens
+    page.drawRectangle({ x: ml, y: y - 16, width: contentW, height: 16, color: DARK })
+    page.drawText('Mensalidade (MRR):', { x: ml + 8, y: y - 11, size: 8, font: bold, color: WHITE })
+    y -= 16
+
+    // Header tabela
+    const cols = [
+      { label: 'Qtd.', x: ml, w: 28 },
+      { label: 'Cat.', x: ml + 30, w: 70 },
+      { label: 'Duracao', x: ml + 102, w: 44 },
+      { label: 'Cobranca', x: ml + 148, w: 50 },
+      { label: 'Item', x: ml + 200, w: 80 },
+      { label: 'Valor unit.', x: ml + 282, w: 80 },
+      { label: 'Tipo', x: ml + 364, w: 40 },
+      { label: 'Subtotal', x: ml + 406, w: 89 },
+    ]
+    page.drawRectangle({ x: ml, y: y - 14, width: contentW, height: 14, color: LIGHT })
+    cols.forEach(c => page.drawText(c.label, { x: c.x + 2, y: y - 10, size: 6, font: bold, color: GRAY }))
+    y -= 14
+
+    // Linha do item
+    const dur = s.contractDuration ?? 12
+    const itemNome = sanitize(s.tituloItemServico ?? 'Servico de Engenharia')
+    const catNome = sanitize(s.tipoEngenharia === 'Hospitalar' ? 'Eng. Hospitalar' : 'Engenharia Clinica')
+    const rowH = 36
+    page.drawRectangle({ x: ml, y: y - rowH, width: contentW, height: rowH, color: rgb(0.99, 0.99, 1.0) })
+    page.drawLine({ start: { x: ml, y }, end: { x: W - mr, y }, thickness: 0.3, color: LIGHT })
+    page.drawLine({ start: { x: ml, y: y - rowH }, end: { x: W - mr, y: y - rowH }, thickness: 0.3, color: LIGHT })
+
+    page.drawText('1 UN', { x: ml + 2, y: y - 10, size: 8, font: reg, color: DARK })
+    page.drawText(catNome, { x: ml + 30, y: y - 10, size: 7.5, font: reg, color: DARK })
+    page.drawText(`${dur} meses`, { x: ml + 102, y: y - 10, size: 7.5, font: reg, color: DARK })
+    page.drawText('Mensal', { x: ml + 148, y: y - 10, size: 7.5, font: reg, color: DARK })
+    page.drawText(itemNome, { x: ml + 200, y: y - 10, size: 7.5, font: bold, color: DARK })
+    page.drawText(fmtMoney(proposalValue), { x: ml + 282, y: y - 10, size: 7.5, font: reg, color: DARK })
+    page.drawText('MRR', { x: ml + 364, y: y - 10, size: 7.5, font: reg, color: DARK })
+    page.drawText(fmtMoney(proposalValue), { x: ml + 406, y: y - 10, size: 7.5, font: bold, color: DARK })
+
+    // Características
+    const chars = (s.escopoSanitizado ?? s.escopoServicos ?? []).join(' - ')
+    const charLines = wrapText(`Caracteristicas: ${chars}`, reg, 7, contentW - 4)
+    charLines.slice(0, 2).forEach((l, i) => {
+      page.drawText(l, { x: ml + 2, y: y - 22 - i * 9, size: 7, font: reg, color: GRAY })
+    })
+    y -= rowH + 20
+
+    // Resumo
+    page.drawText('Resumo da proposta', { x: ml, y, size: 9, font: bold, color: DARK })
+    y -= 14
+
+    const resumoItems = [
+      { label: 'Contrato', value: `${sanitize(s.tipoEngenharia)} - ${dur} meses` },
+      { label: 'Tipo de cobranca', value: 'Mensal' },
+    ]
+    resumoItems.forEach(item => {
+      page.drawText(item.label, { x: ml, y, size: 8, font: reg, color: GRAY })
+      page.drawText(item.value, { x: ml + 120, y, size: 8, font: reg, color: DARK })
+      y -= 13
+    })
+    y -= 8
+
+    // Parcelas
+    const totalContrato = proposalValue * dur
+    for (let i = 1; i <= Math.min(dur, 12); i++) {
+      if (y < 50) { const np = newPage(); page = np.page; y = np.y }
+      if (i % 2 === 0) page.drawRectangle({ x: ml, y: y - 11, width: contentW, height: 11, color: LIGHT })
+      page.drawText(`${i}a parc.:`, { x: ml, y, size: 7.5, font: reg, color: DARK })
+      page.drawText(fmtMoney(proposalValue), { x: ml + 70, y, size: 7.5, font: bold, color: DARK })
+      page.drawText('A combinar', { x: ml + 180, y, size: 7.5, font: reg, color: GRAY })
+      page.drawText('Boleto', { x: ml + 260, y, size: 7.5, font: reg, color: GRAY })
+      y -= 12
+    }
+    y -= 12
+
+    // Total
+    page.drawLine({ start: { x: ml, y: y + 4 }, end: { x: W - mr, y: y + 4 }, thickness: 0.5, color: GRAY })
+    page.drawText('Valor total do contrato:', { x: ml, y, size: 9, font: bold, color: DARK })
+    page.drawText(fmtMoney(totalContrato), { x: W - mr - bold.widthOfTextAtSize(fmtMoney(totalContrato), 11), y, size: 11, font: bold, color: TEAL })
+    y -= 30
+
+    // Aprovações internas (auditoria)
+    const aprovs = [
+      params.submittedByName && { l: 'Enviada para aprovacao tecnica', by: params.submittedByName, at: null },
+      params.technicalApprovedByName && { l: 'Aprovada tecnicamente', by: params.technicalApprovedByName, at: params.technicalApprovedAt, comment: params.technicalComment },
+      params.commercialApprovedByName && { l: 'Aprovada comercialmente', by: params.commercialApprovedByName, at: params.commercialApprovedAt },
     ].filter(Boolean) as any[]
 
-    if (aprovacoes.length) {
-      y = secTitle(page, 'APROVACOES INTERNAS', y)
-      aprovacoes.forEach(a => {
-        page.drawText(sanitize(a.label), { x: ml + 4, y, size: 8, font: bold, color: DARK })
-        const meta = `por ${sanitize(a.by)}${a.at ? ` - ${fmtDate(a.at)}` : ''}`
-        page.drawText(meta, { x: ml + 4, y: y - 12, size: 7, font: reg, color: GRAY })
+    if (aprovs.length) {
+      if (y < 100) { const np = newPage(); page = np.page; y = np.y }
+      page.drawLine({ start: { x: ml, y: y + 4 }, end: { x: W - mr, y: y + 4 }, thickness: 0.3, color: LIGHT })
+      page.drawText('Aprovacoes internas:', { x: ml, y, size: 8, font: bold, color: GRAY })
+      y -= 14
+      aprovs.forEach((a: any) => {
+        page.drawText(`- ${sanitize(a.l)} por ${sanitize(a.by)}${a.at ? ` em ${fmtDate(a.at)}` : ''}`, { x: ml + 8, y, size: 7.5, font: reg, color: GRAY })
+        y -= 12
         if (a.comment) {
-          page.drawText(sanitize(`"${a.comment}"`), { x: ml + 4, y: y - 22, size: 7, font: reg, color: GRAY })
+          const cl = wrapText(`  "${sanitize(a.comment)}"`, reg, 7, contentW - 20)
+          cl.forEach(l => { page.drawText(l, { x: ml + 12, y, size: 7, font: reg, color: GRAY }); y -= 10 })
         }
-        y -= a.comment ? 34 : 22
       })
     }
   }

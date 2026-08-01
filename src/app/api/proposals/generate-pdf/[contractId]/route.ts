@@ -10,19 +10,34 @@ export async function GET(
 
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
 
   const admin = createAdminClient()
 
-  const [{ data: contract }, { data: proposal }, { data: templates }] = await Promise.all([
-    admin.from('contracts').select('client_name, title, process_number, cnpj').eq('id', contractId).maybeSingle(),
+  const [
+    { data: contract },
+    { data: proposal },
+    { data: templates },
+    { data: orgSettings },
+  ] = await Promise.all([
+    admin.from('contracts').select('client_name, title, process_number, cnpj, company_id, contact_id').eq('id', contractId).maybeSingle(),
     admin.from('proposal_status').select('*').eq('contract_id', contractId).maybeSingle(),
     admin.from('proposal_templates').select('*').order('created_at'),
+    admin.from('company_settings').select('company_name, cnpj, address, email, phone, proposal_header_text').maybeSingle(),
   ])
 
   if (!proposal?.technical_snapshot) {
-    return NextResponse.json({ error: 'Snapshot do Price não encontrado. Reenvie o valor do Price.' }, { status: 400 })
+    return NextResponse.json({ error: 'Snapshot do Price nao encontrado. Reenvie o valor do Price.' }, { status: 400 })
   }
+
+  // Busca empresa e contato do contrato
+  const [companyRes, contactRes] = await Promise.all([
+    contract?.company_id ? admin.from('companies').select('name, cnpj, address').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
+    contract?.contact_id ? admin.from('contacts').select('name, email').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
+  ])
+
+  // Busca também o usuário responsável pelo contrato para código da proposta
+  const proposalCode = `ORB.${contract?.process_number ?? contractId.slice(0, 8).toUpperCase()}`
 
   try {
     const { PDFDocument } = await import('pdf-lib')
@@ -30,24 +45,25 @@ export async function GET(
 
     const mergedPdf = await PDFDocument.create()
 
-    // Separa capas e finais
-    const capas = (templates ?? []).filter(t => !t.name.toLowerCase().startsWith('final'))
-    const finais = (templates ?? []).filter(t => t.name.toLowerCase().startsWith('final'))
+    const capas = (templates ?? []).filter((t: any) => !t.name.toLowerCase().startsWith('final'))
+    const finais = (templates ?? []).filter((t: any) => t.name.toLowerCase().startsWith('final'))
 
     async function addTemplate(t: any) {
       if (!t?.file_storage_path) return
-      const { data: fileData } = await admin.storage.from('proposal-files').download(t.file_storage_path)
-      if (!fileData) return
-      const bytes = new Uint8Array(await fileData.arrayBuffer())
-      const doc = await PDFDocument.load(bytes)
-      const copied = await mergedPdf.copyPages(doc, doc.getPageIndices())
-      copied.forEach(p => mergedPdf.addPage(p))
+      try {
+        const { data: fileData } = await admin.storage.from('proposal-files').download(t.file_storage_path)
+        if (!fileData) return
+        const bytes = new Uint8Array(await fileData.arrayBuffer())
+        const doc = await PDFDocument.load(bytes)
+        const copied = await mergedPdf.copyPages(doc, doc.getPageIndices())
+        copied.forEach(p => mergedPdf.addPage(p))
+      } catch { /* ignora templates corrompidos */ }
     }
 
-    // 1. Todas as capas
+    // 1. Capas
     for (const t of capas) await addTemplate(t)
 
-    // 2. Miolo gerado do Price
+    // 2. Miolo
     const mioloBytes = await buildPriceProposalPage({
       snapshot: proposal.technical_snapshot as any,
       proposalValue: Number(proposal.proposal_value) || 0,
@@ -63,13 +79,31 @@ export async function GET(
         process_number: contract.process_number ?? null,
         cnpj: contract.cnpj ?? null,
       } : null,
+      company: companyRes?.data ? {
+        name: companyRes.data.name,
+        cnpj: companyRes.data.cnpj ?? undefined,
+        address: companyRes.data.address ?? undefined,
+      } : { name: contract?.client_name ?? '' },
+      contact: contactRes?.data ? {
+        name: contactRes.data.name,
+        email: contactRes.data.email ?? undefined,
+      } : null,
+      org: {
+        companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA',
+        cnpj: orgSettings?.cnpj ?? '23.129.279/0001-03',
+        address: orgSettings?.address ?? undefined,
+        proposalCode,
+      },
+      textoObjetivos: (proposal as any).texto_objetivos ?? null,
+      textoAtividades: (proposal as any).texto_atividades ?? null,
+      textoEstruturaApoio: (proposal as any).texto_estrutura_apoio ?? null,
     })
 
     const mioloDoc = await PDFDocument.load(mioloBytes)
     const mioloCopied = await mergedPdf.copyPages(mioloDoc, mioloDoc.getPageIndices())
     mioloCopied.forEach(p => mergedPdf.addPage(p))
 
-    // 3. Páginas finais
+    // 3. Finais
     for (const t of finais) await addTemplate(t)
 
     const pdfBytes = await mergedPdf.save()
