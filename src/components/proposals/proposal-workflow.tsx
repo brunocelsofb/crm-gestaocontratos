@@ -319,31 +319,26 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         <div style={card}>
           <div style={{ padding: '14px 16px', borderRadius: 10, background: '#eaf5ee', border: '0.5px solid #bbddc8', marginBottom: 16 }}>
             <p style={{ fontSize: 13, fontWeight: 500, color: '#1a7c3e', margin: '0 0 2px' }}>✅ Proposta aprovada internamente</p>
-            <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Gere o documento de proposta para enviar ao cliente.</p>
+            <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Monte a proposta com os dados do cliente e envie para aprovação.</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            <a
+              href={`/contracts/${contractId}?tab=proposals`}
+              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none' }}>
+              📄 Montar Proposta
+            </a>
             <button
               onClick={async () => {
-                window.open(`/api/proposals/generate-pdf/${contractId}`, '_blank')
-              }}
-              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
-              📄 Gerar Proposta PDF
-            </button>
-            <button
-              onClick={async () => {
-                // Busca a proposta gerada para este contrato
-                const res = await fetch(`/api/proposals/client-token`, {
+                const res = await fetch('/api/proposals/client-token', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ contract_id: contractId }),
                 })
                 const json = await res.json()
-                if (json.proposal_url) {
-                  window.open(json.proposal_url, '_blank')
-                } else if (json.token) {
+                if (json.token) {
                   window.open(`${window.location.origin}/proposals/client/${json.token}`, '_blank')
                 } else {
-                  alert(json.error ?? 'Erro ao gerar link.')
+                  alert(json.error ?? 'Erro ao gerar link')
                 }
               }}
               style={{ flex: 1, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36', cursor: 'pointer' }}>
