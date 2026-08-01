@@ -8,23 +8,34 @@ export async function GET(
   const { token } = await params
   const admin = createAdminClient()
 
-  // Busca proposta pelo client_review_token
-  const { data: proposal } = await admin
+  // Busca proposta pelo client_review_token (sem join para debug)
+  const { data: proposal, error: proposalError } = await admin
     .from('proposal_status')
-    .select('*, contracts(id, client_name, title, process_number, cnpj, company_id, contact_id)')
+    .select('*')
     .eq('client_review_token', token)
     .maybeSingle()
 
-  if (!proposal) {
-    return NextResponse.json({ error: 'Token invalido' }, { status: 404 })
+  if (proposalError) {
+    return NextResponse.json({ error: `DB error: ${proposalError.message}` }, { status: 500 })
   }
+
+  if (!proposal) {
+    return NextResponse.json({ error: 'Token invalido', token_received: token.slice(0, 8) + '...' }, { status: 404 })
+  }
+
+  // Busca contrato separadamente
+  const { data: contractData } = await admin
+    .from('contracts')
+    .select('id, client_name, title, process_number, cnpj, company_id, contact_id')
+    .eq('id', proposal.contract_id)
+    .maybeSingle()
+
+  const contract = contractData
+  const contractId = contract?.id
 
   if (!proposal.technical_snapshot) {
     return NextResponse.json({ error: 'Snapshot nao encontrado. Reenvie o valor do Price.' }, { status: 400 })
   }
-
-  const contract = (proposal as any).contracts
-  const contractId = contract?.id
 
   // Busca empresa, contato e templates
   const [companyRes, contactRes, { data: templates }, { data: orgSettings }] = await Promise.all([
