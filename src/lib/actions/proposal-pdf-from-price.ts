@@ -1,7 +1,8 @@
 // Adaptador: converte snapshot do Price + textos em formato do buildStandardProposalPage de julho
 import { buildStandardProposalPage } from './proposal-pdf-builder'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-function s(text: string | null | undefined): string {
+function san(text: string | null | undefined): string {
   if (!text) return ''
   const map: Record<string, string> = {
     '\u00e1':'a','\u00e0':'a','\u00e3':'a','\u00e2':'a',
@@ -31,35 +32,57 @@ export async function buildPriceProposalPage(params: {
   contract: { client_name: string; process_number: string | null; cnpj: string | null } | null
   company?: { name?: string; cnpj?: string; address?: string } | null
   contact?: { name?: string; email?: string } | null
-  org?: { companyName?: string; cnpj?: string; address?: string; proposalCode?: string } | null
+  org?: {
+    companyName?: string
+    cnpj?: string
+    logoStoragePath?: string | null
+    brandColor?: string | null
+    headerText?: string | null
+    footerText?: string | null
+    proposalCode?: string
+  } | null
   textoObjetivos?: string | null
   textoAtividades?: string | null
   textoEstruturaApoio?: string | null
 }): Promise<Uint8Array> {
-  const { snapshot: snap, proposalValue, validityDays, params: _p, ...rest } = params as any
+  const { snapshot: snap, proposalValue, validityDays } = params
   const dur = snap.contractDuration ?? 12
+  const org = params.org ?? {}
 
-  // Monta itens no formato do builder de julho
+  // Busca logo do Storage
+  let logoBytes: Uint8Array | null = null
+  let logoIsPng = false
+  if (org.logoStoragePath) {
+    try {
+      const admin = createAdminClient()
+      const { data } = await admin.storage.from('proposal-files').download(org.logoStoragePath)
+      if (data) {
+        logoBytes = new Uint8Array(await data.arrayBuffer())
+        logoIsPng = org.logoStoragePath.toLowerCase().endsWith('.png')
+      }
+    } catch { /* logo opcional */ }
+  }
+
+  // Monta texto de características com escopo e equipe
   const profs = (snap.professionals ?? []).filter((p: any) => p.role?.trim())
-  const escopo = (snap.escopoSanitizado ?? snap.escopoServicos ?? []).join(' - ')
-
-  // Texto da equipe para características
+  const escopo = (snap.escopoSanitizado ?? snap.escopoServicos ?? []).map(san).join(' - ')
   const equipeTxt = profs.map((p: any) => {
     const carga = p.hoursPerMonth === 220 ? '44h sem.' : p.hoursPerMonth === 180 ? '12x36' : `${p.hoursPerMonth}h/mes`
-    return `0${p.quantity} ${s(p.role)} - ${s(p.contractType)} ${carga}`
+    return `0${p.quantity} ${san(p.role)} ${san(p.contractType)} ${carga}`
   }).join(', ')
 
-  const characteristics = [
-    escopo && `Escopo: ${s(escopo)}`,
+  const chars = [
+    escopo && `Escopo: ${escopo}`,
     equipeTxt && `Equipe: ${equipeTxt}`,
     snap.dimensionamento?.totalEquipamentos > 0 && `${snap.dimensionamento.totalEquipamentos} equipamentos gerenciados`,
   ].filter(Boolean).join(' | ')
 
+  // Item principal
   const items = [{
     quantity: 1,
-    category: s(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
-    item: s(snap.tituloItemServico ?? 'Servico Continuo de Engenharia'),
-    characteristics: characteristics.slice(0, 400),
+    category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
+    item: san(snap.tituloItemServico ?? 'Servico Continuo de Engenharia'),
+    characteristics: chars.slice(0, 500),
     type: 'MRR',
     delivery_forecast: null,
     unit_value: proposalValue,
@@ -67,51 +90,40 @@ export async function buildPriceProposalPage(params: {
     subtotal: proposalValue,
   }]
 
-  // ContentBlocks com os textos personalizados
+  // Content blocks com textos personalizados
   const contentBlocks: any[] = []
 
-  if (params.textoObjetivos?.trim()) {
+  const addTextBlock = (titulo: string, texto: string | null | undefined) => {
+    if (!texto?.trim()) return
     contentBlocks.push({
       block_type: 'text',
       image_storage_path: null,
-      table_data: { rows: [['OBJETIVOS'], [s(params.textoObjetivos)]] },
+      table_data: { rows: [[titulo], [san(texto)]] },
     })
   }
 
-  if (params.textoAtividades?.trim()) {
-    contentBlocks.push({
-      block_type: 'text',
-      image_storage_path: null,
-      table_data: { rows: [['ATIVIDADES A SEREM DESENVOLVIDAS'], [s(params.textoAtividades)]] },
-    })
-  }
+  addTextBlock('OBJETIVOS', params.textoObjetivos)
+  addTextBlock('ATIVIDADES A SEREM DESENVOLVIDAS', params.textoAtividades)
+  addTextBlock('ESTRUTURA DE APOIO', params.textoEstruturaApoio)
 
-  if (params.textoEstruturaApoio?.trim()) {
-    contentBlocks.push({
-      block_type: 'text',
-      image_storage_path: null,
-      table_data: { rows: [['ESTRUTURA DE APOIO'], [s(params.textoEstruturaApoio)]] },
-    })
-  }
-
-  // Aprovações como bloco de texto
+  // Aprovações internas
   const aprovLines = [
-    params.submittedByName && `Enviada p/ aprovacao tecnica por ${s(params.submittedByName)}`,
-    params.technicalApprovedByName && `Aprovada tecnicamente por ${s(params.technicalApprovedByName)}${params.technicalApprovedAt ? ` em ${new Date(params.technicalApprovedAt).toLocaleDateString('pt-BR')}` : ''}`,
-    params.technicalComment && `Parecer: ${s(params.technicalComment)}`,
-    params.commercialApprovedByName && `Aprovada comercialmente por ${s(params.commercialApprovedByName)}${params.commercialApprovedAt ? ` em ${new Date(params.commercialApprovedAt).toLocaleDateString('pt-BR')}` : ''}`,
-  ].filter(Boolean)
+    params.submittedByName && `Enviada p/ aprovacao tecnica: ${san(params.submittedByName)}`,
+    params.technicalApprovedByName && `Aprovada tecnicamente: ${san(params.technicalApprovedByName)}${params.technicalApprovedAt ? ` em ${new Date(params.technicalApprovedAt).toLocaleDateString('pt-BR')}` : ''}`,
+    params.technicalComment && `Parecer: ${san(params.technicalComment)}`,
+    params.commercialApprovedByName && `Aprovada comercialmente: ${san(params.commercialApprovedByName)}${params.commercialApprovedAt ? ` em ${new Date(params.commercialApprovedAt).toLocaleDateString('pt-BR')}` : ''}`,
+  ].filter(Boolean) as string[]
 
   if (aprovLines.length > 0) {
     contentBlocks.push({
       block_type: 'text',
       image_storage_path: null,
-      table_data: { rows: [['APROVACOES INTERNAS'], ...aprovLines.map(l => [l as string])] },
+      table_data: { rows: [['APROVACOES INTERNAS'], ...aprovLines.map(l => [l])] },
     })
   }
 
   const validUntil = new Date(Date.now() + validityDays * 86400000).toISOString().split('T')[0]
-  const propCode = s(params.org?.proposalCode ?? params.contract?.process_number ?? 'PROP')
+  const propCode = san(org.proposalCode ?? params.contract?.process_number ?? 'PROP')
 
   return buildStandardProposalPage({
     proposal: {
@@ -129,29 +141,36 @@ export async function buildPriceProposalPage(params: {
     },
     items,
     company: params.company ? {
-      name: s(params.company.name ?? ''),
+      name: san(params.company.name ?? ''),
       trade_name: null,
-      cnpj: s(params.company.cnpj ?? params.contract?.cnpj ?? null),
-      legal_name: s(params.company.name ?? params.contract?.client_name ?? null),
+      cnpj: san(params.company.cnpj ?? params.contract?.cnpj ?? null),
+      legal_name: san(params.company.name ?? params.contract?.client_name ?? null),
       nf_email: null,
-      address: s(params.company.address ?? null),
-    } : null,
+      address: san(params.company.address ?? null),
+    } : {
+      name: san(params.contract?.client_name ?? ''),
+      trade_name: null,
+      cnpj: san(params.contract?.cnpj ?? null),
+      legal_name: san(params.contract?.client_name ?? null),
+      nf_email: null,
+      address: null,
+    },
     contact: params.contact ? {
-      name: s(params.contact.name ?? ''),
+      name: san(params.contact.name ?? ''),
       cpf: null,
-      email: s(params.contact.email ?? null),
+      email: san(params.contact.email ?? null),
       phone: null,
       address: null,
     } : null,
     org: {
-      companyName: s(params.org?.companyName ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA'),
-      logoBytes: null,
-      logoIsPng: false,
+      companyName: san(org.companyName ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA'),
+      logoBytes,
+      logoIsPng,
       createdByName: null,
       createdByEmail: null,
-      headerText: null,
-      footerText: null,
-      brandColor: '#1B556B',
+      headerText: san(org.headerText ?? null),
+      footerText: san(org.footerText ?? null),
+      brandColor: org.brandColor ?? '#1B556B',
     },
     contentBlocks,
   })

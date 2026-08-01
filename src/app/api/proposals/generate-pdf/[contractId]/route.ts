@@ -23,7 +23,7 @@ export async function GET(
     admin.from('contracts').select('client_name, title, process_number, cnpj, company_id, contact_id').eq('id', contractId).maybeSingle(),
     admin.from('proposal_status').select('*').eq('contract_id', contractId).maybeSingle(),
     admin.from('proposal_templates').select('*').order('created_at'),
-    admin.from('company_settings').select('company_name, cnpj, address, email, phone, proposal_header_text').maybeSingle(),
+    admin.from('organization_settings').select('company_name, company_cnpj, logo_storage_path, proposal_brand_color, proposal_header_text, proposal_footer_text').maybeSingle(),
   ])
 
   if (!proposal?.technical_snapshot) {
@@ -98,8 +98,11 @@ export async function GET(
       } : null,
       org: {
         companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA',
-        cnpj: orgSettings?.cnpj ?? '23.129.279/0001-03',
-        address: orgSettings?.address ?? undefined,
+        cnpj: orgSettings?.company_cnpj ?? '23.129.279/0001-03',
+        logoStoragePath: orgSettings?.logo_storage_path ?? null,
+        brandColor: orgSettings?.proposal_brand_color ?? '#1B556B',
+        headerText: orgSettings?.proposal_header_text ?? null,
+        footerText: orgSettings?.proposal_footer_text ?? null,
         proposalCode,
       },
       textoObjetivos: (proposal as any).texto_objetivos ?? null,

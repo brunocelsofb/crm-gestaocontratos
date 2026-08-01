@@ -42,7 +42,7 @@ export async function GET(
     contract?.company_id ? admin.from('companies').select('name, cnpj, address').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
     contract?.contact_id ? admin.from('contacts').select('name, email').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
     admin.from('proposal_templates').select('*').order('created_at'),
-    admin.from('company_settings').select('company_name, cnpj, address, email').maybeSingle(),
+    admin.from('organization_settings').select('company_name, company_cnpj, logo_storage_path, proposal_brand_color, proposal_header_text, proposal_footer_text').maybeSingle(),
   ])
 
   const proposalCode = `ORB.${contract?.process_number ?? contractId?.slice(0, 8).toUpperCase() ?? ''}`
@@ -87,7 +87,7 @@ export async function GET(
       contract: contract ? { client_name: contract.client_name, process_number: contract.process_number ?? null, cnpj: contract.cnpj ?? null } : null,
       company: companyRes?.data ? { name: companyRes.data.name, cnpj: companyRes.data.cnpj ?? undefined, address: companyRes.data.address ?? undefined } : { name: contract?.client_name ?? '' },
       contact: contactRes?.data ? { name: contactRes.data.name, email: contactRes.data.email ?? undefined } : null,
-      org: { companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA', cnpj: orgSettings?.cnpj ?? '23.129.279/0001-03', proposalCode },
+      org: { companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA', cnpj: orgSettings?.company_cnpj ?? '23.129.279/0001-03', proposalCode },
       textoObjetivos: (proposal as any).texto_objetivos ?? null,
       textoAtividades: (proposal as any).texto_atividades ?? null,
       textoEstruturaApoio: (proposal as any).texto_estrutura_apoio ?? null,
