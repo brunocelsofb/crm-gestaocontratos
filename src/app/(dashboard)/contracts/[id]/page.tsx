@@ -575,6 +575,17 @@ export default async function ContractDetailPage({
               )
             })(),
           },
+          {
+            id: 'propostas',
+            label: '📋 Propostas',
+            content: (
+              <ProposalsSection
+                contractId={contract.id}
+                proposals={proposals ?? []}
+                catalogItems={catalogItems ?? []}
+              />
+            ),
+          },
           ...(isCurrentlyInContractsPipeline ? [{
             id: 'carteira',
             label: '📋 Dados da Carteira',

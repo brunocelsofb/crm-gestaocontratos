@@ -323,7 +323,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <a
-              href={`/contracts/${contractId}?tab=proposals`}
+              href={`/contracts/${contractId}#propostas`}
               style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', fontSize: 13, fontWeight: 500, borderRadius: 10, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none' }}>
               📄 Montar Proposta
             </a>
