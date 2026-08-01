@@ -576,10 +576,13 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
             <p style={{ fontSize: 12, color: '#52514e', margin: 0 }}>Monte a proposta comercial e gere o link para o cliente assinar.</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <a href={`/contracts/${contractId}#propostas`}
-              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1a1f36', color: '#fff', textDecoration: 'none' }}>
-              📄 Montar Proposta
-            </a>
+            <button
+              onClick={() => {
+                document.getElementById('montagem-proposta')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
+              📄 Montar Proposta ↓
+            </button>
             <button
               onClick={async () => {
                 const res = await fetch('/api/proposals/client-token', {

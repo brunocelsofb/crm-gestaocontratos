@@ -571,20 +571,18 @@ export default async function ContractDetailPage({
                     contractId={contract.id}
                     initialData={proposalStatus as any}
                   />
+                  {proposalStatus?.status === 'aprovado_comercial' && (
+                    <div id="montagem-proposta">
+                      <ProposalsSection
+                        contractId={contract.id}
+                        proposals={proposals ?? []}
+                        catalogItems={catalogItems ?? []}
+                      />
+                    </div>
+                  )}
                 </div>
               )
             })(),
-          },
-          {
-            id: 'propostas',
-            label: '📋 Propostas',
-            content: (
-              <ProposalsSection
-                contractId={contract.id}
-                proposals={proposals ?? []}
-                catalogItems={catalogItems ?? []}
-              />
-            ),
           },
           ...(isCurrentlyInContractsPipeline ? [{
             id: 'carteira',
