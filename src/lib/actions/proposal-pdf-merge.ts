@@ -30,9 +30,33 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
   const { data: company } = contract?.company_id
     ? await supabase.from('companies').select('*').eq('id', contract.company_id).maybeSingle()
     : { data: null }
-  const { data: contact } = contract?.contact_id
-    ? await supabase.from('contacts').select('*').eq('id', contract.contact_id).maybeSingle()
-    : { data: null }
+
+  // Busca contato da empresa do cliente (não o responsável interno)
+  // Prioridade: 1) contatos da empresa vinculada, 2) contact_id do contrato como fallback
+  let contact = null
+  if (company?.id) {
+    const { data: companyContacts } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('company_id', company.id)
+      .order('created_at')
+      .limit(1)
+    contact = companyContacts?.[0] ?? null
+  }
+  // Fallback para contact_id se não há contatos da empresa
+  if (!contact && contract?.contact_id) {
+    const { data: fallbackContact } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('id', contract.contact_id)
+      .maybeSingle()
+    // Só usa se o contato pertence a uma empresa diferente da Orbis (evita puxar contato interno)
+    if (fallbackContact?.company_id && fallbackContact.company_id !== contract.company_id) {
+      contact = null // ignora contato interno
+    } else {
+      contact = fallbackContact
+    }
+  }
 
   const { data: orgSettings } = await supabase
     .from('organization_settings')
