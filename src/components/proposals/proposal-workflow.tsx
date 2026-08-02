@@ -227,6 +227,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         updated_at: new Date().toISOString(),
         ...(nextStatus === 'em_aprovacao_tecnica' ? { submitted_by_name: currentUserName, submitted_at: new Date().toISOString() } : {}),
         ...(nextStatus === 'aprovado_tecnico' ? { technical_approved_by_name: currentUserName, technical_approved_at: new Date().toISOString(), technical_comment: comment ?? null } : {}),
+        ...(nextStatus === 'reprovado_tecnico' ? { technical_approved_by_name: currentUserName, technical_approved_at: new Date().toISOString(), technical_comment: comment ?? null } : {}),
         ...(nextStatus === 'aprovado_comercial' ? { commercial_approved_by_name: currentUserName, commercial_approved_at: new Date().toISOString() } : {}),
       }))
       router.refresh()

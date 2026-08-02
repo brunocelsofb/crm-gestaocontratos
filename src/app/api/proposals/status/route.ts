@@ -56,6 +56,12 @@ export async function POST(req: Request) {
     if (comment) patch.technical_comment = comment
     if (actor_role) patch.technical_approved_by_role = actor_role
   }
+  if (status === 'reprovado_tecnico') {
+    patch.technical_approved_at = now
+    patch.technical_approved_by_name = loggedName
+    if (comment) patch.technical_comment = comment
+    if (actor_role) patch.technical_approved_by_role = actor_role
+  }
   if (status === 'aprovado_comercial') {
     patch.commercial_approved_at = now
     patch.commercial_approved_by_name = loggedName
