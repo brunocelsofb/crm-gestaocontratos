@@ -49,6 +49,9 @@ export async function POST(req: Request) {
   if (status === 'em_aprovacao_tecnica') {
     patch.submitted_at = now
     patch.submitted_by_name = loggedName
+    // Gera token para link de leitura no Price
+    const { randomBytes } = await import('crypto')
+    patch.review_token = randomBytes(24).toString('hex')
   }
   if (status === 'aprovado_tecnico') {
     patch.technical_approved_at = now

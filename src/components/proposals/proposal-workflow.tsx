@@ -443,14 +443,14 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
             </div>
           </div>
 
-          {data.proposal_value && (isAdmin || isComm) && (
+          {data.proposal_value && (isAdmin || isComm || isTech) && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: 'linear-gradient(135deg,#0f1b2d,#1b3050)', borderRadius: 10,
-              padding: '14px 18px'
+              padding: '14px 18px', marginTop: 12,
             }}>
               <div>
-                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '1px' }}>Valor Aprovado</p>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '1px' }}>Valor Mensal</p>
                 <p style={{ fontSize: 20, fontWeight: 700, color: '#32af9d', margin: 0 }}>{fmt(data.proposal_value)}<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>/mês</span></p>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -537,7 +537,24 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
       {/* ── Dados técnicos para aprovador analisar ───────────────── */}
       {['em_aprovacao_tecnica', 'aprovado_tecnico', 'reprovado_tecnico', 'em_aprovacao_comercial', 'aprovado_comercial'].includes(data.status) && data.technical_snapshot && card(
         <div>
-          {sectionLabel('Dimensionamento Técnico — ORBIS Price')}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            {sectionLabel('Dimensionamento Técnico — ORBIS Price')}
+            {data.technical_snapshot?.review_token || initialData?.review_token ? (
+              <a
+                href={`https://orbis-price.vercel.app?snapshot_id=${initialData?.review_token}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#1b556b', color: '#fff', textDecoration: 'none', fontWeight: 500, flexShrink: 0 }}>
+                🔍 Ver no Price (leitura)
+              </a>
+            ) : priceUrl ? (
+              <a
+                href={priceUrl}
+                target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#1b556b', color: '#fff', textDecoration: 'none', fontWeight: 500, flexShrink: 0 }}>
+                🔍 Ver no Price
+              </a>
+            ) : null}
+          </div>
           <SnapshotViewer snapshot={data.technical_snapshot} />
         </div>
       )}
