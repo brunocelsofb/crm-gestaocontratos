@@ -539,21 +539,21 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             {sectionLabel('Dimensionamento Técnico — ORBIS Price')}
-            {data.technical_snapshot?.review_token || initialData?.review_token ? (
-              <a
-                href={`https://orbis-price.vercel.app?snapshot_id=${initialData?.review_token}`}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#1b556b', color: '#fff', textDecoration: 'none', fontWeight: 500, flexShrink: 0 }}>
-                🔍 Ver no Price (leitura)
-              </a>
-            ) : priceUrl ? (
-              <a
-                href={priceUrl}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#1b556b', color: '#fff', textDecoration: 'none', fontWeight: 500, flexShrink: 0 }}>
-                🔍 Ver no Price
-              </a>
-            ) : null}
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              {initialData?.review_token && (
+                <a href={`https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#f1f3f8', color: '#52514e', textDecoration: 'none', fontWeight: 500 }}>
+                  🔍 Leitura
+                </a>
+              )}
+              {(isAdmin || isComm) && (
+                <a href={priceUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#1b556b', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>
+                  ✏️ Abrir no Price
+                </a>
+              )}
+            </div>
           </div>
           <SnapshotViewer snapshot={data.technical_snapshot} />
         </div>
