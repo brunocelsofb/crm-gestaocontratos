@@ -68,11 +68,11 @@ function fmtDt(d: string | null | undefined) {
   })
 }
 
-async function postStatus(contractId: string, status: ProposalStatus, actorName?: string, comment?: string) {
+async function postStatus(contractId: string, status: ProposalStatus, actorName?: string, comment?: string, actorRole?: string) {
   const res = await fetch('/api/proposals/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contract_id: contractId, status, actor_name: actorName, comment }),
+    body: JSON.stringify({ contract_id: contractId, status, actor_name: actorName, comment, actor_role: actorRole }),
   })
   return res.ok
 }
@@ -207,10 +207,6 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   )
   const [modal, setModal] = useState<{ action: 'approve_tech' | 'reject_tech' | 'approve_comm' | 'reject_comm' | 'send_tech' | 'send_comm' } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [reviewLink, setReviewLink] = useState<string | null>(
-    initialData?.review_token ? `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}` : null
-  )
-  const [copyDone, setCopyDone] = useState(false)
   const [generatingLink, setGeneratingLink] = useState(false)
 
   const isAdmin = currentUserRole === 'admin'
@@ -222,7 +218,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   async function doAction(nextStatus: ProposalStatus, comment?: string) {
     setError(null)
     startTransition(async () => {
-      const ok = await postStatus(contractId, nextStatus, currentUserName, comment)
+      const ok = await postStatus(contractId, nextStatus, currentUserName, comment, currentUserRole)
       if (!ok) { setError('Erro ao atualizar. Tente novamente.'); return }
       setData(prev => ({
         ...prev,
@@ -237,20 +233,10 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
     })
   }
 
-  async function handleGenerateLink() {
+  async function handleEnviarAnalise() {
     setGeneratingLink(true)
     try {
-      const res = await fetch('/api/proposals/generate-review-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contract_id: contractId }),
-      })
-      const json = await res.json()
-      if (json.token) {
-        const link = `https://orbis-price.vercel.app?snapshot_id=${json.token}`
-        setReviewLink(link)
-        await doAction('em_aprovacao_tecnica')
-      }
+      await doAction('em_aprovacao_tecnica')
     } finally { setGeneratingLink(false) }
   }
 
@@ -273,9 +259,9 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
           title="Enviar para Análise Técnica"
           subtitle="A proposta será encaminhada para o aprovador técnico."
           requireComment={false}
-          onConfirm={async (comment) => {
+          onConfirm={async () => {
             setModal(null)
-            await handleGenerateLink()
+            await handleEnviarAnalise()
           }}
           onCancel={() => setModal(null)}
           confirmLabel="Confirmar envio"
@@ -450,14 +436,16 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
             )}
             {data.technical_approved_by_name && (
               <AuditRow icon="🔧" label="Aprovada Tecnicamente"
-                by={data.technical_approved_by_name} role={ROLE_LABELS['aprovador_tecnico']}
+                by={data.technical_approved_by_name}
+                role={ROLE_LABELS[(data as any).technical_approved_by_role ?? 'aprovador_tecnico']}
                 at={fmtDt(data.technical_approved_at) ?? undefined}
                 comment={data.technical_comment ?? undefined}
                 restriction={data.technical_restrictions ?? undefined} />
             )}
             {data.commercial_approved_by_name && (
               <AuditRow icon="✅" label="Aprovada Comercialmente"
-                by={data.commercial_approved_by_name} role={ROLE_LABELS['aprovador_comercial']}
+                by={data.commercial_approved_by_name}
+                role={ROLE_LABELS[(data as any).commercial_approved_by_role ?? 'aprovador_comercial']}
                 at={fmtDt(data.commercial_approved_at) ?? undefined} />
             )}
             {data.client_approved_by_name && (
@@ -472,24 +460,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
       )}
 
       {/* ── Link de revisão técnica (quando em análise) ───────────── */}
-      {reviewLink && data.status === 'em_aprovacao_tecnica' && card(
-        <div>
-          {sectionLabel('Link de Revisão Técnica')}
-          <p style={{ fontSize: 12, color: '#8892a4', marginBottom: 10 }}>
-            Envie ao aprovador técnico. Ele deve ter login no ORBIS Price com perfil <strong>Somente Leitura</strong>.
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input readOnly value={reviewLink} style={{
-              flex: 1, padding: '8px 12px', fontSize: 11, borderRadius: 7,
-              border: '0.5px solid #e8edf5', background: '#f8f9fb', fontFamily: 'monospace', color: '#52514e'
-            }} />
-            <button onClick={() => { navigator.clipboard.writeText(reviewLink); setCopyDone(true); setTimeout(() => setCopyDone(false), 2000) }}
-              style={{ padding: '8px 14px', fontSize: 12, borderRadius: 7, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}>
-              {copyDone ? '✅ Copiado' : '📋 Copiar'}
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* ── Ações ─────────────────────────────────────────────────── */}
       {data.status !== 'aprovado_comercial' && card(
@@ -527,7 +498,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
             )}
             {data.status === 'em_aprovacao_tecnica' && !isTech && (
               <div style={{ padding: '12px 16px', borderRadius: 8, background: '#f8f9fb', border: '0.5px solid #e8edf5' }}>
-                <p style={{ fontSize: 12, color: '#8892a4', margin: 0 }}>⏳ Aguardando aprovação técnica. Apenas usuários com o cargo <strong>Aprovador Técnico</strong> podem prosseguir.</p>
+                <p style={{ fontSize: 12, color: '#8892a4', margin: 0 }}>⏳ Aguardando aprovação técnica. O <strong>Aprovador Técnico</strong> deve acessar esta oportunidade no CRM e registrar o parecer.</p>
               </div>
             )}
 
