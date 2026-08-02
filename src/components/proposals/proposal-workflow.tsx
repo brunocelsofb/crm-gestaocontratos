@@ -192,6 +192,80 @@ function ConfirmModal({ title, subtitle, requireComment = false, onConfirm, onCa
   )
 }
 
+// ── SnapshotViewer: exibe dados técnicos do Price para o aprovador ─────────
+function SnapshotViewer({ snapshot: s }: { snapshot: any }) {
+  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+  const kpi = (label: string, value: string | number, color = '#1a1f36') => (
+    <div style={{ background: '#f8f9fb', borderRadius: 8, padding: '10px 14px', flex: 1 }}>
+      <p style={{ fontSize: 9, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 2px' }}>{label}</p>
+      <p style={{ fontSize: 18, fontWeight: 700, color, margin: 0 }}>{value}</p>
+    </div>
+  )
+
+  const profs = (s.professionals ?? []).filter((p: any) => p.role?.trim())
+  const escopo: string[] = s.escopoSanitizado ?? s.escopoServicos ?? []
+  const dim = s.dimensionamento
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* KPIs principais */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {s.revenueMonthly > 0 && kpi('Valor Mensal', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(s.revenueMonthly), '#1a7c3e')}
+        {s.hospitalBeds > 0 && kpi('Leitos', s.hospitalBeds)}
+        {s.equipamentos?.total > 0 && kpi('Equipamentos', s.equipamentos.total)}
+        {s.totalFTE > 0 && kpi('Profissionais', s.totalFTE)}
+        {dim?.fteDemandado > 0 && kpi('FTE Demandado', dim.fteDemandado, '#3b5bdb')}
+        {s.contractDuration > 0 && kpi('Duração', `${s.contractDuration} meses`)}
+      </div>
+
+      {/* Escopo */}
+      {escopo.length > 0 && (
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 8px' }}>Escopo de Serviços</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {escopo.map((e: string, i: number) => (
+              <span key={i} style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, background: '#eaf5ee', color: '#1a7c3e', border: '0.5px solid #bbddc8' }}>✓ {e}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Equipe */}
+      {profs.length > 0 && (
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 8px' }}>Equipe Alocada</p>
+          <div style={{ borderRadius: 8, overflow: 'hidden', border: '0.5px solid #e8edf5' }}>
+            {profs.map((p: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '0.5px solid #f1f3f8' }}>
+                <span style={{ fontSize: 12, color: '#1a1f36', fontWeight: 500 }}>{p.role}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: '#8892a4' }}>{p.quantity}x</span>
+                  <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 10, background: p.contractType === 'CLT' ? '#eef3ff' : '#f1f3f8', color: p.contractType === 'CLT' ? '#3b5bdb' : '#52514e' }}>{p.contractType}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dimensionamento */}
+      {dim?.familias?.length > 0 && (
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 8px' }}>Principais Famílias</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            {dim.familias.slice(0, 8).map((f: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#f8f9fb', borderRadius: 6 }}>
+                <span style={{ fontSize: 11, color: '#52514e' }}>{f.familia}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#1b556b' }}>{f.qty}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Componente principal ────────────────────────────────────────────────────
 export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUserRole, currentUserName }: {
   contractId: string
@@ -460,8 +534,13 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
         </div>
       )}
 
-      {/* ── Link de revisão técnica (quando em análise) ───────────── */}
-
+      {/* ── Dados técnicos para aprovador analisar ───────────────── */}
+      {['em_aprovacao_tecnica', 'aprovado_tecnico', 'reprovado_tecnico', 'em_aprovacao_comercial', 'aprovado_comercial'].includes(data.status) && data.technical_snapshot && card(
+        <div>
+          {sectionLabel('Dimensionamento Técnico — ORBIS Price')}
+          <SnapshotViewer snapshot={data.technical_snapshot} />
+        </div>
+      )}
 
       {/* ── Ações ─────────────────────────────────────────────────── */}
       {data.status !== 'aprovado_comercial' && card(
