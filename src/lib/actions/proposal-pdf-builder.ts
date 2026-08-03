@@ -115,7 +115,7 @@ export async function buildStandardProposalPage({
 
   const pageWidth = 595
   const pageHeight = 842
-  const margin = 40
+  const margin = 32
   let page = doc.addPage([pageWidth, pageHeight])
   let y = pageHeight - margin
 
@@ -152,70 +152,81 @@ export async function buildStandardProposalPage({
   y -= 24
 
   // ---- Cabeçalho: logo + empresa contratada | contato interno ----
-  let logoDrawn = false
+  // ---- Cabeçalho premium ----
+  const headerTopY = y
+  const logoHeight = 56
+  let logoWidth = 0
+
+  // Logo (esquerda)
   if (org.logoBytes) {
     try {
       const image = org.logoIsPng ? await doc.embedPng(org.logoBytes) : await doc.embedJpg(org.logoBytes)
-      const logoHeight = 72
-      const logoWidth = (image.width / image.height) * logoHeight
-      page.drawImage(image, { x: margin, y: y - logoHeight + 6, width: logoWidth, height: logoHeight })
-      logoDrawn = true
-    } catch {
-      // Se o logo não carregar (formato inesperado), segue sem ele —
-      // não quebra a geração do PDF por causa disso.
-    }
+      logoWidth = (image.width / image.height) * logoHeight
+      page.drawImage(image, { x: margin, y: headerTopY - logoHeight, width: logoWidth, height: logoHeight })
+    } catch { logoWidth = 0 }
   }
 
-  const headerTextX = logoDrawn ? margin + 90 : margin
-  text(org.companyName ?? 'Empresa', headerTextX, y, { size: 13, bold: true })
-  y -= 26
+  // Dados Orbis (centro-esquerda, ao lado da logo)
+  const orbisX = logoWidth > 0 ? margin + logoWidth + 16 : margin
+  text(org.companyName ?? 'Empresa', orbisX, headerTopY - 10, { size: 11, bold: true })
+  if (org.headerText) {
+    text(org.headerText, orbisX, headerTopY - 22, { size: 8, color: [0.4, 0.4, 0.4] })
+  }
 
-  text('Contato', pageWidth - margin - 140, y + 26, { size: 11, bold: true })
+  // Contato interno (direita, alinhado ao topo da logo)
+  const contX = pageWidth - margin - 160
+  text('Contato', contX, headerTopY - 10, { size: 9, bold: true, color: [0.4, 0.4, 0.4] })
   if (org.createdByName) {
-    text(org.createdByName, pageWidth - margin - 140, y + 10, { size: 9 })
-    text(org.createdByEmail ?? '', pageWidth - margin - 140, y - 2, { size: 8, color: [0.4, 0.4, 0.4] })
+    text(org.createdByName, contX, headerTopY - 22, { size: 9 })
+    if (org.createdByEmail) text(org.createdByEmail, contX, headerTopY - 34, { size: 8, color: [0.4, 0.4, 0.4] })
   }
 
-  y -= 4
-  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) })
-  y -= 24
+  // Linha divisória ABAIXO de todo o bloco do cabeçalho
+  y = headerTopY - logoHeight - 16
+  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.8, color: rgb(...brandRgb) })
+  y -= 20
 
-  // ---- Duas caixas lado a lado: Dados da pessoa | Dados da empresa (cliente) ----
-  const boxWidth = (pageWidth - margin * 2 - 16) / 2
-  const boxHeight = 110
+  // ---- Duas caixas lado a lado: Dados da pessoa | Dados da empresa ----
+  const boxWidth = (pageWidth - margin * 2 - 12) / 2
+  const boxHeight = 118
   const boxTop = y
 
-  page.drawRectangle({ x: margin, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 1 })
-  page.drawRectangle({ x: margin + boxWidth + 16, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 1 })
+  // Box esquerda — Dados da pessoa
+  page.drawRectangle({ x: margin, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, color: rgb(0.97, 0.98, 0.99) })
+  page.drawLine({ start: { x: margin, y: boxTop }, end: { x: margin + boxWidth, y: boxTop }, thickness: 2, color: rgb(...brandRgb) })
 
-  let ly = boxTop - 16
-  text('Dados da pessoa', margin + 8, ly, { size: 9, bold: true, color: [0.4, 0.4, 0.4] })
+  let ly = boxTop - 14
+  text('Dados da pessoa', margin + 10, ly, { size: 8, bold: true, color: [0.4, 0.4, 0.4] })
   ly -= 16
-  text(contact?.name ?? '—', margin + 8, ly, { size: 9, bold: true })
-  ly -= 14
-  text(`CPF: ${contact?.cpf ?? '—'}`, margin + 8, ly, { size: 8 })
-  ly -= 12
-  text(`E-mail: ${contact?.email ?? '—'}`, margin + 8, ly, { size: 8 })
-  ly -= 12
-  text(`Telefone: ${contact?.phone ?? '—'}`, margin + 8, ly, { size: 8 })
-  ly -= 12
-  text(`Endereço: ${(contact?.address ?? '—').slice(0, 45)}`, margin + 8, ly, { size: 8 })
+  text(contact?.name ?? '—', margin + 10, ly, { size: 10, bold: true })
+  ly -= 15
+  text(`CPF: ${contact?.cpf ?? '—'}`, margin + 10, ly, { size: 8 })
+  ly -= 13
+  text(`E-mail: ${contact?.email ?? '—'}`, margin + 10, ly, { size: 8 })
+  ly -= 13
+  text(`Telefone: ${contact?.phone ?? '—'}`, margin + 10, ly, { size: 8 })
+  ly -= 13
+  text(`Endereço: ${(contact?.address ?? '—').slice(0, 50)}`, margin + 10, ly, { size: 8 })
 
-  let ry = boxTop - 16
-  const rx = margin + boxWidth + 16 + 8
-  text('Dados da empresa', rx, ry, { size: 9, bold: true, color: [0.4, 0.4, 0.4] })
-  ry -= 16
-  text(`Razão social: ${(company?.legal_name ?? company?.name ?? '—').slice(0, 42)}`, rx, ry, { size: 8, bold: true })
-  ry -= 14
-  text(`Nome fantasia: ${company?.trade_name ?? '—'}`, rx, ry, { size: 8 })
-  ry -= 12
-  text(`CNPJ: ${company?.cnpj ?? '—'}`, rx, ry, { size: 8 })
-  ry -= 12
-  text(`E-mail NF: ${company?.nf_email ?? '—'}`, rx, ry, { size: 8 })
-  ry -= 12
-  text(`Endereço: ${(company?.address ?? '—').slice(0, 45)}`, rx, ry, { size: 8 })
+  // Box direita — Dados da empresa
+  const bx = margin + boxWidth + 12
+  page.drawRectangle({ x: bx, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, color: rgb(0.97, 0.98, 0.99) })
+  page.drawLine({ start: { x: bx, y: boxTop }, end: { x: bx + boxWidth, y: boxTop }, thickness: 2, color: rgb(...brandRgb) })
 
-  y = boxTop - boxHeight - 24
+  let ry2 = boxTop - 14
+  text('Dados da empresa', bx + 10, ry2, { size: 8, bold: true, color: [0.4, 0.4, 0.4] })
+  ry2 -= 16
+  text((company?.legal_name ?? company?.name ?? '—').slice(0, 40), bx + 10, ry2, { size: 10, bold: true })
+  ry2 -= 15
+  text(`Nome fantasia: ${company?.trade_name ?? '—'}`, bx + 10, ry2, { size: 8 })
+  ry2 -= 13
+  text(`CNPJ: ${company?.cnpj ?? '—'}`, bx + 10, ry2, { size: 8 })
+  ry2 -= 13
+  text(`E-mail NF: ${company?.nf_email ?? '—'}`, bx + 10, ry2, { size: 8 })
+  ry2 -= 13
+  text(`Endereço: ${(company?.address ?? '—').slice(0, 50)}`, bx + 10, ry2, { size: 8 })
+
+  y = boxTop - boxHeight - 20
 
   // ---- Dados da proposta ----
   newPageIfNeeded(60)
