@@ -58,18 +58,22 @@ export async function POST(req: Request) {
     .eq('contract_id', contract_id)
     .eq('status', 'open')
 
-  // 2. Salva proposal_status com snapshot
+  // 2. Salva proposal_status com snapshot e gera review_token para carregar estado no Price
+  const { randomBytes } = await import('crypto')
   const { data: existing } = await supabase
     .from('proposal_status')
-    .select('status')
+    .select('status, review_token')
     .eq('contract_id', contract_id)
     .maybeSingle()
+
+  const reviewToken = existing?.review_token ?? randomBytes(24).toString('hex')
 
   await supabase.from('proposal_status').upsert({
     contract_id,
     status: existing?.status ?? 'rascunho',
     proposal_value,
     technical_snapshot: snap ?? null,
+    review_token: reviewToken,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'contract_id' })
 
