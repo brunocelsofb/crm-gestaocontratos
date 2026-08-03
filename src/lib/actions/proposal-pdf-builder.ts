@@ -258,17 +258,16 @@ export async function buildStandardProposalPage({
   page.drawLine({ start: { x: margin, y: y }, end: { x: pageWidth - margin, y: y }, thickness: 0.5, color: rgb(...brandRgb) })
   y -= 14
 
-  const tableW = pageWidth - margin * 2
-  // Qtd | Categoria | Item | Tipo | Vlr.Unit. | Desc. | Subtotal
-  const col = {
-    qty:  { x: margin,            w: 24 },
-    cat:  { x: margin + 26,       w: 90 },   // aumentado para "Engenharia Clínica" caber
-    item: { x: margin + 118,      w: 155 },
-    type: { x: margin + 275,      w: 34 },
-    unit: { x: margin + 311,      w: 72 },
-    disc: { x: margin + 385,      w: 50 },
-    sub:  { x: margin + 437,      w: tableW - 437 },
-  }
+  const tableW = pageWidth - margin * 2  // 531pt
+  // Proporções: Qtd 5% | Cat 18% | Item 35% | Tipo 8% | Unit 12% | Desc 10% | Sub 12%
+  const colQty  = { x: margin,                        w: tableW * 0.05 }  // ~26
+  const colCat  = { x: margin + tableW * 0.05,        w: tableW * 0.18 }  // ~95
+  const colItem = { x: margin + tableW * 0.23,        w: tableW * 0.35 }  // ~186
+  const colType = { x: margin + tableW * 0.58,        w: tableW * 0.08 }  // ~42
+  const colUnit = { x: margin + tableW * 0.66,        w: tableW * 0.12 }  // ~64
+  const colDisc = { x: margin + tableW * 0.78,        w: tableW * 0.10 }  // ~53
+  const colSub  = { x: margin + tableW * 0.88,        w: tableW * 0.12 }  // ~64
+  const col = { qty: colQty, cat: colCat, item: colItem, type: colType, unit: colUnit, disc: colDisc, sub: colSub }
 
   // Header com fundo cinza
   newPageIfNeeded(16)
@@ -303,24 +302,24 @@ export async function buildStandardProposalPage({
       page.drawRectangle({ x: margin, y: y - rowH + 4, width: tableW, height: rowH - 4, color: rgb(0.985, 0.988, 0.992) })
     }
 
-    // Dados da linha
-    text(String(it.quantity), col.qty.x + 3, y, { size: 8.5 })
-    // Categoria com wrap suave
-    const catStr = (it.category ?? '—').slice(0, 16)
-    text(catStr, col.cat.x + 3, y, { size: 8, color: [0.35, 0.38, 0.48] })
-    // Item — permite até 2 linhas
-    const itemStr = it.item
-    const itemLine1 = itemStr.slice(0, 40)
-    const itemLine2 = itemStr.length > 40 ? itemStr.slice(40, 76) : null
-    text(itemLine1, col.item.x + 3, y, { size: 8.5, bold: true })
-    if (itemLine2) {
-      text(itemLine2, col.item.x + 3, y - 10, { size: 8.5, bold: true })
-      y -= 10
-    }
-    text((it.type ?? '—'), col.type.x + 3, y, { size: 8 })
-    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 3, y, { size: 8.5 })
-    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 3, y, { size: 8, color: [0.5, 0.5, 0.5] })
-    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 3, y, { size: 8.5, bold: true })
+    // Dados da linha — cada coluna restrita à sua largura
+    text(String(it.quantity), col.qty.x + 2, y, { size: 8 })
+
+    // Categoria: até 2 linhas de 14 chars (~90pt col)
+    const catFull = it.category ?? '—'
+    text(catFull.slice(0, 14), col.cat.x + 2, y, { size: 7.5, color: [0.35, 0.38, 0.48] })
+    if (catFull.length > 14) text(catFull.slice(14, 28), col.cat.x + 2, y - 10, { size: 7.5, color: [0.35, 0.38, 0.48] })
+
+    // Item: até 2 linhas de 30 chars (~186pt col)
+    const itemFull = it.item
+    text(itemFull.slice(0, 30), col.item.x + 2, y, { size: 8, bold: true })
+    if (itemFull.length > 30) text(itemFull.slice(30, 60), col.item.x + 2, y - 10, { size: 8, bold: true })
+
+    // Tipo, valores — alinhados verticalmente no topo da linha
+    text((it.type ?? '—').slice(0, 5), col.type.x + 2, y, { size: 8 })
+    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 2, y, { size: 7.5 })
+    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 2, y, { size: 7.5, color: [0.5, 0.5, 0.5] })
+    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 2, y, { size: 7.5, bold: true })
     y -= 14
 
     // Características em até 3 linhas
