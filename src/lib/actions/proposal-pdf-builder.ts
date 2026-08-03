@@ -258,6 +258,17 @@ export async function buildStandardProposalPage({
   page.drawLine({ start: { x: margin, y: y }, end: { x: pageWidth - margin, y: y }, thickness: 0.5, color: rgb(...brandRgb) })
   y -= 14
 
+  // Proporções: Qtd 5% | Cat 18% | Item 37% | Tipo 8% | Unit 12% | Desc 8% | Sub 12%
+  const tw = tableW
+  const colQty  = { x: margin,                  w: Math.floor(tw * 0.05) }
+  const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.18) }
+  const colItem = { x: margin + tw * 0.23,      w: Math.floor(tw * 0.37) }
+  const colType = { x: margin + tw * 0.60,      w: Math.floor(tw * 0.08) }
+  const colUnit = { x: margin + tw * 0.68,      w: Math.floor(tw * 0.12) }
+  const colDisc = { x: margin + tw * 0.80,      w: Math.floor(tw * 0.08) }
+  const colSub  = { x: margin + tw * 0.88,      w: Math.floor(tw * 0.12) }
+  const col = { qty: colQty, cat: colCat, item: colItem, type: colType, unit: colUnit, disc: colDisc, sub: colSub }
+
   // Quebra texto em linhas respeitando palavras inteiras dentro de maxWidth pontos
   function wrapWords(str: string, maxW: number, sz: number, bold = false): string[] {
     const f = bold ? fontBold : font
@@ -270,23 +281,12 @@ export async function buildStandardProposalPage({
         cur = test
       } else {
         if (cur) lines.push(cur)
-        // Se a palavra sozinha é maior que maxW, trunca
         cur = f.widthOfTextAtSize(w, sz) > maxW ? w.slice(0, Math.floor(w.length * maxW / f.widthOfTextAtSize(w, sz))) : w
       }
     }
     if (cur) lines.push(cur)
     return lines
   }
-  // Proporções: Qtd 5% | Cat 18% | Item 37% | Tipo 8% | Unit 12% | Desc 8% | Sub 12%
-  const tw = tableW
-  const colQty  = { x: margin,                  w: Math.floor(tw * 0.05) }
-  const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.18) }
-  const colItem = { x: margin + tw * 0.23,      w: Math.floor(tw * 0.37) }
-  const colType = { x: margin + tw * 0.60,      w: Math.floor(tw * 0.08) }
-  const colUnit = { x: margin + tw * 0.68,      w: Math.floor(tw * 0.12) }
-  const colDisc = { x: margin + tw * 0.80,      w: Math.floor(tw * 0.08) }
-  const colSub  = { x: margin + tw * 0.88,      w: Math.floor(tw * 0.12) }
-  const col = { qty: colQty, cat: colCat, item: colItem, type: colType, unit: colUnit, disc: colDisc, sub: colSub }
 
   // Header com fundo cinza
   newPageIfNeeded(16)
