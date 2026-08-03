@@ -152,81 +152,95 @@ export async function buildStandardProposalPage({
   y -= 24
 
   // ---- Cabeçalho: logo + empresa contratada | contato interno ----
-  // ---- Cabeçalho premium ----
+  // ---- Cabeçalho premium: Logo (esq) | Nome+Contato (dir) ----
   const headerTopY = y
-  const logoHeight = 56
-  let logoWidth = 0
+  const logoH = 52
+  let logoW = 0
 
-  // Logo (esquerda)
   if (org.logoBytes) {
     try {
       const image = org.logoIsPng ? await doc.embedPng(org.logoBytes) : await doc.embedJpg(org.logoBytes)
-      logoWidth = (image.width / image.height) * logoHeight
-      page.drawImage(image, { x: margin, y: headerTopY - logoHeight, width: logoWidth, height: logoHeight })
-    } catch { logoWidth = 0 }
+      logoW = (image.width / image.height) * logoH
+      page.drawImage(image, { x: margin, y: headerTopY - logoH, width: logoW, height: logoH })
+    } catch { logoW = 0 }
   }
 
-  // Dados Orbis (centro-esquerda, ao lado da logo)
-  const orbisX = logoWidth > 0 ? margin + logoWidth + 16 : margin
-  text(org.companyName ?? 'Empresa', orbisX, headerTopY - 10, { size: 11, bold: true })
-  if (org.headerText) {
-    text(org.headerText, orbisX, headerTopY - 22, { size: 8, color: [0.4, 0.4, 0.4] })
-  }
+  // Bloco direito: Nome da empresa + Contato, alinhado à direita
+  const rightBlockX = pageWidth - margin - 200
+  const rightBlockW = 200
 
-  // Contato interno (direita, alinhado ao topo da logo)
-  const contX = pageWidth - margin - 160
-  text('Contato', contX, headerTopY - 10, { size: 9, bold: true, color: [0.4, 0.4, 0.4] })
+  // Nome Orbis em destaque
+  const orgName = org.companyName ?? 'Empresa'
+  text(orgName, rightBlockX, headerTopY - 10, { size: 10, bold: true })
+
+  // Separador fino
+  page.drawLine({
+    start: { x: rightBlockX, y: headerTopY - 18 },
+    end: { x: pageWidth - margin, y: headerTopY - 18 },
+    thickness: 0.3, color: rgb(0.8, 0.8, 0.8)
+  })
+
+  // Contato abaixo
+  let cY = headerTopY - 28
+  text('Contato interno:', rightBlockX, cY, { size: 7.5, bold: true, color: [0.5, 0.5, 0.5] })
+  cY -= 12
   if (org.createdByName) {
-    text(org.createdByName, contX, headerTopY - 22, { size: 9 })
-    if (org.createdByEmail) text(org.createdByEmail, contX, headerTopY - 34, { size: 8, color: [0.4, 0.4, 0.4] })
+    text(org.createdByName, rightBlockX, cY, { size: 8.5 })
+    cY -= 12
+  }
+  if (org.createdByEmail) {
+    text(org.createdByEmail, rightBlockX, cY, { size: 7.5, color: [0.4, 0.4, 0.4] })
   }
 
-  // Linha divisória ABAIXO de todo o bloco do cabeçalho
-  y = headerTopY - logoHeight - 16
-  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.8, color: rgb(...brandRgb) })
-  y -= 20
+  // Linha colorida da marca — abaixo de TODA a altura do logo
+  y = headerTopY - logoH - 14
+  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 1.5, color: rgb(...brandRgb) })
+  y -= 22
 
-  // ---- Duas caixas lado a lado: Dados da pessoa | Dados da empresa ----
-  const boxWidth = (pageWidth - margin * 2 - 12) / 2
-  const boxHeight = 118
+  // ---- Duas caixas: Dados da pessoa | Dados da empresa ----
+  const boxW = (pageWidth - margin * 2 - 10) / 2
+  const boxH = 120
   const boxTop = y
 
-  // Box esquerda — Dados da pessoa
-  page.drawRectangle({ x: margin, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, color: rgb(0.97, 0.98, 0.99) })
-  page.drawLine({ start: { x: margin, y: boxTop }, end: { x: margin + boxWidth, y: boxTop }, thickness: 2, color: rgb(...brandRgb) })
+  // Desenha as duas caixas com borda radius simulada via bordas coloridas no topo
+  ;[
+    { x: margin, label: 'Dados da pessoa', lines: [
+      contact?.name ?? '—',
+      `CPF: ${contact?.cpf ?? '—'}`,
+      `E-mail: ${contact?.email ?? '—'}`,
+      `Telefone: ${contact?.phone ?? '—'}`,
+      `Endereço: ${(contact?.address ?? '—').slice(0, 48)}`,
+    ], bold0: true },
+    { x: margin + boxW + 10, label: 'Dados da empresa', lines: [
+      company?.legal_name ?? company?.name ?? '—',
+      `Nome fantasia: ${company?.trade_name ?? '—'}`,
+      `CNPJ: ${company?.cnpj ?? '—'}`,
+      `E-mail NF: ${company?.nf_email ?? '—'}`,
+      `Endereço: ${(company?.address ?? '—').slice(0, 48)}`,
+    ], bold0: true },
+  ].forEach(box => {
+    // Fundo
+    page.drawRectangle({ x: box.x, y: boxTop - boxH, width: boxW, height: boxH, color: rgb(0.975, 0.978, 0.985) })
+    // Borda colorida no topo
+    page.drawRectangle({ x: box.x, y: boxTop - 3, width: boxW, height: 3, color: rgb(...brandRgb) })
+    // Borda cinza ao redor
+    page.drawLine({ start: { x: box.x, y: boxTop }, end: { x: box.x, y: boxTop - boxH }, thickness: 0.4, color: rgb(0.82, 0.84, 0.88) })
+    page.drawLine({ start: { x: box.x + boxW, y: boxTop }, end: { x: box.x + boxW, y: boxTop - boxH }, thickness: 0.4, color: rgb(0.82, 0.84, 0.88) })
+    page.drawLine({ start: { x: box.x, y: boxTop - boxH }, end: { x: box.x + boxW, y: boxTop - boxH }, thickness: 0.4, color: rgb(0.82, 0.84, 0.88) })
 
-  let ly = boxTop - 14
-  text('Dados da pessoa', margin + 10, ly, { size: 8, bold: true, color: [0.4, 0.4, 0.4] })
-  ly -= 16
-  text(contact?.name ?? '—', margin + 10, ly, { size: 10, bold: true })
-  ly -= 15
-  text(`CPF: ${contact?.cpf ?? '—'}`, margin + 10, ly, { size: 8 })
-  ly -= 13
-  text(`E-mail: ${contact?.email ?? '—'}`, margin + 10, ly, { size: 8 })
-  ly -= 13
-  text(`Telefone: ${contact?.phone ?? '—'}`, margin + 10, ly, { size: 8 })
-  ly -= 13
-  text(`Endereço: ${(contact?.address ?? '—').slice(0, 50)}`, margin + 10, ly, { size: 8 })
+    // Label
+    let bY = boxTop - 14
+    text(box.label, box.x + 10, bY, { size: 7.5, bold: true, color: [0.45, 0.45, 0.55] })
+    bY -= 15
 
-  // Box direita — Dados da empresa
-  const bx = margin + boxWidth + 12
-  page.drawRectangle({ x: bx, y: boxTop - boxHeight, width: boxWidth, height: boxHeight, color: rgb(0.97, 0.98, 0.99) })
-  page.drawLine({ start: { x: bx, y: boxTop }, end: { x: bx + boxWidth, y: boxTop }, thickness: 2, color: rgb(...brandRgb) })
+    // Linhas de conteúdo
+    box.lines.forEach((line, i) => {
+      text(line, box.x + 10, bY, { size: i === 0 ? 9 : 7.5, bold: i === 0 && box.bold0, color: i === 0 ? [0.1, 0.12, 0.2] : [0.3, 0.32, 0.38] })
+      bY -= i === 0 ? 14 : 12
+    })
+  })
 
-  let ry2 = boxTop - 14
-  text('Dados da empresa', bx + 10, ry2, { size: 8, bold: true, color: [0.4, 0.4, 0.4] })
-  ry2 -= 16
-  text((company?.legal_name ?? company?.name ?? '—').slice(0, 40), bx + 10, ry2, { size: 10, bold: true })
-  ry2 -= 15
-  text(`Nome fantasia: ${company?.trade_name ?? '—'}`, bx + 10, ry2, { size: 8 })
-  ry2 -= 13
-  text(`CNPJ: ${company?.cnpj ?? '—'}`, bx + 10, ry2, { size: 8 })
-  ry2 -= 13
-  text(`E-mail NF: ${company?.nf_email ?? '—'}`, bx + 10, ry2, { size: 8 })
-  ry2 -= 13
-  text(`Endereço: ${(company?.address ?? '—').slice(0, 50)}`, bx + 10, ry2, { size: 8 })
-
-  y = boxTop - boxHeight - 20
+  y = boxTop - boxH - 18
 
   // ---- Dados da proposta ----
   newPageIfNeeded(60)
@@ -245,15 +259,15 @@ export async function buildStandardProposalPage({
   y -= 14
 
   const tableW = pageWidth - margin * 2
-  // Colunas: Qtd | Categoria | Item (maior) | Tipo | Vlr.Unit. | Desc. | Subtotal
+  // Qtd | Categoria | Item | Tipo | Vlr.Unit. | Desc. | Subtotal
   const col = {
-    qty:  { x: margin,            w: 26 },
-    cat:  { x: margin + 28,       w: 70 },
-    item: { x: margin + 100,      w: 165 },
-    type: { x: margin + 267,      w: 38 },
-    unit: { x: margin + 307,      w: 72 },
-    disc: { x: margin + 381,      w: 52 },
-    sub:  { x: margin + 435,      w: tableW - 435 },
+    qty:  { x: margin,            w: 24 },
+    cat:  { x: margin + 26,       w: 90 },   // aumentado para "Engenharia Clínica" caber
+    item: { x: margin + 118,      w: 155 },
+    type: { x: margin + 275,      w: 34 },
+    unit: { x: margin + 311,      w: 72 },
+    disc: { x: margin + 385,      w: 50 },
+    sub:  { x: margin + 437,      w: tableW - 437 },
   }
 
   // Header com fundo cinza
