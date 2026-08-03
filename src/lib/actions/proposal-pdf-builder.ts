@@ -259,6 +259,7 @@ export async function buildStandardProposalPage({
   y -= 14
 
   // Proporções: Qtd 5% | Cat 18% | Item 37% | Tipo 8% | Unit 12% | Desc 8% | Sub 12%
+  const tableW = pageWidth - margin * 2
   const tw = tableW
   const colQty  = { x: margin,                  w: Math.floor(tw * 0.05) }
   const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.18) }
