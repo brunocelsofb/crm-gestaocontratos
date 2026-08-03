@@ -116,7 +116,7 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
       if (page.is_standard_proposal) {
         let standardPageBytes: Uint8Array
 
-        if (proposalStatus?.technical_snapshot) {
+        if (proposalStatus?.technical_snapshot && (!items || items.length === 0)) {
           // Usa dados do Price
           const { buildPriceProposalPage } = await import('./proposal-pdf-from-price')
           standardPageBytes = await buildPriceProposalPage({
