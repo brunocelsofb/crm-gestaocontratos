@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 
   const reviewToken = existing?.review_token ?? randomBytes(24).toString('hex')
 
-  await supabase.from('proposal_status').upsert({
+  const { error: upsertError } = await supabase.from('proposal_status').upsert({
     contract_id,
     status: existing?.status ?? 'rascunho',
     proposal_value,
@@ -76,6 +76,11 @@ export async function POST(req: Request) {
     review_token: reviewToken,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'contract_id' })
+
+  if (upsertError) {
+    console.error('[from-price] upsert error:', upsertError)
+    return NextResponse.json({ error: upsertError.message }, { status: 500, headers: CORS })
+  }
 
   // 3. Cria/atualiza proposta no sistema de julho com itens do Price
   if (snap) {
