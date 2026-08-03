@@ -258,15 +258,34 @@ export async function buildStandardProposalPage({
   page.drawLine({ start: { x: margin, y: y }, end: { x: pageWidth - margin, y: y }, thickness: 0.5, color: rgb(...brandRgb) })
   y -= 14
 
-  const tableW = pageWidth - margin * 2  // 531pt
-  // Proporções: Qtd 5% | Cat 18% | Item 35% | Tipo 8% | Unit 12% | Desc 10% | Sub 12%
-  const colQty  = { x: margin,                        w: tableW * 0.05 }  // ~26
-  const colCat  = { x: margin + tableW * 0.05,        w: tableW * 0.18 }  // ~95
-  const colItem = { x: margin + tableW * 0.23,        w: tableW * 0.35 }  // ~186
-  const colType = { x: margin + tableW * 0.58,        w: tableW * 0.08 }  // ~42
-  const colUnit = { x: margin + tableW * 0.66,        w: tableW * 0.12 }  // ~64
-  const colDisc = { x: margin + tableW * 0.78,        w: tableW * 0.10 }  // ~53
-  const colSub  = { x: margin + tableW * 0.88,        w: tableW * 0.12 }  // ~64
+  // Quebra texto em linhas respeitando palavras inteiras dentro de maxWidth pontos
+  function wrapWords(str: string, maxW: number, sz: number, bold = false): string[] {
+    const f = bold ? fontBold : font
+    const words = str.split(' ')
+    const lines: string[] = []
+    let cur = ''
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w
+      if (f.widthOfTextAtSize(test, sz) <= maxW) {
+        cur = test
+      } else {
+        if (cur) lines.push(cur)
+        // Se a palavra sozinha é maior que maxW, trunca
+        cur = f.widthOfTextAtSize(w, sz) > maxW ? w.slice(0, Math.floor(w.length * maxW / f.widthOfTextAtSize(w, sz))) : w
+      }
+    }
+    if (cur) lines.push(cur)
+    return lines
+  }
+  // Proporções: Qtd 5% | Cat 18% | Item 37% | Tipo 8% | Unit 12% | Desc 8% | Sub 12%
+  const tw = tableW
+  const colQty  = { x: margin,                  w: Math.floor(tw * 0.05) }
+  const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.18) }
+  const colItem = { x: margin + tw * 0.23,      w: Math.floor(tw * 0.37) }
+  const colType = { x: margin + tw * 0.60,      w: Math.floor(tw * 0.08) }
+  const colUnit = { x: margin + tw * 0.68,      w: Math.floor(tw * 0.12) }
+  const colDisc = { x: margin + tw * 0.80,      w: Math.floor(tw * 0.08) }
+  const colSub  = { x: margin + tw * 0.88,      w: Math.floor(tw * 0.12) }
   const col = { qty: colQty, cat: colCat, item: colItem, type: colType, unit: colUnit, disc: colDisc, sub: colSub }
 
   // Header com fundo cinza
@@ -302,38 +321,49 @@ export async function buildStandardProposalPage({
       page.drawRectangle({ x: margin, y: y - rowH + 4, width: tableW, height: rowH - 4, color: rgb(0.985, 0.988, 0.992) })
     }
 
-    // Dados da linha — cada coluna restrita à sua largura
-    text(String(it.quantity), col.qty.x + 2, y, { size: 8 })
+    // Dados da linha — wrapWords garante quebra por palavra inteira
+    const sz = 7.5
+    const szBold = 8
 
-    // Categoria: até 2 linhas de 14 chars (~90pt col)
-    const catFull = it.category ?? '—'
-    text(catFull.slice(0, 14), col.cat.x + 2, y, { size: 7.5, color: [0.35, 0.38, 0.48] })
-    if (catFull.length > 14) text(catFull.slice(14, 28), col.cat.x + 2, y - 10, { size: 7.5, color: [0.35, 0.38, 0.48] })
+    text(String(it.quantity), col.qty.x + 2, y, { size: sz })
 
-    // Item: até 2 linhas de 30 chars (~186pt col)
-    const itemFull = it.item
-    text(itemFull.slice(0, 30), col.item.x + 2, y, { size: 8, bold: true })
-    if (itemFull.length > 30) text(itemFull.slice(30, 60), col.item.x + 2, y - 10, { size: 8, bold: true })
+    // Categoria
+    const catLines = wrapWords(it.category ?? '—', col.cat.w - 4, sz)
+    catLines.slice(0, 2).forEach((l, i) =>
+      text(l, col.cat.x + 2, y - i * 10, { size: sz, color: [0.35, 0.38, 0.48] })
+    )
 
-    // Tipo, valores — alinhados verticalmente no topo da linha
-    text((it.type ?? '—').slice(0, 5), col.type.x + 2, y, { size: 8 })
-    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 2, y, { size: 7.5 })
-    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 2, y, { size: 7.5, color: [0.5, 0.5, 0.5] })
-    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 2, y, { size: 7.5, bold: true })
-    y -= 14
+    // Item — linha mais larga, até 2 linhas
+    const itemLines = wrapWords(it.item, col.item.w - 4, szBold, true)
+    itemLines.slice(0, 2).forEach((l, i) =>
+      text(l, col.item.x + 2, y - i * 10, { size: szBold, bold: true })
+    )
 
-    // Características em até 3 linhas
+    // Tipo, valores — só primeira linha, alinhados no topo
+    text((it.type ?? '—').slice(0, 6), col.type.x + 2, y, { size: sz })
+    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 2, y, { size: sz })
+    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 2, y, { size: sz, color: [0.5, 0.5, 0.5] })
+    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 2, y, { size: sz, bold: true })
+
+    // Avança Y pela altura máxima usada (cat ou item, max 2 linhas)
+    const usedLines = Math.max(
+      Math.min(catLines.length, 2),
+      Math.min(itemLines.length, 2)
+    )
+    y -= usedLines > 1 ? 22 : 14
+
+    // Características com wrap correto e espaçamento
     if (it.characteristics) {
-      const maxCharsPerLine = 80
-      const chars = it.characteristics
-      for (let i = 0; i < chars.length && i < maxCharsPerLine * 3; i += maxCharsPerLine) {
-        text(`  ${chars.slice(i, i + maxCharsPerLine)}`, col.item.x + 3, y, { size: 7, color: [0.45, 0.48, 0.55] })
+      y -= 4  // respiro entre item e características
+      const charLines = wrapWords(it.characteristics, col.item.w + col.type.w - 4, 7)
+      charLines.slice(0, 3).forEach(l => {
+        text(`  ${l}`, col.item.x + 2, y, { size: 7, color: [0.45, 0.48, 0.55] })
         y -= 10
-      }
-      y -= 2
+      })
     }
     if (it.delivery_forecast) {
-      text(`  Previsão: ${it.delivery_forecast}`, col.item.x + 3, y, { size: 7, color: [0.45, 0.45, 0.45] })
+      y -= 2
+      text(`  Previsão: ${it.delivery_forecast}`, col.item.x + 2, y, { size: 7, color: [0.45, 0.45, 0.45] })
       y -= 10
     }
 
