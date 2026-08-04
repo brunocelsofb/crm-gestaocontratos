@@ -192,10 +192,8 @@ export async function buildStandardProposalPage({
     text(org.createdByEmail, rightBlockX, cY, { size: 7.5, color: [0.4, 0.4, 0.4] })
   }
 
-  // Linha colorida da marca — abaixo de TODA a altura do logo
-  y = headerTopY - logoH - 14
-  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 1.5, color: rgb(...brandRgb) })
-  y -= 22
+  // Sem linha separadora — os cards já têm borda colorida no topo
+  y = headerTopY - logoH - 20
 
   // ---- Duas caixas: Dados da pessoa | Dados da empresa ----
   const boxW = (pageWidth - margin * 2 - 10) / 2
@@ -240,7 +238,7 @@ export async function buildStandardProposalPage({
     })
   })
 
-  y = boxTop - boxH - 18
+  y = boxTop - boxH - 36  // respiro generoso antes de Dados da Proposta
 
   // ---- Dados da proposta ----
   newPageIfNeeded(60)
