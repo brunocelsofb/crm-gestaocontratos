@@ -284,46 +284,33 @@ export async function createProposalVersion(
 // capas fixas, dá pra colar uma imagem ou montar uma tabela em
 // qualquer ponto da proposta.
 // ------------------------------------------------------------
-export async function addImageBlock(proposalId: string, contractId: string, storagePath: string, imageSize = 'medium'): Promise<ActionState> {
+export async function addImageBlock(proposalId: string, contractId: string, storagePath: string, imageSize = 'medium'): Promise<ActionState & { id?: string }> {
   const supabase = await createClient()
-
-  const { count } = await supabase
-    .from('proposal_content_blocks')
-    .select('id', { count: 'exact', head: true })
-    .eq('proposal_id', proposalId)
-
-  const { error } = await supabase.from('proposal_content_blocks').insert({
-    proposal_id: proposalId,
-    position: count ?? 0,
-    block_type: 'image',
-    image_storage_path: storagePath,
-    image_size: imageSize,
-  })
-
+  const { count } = await supabase.from('proposal_content_blocks').select('id', { count: 'exact', head: true }).eq('proposal_id', proposalId)
+  const { data, error } = await supabase.from('proposal_content_blocks').insert({
+    proposal_id: proposalId, position: count ?? 0, block_type: 'image',
+    image_storage_path: storagePath, image_size: imageSize,
+  }).select('id').single()
   if (error) return { error: error.message }
   revalidatePath(`/contracts/${contractId}/proposals/${proposalId}`)
-  return {}
+  return { id: data?.id }
 }
 
-export async function addTableBlock(proposalId: string, contractId: string, tableData: string[][], headerColor = '#1B556B'): Promise<ActionState> {
+export async function addTableBlock(proposalId: string, contractId: string, tableData: string[][], headerColor = '#1B556B'): Promise<ActionState & { id?: string }> {
   const supabase = await createClient()
-
-  const { count } = await supabase
-    .from('proposal_content_blocks')
-    .select('id', { count: 'exact', head: true })
-    .eq('proposal_id', proposalId)
-
-  const { error } = await supabase.from('proposal_content_blocks').insert({
-    proposal_id: proposalId,
-    position: count ?? 0,
-    block_type: 'table',
-    table_data: { rows: tableData },
-    header_color: headerColor,
-  })
-
+  const { count } = await supabase.from('proposal_content_blocks').select('id', { count: 'exact', head: true }).eq('proposal_id', proposalId)
+  const { data, error } = await supabase.from('proposal_content_blocks').insert({
+    proposal_id: proposalId, position: count ?? 0, block_type: 'table',
+    table_data: { rows: tableData }, header_color: headerColor,
+  }).select('id').single()
   if (error) return { error: error.message }
   revalidatePath(`/contracts/${contractId}/proposals/${proposalId}`)
-  return {}
+  return { id: data?.id }
+}
+
+export async function updateBlockIntroduction(blockId: string, introduction: string): Promise<void> {
+  const supabase = createAdminClient()
+  await supabase.from('proposal_content_blocks').update({ introduction }).eq('id', blockId)
 }
 
 export async function deleteContentBlock(blockId: string, contractId: string, proposalId: string) {

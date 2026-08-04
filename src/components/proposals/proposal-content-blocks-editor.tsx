@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { addImageBlock, addTableBlock, deleteContentBlock } from '@/lib/actions/proposals'
+import { addImageBlock, addTableBlock, deleteContentBlock, updateBlockIntroduction } from '@/lib/actions/proposals'
 import { sanitizeStorageFileName } from '@/lib/utils/storage'
 
 type ContentBlock = {
@@ -12,6 +12,7 @@ type ContentBlock = {
   table_data: { rows: string[][] } | null
   header_color?: string | null
   image_size?: string | null
+  introduction?: string | null
 }
 
 const PRESET_COLORS = [
@@ -23,10 +24,10 @@ const PRESET_COLORS = [
 ]
 
 const IMAGE_SIZES = [
-  { label: 'Pequena', value: 'small', w: 200 },
-  { label: 'Média', value: 'medium', w: 350 },
-  { label: 'Grande', value: 'large', w: 500 },
-  { label: 'Total', value: 'full', w: 0 },
+  { label: 'Pequena', value: 'small' },
+  { label: 'Média', value: 'medium' },
+  { label: 'Grande', value: 'large' },
+  { label: 'Total', value: 'full' },
 ]
 
 export function ProposalContentBlocksEditor({
@@ -37,12 +38,13 @@ export function ProposalContentBlocksEditor({
   initialBlocks: ContentBlock[]
   canEdit: boolean
 }) {
-  const [blocks, setBlocks] = useState(initialBlocks)
+  const [blocks, setBlocks] = useState<ContentBlock[]>(initialBlocks)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tableRows, setTableRows] = useState<string[][]>([['', ''], ['', '']])
   const [headerColor, setHeaderColor] = useState('#1B556B')
   const [imageSize, setImageSize] = useState('medium')
+  const [savingIntro, setSavingIntro] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleAddImage() {
@@ -57,7 +59,7 @@ export function ProposalContentBlocksEditor({
     setUploadingImage(false)
     if (result.error) { setError(result.error) }
     else {
-      setBlocks(prev => [...prev, { id: crypto.randomUUID(), block_type: 'image', image_storage_path: storagePath, table_data: null, image_size: imageSize }])
+      setBlocks(prev => [...prev, { id: result.id ?? crypto.randomUUID(), block_type: 'image', image_storage_path: storagePath, table_data: null, image_size: imageSize, introduction: null }])
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -73,7 +75,7 @@ export function ProposalContentBlocksEditor({
     const result = await addTableBlock(proposalId, contractId, tableRows, headerColor)
     if (result.error) { setError(result.error) }
     else {
-      setBlocks(prev => [...prev, { id: crypto.randomUUID(), block_type: 'table', image_storage_path: null, table_data: { rows: tableRows }, header_color: headerColor }])
+      setBlocks(prev => [...prev, { id: result.id ?? crypto.randomUUID(), block_type: 'table', image_storage_path: null, table_data: { rows: tableRows }, header_color: headerColor, introduction: null }])
       setTableRows([['', ''], ['', '']])
     }
   }
@@ -83,31 +85,78 @@ export function ProposalContentBlocksEditor({
     await deleteContentBlock(blockId, contractId, proposalId)
   }
 
-  const inp = 'rounded-md border border-gray-300 px-2 py-1 text-xs'
+  async function saveIntro(blockId: string, intro: string) {
+    setSavingIntro(blockId)
+    await updateBlockIntroduction(blockId, intro)
+    setSavingIntro(null)
+    setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, introduction: intro } : b))
+  }
+
+  const inp = 'border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-brand-700'
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-medium text-gray-900">Conteúdo extra (imagens e tabelas)</h2>
-      <p className="text-xs text-gray-400">Entram na página de dados da proposta, depois dos itens.</p>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-sm font-medium text-gray-900">Conteúdo extra (imagens e tabelas)</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Cada item pode ter um texto de introdução que aparece antes dele no PDF.</p>
+      </div>
 
-      <div className="space-y-2">
-        {blocks.map(b => (
-          <div key={b.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-            <span className="text-gray-700">
-              {b.block_type === 'image' ? '🖼️ Imagem' : '▦ Tabela'}
-              {b.block_type === 'table' && b.table_data ? ` (${b.table_data.rows.length}×${b.table_data.rows[0]?.length ?? 0})` : ''}
-              {b.block_type === 'image' && b.image_size ? ` · ${IMAGE_SIZES.find(s => s.value === b.image_size)?.label ?? b.image_size}` : ''}
-              {b.block_type === 'table' && b.header_color ? (
-                <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: b.header_color, marginLeft: 6, verticalAlign: 'middle' }} />
-              ) : null}
-            </span>
-            {canEdit && (
-              <button onClick={() => handleDelete(b.id)} className="text-xs text-negative-600 hover:underline">Remover</button>
+      {/* Lista dinâmica de blocks com introdução */}
+      <div className="space-y-4">
+        {blocks.map((b, idx) => (
+          <div key={b.id} className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+            {/* Header do block */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                {b.block_type === 'image' ? `🖼️ Imagem ${blocks.filter(x => x.block_type === 'image').indexOf(b) + 1}` : `▦ Tabela ${blocks.filter(x => x.block_type === 'table').indexOf(b) + 1}`}
+                {b.block_type === 'image' && b.image_size ? ` · ${IMAGE_SIZES.find(s => s.value === b.image_size)?.label}` : ''}
+              </span>
+              {canEdit && (
+                <button onClick={() => handleDelete(b.id)} className="text-xs text-gray-400 hover:text-red-500">🗑️ Remover</button>
+              )}
+            </div>
+
+            {/* Campo de introdução */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Texto de introdução para este item</label>
+              <div className="flex gap-2">
+                <textarea
+                  defaultValue={b.introduction ?? ''}
+                  onBlur={e => saveIntro(b.id, e.target.value)}
+                  rows={2}
+                  placeholder="Digite o contexto ou introdução para este item..."
+                  disabled={!canEdit}
+                  className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-brand-700 resize-none disabled:bg-gray-50"
+                />
+                {savingIntro === b.id && <span className="text-xs text-gray-400 self-center">Salvando...</span>}
+              </div>
+            </div>
+
+            {/* Preview do block */}
+            {b.block_type === 'table' && b.table_data && (
+              <div className="overflow-x-auto rounded border border-gray-100">
+                <table className="text-xs border-collapse w-full">
+                  {b.table_data.rows.map((row, r) => (
+                    <tr key={r} style={{ background: r === 0 ? (b.header_color ?? '#1B556B') : r % 2 === 0 ? '#f9fafb' : '#fff' }}>
+                      {row.map((cell, c) => (
+                        <td key={c} className="border border-gray-100 px-2 py-1"
+                          style={{ color: r === 0 ? '#fff' : '#111', fontWeight: r === 0 ? 600 : 400 }}>
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </table>
+              </div>
+            )}
+            {b.block_type === 'image' && b.image_storage_path && (
+              <p className="text-xs text-gray-400">📎 {b.image_storage_path.split('/').pop()}</p>
             )}
           </div>
         ))}
       </div>
 
+      {/* Formulários de adição */}
       {canEdit && (
         <div className="grid grid-cols-2 gap-3">
           {/* Imagem */}
@@ -136,7 +185,7 @@ export function ProposalContentBlocksEditor({
             <p className="text-xs font-medium text-gray-700">+ Adicionar tabela</p>
             <div>
               <p className="text-xs text-gray-500 mb-1">Cor do cabeçalho:</p>
-              <div className="flex gap-1 flex-wrap">
+              <div className="flex gap-1 flex-wrap items-center">
                 {PRESET_COLORS.map(c => (
                   <button key={c.value} onClick={() => setHeaderColor(c.value)} title={c.label}
                     style={{ width: 20, height: 20, borderRadius: 4, background: c.value, border: headerColor === c.value ? '2px solid #000' : '2px solid transparent' }} />
@@ -171,7 +220,7 @@ export function ProposalContentBlocksEditor({
         </div>
       )}
 
-      {error && <p className="text-xs text-negative-600">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }

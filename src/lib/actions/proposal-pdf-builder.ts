@@ -415,6 +415,12 @@ export async function buildStandardProposalPage({
   // ---- Blocos de conteúdo extra (imagens e tabelas coladas pelo usuário) ----
   if (contentBlocks.length > 0) y -= 24  // respiro antes do conteúdo extra
   for (const block of contentBlocks) {
+    // Texto de introdução antes do block
+    if ((block as any).introduction?.trim()) {
+      newPageIfNeeded(20)
+      text((block as any).introduction, margin, y, { size: 9, bold: false, color: [0.2, 0.22, 0.3] })
+      y -= 14
+    }
     if (block.block_type === 'image' && block.imageBytes) {
       try {
         const image = block.imageIsPng ? await doc.embedPng(block.imageBytes) : await doc.embedJpg(block.imageBytes)

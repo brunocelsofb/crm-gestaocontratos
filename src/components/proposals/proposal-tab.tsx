@@ -37,11 +37,16 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
 export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserRole, currentUserName, proposals, catalogItems }: Props) {
   const [open, setOpen] = useState(false)
   const [isNewProposal, setIsNewProposal] = useState(false)
+  const [sessionKey, setSessionKey] = useState(0)
 
   const hasProposal = !!proposalStatus
 
   function openExisting() { setIsNewProposal(false); setOpen(true) }
-  function openNew() { setIsNewProposal(true); setOpen(true) }
+  function openNew() {
+    setIsNewProposal(true)
+    setSessionKey(k => k + 1)  // força remount completo do workflow
+    setOpen(true)
+  }
   function backToList() { setOpen(false); setIsNewProposal(false) }
 
   return (
@@ -151,6 +156,7 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ProposalWorkflow
+            key={`workflow-${sessionKey}`}
             contractId={contractId}
             initialData={isNewProposal ? null : proposalStatus}
             priceUrl={priceUrl}
