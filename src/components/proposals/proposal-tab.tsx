@@ -42,10 +42,15 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
   const hasProposal = !!proposalStatus
 
   function openExisting() { setIsNewProposal(false); setOpen(true) }
-  function openNew() {
-    setIsNewProposal(true)
-    setSessionKey(k => k + 1)  // força remount completo do workflow
-    setOpen(true)
+  async function openNew() {
+    // Reseta o workflow no banco para rascunho em branco
+    await fetch('/api/proposals/new-workflow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract_id: contractId }),
+    })
+    // Recarrega a página para buscar o estado resetado do servidor
+    window.location.reload()
   }
   function backToList() { setOpen(false); setIsNewProposal(false) }
 
