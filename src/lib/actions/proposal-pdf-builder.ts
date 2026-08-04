@@ -355,8 +355,8 @@ export async function buildStandardProposalPage({
       Math.min(catLines.length, 2),
       Math.min(itemLines.length, 2)
     )
-    const rowH = padTop + usedLines * lineGap + 8  // 8pt padding bottom
-    y -= rowH
+    const lineRowH = padTop + usedLines * lineGap + 8  // 8pt padding bottom
+    y -= lineRowH
 
     // Características com wrap correto — abaixo do título, com espaço
     if (it.characteristics) {
