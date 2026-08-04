@@ -21,8 +21,7 @@ import { ContractCustomFieldsSection } from '@/components/custom-fields/contract
 import { ContractContactsSection } from '@/components/contracts/contract-contacts-section'
 import { ContractZapSignSection } from '@/components/zapsign/contract-zapsign-section'
 import { PortfolioFieldsForm } from '@/components/carteira/portfolio-fields-form'
-import { ProposalWorkflow } from '@/components/proposals/proposal-workflow'
-import { ProposalTextsEditor } from '@/components/proposals/proposal-texts-editor'
+import { ProposalTab } from '@/components/proposals/proposal-tab'
 import { getContractContacts } from '@/lib/actions/contract-contacts'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { getConnectedEmailAccount } from '@/lib/actions/email'
@@ -559,28 +558,15 @@ export default async function ContractDetailPage({
               })
               const priceUrl = `https://orbis-price.vercel.app/?${priceParams.toString()}`
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <ProposalWorkflow
-                    contractId={contract.id}
-                    initialData={proposalStatus as any}
-                    priceUrl={priceUrl}
-                    currentUserRole={currentProfile?.role ?? 'member'}
-                    currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
-                  />
-                  <ProposalTextsEditor
-                    contractId={contract.id}
-                    initialData={proposalStatus as any}
-                  />
-                  {proposalStatus?.status === 'aprovado_comercial' && (
-                    <div id="montagem-proposta">
-                      <ProposalsSection
-                        contractId={contract.id}
-                        proposals={proposals ?? []}
-                        catalogItems={catalogItems ?? []}
-                      />
-                    </div>
-                  )}
-                </div>
+                <ProposalTab
+                  contractId={contract.id}
+                  proposalStatus={proposalStatus as any}
+                  priceUrl={priceUrl}
+                  currentUserRole={currentProfile?.role ?? 'member'}
+                  currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
+                  proposals={proposals ?? []}
+                  catalogItems={catalogItems ?? []}
+                />
               )
             })(),
           },
