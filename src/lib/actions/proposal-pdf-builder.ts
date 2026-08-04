@@ -256,13 +256,13 @@ export async function buildStandardProposalPage({
   page.drawLine({ start: { x: margin, y: y }, end: { x: pageWidth - margin, y: y }, thickness: 0.5, color: rgb(...brandRgb) })
   y -= 14
 
-  // Proporções: Qtd 5% | Cat 18% | Item 34% | Tipo 11% | Unit 12% | Desc 8% | Sub 12%
+  // Proporções: Qtd 5% | Cat 16% | Item 35% | Tipo 12% | Unit 12% | Desc 8% | Sub 12%
   const tableW = pageWidth - margin * 2
   const tw = tableW
   const colQty  = { x: margin,                  w: Math.floor(tw * 0.05) }
-  const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.18) }
-  const colItem = { x: margin + tw * 0.23,      w: Math.floor(tw * 0.34) }
-  const colType = { x: margin + tw * 0.57,      w: Math.floor(tw * 0.11) }
+  const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.16) }
+  const colItem = { x: margin + tw * 0.21,      w: Math.floor(tw * 0.35) }
+  const colType = { x: margin + tw * 0.56,      w: Math.floor(tw * 0.12) }
   const colUnit = { x: margin + tw * 0.68,      w: Math.floor(tw * 0.12) }
   const colDisc = { x: margin + tw * 0.80,      w: Math.floor(tw * 0.08) }
   const colSub  = { x: margin + tw * 0.88,      w: Math.floor(tw * 0.12) }
@@ -327,46 +327,47 @@ export async function buildStandardProposalPage({
     // Dados da linha — wrapWords garante quebra por palavra inteira
     const sz = 7.5
     const szBold = 8
+    const padTop = 6   // padding top de cada linha
+    const lineGap = 12 // espaço entre linha de título e descrição
 
-    text(String(it.quantity), col.qty.x + 2, y, { size: sz })
+    text(String(it.quantity), col.qty.x + 2, y - padTop, { size: sz })
 
-    // Categoria
+    // Categoria — até 2 linhas com padding top
     const catLines = wrapWords(it.category ?? '—', col.cat.w - 4, sz)
     catLines.slice(0, 2).forEach((l, i) =>
-      text(l, col.cat.x + 2, y - i * 10, { size: sz, color: [0.35, 0.38, 0.48] })
+      text(l, col.cat.x + 2, y - padTop - i * lineGap, { size: sz, color: [0.35, 0.38, 0.48] })
     )
 
-    // Item — linha mais larga, até 2 linhas
+    // Item: título em negrito + descrição em cinza abaixo
     const itemLines = wrapWords(it.item, col.item.w - 4, szBold, true)
     itemLines.slice(0, 2).forEach((l, i) =>
-      text(l, col.item.x + 2, y - i * 10, { size: szBold, bold: true })
+      text(l, col.item.x + 2, y - padTop - i * lineGap, { size: szBold, bold: true })
     )
 
-    // Tipo, valores — só primeira linha, alinhados no topo
-    text((it.type ?? '—').slice(0, 6), col.type.x + 2, y, { size: sz })
-    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 2, y, { size: sz })
-    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 2, y, { size: sz, color: [0.5, 0.5, 0.5] })
-    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 2, y, { size: sz, bold: true })
+    // Tipo, valores alinhados ao topo + padding
+    text((it.type ?? '—').slice(0, 8), col.type.x + 2, y - padTop, { size: sz })
+    text(fmtCurrency(it.unit_value, proposal.currency), col.unit.x + 2, y - padTop, { size: sz })
+    text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 2, y - padTop, { size: sz, color: [0.5, 0.5, 0.5] })
+    text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 2, y - padTop, { size: sz, bold: true })
 
-    // Avança Y pela altura máxima usada (cat ou item, max 2 linhas) + padding
+    // Calcula altura da linha: max linhas usadas + padding top + padding bottom
     const usedLines = Math.max(
       Math.min(catLines.length, 2),
       Math.min(itemLines.length, 2)
     )
-    y -= usedLines > 1 ? 28 : 18  // padding generoso: 28pt para 2 linhas, 18pt para 1
+    const rowH = padTop + usedLines * lineGap + 8  // 8pt padding bottom
+    y -= rowH
 
-    // Características com wrap correto e espaçamento
+    // Características com wrap correto — abaixo do título, com espaço
     if (it.characteristics) {
-      y -= 4  // respiro entre item e características
       const charLines = wrapWords(it.characteristics, col.item.w + col.type.w - 4, 7)
-      charLines.slice(0, 3).forEach(l => {
-        text(`  ${l}`, col.item.x + 2, y, { size: 7, color: [0.45, 0.48, 0.55] })
-        y -= 10
+      charLines.slice(0, 3).forEach((l, i) => {
+        text(l, col.item.x + 2, y + 4 - i * 10, { size: 7, color: [0.42, 0.45, 0.52] })
       })
+      y -= Math.min(charLines.length, 3) * 10 + 4
     }
     if (it.delivery_forecast) {
-      y -= 2
-      text(`  Previsão: ${it.delivery_forecast}`, col.item.x + 2, y, { size: 7, color: [0.45, 0.45, 0.45] })
+      text(`Previsão: ${it.delivery_forecast}`, col.item.x + 2, y, { size: 7, color: [0.45, 0.45, 0.45] })
       y -= 10
     }
 
