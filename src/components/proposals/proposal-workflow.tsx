@@ -45,7 +45,7 @@ const STEPS = [
   { key: 'em_aprovacao_tecnica',   label: 'Análise Técnica',short: '2' },
   { key: 'aprovado_tecnico',       label: 'OK Técnico',     short: '3' },
   { key: 'em_aprovacao_comercial', label: 'Aprov. Comercial',short: '4' },
-  { key: 'aprovado_comercial',     label: 'Aprovado',       short: '5' },
+  { key: 'aprovado_comercial',     label: 'Ag. Cliente',    short: '5' },
 ]
 const STEP_ORDER = STEPS.map(s => s.key)
 

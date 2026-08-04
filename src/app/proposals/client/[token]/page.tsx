@@ -7,7 +7,7 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
 
   const { data: proposal } = await admin
     .from('proposal_status')
-    .select('*, contracts(id, client_name, title, process_number)')
+    .select('*')
     .eq('client_review_token', token)
     .maybeSingle()
 
@@ -22,8 +22,15 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
     )
   }
 
-  const contract = (proposal as any).contracts
+  // Busca contrato separadamente — funciona com pipeline_run ou contract
   const contractId = (proposal as any).contract_id
+  const { data: contractData } = await admin
+    .from('contracts')
+    .select('id, client_name, title, process_number')
+    .eq('id', contractId)
+    .maybeSingle()
+
+  const clientName = contractData?.client_name ?? 'Cliente'
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f7f7', fontFamily: 'system-ui,-apple-system,sans-serif' }}>
@@ -34,7 +41,7 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
         </div>
         <div>
           <p style={{ fontSize: 14, fontWeight: 600, color: '#fff', margin: 0 }}>Proposta Comercial</p>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0 }}>{contract?.client_name}</p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0 }}>{clientName}</p>
         </div>
       </div>
 
