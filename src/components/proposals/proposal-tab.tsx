@@ -213,11 +213,11 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
       ) : (
         <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
           <div style={{
-            display: 'grid', gridTemplateColumns: '80px 2fr 1fr 1fr 1fr 80px',
+            display: 'grid', gridTemplateColumns: '140px 2fr 1fr 1fr 1fr 80px 60px',
             padding: '10px 20px', background: '#f8f9fb',
             borderBottom: '0.5px solid #e8edf5'
           }}>
-            {['Versão', 'Status', 'Data', 'Valor', 'Validade', ''].map((h, i) => (
+            {['Código', 'Status', 'Data', 'Valor', 'Validade', '', ''].map((h, i) => (
               <span key={i} style={{ fontSize: 10, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{h}</span>
             ))}
           </div>
@@ -227,12 +227,12 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             const s = STATUS_LABEL[wStatus] ?? STATUS_LABEL['rascunho']
             return (
               <div key={p.id} style={{
-                display: 'grid', gridTemplateColumns: '80px 2fr 1fr 1fr 1fr 80px',
+                display: 'grid', gridTemplateColumns: '140px 2fr 1fr 1fr 1fr 80px 60px',
                 padding: '14px 20px',
                 borderBottom: '0.5px solid #f1f3f8',
               }}>
-                <span style={{ fontSize: 12, color: '#8892a4', display: 'flex', alignItems: 'center' }}>
-                  v{p.version}
+                <span style={{ fontSize: 11, color: '#1a1f36', fontWeight: 600, display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>
+                  {p.control_code}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
@@ -255,6 +255,19 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
                 }}>
                   ✏️ Editar
                 </button>
+                {currentUserRole === 'admin' && (
+                  <button onClick={async () => {
+                    if (!confirm(`Excluir ${p.control_code}? Esta ação não pode ser desfeita.`)) return
+                    await fetch(`/api/proposals/${p.id}/delete`, { method: 'POST' })
+                    router.refresh()
+                  }} style={{
+                    padding: '5px 8px', fontSize: 11,
+                    borderRadius: 6, border: '0.5px solid #fca5a5',
+                    background: '#fff', color: '#b91c1c', cursor: 'pointer'
+                  }} title="Excluir proposta">
+                    🗑️
+                  </button>
+                )}
               </div>
             )
           })}

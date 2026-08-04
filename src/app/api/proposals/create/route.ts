@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const pfx = orgSettings?.proposal_number_prefix ?? 'PROP'
   const year = new Date().getFullYear()
 
-  // Total de propostas para código único
+  // Total GLOBAL incluindo excluídas — garante numeração contínua (nunca reutiliza)
   const { count: totalCount } = await admin.from('proposals')
     .select('id', { count: 'exact', head: true })
   const code = `${pfx}-${year}-${String((totalCount ?? 0) + 1).padStart(4, '0')}`
