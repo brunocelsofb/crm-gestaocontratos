@@ -35,7 +35,17 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
 }
 
 export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserRole, currentUserName, proposals, catalogItems }: Props) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(() => {
+    // Abre workflow automaticamente após criação de nova proposta
+    if (typeof window !== 'undefined') {
+      const key = `proposal_open_${contractId}`
+      if (sessionStorage.getItem(key)) {
+        sessionStorage.removeItem(key)
+        return true
+      }
+    }
+    return false
+  })
   const [isNewProposal, setIsNewProposal] = useState(false)
   const [sessionKey, setSessionKey] = useState(0)
 
@@ -43,13 +53,13 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
 
   function openExisting() { setIsNewProposal(false); setOpen(true) }
   async function openNew() {
-    // Reseta o workflow no banco para rascunho em branco
     await fetch('/api/proposals/new-workflow', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contract_id: contractId }),
     })
-    // Recarrega a página para buscar o estado resetado do servidor
+    // Marca para abrir workflow após reload
+    sessionStorage.setItem(`proposal_open_${contractId}`, '1')
     window.location.reload()
   }
   function backToList() { setOpen(false); setIsNewProposal(false) }

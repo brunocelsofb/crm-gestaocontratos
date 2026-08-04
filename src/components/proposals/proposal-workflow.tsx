@@ -649,7 +649,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
                 e.preventDefault()
                 document.getElementById('montagem-proposta')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }}
-              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1a1f36', color: '#fff', cursor: 'pointer' }}>
+              style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1B556B', color: '#fff', cursor: 'pointer' }}>
               📄 Montar Proposta ↓
             </button>
             <button
