@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from 'react'
 
-export function ProposalTextsEditor({ contractId, initialData }: {
+export function ProposalTextsEditor({ contractId, proposalId, initialData }: {
   contractId: string
+  proposalId?: string
   initialData: {
     texto_objetivos?: string | null
     texto_atividades?: string | null
@@ -24,6 +25,7 @@ export function ProposalTextsEditor({ contractId, initialData }: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contract_id: contractId,
+        proposal_id: proposalId,
         texto_objetivos: objetivos,
         texto_atividades: atividades,
         texto_estrutura_apoio: estrutura,

@@ -90,7 +90,7 @@ export default async function ContractDetailPage({
     supabase.from('dimensioning_reviews').select('id, file_storage_path, file_name, sent_at, status, reviewed_at, review_notes').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, department'),
     supabase.from('billing_records').select('id, year, month, amount, file_storage_path, file_name, notes, confirmed_at').eq('contract_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
-    supabase.from('proposals').select('id, control_code, status, version, created_at').eq('contract_id', id).order('created_at', { ascending: false }),
+    supabase.from('proposals').select('id, control_code, version, status, workflow_status, proposal_value, proposal_validity_days, created_at, updated_at, technical_snapshot, review_token, submitted_at, submitted_by_name, technical_approved_at, technical_approved_by_name, technical_approved_by_role, technical_comment, technical_restrictions, commercial_approved_at, commercial_approved_by_name, commercial_approved_by_role, client_status, client_approved_at, client_approved_by_name, client_review_token, texto_objetivos, texto_atividades, texto_estrutura_apoio').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('proposal_catalog_items').select('id, name, category, type, characteristics, unit_value').order('name'),
   ])
 
@@ -560,11 +560,10 @@ export default async function ContractDetailPage({
               return (
                 <ProposalTab
                   contractId={contract.id}
-                  proposalStatus={proposalStatus as any}
+                  proposals={proposals ?? []}
                   priceUrl={priceUrl}
                   currentUserRole={currentProfile?.role ?? 'member'}
                   currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
-                  proposals={proposals ?? []}
                   catalogItems={catalogItems ?? []}
                 />
               )

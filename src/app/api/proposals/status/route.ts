@@ -81,10 +81,22 @@ export async function POST(req: Request) {
     patch.commercial_approved_by_name = null
   }
 
-  await supabase.from('proposal_status').upsert(
-    { contract_id, ...patch },
-    { onConflict: 'contract_id' }
-  )
+  // Salva no proposals (novo modelo 1:N) se vier proposal_id
+  if (proposal_id) {
+    const proposalPatch: Record<string, unknown> = { workflow_status: status, updated_at: now }
+    // Copia campos relevantes do patch para proposals
+    const fieldsToCopy = ['proposal_value','submitted_at','submitted_by_name','technical_approved_at','technical_approved_by_name','technical_approved_by_role','technical_comment','technical_restrictions','commercial_approved_at','commercial_approved_by_name','commercial_approved_by_role','commercial_comment','client_status','client_approved_at','client_approved_by_name','client_approved_by_cpf','review_token']
+    for (const f of fieldsToCopy) {
+      if (patch[f] !== undefined) proposalPatch[f] = patch[f]
+    }
+    await supabase.from('proposals').update(proposalPatch).eq('id', proposal_id)
+  } else {
+    // Fallback: mantém proposal_status para propostas antigas
+    await supabase.from('proposal_status').upsert(
+      { contract_id, ...patch },
+      { onConflict: 'contract_id' }
+    )
+  }
 
   if (proposal_value) {
     await supabase.from('pipeline_runs')

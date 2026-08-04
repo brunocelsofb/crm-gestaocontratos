@@ -7,17 +7,28 @@ export async function POST(req: Request) {
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { contract_id, texto_objetivos, texto_atividades, texto_estrutura_apoio } = await req.json()
-  if (!contract_id) return NextResponse.json({ error: 'contract_id obrigatório' }, { status: 400 })
+  const { contract_id, proposal_id, texto_objetivos, texto_atividades, texto_estrutura_apoio } = await req.json()
 
   const admin = createAdminClient()
-  await admin.from('proposal_status').upsert({
-    contract_id,
-    texto_objetivos,
-    texto_atividades,
-    texto_estrutura_apoio,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'contract_id' })
+
+  if (proposal_id) {
+    // Novo modelo: salva direto em proposals
+    await admin.from('proposals').update({
+      texto_objetivos,
+      texto_atividades,
+      texto_estrutura_apoio,
+      updated_at: new Date().toISOString(),
+    }).eq('id', proposal_id)
+  } else if (contract_id) {
+    // Fallback legado: proposal_status
+    await admin.from('proposal_status').upsert({
+      contract_id,
+      texto_objetivos,
+      texto_atividades,
+      texto_estrutura_apoio,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'contract_id' })
+  }
 
   return NextResponse.json({ ok: true })
 }

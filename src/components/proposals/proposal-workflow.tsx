@@ -68,11 +68,11 @@ function fmtDt(d: string | null | undefined) {
   })
 }
 
-async function postStatus(contractId: string, status: ProposalStatus, actorName?: string, comment?: string, actorRole?: string) {
+async function postStatus(contractId: string, status: ProposalStatus, actorName?: string, comment?: string, actorRole?: string, proposalId?: string) {
   const res = await fetch('/api/proposals/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contract_id: contractId, status, actor_name: actorName, comment, actor_role: actorRole }),
+    body: JSON.stringify({ contract_id: contractId, status, actor_name: actorName, comment, actor_role: actorRole, proposal_id: proposalId }),
   })
   return res.ok
 }
@@ -267,8 +267,9 @@ function SnapshotViewer({ snapshot: s }: { snapshot: any }) {
 }
 
 // ── Componente principal ────────────────────────────────────────────────────
-export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUserRole, currentUserName }: {
+export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl, currentUserRole, currentUserName }: {
   contractId: string
+  proposalId?: string
   initialData: ProposalData | null
   priceUrl: string
   currentUserRole: string
@@ -292,7 +293,7 @@ export function ProposalWorkflow({ contractId, initialData, priceUrl, currentUse
   async function doAction(nextStatus: ProposalStatus, comment?: string) {
     setError(null)
     startTransition(async () => {
-      const ok = await postStatus(contractId, nextStatus, currentUserName, comment, currentUserRole)
+      const ok = await postStatus(contractId, nextStatus, currentUserName, comment, currentUserRole, proposalId)
       if (!ok) { setError('Erro ao atualizar. Tente novamente.'); return }
       setData(prev => ({
         ...prev,
