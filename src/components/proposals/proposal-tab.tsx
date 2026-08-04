@@ -36,9 +36,13 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
 
 export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserRole, currentUserName, proposals, catalogItems }: Props) {
   const [open, setOpen] = useState(false)
+  const [isNewProposal, setIsNewProposal] = useState(false)
 
-  // Se já existe proposta no fluxo, mostra na lista
   const hasProposal = !!proposalStatus
+
+  function openExisting() { setIsNewProposal(false); setOpen(true) }
+  function openNew() { setIsNewProposal(true); setOpen(true) }
+  function backToList() { setOpen(false); setIsNewProposal(false) }
 
   return (
     <div>
@@ -51,7 +55,7 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
           </p>
         </div>
         {open ? (
-          <button onClick={() => setOpen(false)} style={{
+          <button onClick={backToList} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '8px 14px', fontSize: 12, fontWeight: 500,
             borderRadius: 8, border: '0.5px solid #d1d8e8',
@@ -128,7 +132,7 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
                   {proposalStatus.proposal_validity_days ? `${proposalStatus.proposal_validity_days} dias` : '30 dias'}
                 </span>
                 <button
-                  onClick={() => setOpen(true)}
+                  onClick={openExisting}
                   style={{
                     padding: '5px 12px', fontSize: 11, fontWeight: 600,
                     borderRadius: 6, border: '0.5px solid #d1d8e8',
@@ -148,14 +152,14 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ProposalWorkflow
             contractId={contractId}
-            initialData={proposalStatus}
+            initialData={isNewProposal ? null : proposalStatus}
             priceUrl={priceUrl}
             currentUserRole={currentUserRole}
             currentUserName={currentUserName}
           />
           <ProposalTextsEditor
             contractId={contractId}
-            initialData={proposalStatus}
+            initialData={isNewProposal ? null : proposalStatus}
           />
           {/* ProposalsSection (montagem do PDF) visível mas SEM botão de nova proposta */}
           {proposalStatus?.status === 'aprovado_comercial' && (

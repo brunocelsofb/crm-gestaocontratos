@@ -7,6 +7,7 @@ import { ProposalApprovalPanel } from '@/components/proposals/proposal-approval-
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { NewVersionButton } from '@/components/proposals/new-version-button'
 import { ProposalContentBlocksEditor } from '@/components/proposals/proposal-content-blocks-editor'
+import { ProposalItemsEditor } from '@/components/proposals/proposal-items-editor'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Rascunho',
@@ -116,59 +117,20 @@ export default async function ProposalDetailPage({
         )}
       </div>
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-gray-900">Itens</h2>
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200 text-xs">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Item</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Qtd</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Vlr. Unit.</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Desconto</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-500">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items?.map((it) => (
-                <tr key={it.id}>
-                  <td className="px-3 py-2">{it.item}</td>
-                  <td className="px-3 py-2">{it.quantity}</td>
-                  <td className="px-3 py-2">{fmt(Number(it.unit_value), proposal.currency)}</td>
-                  <td className="px-3 py-2">{fmt(Number(it.discount), proposal.currency)}</td>
-                  <td className="px-3 py-2 font-medium">{fmt(Number(it.subtotal), proposal.currency)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-right text-sm font-semibold text-gray-900">Total: {fmt(total, proposal.currency)}</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white p-4 text-sm">
-        <div>
-          <p className="text-xs text-gray-500">Desconto</p>
-          <p className="font-medium text-gray-900">
-            {proposal.discount_type
-              ? proposal.discount_type === 'percentage'
-                ? `${proposal.discount_value}%`
-                : fmt(Number(proposal.discount_value), proposal.currency)
-              : 'Sem desconto'}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">Condição de pagamento</p>
-          <p className="font-medium text-gray-900">{proposal.payment_terms ?? '—'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">Parcelas</p>
-          <p className="font-medium text-gray-900">{proposal.installments}x</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">Tipo de receita</p>
-          <p className="font-medium text-gray-900">{proposal.is_recurring ? 'Recorrente (MRR)' : 'Receita única'}</p>
-        </div>
-      </div>
+      <ProposalItemsEditor
+        proposalId={proposal.id}
+        contractId={contractId}
+        initialItems={items ?? []}
+        initialConditions={{
+          discount_type: proposal.discount_type ?? null,
+          discount_value: Number(proposal.discount_value) ?? 0,
+          payment_terms: proposal.payment_terms ?? null,
+          installments: proposal.installments ?? 1,
+          is_recurring: proposal.is_recurring ?? false,
+          currency: proposal.currency ?? 'BRL',
+        }}
+        canEdit={canEditPages}
+      />
 
       <ProposalContentBlocksEditor
         proposalId={proposal.id}

@@ -6,6 +6,14 @@ import { setProposalPageOrder } from '@/lib/actions/proposals'
 type Template = { id: string; name: string }
 type PageEntry = { key: string; templateId: string | null; isStandardProposal: boolean }
 
+// Dicionário de templates por tipo de serviço
+// Os nomes devem corresponder aos nomes dos templates cadastrados em Configurações
+const SERVICE_TEMPLATES: Record<string, string[]> = {
+  clinica: ['Capa EC', 'Proposta Padrão', 'Anexo Metodologia EC', 'Anexo Equipe', 'Final EC'],
+  hospitalar: ['Capa EH', 'Proposta Padrão', 'Anexo Metodologia EH', 'Anexo Equipe', 'Anexo Leitos', 'Final EH'],
+  avulso: ['Proposta Padrão'],
+}
+
 export function ProposalPageOrderEditor({
   proposalId,
   contractId,
@@ -24,6 +32,23 @@ export function ProposalPageOrderEditor({
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function applyServiceTemplate(service: string) {
+    if (service === '') return
+    const names = SERVICE_TEMPLATES[service] ?? []
+    const newPages: PageEntry[] = names.map(name => {
+      if (name === 'Proposta Padrão') {
+        return { key: crypto.randomUUID(), templateId: null, isStandardProposal: true }
+      }
+      const found = templates.find(t => t.name.toLowerCase().includes(name.toLowerCase().split(' ')[1] ?? name.toLowerCase()))
+      return { key: crypto.randomUUID(), templateId: found?.id ?? templates[0]?.id ?? null, isStandardProposal: false }
+    })
+    // Garante que sempre tem pelo menos a proposta padrão
+    if (!newPages.some(p => p.isStandardProposal)) {
+      newPages.splice(1, 0, { key: crypto.randomUUID(), templateId: null, isStandardProposal: true })
+    }
+    setPages(newPages)
+  }
 
   function addPage() {
     setPages((prev) => [...prev, { key: crypto.randomUUID(), templateId: templates[0]?.id ?? null, isStandardProposal: false }])
@@ -73,7 +98,24 @@ export function ProposalPageOrderEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Template de serviço */}
+      <div className="flex items-center gap-3 rounded-lg border border-dashed border-brand-300 bg-brand-50 px-4 py-3">
+        <div className="flex-1">
+          <p className="text-xs font-semibold text-brand-700 mb-1">Template de Serviço</p>
+          <p className="text-xs text-brand-500">Selecione para auto-preencher as páginas padrão do serviço.</p>
+        </div>
+        <select
+          onChange={e => applyServiceTemplate(e.target.value)}
+          defaultValue=""
+          className="rounded-md border border-brand-300 px-2 py-1.5 text-xs font-medium text-brand-700 bg-white focus:outline-none">
+          <option value="">Selecionar template...</option>
+          <option value="clinica">Engenharia Clínica</option>
+          <option value="hospitalar">Engenharia Hospitalar</option>
+          <option value="avulso">Avulso</option>
+        </select>
+      </div>
+      <div className="space-y-2">
       {pages.map((p, i) => (
         <div key={p.key} className="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-2">
           <span className="w-5 text-xs text-gray-400">{i + 1}.</span>
@@ -98,6 +140,7 @@ export function ProposalPageOrderEditor({
         <button onClick={handleSave} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
           {busy ? 'Salvando...' : 'Salvar montagem'}
         </button>
+      </div>
       </div>
     </div>
   )
