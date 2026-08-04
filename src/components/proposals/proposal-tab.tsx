@@ -168,7 +168,7 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
         </>
       )}
 
-      {/* Workflow completo (ao clicar em criar/abrir) */}
+      {/* Workflow completo (ao clicar em abrir proposta) */}
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ProposalWorkflow
@@ -182,12 +182,14 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
             contractId={contractId}
             initialData={proposalStatus}
           />
+          {/* ProposalsSection (montagem do PDF) visível mas SEM botão de nova proposta */}
           {proposalStatus?.status === 'aprovado_comercial' && (
             <div id="montagem-proposta">
               <ProposalsSection
                 contractId={contractId}
                 proposals={proposals}
                 catalogItems={catalogItems}
+                hideCreate={true}
               />
             </div>
           )}

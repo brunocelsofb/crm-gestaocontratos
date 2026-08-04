@@ -31,10 +31,12 @@ export function ProposalsSection({
   contractId,
   proposals,
   catalogItems,
+  hideCreate = false,
 }: {
   contractId: string
   proposals: Proposal[]
   catalogItems: CatalogItem[]
+  hideCreate?: boolean
 }) {
   const [creating, setCreating] = useState(false)
 
@@ -42,7 +44,7 @@ export function ProposalsSection({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-gray-900">Propostas Comerciais</h2>
-        {!creating && (
+        {!creating && !hideCreate && (
           <button onClick={() => setCreating(true)} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800">
             + Nova Proposta
           </button>
