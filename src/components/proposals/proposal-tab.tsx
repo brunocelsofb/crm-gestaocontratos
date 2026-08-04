@@ -50,7 +50,10 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
             {hasProposal ? '1 proposta nesta oportunidade' : 'Nenhuma proposta criada ainda'}
           </p>
         </div>
-        {!open && (
+        {!open && hasProposal && (
+          <span style={{ fontSize: 12, color: '#8892a4' }}>Clique na linha para abrir</span>
+        )}
+        {!open && !hasProposal && (
           <button
             onClick={() => setOpen(true)}
             style={{
@@ -59,7 +62,7 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
               borderRadius: 8, border: 'none',
               background: '#1a1f36', color: '#fff', cursor: 'pointer'
             }}>
-            {hasProposal ? '📄 Abrir Proposta' : '+ Criar Proposta'}
+            + Criar Proposta
           </button>
         )}
         {open && (

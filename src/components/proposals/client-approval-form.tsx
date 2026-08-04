@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { isValidCPF, formatCPF } from '@/lib/utils/cpf'
 
 export function ClientApprovalForm({ token, contractId, currentStatus }: {
   token: string
@@ -18,15 +19,21 @@ export function ClientApprovalForm({ token, contractId, currentStatus }: {
 
   const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8, border: '0.5px solid #d1d8e8', outline: 'none', color: '#1a1f36', background: '#fff', boxSizing: 'border-box' as const, fontFamily: 'inherit' }
 
+  const cpfValido = isValidCPF(cpf)
+  const cpfDigitado = cpf.replace(/\D/g, '').length === 11
+
   async function handleSubmit(d: 'aprovado' | 'declinado') {
     if (!name.trim()) { setError('Informe seu nome completo.'); return }
+    if (!cpf.trim()) { setError('CPF é obrigatório para registrar a decisão.'); return }
+    if (!cpfValido) { setError('CPF inválido. Verifique o número informado.'); return }
     setLoading(true); setError('')
     const res = await fetch('/api/proposals/client-review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, contract_id: contractId, status: d, name: name.trim(), role: role.trim(), cpf: cpf.trim(), comment: comment.trim() }),
+      body: JSON.stringify({ token, contract_id: contractId, status: d, name: name.trim(), role: role.trim(), cpf: cpf.replace(/\D/g, ''), comment: comment.trim() }),
     })
-    if (!res.ok) { setError('Erro ao registrar. Tente novamente.'); setLoading(false); return }
+    const json = await res.json()
+    if (!res.ok) { setError(json.error ?? 'Erro ao registrar. Tente novamente.'); setLoading(false); return }
     setDecision(d)
     setDone(true)
     setLoading(false)
@@ -66,8 +73,22 @@ export function ClientApprovalForm({ token, contractId, currentStatus }: {
           </div>
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#8892a4', marginBottom: 4 }}>CPF (opcional)</label>
-          <input value={cpf} onChange={e => setCpf(e.target.value)} style={inp} placeholder="000.000.000-00" maxLength={14} />
+          <label style={{ display: 'block', fontSize: 11, color: '#8892a4', marginBottom: 4 }}>
+            CPF <span style={{ color: '#b91c1c' }}>*</span>
+          </label>
+          <input
+            value={cpf}
+            onChange={e => setCpf(formatCPF(e.target.value))}
+            style={{ ...inp, borderColor: cpfDigitado ? (cpfValido ? '#22c55e' : '#b91c1c') : '#d1d8e8' }}
+            placeholder="000.000.000-00"
+            maxLength={14}
+          />
+          {cpfDigitado && !cpfValido && (
+            <p style={{ fontSize: 11, color: '#b91c1c', margin: '4px 0 0' }}>CPF inválido. Verifique o número.</p>
+          )}
+          {cpfDigitado && cpfValido && (
+            <p style={{ fontSize: 11, color: '#1a7c3e', margin: '4px 0 0' }}>✓ CPF válido</p>
+          )}
         </div>
         <div>
           <label style={{ display: 'block', fontSize: 11, color: '#8892a4', marginBottom: 4 }}>Comentário (opcional)</label>
@@ -79,11 +100,11 @@ export function ClientApprovalForm({ token, contractId, currentStatus }: {
       {error && <p style={{ fontSize: 12, color: '#b91c1c', marginBottom: 12 }}>{error}</p>}
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => handleSubmit('aprovado')} disabled={loading}
+        <button onClick={() => handleSubmit('aprovado')} disabled={loading || !cpfValido || !name.trim()}
           style={{ flex: 1, padding: '14px', fontSize: 14, fontWeight: 600, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', cursor: 'pointer', opacity: loading ? 0.6 : 1 }}>
           🤝 Aceitar proposta
         </button>
-        <button onClick={() => handleSubmit('declinado')} disabled={loading}
+        <button onClick={() => handleSubmit('declinado')} disabled={loading || !cpfValido || !name.trim()}
           style={{ flex: 1, padding: '14px', fontSize: 14, fontWeight: 600, borderRadius: 10, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer', opacity: loading ? 0.6 : 1 }}>
           ❌ Declinar
         </button>
