@@ -450,7 +450,7 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
           {data.proposal_value && (isAdmin || isComm || isTech) && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'linear-gradient(135deg,#0f1b2d,#1b3050)', borderRadius: 10,
+              background: 'linear-gradient(135deg,#1B556B,#1e6a82)', borderRadius: 10,
               padding: '14px 18px', marginTop: 12,
             }}>
               <div>
