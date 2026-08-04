@@ -50,31 +50,23 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
             {hasProposal ? '1 proposta nesta oportunidade' : 'Nenhuma proposta criada ainda'}
           </p>
         </div>
-        {!open && hasProposal && (
-          <span style={{ fontSize: 12, color: '#8892a4' }}>Clique na linha para abrir</span>
-        )}
-        {!open && !hasProposal && (
-          <button
-            onClick={() => setOpen(true)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 18px', fontSize: 13, fontWeight: 600,
-              borderRadius: 8, border: 'none',
-              background: '#1a1f36', color: '#fff', cursor: 'pointer'
-            }}>
-            + Criar Proposta
-          </button>
-        )}
-        {open && (
-          <button
-            onClick={() => setOpen(false)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 12, fontWeight: 500,
-              borderRadius: 8, border: '0.5px solid #d1d8e8',
-              background: '#fff', color: '#52514e', cursor: 'pointer'
-            }}>
+        {open ? (
+          <button onClick={() => setOpen(false)} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', fontSize: 12, fontWeight: 500,
+            borderRadius: 8, border: '0.5px solid #d1d8e8',
+            background: '#fff', color: '#52514e', cursor: 'pointer'
+          }}>
             ← Voltar para lista
+          </button>
+        ) : (
+          <button onClick={() => setOpen(true)} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 18px', fontSize: 13, fontWeight: 600,
+            borderRadius: 8, border: 'none',
+            background: 'linear-gradient(135deg,#1b556b,#2a8a7a)', color: '#fff', cursor: 'pointer'
+          }}>
+            + Nova Proposta
           </button>
         )}
       </div>
@@ -83,7 +75,6 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
       {!open && (
         <>
           {!hasProposal ? (
-            // Empty state
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               padding: '64px 24px', background: '#fff', borderRadius: 12,
@@ -94,22 +85,19 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
               <p style={{ fontSize: 12, color: '#8892a4', margin: '0 0 20px', maxWidth: 320 }}>
                 Crie uma proposta para iniciar o fluxo de aprovação técnica e comercial.
               </p>
-              <button
-                onClick={() => setOpen(true)}
-                style={{
-                  padding: '10px 24px', fontSize: 13, fontWeight: 600,
-                  borderRadius: 8, border: 'none',
-                  background: 'linear-gradient(135deg,#1b556b,#2a8a7a)', color: '#fff', cursor: 'pointer'
-                }}>
-                + Criar Proposta
+              <button onClick={() => setOpen(true)} style={{
+                padding: '10px 24px', fontSize: 13, fontWeight: 600,
+                borderRadius: 8, border: 'none',
+                background: 'linear-gradient(135deg,#1b556b,#2a8a7a)', color: '#fff', cursor: 'pointer'
+              }}>
+                + Nova Proposta
               </button>
             </div>
           ) : (
-            // Tabela com a proposta existente
             <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
               {/* Header da tabela */}
               <div style={{
-                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
+                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 80px',
                 padding: '10px 20px', background: '#f8f9fb',
                 borderBottom: '0.5px solid #e8edf5'
               }}>
@@ -119,49 +107,36 @@ export function ProposalTab({ contractId, proposalStatus, priceUrl, currentUserR
               </div>
 
               {/* Linha da proposta */}
-              <div
-                onClick={() => setOpen(true)}
-                style={{
-                  display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
-                  padding: '14px 20px', cursor: 'pointer',
-                  borderBottom: '0.5px solid #f1f3f8',
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fb')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
-              >
-                {/* Status */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 80px',
+                padding: '14px 20px',
+                borderBottom: '0.5px solid #f1f3f8',
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {(() => {
                     const s = STATUS_LABEL[proposalStatus.status] ?? STATUS_LABEL['rascunho']
-                    return (
-                      <span style={{
-                        padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                        background: s.bg, color: s.color
-                      }}>{s.label}</span>
-                    )
+                    return <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>{s.label}</span>
                   })()}
                 </div>
-
-                {/* Data */}
                 <span style={{ fontSize: 12, color: '#52514e', display: 'flex', alignItems: 'center' }}>
                   {proposalStatus.updated_at ? fmtDate(proposalStatus.updated_at) : '—'}
                 </span>
-
-                {/* Valor */}
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#1a7c3e', display: 'flex', alignItems: 'center' }}>
                   {proposalStatus.proposal_value ? fmt(proposalStatus.proposal_value) + '/mês' : '—'}
                 </span>
-
-                {/* Validade */}
                 <span style={{ fontSize: 12, color: '#52514e', display: 'flex', alignItems: 'center' }}>
                   {proposalStatus.proposal_validity_days ? `${proposalStatus.proposal_validity_days} dias` : '30 dias'}
                 </span>
-
-                {/* Ação */}
-                <span style={{ fontSize: 12, color: '#1b556b', fontWeight: 500, display: 'flex', alignItems: 'center' }}>
-                  Abrir →
-                </span>
+                <button
+                  onClick={() => setOpen(true)}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 600,
+                    borderRadius: 6, border: '0.5px solid #d1d8e8',
+                    background: '#fff', color: '#1b556b', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4
+                  }}>
+                  ✏️ Editar
+                </button>
               </div>
             </div>
           )}

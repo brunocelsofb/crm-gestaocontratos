@@ -177,16 +177,7 @@ export default async function ProposalDetailPage({
         canEdit={canEditPages}
       />
 
-      <ProposalApprovalPanel
-        proposalId={proposal.id}
-        contractId={contractId}
-        status={proposal.status}
-        technicalUsers={technicalUsers}
-        commercialUsers={commercialUsers}
-        assignedTechnicalName={proposal.assigned_technical_approver_id ? profileById.get(proposal.assigned_technical_approver_id) ?? null : null}
-        assignedCommercialName={proposal.assigned_commercial_approver_id ? profileById.get(proposal.assigned_commercial_approver_id) ?? null : null}
-      />
-
+      {/* Histórico de decisões do sistema legado — mantido para auditoria */}
       {approvals && approvals.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-sm font-medium text-gray-900">Histórico de decisões (lastro)</h2>

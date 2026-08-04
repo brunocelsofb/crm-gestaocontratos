@@ -80,7 +80,7 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
 
   const { data: rawContentBlocks } = await supabase
     .from('proposal_content_blocks')
-    .select('block_type, image_storage_path, table_data')
+    .select('block_type, image_storage_path, table_data, image_size, header_color')
     .eq('proposal_id', proposalId)
     .order('position')
 
@@ -92,9 +92,10 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
           ...b,
           imageBytes: imgFile ? new Uint8Array(await imgFile.arrayBuffer()) : null,
           imageIsPng: b.image_storage_path.toLowerCase().endsWith('.png'),
+          imageSize: (b as any).image_size ?? 'medium',
         }
       }
-      return { ...b, imageBytes: null, imageIsPng: true }
+      return { ...b, imageBytes: null, imageIsPng: true, headerColor: (b as any).header_color ?? '#1B556B' }
     })
   )
 

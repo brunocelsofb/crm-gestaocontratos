@@ -413,33 +413,50 @@ export async function buildStandardProposalPage({
   }
 
   // ---- Blocos de conteúdo extra (imagens e tabelas coladas pelo usuário) ----
+  if (contentBlocks.length > 0) y -= 24  // respiro antes do conteúdo extra
   for (const block of contentBlocks) {
     if (block.block_type === 'image' && block.imageBytes) {
       try {
         const image = block.imageIsPng ? await doc.embedPng(block.imageBytes) : await doc.embedJpg(block.imageBytes)
-        const maxWidth = pageWidth - margin * 2
-        const scale = Math.min(1, maxWidth / image.width)
+        // Respeita image_size salvo no block
+        const sizeMap: Record<string, number> = { small: 180, medium: 320, large: 480, full: pageWidth - margin * 2 }
+        const maxW = sizeMap[(block as any).imageSize ?? 'medium'] ?? 320
+        const scale = Math.min(maxW / image.width, 280 / image.height)
         const imgWidth = image.width * scale
         const imgHeight = image.height * scale
         newPageIfNeeded(imgHeight + 16)
         y -= imgHeight
         page.drawImage(image, { x: margin, y, width: imgWidth, height: imgHeight })
         y -= 16
-      } catch {
-        // Imagem que não carregou é pulada, não trava o resto do PDF.
-      }
+      } catch { /* Imagem que não carregou é pulada */ }
     } else if (block.block_type === 'table' && block.table_data) {
       const rows = block.table_data.rows
       const numCols = rows[0]?.length ?? 1
       const colWidth = (pageWidth - margin * 2) / numCols
-      for (const row of rows) {
-        newPageIfNeeded(16)
+      // Cor do cabeçalho salva no block
+      const hColor = (block as any).headerColor ?? '#1B556B'
+      const hRgb = [
+        parseInt(hColor.slice(1,3),16)/255,
+        parseInt(hColor.slice(3,5),16)/255,
+        parseInt(hColor.slice(5,7),16)/255,
+      ] as [number,number,number]
+      rows.forEach((row, ri) => {
+        newPageIfNeeded(18)
+        if (ri === 0) {
+          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(...hRgb) })
+        } else if (ri % 2 === 0) {
+          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.97, 0.97, 0.98) })
+        }
         row.forEach((cell, ci) => {
-          text(cell.slice(0, 30), margin + ci * colWidth, y, { size: 8 })
+          text(cell.slice(0, 30), margin + ci * colWidth + 3, y - 10, {
+            size: 8,
+            bold: ri === 0,
+            color: ri === 0 ? [1,1,1] : [0.1,0.12,0.2]
+          })
         })
-        page.drawLine({ start: { x: margin, y: y - 4 }, end: { x: pageWidth - margin, y: y - 4 }, thickness: 0.3, color: rgb(0.85, 0.85, 0.85) })
+        page.drawLine({ start: { x: margin, y: y - 14 }, end: { x: pageWidth - margin, y: y - 14 }, thickness: 0.2, color: rgb(0.88, 0.88, 0.9) })
         y -= 16
-      }
+      })
       y -= 8
     }
   }

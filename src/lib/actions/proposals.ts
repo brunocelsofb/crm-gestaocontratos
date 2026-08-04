@@ -284,7 +284,7 @@ export async function createProposalVersion(
 // capas fixas, dá pra colar uma imagem ou montar uma tabela em
 // qualquer ponto da proposta.
 // ------------------------------------------------------------
-export async function addImageBlock(proposalId: string, contractId: string, storagePath: string): Promise<ActionState> {
+export async function addImageBlock(proposalId: string, contractId: string, storagePath: string, imageSize = 'medium'): Promise<ActionState> {
   const supabase = await createClient()
 
   const { count } = await supabase
@@ -297,6 +297,7 @@ export async function addImageBlock(proposalId: string, contractId: string, stor
     position: count ?? 0,
     block_type: 'image',
     image_storage_path: storagePath,
+    image_size: imageSize,
   })
 
   if (error) return { error: error.message }
@@ -304,7 +305,7 @@ export async function addImageBlock(proposalId: string, contractId: string, stor
   return {}
 }
 
-export async function addTableBlock(proposalId: string, contractId: string, tableData: string[][]): Promise<ActionState> {
+export async function addTableBlock(proposalId: string, contractId: string, tableData: string[][], headerColor = '#1B556B'): Promise<ActionState> {
   const supabase = await createClient()
 
   const { count } = await supabase
@@ -317,6 +318,7 @@ export async function addTableBlock(proposalId: string, contractId: string, tabl
     position: count ?? 0,
     block_type: 'table',
     table_data: { rows: tableData },
+    header_color: headerColor,
   })
 
   if (error) return { error: error.message }
