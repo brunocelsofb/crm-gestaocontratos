@@ -287,20 +287,24 @@ export async function buildStandardProposalPage({
     return lines
   }
 
-  // Header com fundo cinza
-  newPageIfNeeded(16)
-  page.drawRectangle({ x: margin, y: y - 14, width: tableW, height: 16, color: rgb(0.95, 0.96, 0.97) })
+  y -= 8  // respiro entre linha decorativa e cabeçalho da tabela
+
+  // Header com fundo cinza — altura 22pt com padding top/bottom de 7pt
+  const hdrH = 22
+  newPageIfNeeded(hdrH + 4)
+  page.drawRectangle({ x: margin, y: y - hdrH, width: tableW, height: hdrH, color: rgb(0.93, 0.94, 0.96) })
   const headers = [
-    { label: 'Qtd',      x: col.qty.x },
-    { label: 'Categoria',x: col.cat.x },
-    { label: 'Item',     x: col.item.x },
-    { label: 'Tipo',     x: col.type.x },
-    { label: 'Vlr. Unit.',x: col.unit.x },
-    { label: 'Desc.',    x: col.disc.x },
-    { label: 'Subtotal', x: col.sub.x },
+    { label: 'Qtd',        x: col.qty.x },
+    { label: 'Categoria',  x: col.cat.x },
+    { label: 'Item',       x: col.item.x },
+    { label: 'Tipo',       x: col.type.x },
+    { label: 'Vlr. Unit.', x: col.unit.x },
+    { label: 'Desc.',      x: col.disc.x },
+    { label: 'Subtotal',   x: col.sub.x },
   ]
-  headers.forEach(h => text(h.label, h.x + 3, y - 10, { size: 7.5, bold: true, color: [0.25, 0.28, 0.38] }))
-  y -= 16
+  // Texto centralizado verticalmente: y - hdrH/2 + fontSize/2 ≈ y - 11 + 3.75 = y - 7.5
+  headers.forEach(h => text(h.label, h.x + 3, y - hdrH / 2 + 3, { size: 7.5, bold: true, color: [0.25, 0.28, 0.38] }))
+  y -= hdrH
 
   // Linha separadora do header
   page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.3, color: rgb(0.85, 0.87, 0.90) })
