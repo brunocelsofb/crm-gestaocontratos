@@ -256,13 +256,13 @@ export async function buildStandardProposalPage({
   page.drawLine({ start: { x: margin, y: y }, end: { x: pageWidth - margin, y: y }, thickness: 0.5, color: rgb(...brandRgb) })
   y -= 14
 
-  // Proporções: Qtd 5% | Cat 18% | Item 37% | Tipo 8% | Unit 12% | Desc 8% | Sub 12%
+  // Proporções: Qtd 5% | Cat 18% | Item 34% | Tipo 11% | Unit 12% | Desc 8% | Sub 12%
   const tableW = pageWidth - margin * 2
   const tw = tableW
   const colQty  = { x: margin,                  w: Math.floor(tw * 0.05) }
   const colCat  = { x: margin + tw * 0.05,      w: Math.floor(tw * 0.18) }
-  const colItem = { x: margin + tw * 0.23,      w: Math.floor(tw * 0.37) }
-  const colType = { x: margin + tw * 0.60,      w: Math.floor(tw * 0.08) }
+  const colItem = { x: margin + tw * 0.23,      w: Math.floor(tw * 0.34) }
+  const colType = { x: margin + tw * 0.57,      w: Math.floor(tw * 0.11) }
   const colUnit = { x: margin + tw * 0.68,      w: Math.floor(tw * 0.12) }
   const colDisc = { x: margin + tw * 0.80,      w: Math.floor(tw * 0.08) }
   const colSub  = { x: margin + tw * 0.88,      w: Math.floor(tw * 0.12) }
@@ -292,7 +292,7 @@ export async function buildStandardProposalPage({
   // Header com fundo cinza — altura 22pt com padding top/bottom de 7pt
   const hdrH = 22
   newPageIfNeeded(hdrH + 4)
-  page.drawRectangle({ x: margin, y: y - hdrH, width: tableW, height: hdrH, color: rgb(0.93, 0.94, 0.96) })
+  page.drawRectangle({ x: margin, y: y - hdrH, width: tableW, height: hdrH, color: rgb(0.953, 0.957, 0.965) })
   const headers = [
     { label: 'Qtd',        x: col.qty.x },
     { label: 'Categoria',  x: col.cat.x },
@@ -303,7 +303,7 @@ export async function buildStandardProposalPage({
     { label: 'Subtotal',   x: col.sub.x },
   ]
   // Texto centralizado verticalmente: y - hdrH/2 + fontSize/2 ≈ y - 11 + 3.75 = y - 7.5
-  headers.forEach(h => text(h.label, h.x + 3, y - hdrH / 2 + 3, { size: 7.5, bold: true, color: [0.25, 0.28, 0.38] }))
+  headers.forEach(h => text(h.label, h.x + 3, y - hdrH / 2 + 3, { size: 7.5, bold: true, color: [0.216, 0.255, 0.318] }))
   y -= hdrH
 
   // Linha separadora do header
@@ -348,12 +348,12 @@ export async function buildStandardProposalPage({
     text(fmtCurrency(it.discount, proposal.currency), col.disc.x + 2, y, { size: sz, color: [0.5, 0.5, 0.5] })
     text(fmtCurrency(it.subtotal, proposal.currency), col.sub.x + 2, y, { size: sz, bold: true })
 
-    // Avança Y pela altura máxima usada (cat ou item, max 2 linhas)
+    // Avança Y pela altura máxima usada (cat ou item, max 2 linhas) + padding
     const usedLines = Math.max(
       Math.min(catLines.length, 2),
       Math.min(itemLines.length, 2)
     )
-    y -= usedLines > 1 ? 22 : 14
+    y -= usedLines > 1 ? 28 : 18  // padding generoso: 28pt para 2 linhas, 18pt para 1
 
     // Características com wrap correto e espaçamento
     if (it.characteristics) {
