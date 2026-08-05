@@ -314,8 +314,6 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
     if (token) url.searchParams.set('snapshot_id', token)
 
     // DEBUG TEMPORÁRIO — mostra a URL exata antes de abrir
-    alert(`🔗 Abrindo Price com:\n\n${url.toString()}`)
-
     window.open(url.toString(), '_blank')
   }
   const isTech  = currentUserRole === 'aprovador_tecnico' || isAdmin
