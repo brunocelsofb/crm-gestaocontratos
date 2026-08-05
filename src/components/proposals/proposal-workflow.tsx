@@ -280,9 +280,19 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
   const [data, setData] = useState<ProposalData>(
     initialData ?? { status: 'rascunho', proposal_value: null, actor_name: null, updated_at: null }
   )
+  const [reviewToken, setReviewToken] = useState<string | null>(initialData?.review_token ?? null)
   const [modal, setModal] = useState<{ action: 'approve_tech' | 'reject_tech' | 'approve_comm' | 'reject_comm' | 'send_tech' | 'send_comm' } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [generatingLink, setGeneratingLink] = useState(false)
+
+  // Busca review_token atualizado — pode ter sido salvo pelo Price após o carregamento
+  useEffect(() => {
+    if (!proposalId) return
+    fetch(`/api/proposals/${proposalId}/token`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.review_token) setReviewToken(d.review_token) })
+      .catch(() => {})
+  }, [proposalId])
 
   const isAdmin = currentUserRole === 'admin'
   const isTech  = currentUserRole === 'aprovador_tecnico' || isAdmin
@@ -433,13 +443,10 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <a href={(() => {
-                // Se já tem snapshot, abre em modo leitura com o estado exato
-                if (initialData?.review_token) {
-                  return `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`
-                }
-                // Caso contrário, abre para precificação nova passando proposal_id para amarração
                 const url = new URL(priceUrl)
                 if (proposalId) url.searchParams.set('proposal_id', proposalId)
+                // Se tem snapshot, passa também para o Price carregar o estado exato
+                if (reviewToken) url.searchParams.set('snapshot_id', reviewToken)
                 return url.toString()
               })()} target="_blank" rel="noopener noreferrer"
                 style={{
