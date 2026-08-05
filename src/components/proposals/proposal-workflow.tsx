@@ -294,6 +294,8 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       .catch(() => {})
   }, [proposalId])
 
+  const isAdmin = currentUserRole === 'admin'
+
   async function handleOpenPrice() {
     // Busca token atualizado do banco
     let token: string | null = reviewToken
