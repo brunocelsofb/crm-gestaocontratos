@@ -294,7 +294,28 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       .catch(() => {})
   }, [proposalId])
 
-  const isAdmin = currentUserRole === 'admin'
+  async function handleOpenPrice() {
+    // Busca token atualizado do banco
+    let token: string | null = reviewToken
+    if (proposalId) {
+      try {
+        const res = await fetch(`/api/proposals/${proposalId}/token`)
+        const d = res.ok ? await res.json() : null
+        token = d?.review_token ?? token
+        if (token) setReviewToken(token)
+      } catch { /* usa token já em estado */ }
+    }
+
+    // Monta URL — proposal_id é SEMPRE incluído quando disponível
+    const url = new URL(priceUrl)
+    if (proposalId) url.searchParams.set('proposal_id', proposalId)
+    if (token) url.searchParams.set('snapshot_id', token)
+
+    // DEBUG TEMPORÁRIO — mostra a URL exata antes de abrir
+    alert(`🔗 Abrindo Price com:\n\n${url.toString()}`)
+
+    window.open(url.toString(), '_blank')
+  }
   const isTech  = currentUserRole === 'aprovador_tecnico' || isAdmin
   const isComm  = currentUserRole === 'aprovador_comercial' || isAdmin
   const isCommMember = ['member', 'admin', 'aprovador_comercial'].includes(currentUserRole)
@@ -443,20 +464,7 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
-                onClick={async () => {
-                  // Busca token atualizado do banco no momento do clique
-                  let token = reviewToken
-                  if (proposalId && !token) {
-                    const res = await fetch(`/api/proposals/${proposalId}/token`)
-                    const d = res.ok ? await res.json() : null
-                    token = d?.review_token ?? null
-                    if (token) setReviewToken(token)
-                  }
-                  const url = new URL(priceUrl)
-                  if (proposalId) url.searchParams.set('proposal_id', proposalId)
-                  if (token) url.searchParams.set('snapshot_id', token)
-                  window.open(url.toString(), '_blank')
-                }}
+                onClick={handleOpenPrice}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px',
                   fontSize: 11, fontWeight: 600, borderRadius: 7, border: 'none',
