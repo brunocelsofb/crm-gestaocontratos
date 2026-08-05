@@ -570,16 +570,7 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       {/* ── Dados técnicos para aprovador analisar ───────────────── */}
       {['em_aprovacao_tecnica', 'aprovado_tecnico', 'reprovado_tecnico', 'em_aprovacao_comercial', 'aprovado_comercial'].includes(data.status) && data.technical_snapshot && card(
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            {sectionLabel('Dimensionamento Técnico — ORBIS Price')}
-            {initialData?.review_token && (
-              <a href={`https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#f1f3f8', color: '#52514e', textDecoration: 'none', fontWeight: 500 }}>
-                🔍 Ver no Price
-              </a>
-            )}
-          </div>
+          {sectionLabel('Dimensionamento Técnico — ORBIS Price')}
           <SnapshotViewer snapshot={data.technical_snapshot} />
         </div>
       )}
