@@ -18,26 +18,37 @@ export async function GET(
   const { token } = await params
   const admin = createAdminClient()
 
-  const { data } = await admin
-    .from('proposal_status')
-    .select(`
-      review_token,
-      status,
-      technical_snapshot,
-      contracts(id, client_name, title, process_number)
-    `)
+  // Busca primeiro em proposals (novo modelo 1:N)
+  const { data: proposal } = await admin
+    .from('proposals')
+    .select('id, review_token, workflow_status, technical_snapshot')
     .eq('review_token', token)
     .maybeSingle()
 
-  if (!data) {
+  if (proposal) {
+    return NextResponse.json({
+      token,
+      status: proposal.workflow_status,
+      snapshot: proposal.technical_snapshot,
+      review_url: `https://crm-gestaocontratos-pi.vercel.app/api/proposals/review`,
+    }, { headers: CORS })
+  }
+
+  // Fallback: busca em proposal_status (modelo legado)
+  const { data: legacy } = await admin
+    .from('proposal_status')
+    .select('review_token, status, technical_snapshot')
+    .eq('review_token', token)
+    .maybeSingle()
+
+  if (!legacy) {
     return NextResponse.json({ error: 'Token inválido' }, { status: 404, headers: CORS })
   }
 
   return NextResponse.json({
     token,
-    status: data.status,
-    snapshot: data.technical_snapshot,
-    contract: (data as any).contracts,
+    status: legacy.status,
+    snapshot: legacy.technical_snapshot,
     review_url: `https://crm-gestaocontratos-pi.vercel.app/api/proposals/review`,
   }, { headers: CORS })
 }
