@@ -442,21 +442,29 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
               <StatusBadge status={data.status} />
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <a href={(() => {
-                const url = new URL(priceUrl)
-                if (proposalId) url.searchParams.set('proposal_id', proposalId)
-                // Se tem snapshot, passa também para o Price carregar o estado exato
-                if (reviewToken) url.searchParams.set('snapshot_id', reviewToken)
-                return url.toString()
-              })()} target="_blank" rel="noopener noreferrer"
+              <button
+                onClick={async () => {
+                  // Busca token atualizado do banco no momento do clique
+                  let token = reviewToken
+                  if (proposalId && !token) {
+                    const res = await fetch(`/api/proposals/${proposalId}/token`)
+                    const d = res.ok ? await res.json() : null
+                    token = d?.review_token ?? null
+                    if (token) setReviewToken(token)
+                  }
+                  const url = new URL(priceUrl)
+                  if (proposalId) url.searchParams.set('proposal_id', proposalId)
+                  if (token) url.searchParams.set('snapshot_id', token)
+                  window.open(url.toString(), '_blank')
+                }}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px',
                   fontSize: 11, fontWeight: 600, borderRadius: 7, border: 'none',
                   background: 'linear-gradient(135deg,#1b556b,#2a8a7a)', color: '#fff',
-                  textDecoration: 'none', letterSpacing: '0.3px'
+                  cursor: 'pointer', letterSpacing: '0.3px'
                 }}>
                 <span style={{ fontSize: 14 }}>⚡</span> Abrir Price
-              </a>
+              </button>
             </div>
           </div>
 
