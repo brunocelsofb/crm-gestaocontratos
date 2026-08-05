@@ -43,7 +43,7 @@ async function generateControlCode(supabase: any): Promise<string> {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { contract_id, proposal_value, margem_pct, technical_snapshot: snap } = body
+  const { contract_id, proposal_id, proposal_value, margem_pct, technical_snapshot: snap } = body
 
   if (!contract_id || !proposal_value) {
     return NextResponse.json({ error: 'contract_id e proposal_value são obrigatórios' }, { status: 400, headers: CORS })
@@ -58,28 +58,45 @@ export async function POST(req: Request) {
     .eq('contract_id', contract_id)
     .eq('status', 'open')
 
-  // 2. Salva proposal_status com snapshot e gera review_token para carregar estado no Price
+  // 2. Gera review_token único para amarrar snapshot ao Price
   const { randomBytes } = await import('crypto')
-  const { data: existing } = await supabase
-    .from('proposal_status')
-    .select('status, review_token')
-    .eq('contract_id', contract_id)
-    .maybeSingle()
+  const reviewToken = randomBytes(24).toString('hex')
 
-  const reviewToken = existing?.review_token ?? randomBytes(24).toString('hex')
+  // 3. Salva snapshot na proposals (novo modelo 1:N) ou proposal_status (fallback legado)
+  if (proposal_id) {
+    // Novo modelo: salva direto na linha da proposta
+    const { error: propError } = await supabase.from('proposals').update({
+      proposal_value,
+      technical_snapshot: snap ?? null,
+      review_token: reviewToken,
+      updated_at: new Date().toISOString(),
+    }).eq('id', proposal_id)
+    if (propError) {
+      console.error('[from-price] proposals update error:', propError)
+      return NextResponse.json({ error: propError.message }, { status: 500, headers: CORS })
+    }
+  } else {
+    // Fallback legado: proposal_status
+    const { data: existing } = await supabase
+      .from('proposal_status')
+      .select('status, review_token')
+      .eq('contract_id', contract_id)
+      .maybeSingle()
 
-  const { error: upsertError } = await supabase.from('proposal_status').upsert({
-    contract_id,
-    status: existing?.status ?? 'rascunho',
-    proposal_value,
-    technical_snapshot: snap ?? null,
-    review_token: reviewToken,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'contract_id' })
+    const existingToken = existing?.review_token ?? reviewToken
+    const { error: upsertError } = await supabase.from('proposal_status').upsert({
+      contract_id,
+      status: existing?.status ?? 'rascunho',
+      proposal_value,
+      technical_snapshot: snap ?? null,
+      review_token: existingToken,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'contract_id' })
 
-  if (upsertError) {
-    console.error('[from-price] upsert error:', upsertError)
-    return NextResponse.json({ error: upsertError.message }, { status: 500, headers: CORS })
+    if (upsertError) {
+      console.error('[from-price] upsert error:', upsertError)
+      return NextResponse.json({ error: upsertError.message }, { status: 500, headers: CORS })
+    }
   }
 
   // 3. Cria/atualiza proposta no sistema de julho com itens do Price

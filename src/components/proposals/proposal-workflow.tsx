@@ -432,10 +432,16 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
               <StatusBadge status={data.status} />
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <a href={initialData?.review_token
-                  ? `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`
-                  : priceUrl}
-                target="_blank" rel="noopener noreferrer"
+              <a href={(() => {
+                // Se já tem snapshot, abre em modo leitura com o estado exato
+                if (initialData?.review_token) {
+                  return `https://orbis-price.vercel.app?snapshot_id=${initialData.review_token}`
+                }
+                // Caso contrário, abre para precificação nova passando proposal_id para amarração
+                const url = new URL(priceUrl)
+                if (proposalId) url.searchParams.set('proposal_id', proposalId)
+                return url.toString()
+              })()} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px',
                   fontSize: 11, fontWeight: 600, borderRadius: 7, border: 'none',
