@@ -7,11 +7,10 @@ type Template = { id: string; name: string }
 type PageEntry = { key: string; templateId: string | null; isStandardProposal: boolean }
 
 // Dicionário de templates por tipo de serviço
-// Os nomes devem corresponder aos nomes dos templates cadastrados em Configurações
-const SERVICE_TEMPLATES: Record<string, string[]> = {
-  clinica: ['Capa EC', 'Proposta Padrão', 'Anexo Metodologia EC', 'Anexo Equipe', 'Final EC'],
-  hospitalar: ['Capa EH', 'Proposta Padrão', 'Anexo Metodologia EH', 'Anexo Equipe', 'Anexo Leitos', 'Final EH'],
-  avulso: ['Proposta Padrão'],
+const SERVICE_TEMPLATES: Record<string, { pages: string[]; serviceType: string }> = {
+  clinica:    { serviceType: 'clinica',    pages: ['Capa EC', 'Proposta Padrão', 'Anexo Metodologia EC', 'Anexo Equipe', 'Final EC'] },
+  hospitalar: { serviceType: 'hospitalar', pages: ['Capa EH', 'Proposta Padrão', 'Anexo Metodologia EH', 'Anexo Equipe', 'Anexo Leitos', 'Final EH'] },
+  avulso:     { serviceType: 'avulso',     pages: ['Proposta Padrão'] },
 }
 
 export function ProposalPageOrderEditor({
@@ -33,21 +32,26 @@ export function ProposalPageOrderEditor({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function applyServiceTemplate(service: string) {
-    if (service === '') return
-    const names = SERVICE_TEMPLATES[service] ?? []
-    const newPages: PageEntry[] = names.map(name => {
-      if (name === 'Proposta Padrão') {
-        return { key: crypto.randomUUID(), templateId: null, isStandardProposal: true }
-      }
+  async function applyServiceTemplate(service: string) {
+    if (!service) return
+    const tmpl = SERVICE_TEMPLATES[service]
+    if (!tmpl) return
+    const newPages: PageEntry[] = tmpl.pages.map(name => {
+      if (name === 'Proposta Padrão') return { key: crypto.randomUUID(), templateId: null, isStandardProposal: true }
       const found = templates.find(t => t.name.toLowerCase().includes(name.toLowerCase().split(' ')[1] ?? name.toLowerCase()))
       return { key: crypto.randomUUID(), templateId: found?.id ?? templates[0]?.id ?? null, isStandardProposal: false }
     })
-    // Garante que sempre tem pelo menos a proposta padrão
     if (!newPages.some(p => p.isStandardProposal)) {
       newPages.splice(1, 0, { key: crypto.randomUUID(), templateId: null, isStandardProposal: true })
     }
     setPages(newPages)
+
+    // Salva template_service_type na proposta
+    await fetch('/api/proposals/service-type', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposal_id: proposalId, service_type: tmpl.serviceType }),
+    })
   }
 
   function addPage() {

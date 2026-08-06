@@ -3,10 +3,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ contractId: string }> }
 ) {
   const { contractId } = await params
+  const { searchParams } = new URL(req.url)
+  const proposalId = searchParams.get('proposal_id')
 
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
@@ -14,38 +16,57 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  const [
-    { data: contract },
-    { data: proposal },
-    { data: templates },
-    { data: orgSettings },
-  ] = await Promise.all([
-    admin.from('contracts').select('client_name, title, process_number, cnpj, company_id, contact_id').eq('id', contractId).maybeSingle(),
-    admin.from('proposal_status').select('*').eq('contract_id', contractId).maybeSingle(),
-    admin.from('proposal_templates').select('*').order('created_at'),
-    admin.from('organization_settings').select('company_name, company_cnpj, logo_storage_path, proposal_brand_color, proposal_header_text, proposal_footer_text').maybeSingle(),
-  ])
+  // Busca proposta — preferência pelo novo modelo (proposals) com proposal_id
+  let proposal: any = null
+  let serviceType = 'clinica'
+
+  if (proposalId) {
+    const { data } = await admin.from('proposals')
+      .select('*')
+      .eq('id', proposalId)
+      .maybeSingle()
+    proposal = data
+    serviceType = data?.template_service_type ?? 'clinica'
+  }
+
+  // Fallback para proposal_status (legado)
+  if (!proposal) {
+    const { data } = await admin.from('proposal_status')
+      .select('*')
+      .eq('contract_id', contractId)
+      .maybeSingle()
+    proposal = data
+  }
 
   if (!proposal?.technical_snapshot) {
     return NextResponse.json({ error: 'Snapshot do Price nao encontrado. Reenvie o valor do Price.' }, { status: 400 })
   }
 
-  // Busca empresa e contato do contrato
+  const [
+    { data: contract },
+    { data: templates },
+    { data: orgSettings },
+  ] = await Promise.all([
+    admin.from('contracts').select('client_name, title, process_number, cnpj, company_id, contact_id').eq('id', contractId).maybeSingle(),
+    // Filtra templates pelo service_type da proposta
+    admin.from('proposal_templates').select('*')
+      .eq('service_type', serviceType)
+      .order('sort_order'),
+    admin.from('organization_settings').select('company_name, company_cnpj, logo_storage_path, proposal_brand_color, proposal_header_text, proposal_footer_text').maybeSingle(),
+  ])
+
   const [companyRes, contactRes] = await Promise.all([
-    contract?.company_id ? admin.from('companies').select('name, cnpj, trade_name, street, street_number, neighborhood, city, state, zip_code, email, phone').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
+    contract?.company_id ? admin.from('companies').select('name, cnpj, trade_name, street, street_number, neighborhood, city, state, zip_code, email, phone, address, nf_email, legal_name').eq('id', contract.company_id).maybeSingle() : Promise.resolve({ data: null }),
     contract?.contact_id ? admin.from('contacts').select('name, email, phone, cpf').eq('id', contract.contact_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
 
-  // Busca também o usuário responsável pelo contrato para código da proposta
   const proposalCode = `ORB.${contract?.process_number ?? contractId.slice(0, 8).toUpperCase()}`
 
   try {
     const { PDFDocument } = await import('pdf-lib')
-    const { buildPriceProposalPage } = await import('@/lib/actions/proposal-pdf-from-price')
+    const { buildMergedProposalBytes } = await import('@/lib/actions/proposal-pdf-merge')
 
     const mergedPdf = await PDFDocument.create()
-
-    // Ordena templates por sort_order
     const ordered = [...(templates ?? [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     const mioloAfterIdx = ordered.findIndex((t: any) => t.is_miolo_after)
 
@@ -58,75 +79,67 @@ export async function GET(
         const doc = await PDFDocument.load(bytes)
         const copied = await mergedPdf.copyPages(doc, doc.getPageIndices())
         copied.forEach(p => mergedPdf.addPage(p))
-      } catch { /* ignora templates corrompidos */ }
+      } catch { /* ignora template corrompido */ }
     }
 
+    // Templates antes do miolo
     if (mioloAfterIdx === -1) {
-      // Sem posição definida: capas (não-Final) → miolo → Final
       const capas = ordered.filter((t: any) => !t.name.toLowerCase().startsWith('final'))
-      const finais = ordered.filter((t: any) => t.name.toLowerCase().startsWith('final'))
       for (const t of capas) await addTemplate(t)
     } else {
-      // Adiciona templates antes do miolo
       for (let i = 0; i <= mioloAfterIdx; i++) await addTemplate(ordered[i])
     }
 
-    // Miolo
-    const mioloBytes = await buildPriceProposalPage({
-      snapshot: proposal.technical_snapshot as any,
-      proposalValue: Number(proposal.proposal_value) || 0,
-      validityDays: proposal.proposal_validity_days ?? 30,
-      submittedByName: proposal.submitted_by_name ?? null,
-      technicalApprovedByName: proposal.technical_approved_by_name ?? null,
-      technicalApprovedAt: proposal.technical_approved_at ?? null,
-      technicalComment: proposal.technical_comment ?? null,
-      commercialApprovedByName: proposal.commercial_approved_by_name ?? null,
-      commercialApprovedAt: proposal.commercial_approved_at ?? null,
-      contract: contract ? {
-        client_name: contract.client_name,
-        process_number: contract.process_number ?? null,
-        cnpj: contract.cnpj ?? null,
-      } : null,
-      company: companyRes?.data ? {
-        name: companyRes.data.name,
-        cnpj: companyRes.data.cnpj ?? undefined,
-        tradeName: companyRes.data.trade_name ?? undefined,
-        email: companyRes.data.email ?? undefined,
-        phone: companyRes.data.phone ?? undefined,
-        address: [
-          companyRes.data.street && `${companyRes.data.street}${companyRes.data.street_number ? ', ' + companyRes.data.street_number : ''}`,
-          companyRes.data.neighborhood,
-          companyRes.data.city && companyRes.data.state ? `${companyRes.data.city}/${companyRes.data.state}` : companyRes.data.city,
-          companyRes.data.zip_code,
-        ].filter(Boolean).join(' - ') || undefined,
-      } : { name: contract?.client_name ?? '' },
-      contact: contactRes?.data ? {
-        name: contactRes.data.name,
-        email: contactRes.data.email ?? undefined,
-        phone: contactRes.data.phone ?? undefined,
-        cpf: contactRes.data.cpf ?? undefined,
-      } : null,
-      org: {
-        companyName: orgSettings?.company_name ?? 'ORBIS GESTAO DE TECNOLOGIA EM SAUDE LTDA',
-        cnpj: orgSettings?.company_cnpj ?? '23.129.279/0001-03',
-        logoStoragePath: orgSettings?.logo_storage_path ?? null,
-        brandColor: orgSettings?.proposal_brand_color ?? '#1B556B',
-        headerText: orgSettings?.proposal_header_text ?? null,
-        footerText: orgSettings?.proposal_footer_text ?? null,
-        proposalCode,
-      },
-      textoObjetivos: (proposal as any).texto_objetivos ?? null,
-      textoAtividades: (proposal as any).texto_atividades ?? null,
-      textoEstruturaApoio: (proposal as any).texto_estrutura_apoio ?? null,
-    })
+    // Miolo — usa buildMergedProposalBytes se tiver proposalId, senão builder legado
+    let mioloBytes: Uint8Array | null = null
+
+    if (proposalId) {
+      const result = await buildMergedProposalBytes(proposalId)
+      if (result.bytes) mioloBytes = result.bytes
+    }
+
+    // Fallback: builder do Price (legado)
+    if (!mioloBytes) {
+      const { buildPriceProposalPage } = await import('@/lib/actions/proposal-pdf-from-price')
+      mioloBytes = await buildPriceProposalPage({
+        snapshot: proposal.technical_snapshot as any,
+        proposalValue: Number(proposal.proposal_value) || 0,
+        validityDays: proposal.proposal_validity_days ?? 30,
+        submittedByName: proposal.submitted_by_name ?? null,
+        technicalApprovedByName: proposal.technical_approved_by_name ?? null,
+        technicalApprovedAt: proposal.technical_approved_at ?? null,
+        technicalComment: proposal.technical_comment ?? null,
+        commercialApprovedByName: proposal.commercial_approved_by_name ?? null,
+        commercialApprovedAt: proposal.commercial_approved_at ?? null,
+        contract: contract ? { client_name: contract.client_name, process_number: contract.process_number ?? null, cnpj: contract.cnpj ?? null } : null,
+        company: companyRes?.data ? {
+          name: companyRes.data.name,
+          cnpj: companyRes.data.cnpj ?? undefined,
+          tradeName: companyRes.data.trade_name ?? undefined,
+          address: (companyRes.data as any).address ?? undefined,
+        } : { name: contract?.client_name ?? '' },
+        contact: contactRes?.data ? { name: contactRes.data.name, email: contactRes.data.email ?? undefined, phone: contactRes.data.phone ?? undefined, cpf: contactRes.data.cpf ?? undefined } : null,
+        org: {
+          companyName: orgSettings?.company_name ?? 'ORBIS',
+          cnpj: orgSettings?.company_cnpj ?? '',
+          logoStoragePath: orgSettings?.logo_storage_path ?? null,
+          brandColor: orgSettings?.proposal_brand_color ?? '#1B556B',
+          headerText: orgSettings?.proposal_header_text ?? null,
+          footerText: orgSettings?.proposal_footer_text ?? null,
+          proposalCode,
+        },
+        textoObjetivos: (proposal as any).texto_objetivos ?? null,
+        textoAtividades: (proposal as any).texto_atividades ?? null,
+        textoEstruturaApoio: (proposal as any).texto_estrutura_apoio ?? null,
+      })
+    }
 
     const mioloDoc = await PDFDocument.load(mioloBytes)
     const mioloCopied = await mergedPdf.copyPages(mioloDoc, mioloDoc.getPageIndices())
     mioloCopied.forEach(p => mergedPdf.addPage(p))
 
-    // Páginas após o miolo
+    // Templates após o miolo
     if (mioloAfterIdx === -1) {
-      // Finais
       const finais = ordered.filter((t: any) => t.name.toLowerCase().startsWith('final'))
       for (const t of finais) await addTemplate(t)
     } else {
