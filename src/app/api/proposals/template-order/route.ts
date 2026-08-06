@@ -14,16 +14,26 @@ export async function POST(req: Request) {
 
   // Reseta is_miolo_after APENAS para o service_type ativo
   if (service_type) {
-    await admin.from('proposal_templates')
+    const { error: resetErr } = await admin.from('proposal_templates')
       .update({ is_miolo_after: false })
       .eq('service_type', service_type)
+    if (resetErr) console.error('[template-order] reset error:', resetErr)
   }
 
-  // Atualiza sort_order e is_miolo_after de cada template
+  // Atualiza sort_order e is_miolo_after de cada template individualmente
+  const errors: string[] = []
   for (const { id, sort_order } of order) {
     const patch: Record<string, unknown> = { sort_order }
     if (miolo_after_id && id === miolo_after_id) patch.is_miolo_after = true
-    await admin.from('proposal_templates').update(patch).eq('id', id)
+    const { error } = await admin.from('proposal_templates').update(patch).eq('id', id)
+    if (error) {
+      console.error(`[template-order] update ${id} error:`, error)
+      errors.push(error.message)
+    }
+  }
+
+  if (errors.length > 0) {
+    return NextResponse.json({ error: errors.join('; ') }, { status: 500 })
   }
 
   // Posição especial: miolo no início (start) ou fim (end)
