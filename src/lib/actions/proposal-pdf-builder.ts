@@ -238,9 +238,115 @@ export async function buildStandardProposalPage({
     })
   })
 
-  y = boxTop - boxH - 36  // respiro generoso antes de Dados da Proposta
+  y = boxTop - boxH - 36
 
-  // ---- Dados da proposta ----
+  // Texto justificado: distribui espaço extra entre palavras (exceto última linha)
+  function drawJustified(str: string, startX: number, startY: number, maxW: number, sz: number, colorRgb: [number,number,number] = [0.2, 0.22, 0.3]) {
+    const lines = wrapWords(str, maxW, sz)
+    let ly = startY
+    lines.forEach((line, idx) => {
+      const isLast = idx === lines.length - 1
+      const words = line.split(' ')
+      if (isLast || words.length === 1) {
+        text(line, startX, ly, { size: sz, color: colorRgb })
+      } else {
+        const totalWordsW = words.reduce((s, w) => s + font.widthOfTextAtSize(w, sz), 0)
+        const spaceExtra = (maxW - totalWordsW) / (words.length - 1)
+        let cx = startX
+        words.forEach((w) => {
+          text(w, cx, ly, { size: sz, color: colorRgb })
+          cx += font.widthOfTextAtSize(w, sz) + spaceExtra
+        })
+      }
+      ly -= sz * 1.45
+    })
+    return ly
+  }
+
+  // ---- 1. Conteúdo Extra (blocos customizados) — antes do financeiro ----
+  if (contentBlocks.length > 0) y -= 8
+  for (const block of contentBlocks) {
+    // Texto de introdução justificado com quebra de linha automática
+    if ((block as any).introduction?.trim()) {
+      newPageIfNeeded(20)
+      const introH = wrapWords((block as any).introduction, pageWidth - margin * 2, 9).length * 13
+      newPageIfNeeded(introH + 8)
+      y = drawJustified((block as any).introduction, margin, y, pageWidth - margin * 2, 9)
+      y -= 4
+    }
+    if (block.block_type === 'image' && block.imageBytes) {
+      try {
+        const image = block.imageIsPng ? await doc.embedPng(block.imageBytes) : await doc.embedJpg(block.imageBytes)
+        const sizeMap: Record<string, number> = { small: 180, medium: 320, large: 480, full: pageWidth - margin * 2 }
+        const maxW = sizeMap[(block as any).imageSize ?? 'medium'] ?? 320
+        const scale = Math.min(maxW / image.width, 280 / image.height)
+        const imgWidth = image.width * scale
+        const imgHeight = image.height * scale
+        newPageIfNeeded(imgHeight + 16)
+        y -= imgHeight
+        page.drawImage(image, { x: margin, y, width: imgWidth, height: imgHeight })
+        y -= 16
+      } catch { /* ignora imagem corrompida */ }
+    } else if (block.block_type === 'table' && block.table_data) {
+      const rows = block.table_data.rows
+      const numCols = rows[0]?.length ?? 1
+      const colWidth = (pageWidth - margin * 2) / numCols
+      const hColor = (block as any).headerColor ?? '#1B556B'
+      const hRgb = [
+        parseInt(hColor.slice(1,3),16)/255,
+        parseInt(hColor.slice(3,5),16)/255,
+        parseInt(hColor.slice(5,7),16)/255,
+      ] as [number,number,number]
+      const align = ((block as any).textAlign ?? 'left') as 'left' | 'center' | 'right'
+      const showTotals = (block as any).showTotals === true
+      const colTotals: (number | null)[] = Array(numCols).fill(null)
+      if (showTotals && rows.length > 1) {
+        for (let c = 0; c < numCols; c++) {
+          let sum = 0; let allNumeric = true
+          for (let r = 1; r < rows.length; r++) {
+            const val = parseFloat(rows[r][c]?.replace(/[^0-9,.-]/g, '').replace(',', '.') ?? '')
+            if (isNaN(val)) { allNumeric = false; break }
+            sum += val
+          }
+          colTotals[c] = allNumeric ? sum : null
+        }
+      }
+      const allRows = showTotals ? [...rows, colTotals.map((t, c) =>
+        t !== null ? new Intl.NumberFormat('pt-BR').format(t) : (rows[0][c] ? 'Total' : '')
+      )] : rows
+      allRows.forEach((row, ri) => {
+        const isHeader = ri === 0
+        const isFooter = showTotals && ri === allRows.length - 1
+        newPageIfNeeded(18)
+        if (isHeader) {
+          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(...hRgb) })
+        } else if (isFooter) {
+          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.93, 0.94, 0.96) })
+        } else if (ri % 2 === 0) {
+          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.97, 0.97, 0.98) })
+        }
+        row.forEach((cell: string, ci: number) => {
+          const cellX = margin + ci * colWidth
+          const cellStr = String(cell ?? '').slice(0, 30)
+          const cellW = font.widthOfTextAtSize(cellStr, 8)
+          let tx = cellX + 3
+          if (align === 'right')  tx = cellX + colWidth - cellW - 3
+          if (align === 'center') tx = cellX + (colWidth - cellW) / 2
+          text(cellStr, tx, y - 10, {
+            size: 8,
+            bold: isHeader || isFooter,
+            color: isHeader ? [1,1,1] : isFooter ? [0.2,0.25,0.35] : [0.1,0.12,0.2]
+          })
+        })
+        page.drawLine({ start: { x: margin, y: y - 14 }, end: { x: pageWidth - margin, y: y - 14 }, thickness: 0.2, color: rgb(0.88, 0.88, 0.9) })
+        y -= 16
+      })
+      y -= 8
+    }
+  }
+
+  // ---- 2. Dados da proposta (financeiro) — após o conteúdo extra ----
+  y -= 16
   newPageIfNeeded(60)
   text('Dados da Proposta', margin, y, { size: 10, bold: true })
   y -= 16
@@ -419,115 +525,6 @@ export async function buildStandardProposalPage({
   }
 
   // Texto justificado: distribui espaço extra entre palavras (exceto última linha)
-  function drawJustified(str: string, startX: number, startY: number, maxW: number, sz: number, colorRgb: [number,number,number] = [0.2, 0.22, 0.3]) {
-    const lines = wrapWords(str, maxW, sz)
-    let ly = startY
-    lines.forEach((line, idx) => {
-      const isLast = idx === lines.length - 1
-      const words = line.split(' ')
-      if (isLast || words.length === 1) {
-        // Última linha ou palavra única: alinha à esquerda normalmente
-        text(line, startX, ly, { size: sz, color: colorRgb })
-      } else {
-        // Distribui espaço extra entre palavras
-        const totalWordsW = words.reduce((s, w) => s + font.widthOfTextAtSize(w, sz), 0)
-        const spaceExtra = (maxW - totalWordsW) / (words.length - 1)
-        let cx = startX
-        words.forEach((w, wi) => {
-          text(w, cx, ly, { size: sz, color: colorRgb })
-          cx += font.widthOfTextAtSize(w, sz) + spaceExtra
-        })
-      }
-      ly -= sz * 1.45
-    })
-    return ly
-  }
-  if (contentBlocks.length > 0) y -= 24  // respiro antes do conteúdo extra
-  for (const block of contentBlocks) {
-    // Texto de introdução justificado com quebra de linha automática
-    if ((block as any).introduction?.trim()) {
-      newPageIfNeeded(20)
-      const introH = wrapWords((block as any).introduction, pageWidth - margin * 2, 9).length * 13
-      newPageIfNeeded(introH + 8)
-      y = drawJustified((block as any).introduction, margin, y, pageWidth - margin * 2, 9)
-      y -= 4
-    }
-    if (block.block_type === 'image' && block.imageBytes) {
-      try {
-        const image = block.imageIsPng ? await doc.embedPng(block.imageBytes) : await doc.embedJpg(block.imageBytes)
-        // Respeita image_size salvo no block
-        const sizeMap: Record<string, number> = { small: 180, medium: 320, large: 480, full: pageWidth - margin * 2 }
-        const maxW = sizeMap[(block as any).imageSize ?? 'medium'] ?? 320
-        const scale = Math.min(maxW / image.width, 280 / image.height)
-        const imgWidth = image.width * scale
-        const imgHeight = image.height * scale
-        newPageIfNeeded(imgHeight + 16)
-        y -= imgHeight
-        page.drawImage(image, { x: margin, y, width: imgWidth, height: imgHeight })
-        y -= 16
-      } catch { /* Imagem que não carregou é pulada */ }
-    } else if (block.block_type === 'table' && block.table_data) {
-      const rows = block.table_data.rows
-      const numCols = rows[0]?.length ?? 1
-      const colWidth = (pageWidth - margin * 2) / numCols
-      const hColor = (block as any).headerColor ?? '#1B556B'
-      const hRgb = [
-        parseInt(hColor.slice(1,3),16)/255,
-        parseInt(hColor.slice(3,5),16)/255,
-        parseInt(hColor.slice(5,7),16)/255,
-      ] as [number,number,number]
-      const align = ((block as any).textAlign ?? 'left') as 'left' | 'center' | 'right'
-      const showTotals = (block as any).showTotals === true
-
-      // Soma inteligente: só se todas as células da coluna (exceto header) forem numéricas
-      const colTotals: (number | null)[] = Array(numCols).fill(null)
-      if (showTotals && rows.length > 1) {
-        for (let c = 0; c < numCols; c++) {
-          let sum = 0; let allNumeric = true
-          for (let r = 1; r < rows.length; r++) {
-            const val = parseFloat(rows[r][c]?.replace(/[^0-9,.-]/g, '').replace(',', '.') ?? '')
-            if (isNaN(val)) { allNumeric = false; break }
-            sum += val
-          }
-          colTotals[c] = allNumeric ? sum : null
-        }
-      }
-
-      const allRows = showTotals ? [...rows, colTotals.map((t, c) =>
-        t !== null ? new Intl.NumberFormat('pt-BR').format(t) : (rows[0][c] ? 'Total' : '')
-      )] : rows
-
-      allRows.forEach((row, ri) => {
-        const isHeader = ri === 0
-        const isFooter = showTotals && ri === allRows.length - 1
-        newPageIfNeeded(18)
-        if (isHeader) {
-          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(...hRgb) })
-        } else if (isFooter) {
-          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.93, 0.94, 0.96) })
-        } else if (ri % 2 === 0) {
-          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.97, 0.97, 0.98) })
-        }
-        row.forEach((cell: string, ci: number) => {
-          const cellX = margin + ci * colWidth
-          const cellStr = String(cell ?? '').slice(0, 30)
-          const cellW = font.widthOfTextAtSize(cellStr, 8)
-          let tx = cellX + 3
-          if (align === 'right')  tx = cellX + colWidth - cellW - 3
-          if (align === 'center') tx = cellX + (colWidth - cellW) / 2
-          text(cellStr, tx, y - 10, {
-            size: 8,
-            bold: isHeader || isFooter,
-            color: isHeader ? [1,1,1] : isFooter ? [0.2,0.25,0.35] : [0.1,0.12,0.2]
-          })
-        })
-        page.drawLine({ start: { x: margin, y: y - 14 }, end: { x: pageWidth - margin, y: y - 14 }, thickness: 0.2, color: rgb(0.88, 0.88, 0.9) })
-        y -= 16
-      })
-      y -= 8
-    }
-  }
-
   // ---- Rodapé customizado (faixa colorida), repetido em TODAS as páginas ----
   if (org.footerText) {
     const footerBarHeight = 22
