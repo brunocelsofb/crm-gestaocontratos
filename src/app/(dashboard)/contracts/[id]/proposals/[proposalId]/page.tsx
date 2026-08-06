@@ -42,7 +42,7 @@ export default async function ProposalDetailPage({
     supabase.from('proposal_templates').select('id, name'),
     supabase.from('proposal_approvals').select('*').eq('proposal_id', proposalId).order('decided_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, department'),
-    supabase.from('proposal_content_blocks').select('id, block_type, image_storage_path, table_data, header_color, image_size, introduction').eq('proposal_id', proposalId).order('position'),
+    supabase.from('proposal_content_blocks').select('id, block_type, image_storage_path, table_data, header_color, image_size, introduction, show_totals, text_align').eq('proposal_id', proposalId).order('position'),
   ])
 
   if (!proposal) notFound()

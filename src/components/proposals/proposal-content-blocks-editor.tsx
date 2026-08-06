@@ -44,6 +44,8 @@ export function ProposalContentBlocksEditor({
   const [tableRows, setTableRows] = useState<string[][]>([['', ''], ['', '']])
   const [headerColor, setHeaderColor] = useState('#1B556B')
   const [imageSize, setImageSize] = useState('medium')
+  const [showTotals, setShowTotals] = useState(false)
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left')
   const [savingIntro, setSavingIntro] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -72,7 +74,7 @@ export function ProposalContentBlocksEditor({
 
   async function handleAddTable() {
     setError(null)
-    const result = await addTableBlock(proposalId, contractId, tableRows, headerColor)
+    const result = await addTableBlock(proposalId, contractId, tableRows, headerColor, showTotals, textAlign)
     if (result.error) { setError(result.error) }
     else {
       setBlocks(prev => [...prev, { id: result.id ?? crypto.randomUUID(), block_type: 'table', image_storage_path: null, table_data: { rows: tableRows }, header_color: headerColor, introduction: null }])
@@ -212,10 +214,27 @@ export function ProposalContentBlocksEditor({
             <div className="flex gap-2">
               <button onClick={addRow} className={inp}>+ Linha</button>
               <button onClick={addCol} className={inp}>+ Coluna</button>
-              <button onClick={handleAddTable} className="rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">
-                Adicionar tabela
-              </button>
             </div>
+            {/* Alinhamento */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Alinhamento:</p>
+              <div className="flex gap-1">
+                {(['left','center','right'] as const).map(a => (
+                  <button key={a} onClick={() => setTextAlign(a)}
+                    className={`px-2 py-0.5 text-xs rounded border ${textAlign === a ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
+                    {a === 'left' ? '⬅ Esq' : a === 'center' ? '↔ Centro' : '➡ Dir'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Linha de total */}
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={showTotals} onChange={e => setShowTotals(e.target.checked)} className="rounded" />
+              Adicionar linha de total (soma automática de colunas numéricas)
+            </label>
+            <button onClick={handleAddTable} className="rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">
+              Adicionar tabela
+            </button>
           </div>
         </div>
       )}

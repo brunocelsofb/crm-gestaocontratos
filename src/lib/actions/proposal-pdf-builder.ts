@@ -154,7 +154,7 @@ export async function buildStandardProposalPage({
   // ---- Cabeçalho: logo + empresa contratada | contato interno ----
   // ---- Cabeçalho premium: Logo (esq) | Nome+Contato (dir) ----
   const headerTopY = y
-  const logoH = 52
+  const logoH = 72
   let logoW = 0
 
   if (org.logoBytes) {
@@ -204,17 +204,17 @@ export async function buildStandardProposalPage({
   ;[
     { x: margin, label: 'Dados da pessoa', lines: [
       contact?.name ?? '—',
-      `CPF: ${contact?.cpf ?? '—'}`,
-      `E-mail: ${contact?.email ?? '—'}`,
-      `Telefone: ${contact?.phone ?? '—'}`,
-      `Endereço: ${(contact?.address ?? '—').slice(0, 48)}`,
+      ...(contact?.cpf     ? [`CPF: ${contact.cpf}`]     : []),
+      ...(contact?.email   ? [`E-mail: ${contact.email}`]   : []),
+      ...(contact?.phone   ? [`Telefone: ${contact.phone}`] : []),
+      ...(contact?.address ? [`Endereço: ${contact.address.slice(0, 48)}`] : []),
     ], bold0: true },
     { x: margin + boxW + 10, label: 'Dados da empresa', lines: [
       company?.legal_name ?? company?.name ?? '—',
-      `Nome fantasia: ${company?.trade_name ?? '—'}`,
-      `CNPJ: ${company?.cnpj ?? '—'}`,
-      `E-mail NF: ${company?.nf_email ?? '—'}`,
-      `Endereço: ${(company?.address ?? '—').slice(0, 48)}`,
+      ...(company?.trade_name ? [`Nome fantasia: ${company.trade_name}`] : []),
+      ...(company?.cnpj       ? [`CNPJ: ${company.cnpj}`]               : []),
+      ...(company?.nf_email   ? [`E-mail NF: ${company.nf_email}`]       : []),
+      ...(company?.address    ? [`Endereço: ${company.address.slice(0, 48)}`] : []),
     ], bold0: true },
   ].forEach(box => {
     // Fundo
@@ -404,8 +404,14 @@ export async function buildStandardProposalPage({
   if (proposal.is_recurring) {
     text(`Receita recorrente (MRR): ${fmtCurrency(netTotal, proposal.currency)}/mês`, margin, y, { size: 9, bold: true })
     y -= 14
+    // TCV — Valor Total do Contrato
+    const months = proposal.installments > 1 ? proposal.installments : 12
+    text(`Valor Total do Contrato (${months} meses): ${fmtCurrency(netTotal * months, proposal.currency)}`, margin, y, { size: 9, color: [0.35, 0.38, 0.48] })
+    y -= 14
   } else if (proposal.installments > 1) {
     text(`Parcelamento: ${proposal.installments}x de ${fmtCurrency(netTotal / proposal.installments, proposal.currency)}`, margin, y, { size: 9, bold: true })
+    y -= 14
+    text(`Valor Total: ${fmtCurrency(netTotal, proposal.currency)}`, margin, y, { size: 9, color: [0.35, 0.38, 0.48] })
     y -= 14
   } else {
     text(`Pagamento único: ${fmtCurrency(netTotal, proposal.currency)}`, margin, y, { size: 9, bold: true })
@@ -439,25 +445,55 @@ export async function buildStandardProposalPage({
       const rows = block.table_data.rows
       const numCols = rows[0]?.length ?? 1
       const colWidth = (pageWidth - margin * 2) / numCols
-      // Cor do cabeçalho salva no block
       const hColor = (block as any).headerColor ?? '#1B556B'
       const hRgb = [
         parseInt(hColor.slice(1,3),16)/255,
         parseInt(hColor.slice(3,5),16)/255,
         parseInt(hColor.slice(5,7),16)/255,
       ] as [number,number,number]
-      rows.forEach((row, ri) => {
+      const align = ((block as any).textAlign ?? 'left') as 'left' | 'center' | 'right'
+      const showTotals = (block as any).showTotals === true
+
+      // Soma inteligente: só se todas as células da coluna (exceto header) forem numéricas
+      const colTotals: (number | null)[] = Array(numCols).fill(null)
+      if (showTotals && rows.length > 1) {
+        for (let c = 0; c < numCols; c++) {
+          let sum = 0; let allNumeric = true
+          for (let r = 1; r < rows.length; r++) {
+            const val = parseFloat(rows[r][c]?.replace(/[^0-9,.-]/g, '').replace(',', '.') ?? '')
+            if (isNaN(val)) { allNumeric = false; break }
+            sum += val
+          }
+          colTotals[c] = allNumeric ? sum : null
+        }
+      }
+
+      const allRows = showTotals ? [...rows, colTotals.map((t, c) =>
+        t !== null ? new Intl.NumberFormat('pt-BR').format(t) : (rows[0][c] ? 'Total' : '')
+      )] : rows
+
+      allRows.forEach((row, ri) => {
+        const isHeader = ri === 0
+        const isFooter = showTotals && ri === allRows.length - 1
         newPageIfNeeded(18)
-        if (ri === 0) {
+        if (isHeader) {
           page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(...hRgb) })
+        } else if (isFooter) {
+          page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.93, 0.94, 0.96) })
         } else if (ri % 2 === 0) {
           page.drawRectangle({ x: margin, y: y - 14, width: pageWidth - margin * 2, height: 16, color: rgb(0.97, 0.97, 0.98) })
         }
-        row.forEach((cell, ci) => {
-          text(cell.slice(0, 30), margin + ci * colWidth + 3, y - 10, {
+        row.forEach((cell: string, ci: number) => {
+          const cellX = margin + ci * colWidth
+          const cellStr = String(cell ?? '').slice(0, 30)
+          const cellW = font.widthOfTextAtSize(cellStr, 8)
+          let tx = cellX + 3
+          if (align === 'right')  tx = cellX + colWidth - cellW - 3
+          if (align === 'center') tx = cellX + (colWidth - cellW) / 2
+          text(cellStr, tx, y - 10, {
             size: 8,
-            bold: ri === 0,
-            color: ri === 0 ? [1,1,1] : [0.1,0.12,0.2]
+            bold: isHeader || isFooter,
+            color: isHeader ? [1,1,1] : isFooter ? [0.2,0.25,0.35] : [0.1,0.12,0.2]
           })
         })
         page.drawLine({ start: { x: margin, y: y - 14 }, end: { x: pageWidth - margin, y: y - 14 }, thickness: 0.2, color: rgb(0.88, 0.88, 0.9) })

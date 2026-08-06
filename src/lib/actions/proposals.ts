@@ -296,12 +296,13 @@ export async function addImageBlock(proposalId: string, contractId: string, stor
   return { id: data?.id }
 }
 
-export async function addTableBlock(proposalId: string, contractId: string, tableData: string[][], headerColor = '#1B556B'): Promise<ActionState & { id?: string }> {
+export async function addTableBlock(proposalId: string, contractId: string, tableData: string[][], headerColor = '#1B556B', showTotals = false, textAlign = 'left'): Promise<ActionState & { id?: string }> {
   const supabase = await createClient()
   const { count } = await supabase.from('proposal_content_blocks').select('id', { count: 'exact', head: true }).eq('proposal_id', proposalId)
   const { data, error } = await supabase.from('proposal_content_blocks').insert({
     proposal_id: proposalId, position: count ?? 0, block_type: 'table',
     table_data: { rows: tableData }, header_color: headerColor,
+    show_totals: showTotals, text_align: textAlign,
   }).select('id').single()
   if (error) return { error: error.message }
   revalidatePath(`/contracts/${contractId}/proposals/${proposalId}`)
