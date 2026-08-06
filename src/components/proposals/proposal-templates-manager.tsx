@@ -29,9 +29,22 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
   const [file, setFile] = useState<File | null>(null)
   const dragIdx = useRef<number | null>(null)
 
-  const templates = [...allTemplates]
-    .filter(t => (t.service_type ?? 'clinica') === activeType)
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  // Ordem visual por tipo — independente do sort_order do banco
+  const [visualOrder, setVisualOrder] = useState<Record<string, string[]>>(() => {
+    const byType: Record<string, string[]> = {}
+    for (const st of ['clinica', 'hospitalar', 'avulso']) {
+      byType[st] = initialTemplates
+        .filter(t => (t.service_type ?? 'clinica') === st)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map(t => t.id)
+    }
+    return byType
+  })
+
+  // Templates na ordem visual atual
+  const templates = (visualOrder[activeType] ?? [])
+    .map(id => allTemplates.find(t => t.id === id))
+    .filter(Boolean) as Template[]
 
   const [mioloAfter, setMioloAfter] = useState<Record<string, string | null>>({
     clinica:    initialTemplates.find(t => t.is_miolo_after && (t.service_type ?? 'clinica') === 'clinica')?.id ?? null,
@@ -44,15 +57,11 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
   function onDragStart(i: number) { dragIdx.current = i }
   function onDrop(i: number) {
     if (dragIdx.current === null || dragIdx.current === i) return
-    const arr = [...templates]
-    const [moved] = arr.splice(dragIdx.current, 1)
-    arr.splice(i, 0, moved)
+    const ids = [...(visualOrder[activeType] ?? [])]
+    const [moved] = ids.splice(dragIdx.current, 1)
+    ids.splice(i, 0, moved)
     dragIdx.current = null
-    // Atualiza allTemplates mantendo outros tipos
-    setAllTemplates(prev => [
-      ...prev.filter(t => (t.service_type ?? 'clinica') !== activeType),
-      ...arr,
-    ])
+    setVisualOrder(prev => ({ ...prev, [activeType]: ids }))
   }
 
   async function saveOrder() {
