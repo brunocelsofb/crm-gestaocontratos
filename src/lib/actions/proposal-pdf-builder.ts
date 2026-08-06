@@ -421,11 +421,16 @@ export async function buildStandardProposalPage({
   // ---- Blocos de conteúdo extra (imagens e tabelas coladas pelo usuário) ----
   if (contentBlocks.length > 0) y -= 24  // respiro antes do conteúdo extra
   for (const block of contentBlocks) {
-    // Texto de introdução antes do block
+    // Texto de introdução com quebra de linha automática
     if ((block as any).introduction?.trim()) {
       newPageIfNeeded(20)
-      text((block as any).introduction, margin, y, { size: 9, bold: false, color: [0.2, 0.22, 0.3] })
-      y -= 14
+      const introLines = wrapWords((block as any).introduction, pageWidth - margin * 2, 9)
+      for (const line of introLines) {
+        newPageIfNeeded(14)
+        text(line, margin, y, { size: 9, color: [0.2, 0.22, 0.3] })
+        y -= 13
+      }
+      y -= 4  // respiro entre intro e o elemento
     }
     if (block.block_type === 'image' && block.imageBytes) {
       try {
