@@ -57,17 +57,30 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
 
   async function saveOrder() {
     setSaving(true); setSaved(false)
-    await fetch('/api/proposals/template-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const payload = {
         order: templates.map((t, i) => ({ id: t.id, sort_order: i + 1 })),
         miolo_after_id: mioloAfter[activeType],
         service_type: activeType,
-      }),
-    })
-    setSaving(false); setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+      }
+      console.log('[template-order] payload:', payload)
+      const res = await fetch('/api/proposals/template-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      console.log('[template-order] response:', res.status, json)
+      if (!res.ok) {
+        alert(`Erro ao salvar: ${json.error ?? res.status}`)
+        setSaving(false); return
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      alert(`Erro inesperado: ${e}`)
+    }
+    setSaving(false)
   }
 
   async function addTemplate() {
