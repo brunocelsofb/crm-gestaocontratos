@@ -33,6 +33,8 @@ const PRESET_COLORS = [
   { label: 'Preto',  value: '#111827' },
 ]
 
+const BTN_SM = 'px-2 py-0.5 text-xs rounded border'
+
 const IMAGE_SIZES = [
   { label: 'Pequena', value: 'small' },
   { label: 'Média',   value: 'medium' },
@@ -50,7 +52,6 @@ function TableControls({ rows, onCell, onAddRow, onAddCol, onDelRow, onDelCol, c
   totals: boolean; onTotals: (v: boolean) => void
   align: 'left' | 'center' | 'right'; onAlign: (v: 'left' | 'center' | 'right') => void
 }) {
-  const btnSm = 'px-2 py-0.5 text-xs rounded border'
   return (
     <div className="space-y-2">
       <div>
@@ -85,17 +86,17 @@ function TableControls({ rows, onCell, onAddRow, onAddCol, onDelRow, onDelCol, c
         </table>
       </div>
       <div className="flex gap-1 flex-wrap">
-        <button onClick={onAddRow} className={`${btnSm} border-gray-300 text-gray-600`}>+ Linha</button>
-        <button onClick={onAddCol} className={`${btnSm} border-gray-300 text-gray-600`}>+ Coluna</button>
-        <button onClick={onDelRow} className={`${btnSm} border-red-200 text-red-400`}>- Linha</button>
-        <button onClick={onDelCol} className={`${btnSm} border-red-200 text-red-400`}>- Col</button>
+        <button onClick={onAddRow} className={`${BTN_SM} border-gray-300 text-gray-600`}>+ Linha</button>
+        <button onClick={onAddCol} className={`${BTN_SM} border-gray-300 text-gray-600`}>+ Coluna</button>
+        <button onClick={onDelRow} className={`${BTN_SM} border-red-200 text-red-400`}>- Linha</button>
+        <button onClick={onDelCol} className={`${BTN_SM} border-red-200 text-red-400`}>- Col</button>
       </div>
       <div>
         <p className="text-xs text-gray-500 mb-1">Alinhamento:</p>
         <div className="flex gap-1">
           {(['left', 'center', 'right'] as const).map(a => (
             <button key={a} onClick={() => onAlign(a)}
-              className={`${btnSm} ${align === a ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
+              className={`${BTN_SM} ${align === a ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
               {a === 'left' ? '⬅' : a === 'center' ? '↔' : '➡'}
             </button>
           ))}
@@ -311,7 +312,7 @@ export function ProposalContentBlocksEditor({
               <div className="flex gap-1 flex-wrap">
                 {IMAGE_SIZES.map(s => (
                   <button key={s.value} onClick={() => setImageSize(s.value)}
-                    className={`${btnSm} ${imageSize === s.value ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
+                    className={`${BTN_SM} ${imageSize === s.value ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
                     {s.label}
                   </button>
                 ))}
