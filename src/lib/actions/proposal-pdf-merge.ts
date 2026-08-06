@@ -92,10 +92,20 @@ export async function buildMergedProposalBytes(proposalId: string): Promise<{ by
           ...b,
           imageBytes: imgFile ? new Uint8Array(await imgFile.arrayBuffer()) : null,
           imageIsPng: b.image_storage_path.toLowerCase().endsWith('.png'),
-          imageSize: (b as any).image_size ?? 'medium',
+          imageSize:   (b as any).image_size ?? 'medium',
+          headerColor: (b as any).header_color ?? '#1B556B',
+          textAlign:   (b as any).text_align   ?? 'left',
+          showTotals:  (b as any).show_totals  ?? false,
         }
       }
-      return { ...b, imageBytes: null, imageIsPng: true, headerColor: (b as any).header_color ?? '#1B556B' }
+      return {
+        ...b,
+        imageBytes: null,
+        imageIsPng: true,
+        headerColor: (b as any).header_color ?? '#1B556B',
+        textAlign:   (b as any).text_align   ?? 'left',
+        showTotals:  (b as any).show_totals  ?? false,
+      }
     })
   )
 
