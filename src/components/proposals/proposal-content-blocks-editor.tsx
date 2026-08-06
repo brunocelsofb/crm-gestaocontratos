@@ -40,6 +40,75 @@ const IMAGE_SIZES = [
   { label: 'Total',   value: 'full' },
 ]
 
+// ── TableControls fora do componente para evitar remount a cada render ──────
+function TableControls({ rows, onCell, onAddRow, onAddCol, onDelRow, onDelCol, color, onColor, totals, onTotals, align, onAlign }: {
+  rows: string[][]
+  onCell: (r: number, c: number, v: string) => void
+  onAddRow: () => void; onAddCol: () => void
+  onDelRow: () => void; onDelCol: () => void
+  color: string; onColor: (v: string) => void
+  totals: boolean; onTotals: (v: boolean) => void
+  align: 'left' | 'center' | 'right'; onAlign: (v: 'left' | 'center' | 'right') => void
+}) {
+  const btnSm = 'px-2 py-0.5 text-xs rounded border'
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Cor do cabeçalho:</p>
+        <div className="flex gap-1 flex-wrap items-center">
+          {PRESET_COLORS.map(c => (
+            <button key={c.value} onClick={() => onColor(c.value)} title={c.label}
+              style={{ width: 20, height: 20, borderRadius: 4, background: c.value, border: color === c.value ? '2px solid #000' : '2px solid transparent' }} />
+          ))}
+          <input type="color" value={color} onChange={e => onColor(e.target.value)}
+            style={{ width: 20, height: 20, border: 'none', padding: 0, cursor: 'pointer', borderRadius: 4 }} />
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="text-xs border-collapse">
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, c) => (
+                  <td key={c} className="border border-gray-200 p-0.5">
+                    <input
+                      value={cell}
+                      onChange={e => onCell(r, c, e.target.value)}
+                      className="w-20 px-1 py-0.5 outline-none text-xs"
+                      style={{ background: r === 0 ? color + '22' : '#fff' }}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        <button onClick={onAddRow} className={`${btnSm} border-gray-300 text-gray-600`}>+ Linha</button>
+        <button onClick={onAddCol} className={`${btnSm} border-gray-300 text-gray-600`}>+ Coluna</button>
+        <button onClick={onDelRow} className={`${btnSm} border-red-200 text-red-400`}>- Linha</button>
+        <button onClick={onDelCol} className={`${btnSm} border-red-200 text-red-400`}>- Col</button>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Alinhamento:</p>
+        <div className="flex gap-1">
+          {(['left', 'center', 'right'] as const).map(a => (
+            <button key={a} onClick={() => onAlign(a)}
+              className={`${btnSm} ${align === a ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
+              {a === 'left' ? '⬅' : a === 'center' ? '↔' : '➡'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+        <input type="checkbox" checked={totals} onChange={e => onTotals(e.target.checked)} />
+        Linha de total (soma colunas numéricas)
+      </label>
+    </div>
+  )
+}
+
 export function ProposalContentBlocksEditor({
   proposalId, contractId, initialBlocks, canEdit,
 }: {
@@ -146,68 +215,6 @@ export function ProposalContentBlocksEditor({
   }
 
   const inp = 'border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-brand-700'
-  const btnSm = 'px-2 py-0.5 text-xs rounded border'
-
-  // ── Componente de controles de tabela (reutilizado no edit e no new) ────────
-  function TableControls({ rows, onCell, onAddRow, onAddCol, onDelRow, onDelCol, color, onColor, totals, onTotals, align, onAlign }: {
-    rows: string[][]; onCell: (r:number,c:number,v:string)=>void
-    onAddRow:()=>void; onAddCol:()=>void; onDelRow:()=>void; onDelCol:()=>void
-    color: string; onColor:(v:string)=>void
-    totals: boolean; onTotals:(v:boolean)=>void
-    align: 'left'|'center'|'right'; onAlign:(v:'left'|'center'|'right')=>void
-  }) {
-    return (
-      <div className="space-y-2">
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Cor do cabeçalho:</p>
-          <div className="flex gap-1 flex-wrap items-center">
-            {PRESET_COLORS.map(c => (
-              <button key={c.value} onClick={() => onColor(c.value)} title={c.label}
-                style={{ width: 20, height: 20, borderRadius: 4, background: c.value, border: color === c.value ? '2px solid #000' : '2px solid transparent' }} />
-            ))}
-            <input type="color" value={color} onChange={e => onColor(e.target.value)}
-              style={{ width: 20, height: 20, border: 'none', padding: 0, cursor: 'pointer', borderRadius: 4 }} />
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="text-xs border-collapse">
-            {rows.map((row, r) => (
-              <tr key={r}>
-                {row.map((cell, c) => (
-                  <td key={c} className="border border-gray-200 p-0.5">
-                    <input value={cell} onChange={e => onCell(r, c, e.target.value)}
-                      className="w-20 px-1 py-0.5 outline-none text-xs"
-                      style={{ background: r === 0 ? color + '22' : '#fff' }} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </table>
-        </div>
-        <div className="flex gap-1 flex-wrap">
-          <button onClick={onAddRow} className={`${btnSm} border-gray-300 text-gray-600`}>+ Linha</button>
-          <button onClick={onAddCol} className={`${btnSm} border-gray-300 text-gray-600`}>+ Coluna</button>
-          <button onClick={onDelRow} className={`${btnSm} border-red-200 text-red-400`}>- Linha</button>
-          <button onClick={onDelCol} className={`${btnSm} border-red-200 text-red-400`}>- Col</button>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Alinhamento:</p>
-          <div className="flex gap-1">
-            {(['left','center','right'] as const).map(a => (
-              <button key={a} onClick={() => onAlign(a)}
-                className={`${btnSm} ${align === a ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-300 text-gray-600'}`}>
-                {a === 'left' ? '⬅' : a === 'center' ? '↔' : '➡'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-          <input type="checkbox" checked={totals} onChange={e => onTotals(e.target.checked)} />
-          Linha de total (soma colunas numéricas)
-        </label>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-4">
