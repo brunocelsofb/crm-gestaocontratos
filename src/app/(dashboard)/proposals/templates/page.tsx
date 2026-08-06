@@ -5,8 +5,8 @@ export default async function ProposalTemplatesPage() {
   const supabase = await createClient()
   const { data: templates } = await supabase
     .from('proposal_templates')
-    .select('id, name, file_name, page_count')
-    .order('name')
+    .select('id, name, file_name, page_count, sort_order, is_miolo_after, service_type')
+    .order('sort_order', { ascending: true })
 
   return (
     <div className="max-w-2xl space-y-6">

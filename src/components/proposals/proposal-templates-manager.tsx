@@ -72,14 +72,17 @@ export function ProposalTemplatesManager({ initialTemplates }: { initialTemplate
         miolo_after_id: mioloAfter[activeType],
         service_type: activeType,
       }
-      console.log('[template-order] payload:', payload)
+      // LOG para rastrear o que está sendo enviado
+      console.log('[saveOrder] templates na tela:', templates.map(t => t.name))
+      console.log('[saveOrder] payload:', JSON.stringify(payload, null, 2))
+
       const res = await fetch('/api/proposals/template-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const json = await res.json()
-      console.log('[template-order] response:', res.status, json)
+      console.log('[saveOrder] response:', res.status, json)
       if (!res.ok) {
         alert(`Erro ao salvar: ${json.error ?? res.status}`)
         setSaving(false); return
