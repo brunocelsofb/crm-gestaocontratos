@@ -314,6 +314,18 @@ export async function updateBlockIntroduction(blockId: string, introduction: str
   await supabase.from('proposal_content_blocks').update({ introduction }).eq('id', blockId)
 }
 
+export async function updateTableBlock(blockId: string, tableData: string[][], headerColor: string, showTotals: boolean, textAlign: string): Promise<ActionState> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('proposal_content_blocks').update({
+    table_data: { rows: tableData },
+    header_color: headerColor,
+    show_totals: showTotals,
+    text_align: textAlign,
+  }).eq('id', blockId)
+  if (error) return { error: error.message }
+  return {}
+}
+
 export async function deleteContentBlock(blockId: string, contractId: string, proposalId: string) {
   const supabase = createAdminClient()
   await supabase.from('proposal_content_blocks').delete().eq('id', blockId)
