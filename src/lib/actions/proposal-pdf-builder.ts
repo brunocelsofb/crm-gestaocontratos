@@ -264,14 +264,70 @@ export async function buildStandardProposalPage({
   }
 
   // ---- 1. Conteúdo Extra (blocos customizados) — antes do financeiro ----
+  // Parser Markdown leve inline: **negrito** e *itálico*
+  type MdSeg = { txt: string; bold: boolean }
+  function parseMd(str: string): MdSeg[] {
+    const segs: MdSeg[] = []
+    const re = /\*\*(.+?)\*\*|\*(.+?)\*/g
+    let last = 0; let m: RegExpExecArray | null
+    while ((m = re.exec(str)) !== null) {
+      if (m.index > last) segs.push({ txt: str.slice(last, m.index), bold: false })
+      segs.push({ txt: m[1] ?? m[2], bold: !!m[1] })
+      last = m.index + m[0].length
+    }
+    if (last < str.length) segs.push({ txt: str.slice(last), bold: false })
+    return segs.filter(s => s.txt)
+  }
+
+  // Renderiza texto com Markdown, linha por linha justificada
+  function drawRichText(str: string, sx: number, sy: number, maxW: number, sz: number): number {
+    const plain = str.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1')
+    const lines = wrapWords(plain, maxW, sz)
+    let ly = sy
+    // Mapeia posição no plain para posição no md original
+    let mdCursor = 0
+    for (let li = 0; li < lines.length; li++) {
+      const lineLen = lines[li].length
+      // Extrai a substring do md correspondente à linha plain
+      let plainCount = 0; let mdStart = mdCursor
+      while (mdCursor < str.length && plainCount < lineLen + (li < lines.length - 1 ? 1 : 0)) {
+        if (str[mdCursor] === '*') {
+          // Pula marcadores
+          if (str.slice(mdCursor, mdCursor + 2) === '**') { mdCursor += 2; continue }
+          mdCursor++; continue
+        }
+        plainCount++; mdCursor++
+      }
+      const lineStr = str.slice(mdStart, mdCursor).replace(/\s+$/, '')
+      const segs = parseMd(lineStr)
+      const isLast = li === lines.length - 1
+
+      if (segs.length <= 1 && !segs[0]?.bold) {
+        // Linha simples — justificada
+        ly = drawJustified(lines[li], sx, ly, maxW, sz)
+      } else {
+        // Linha com Markdown — renderiza segmento a segmento (sem justificação para simplicidade)
+        let cx = sx
+        for (const seg of segs) {
+          const f = seg.bold ? fontBold : font
+          const color: [number,number,number] = seg.bold ? [0.1, 0.12, 0.22] : [0.2, 0.22, 0.3]
+          page.drawText(seg.txt, { x: cx, y: ly, size: sz, font: f, color: rgb(...color) })
+          cx += f.widthOfTextAtSize(seg.txt, sz)
+        }
+        ly -= sz * 1.45
+      }
+    }
+    return ly
+  }
+
   if (contentBlocks.length > 0) y -= 8
   for (const block of contentBlocks) {
     // Texto de introdução justificado com quebra de linha automática
     if ((block as any).introduction?.trim()) {
       newPageIfNeeded(20)
-      const introH = wrapWords((block as any).introduction, pageWidth - margin * 2, 9).length * 13
-      newPageIfNeeded(introH + 8)
-      y = drawJustified((block as any).introduction, margin, y, pageWidth - margin * 2, 9)
+      const introLines = wrapWords((block as any).introduction.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1'), pageWidth - margin * 2, 9)
+      newPageIfNeeded(introLines.length * 13 + 8)
+      y = drawRichText((block as any).introduction, margin, y, pageWidth - margin * 2, 9)
       y -= 4
     }
     if (block.block_type === 'image' && block.imageBytes) {
@@ -348,13 +404,6 @@ export async function buildStandardProposalPage({
   // ---- 2. Dados da proposta (financeiro) — após o conteúdo extra ----
   y -= 16
   newPageIfNeeded(60)
-  text('Dados da Proposta', margin, y, { size: 10, bold: true })
-  y -= 16
-  text(`Moeda: ${proposal.currency}   ·   Nº OC do cliente: ${proposal.client_po_number ?? '—'}`, margin, y, { size: 8 })
-  y -= 24
-
-  // ---- Tabela de itens ----
-  newPageIfNeeded(40)
   text('Produtos / Serviços', margin, y, { size: 10, bold: true })
   y -= 6
 
@@ -510,7 +559,6 @@ export async function buildStandardProposalPage({
   if (proposal.is_recurring) {
     text(`Receita recorrente (MRR): ${fmtCurrency(netTotal, proposal.currency)}/mês`, margin, y, { size: 9, bold: true })
     y -= 14
-    // TCV — Valor Total do Contrato
     const months = proposal.installments > 1 ? proposal.installments : 12
     text(`Valor Total do Contrato (${months} meses): ${fmtCurrency(netTotal * months, proposal.currency)}`, margin, y, { size: 9, color: [0.35, 0.38, 0.48] })
     y -= 14
@@ -522,6 +570,14 @@ export async function buildStandardProposalPage({
   } else {
     text(`Pagamento único: ${fmtCurrency(netTotal, proposal.currency)}`, margin, y, { size: 9, bold: true })
     y -= 14
+  }
+
+  // Moeda (junto ao financeiro) e OC condicional (só se preenchida)
+  text(`Moeda: ${proposal.currency}`, margin, y, { size: 8, color: [0.45, 0.47, 0.52] })
+  y -= 13
+  if (proposal.client_po_number?.trim()) {
+    text(`Nº OC do cliente: ${proposal.client_po_number}`, margin, y, { size: 8, color: [0.45, 0.47, 0.52] })
+    y -= 13
   }
 
   // Texto justificado: distribui espaço extra entre palavras (exceto última linha)
