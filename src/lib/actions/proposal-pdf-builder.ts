@@ -418,19 +418,39 @@ export async function buildStandardProposalPage({
     y -= 14
   }
 
-  // ---- Blocos de conteúdo extra (imagens e tabelas coladas pelo usuário) ----
+  // Texto justificado: distribui espaço extra entre palavras (exceto última linha)
+  function drawJustified(str: string, startX: number, startY: number, maxW: number, sz: number, colorRgb: [number,number,number] = [0.2, 0.22, 0.3]) {
+    const lines = wrapWords(str, maxW, sz)
+    let ly = startY
+    lines.forEach((line, idx) => {
+      const isLast = idx === lines.length - 1
+      const words = line.split(' ')
+      if (isLast || words.length === 1) {
+        // Última linha ou palavra única: alinha à esquerda normalmente
+        text(line, startX, ly, { size: sz, color: colorRgb })
+      } else {
+        // Distribui espaço extra entre palavras
+        const totalWordsW = words.reduce((s, w) => s + font.widthOfTextAtSize(w, sz), 0)
+        const spaceExtra = (maxW - totalWordsW) / (words.length - 1)
+        let cx = startX
+        words.forEach((w, wi) => {
+          text(w, cx, ly, { size: sz, color: colorRgb })
+          cx += font.widthOfTextAtSize(w, sz) + spaceExtra
+        })
+      }
+      ly -= sz * 1.45
+    })
+    return ly
+  }
   if (contentBlocks.length > 0) y -= 24  // respiro antes do conteúdo extra
   for (const block of contentBlocks) {
-    // Texto de introdução com quebra de linha automática
+    // Texto de introdução justificado com quebra de linha automática
     if ((block as any).introduction?.trim()) {
       newPageIfNeeded(20)
-      const introLines = wrapWords((block as any).introduction, pageWidth - margin * 2, 9)
-      for (const line of introLines) {
-        newPageIfNeeded(14)
-        text(line, margin, y, { size: 9, color: [0.2, 0.22, 0.3] })
-        y -= 13
-      }
-      y -= 4  // respiro entre intro e o elemento
+      const introH = wrapWords((block as any).introduction, pageWidth - margin * 2, 9).length * 13
+      newPageIfNeeded(introH + 8)
+      y = drawJustified((block as any).introduction, margin, y, pageWidth - margin * 2, 9)
+      y -= 4
     }
     if (block.block_type === 'image' && block.imageBytes) {
       try {
