@@ -264,7 +264,7 @@ export async function buildStandardProposalPage({
   }
 
   // ---- 1. Conteúdo Extra (blocos customizados) — antes do financeiro ----
-  // Parser Markdown leve inline: **negrito** e *itálico*
+  // Parser Markdown leve: **negrito** e *itálico*
   type MdSeg = { txt: string; bold: boolean }
   function parseMd(str: string): MdSeg[] {
     const segs: MdSeg[] = []
@@ -279,45 +279,79 @@ export async function buildStandardProposalPage({
     return segs.filter(s => s.txt)
   }
 
-  // Renderiza texto com Markdown, linha por linha justificada
+  // Renderiza texto rico (Markdown) com justificação real
   function drawRichText(str: string, sx: number, sy: number, maxW: number, sz: number): number {
+    // Remove Markdown para calcular o wrap com texto plain
     const plain = str.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1')
     const lines = wrapWords(plain, maxW, sz)
     let ly = sy
-    // Mapeia posição no plain para posição no md original
-    let mdCursor = 0
+
+    // Para cada linha do texto plain, encontra os segmentos formatados correspondentes
+    let plainPos = 0
     for (let li = 0; li < lines.length; li++) {
-      const lineLen = lines[li].length
-      // Extrai a substring do md correspondente à linha plain
-      let plainCount = 0; let mdStart = mdCursor
-      while (mdCursor < str.length && plainCount < lineLen + (li < lines.length - 1 ? 1 : 0)) {
-        if (str[mdCursor] === '*') {
-          // Pula marcadores
-          if (str.slice(mdCursor, mdCursor + 2) === '**') { mdCursor += 2; continue }
-          mdCursor++; continue
-        }
-        plainCount++; mdCursor++
-      }
-      const lineStr = str.slice(mdStart, mdCursor).replace(/\s+$/, '')
-      const segs = parseMd(lineStr)
+      const lineText = lines[li]
       const isLast = li === lines.length - 1
 
-      if (segs.length <= 1 && !segs[0]?.bold) {
-        // Linha simples — justificada
-        ly = drawJustified(lines[li], sx, ly, maxW, sz)
-      } else {
-        // Linha com Markdown — renderiza segmento a segmento (sem justificação para simplicidade)
-        let cx = sx
-        for (const seg of segs) {
-          const f = seg.bold ? fontBold : font
-          const color: [number,number,number] = seg.bold ? [0.1, 0.12, 0.22] : [0.2, 0.22, 0.3]
-          page.drawText(seg.txt, { x: cx, y: ly, size: sz, font: f, color: rgb(...color) })
-          cx += f.widthOfTextAtSize(seg.txt, sz)
-        }
-        ly -= sz * 1.45
+      // Extrai segmentos Markdown para esta linha
+      // Encontra no string original a fatia que gera este lineText
+      const lineSegs = getMdSegsForPlainSlice(str, plainPos, lineText.length)
+      plainPos += lineText.length + 1 // +1 para o espaço/quebra
+
+      // Calcula largura total de todas as palavras na linha
+      const allWords: { txt: string; bold: boolean }[] = []
+      for (const seg of lineSegs) {
+        const segWords = seg.txt.split(' ').filter(w => w)
+        segWords.forEach(w => allWords.push({ txt: w, bold: seg.bold }))
       }
+
+      if (allWords.length === 0) { ly -= sz * 1.45; continue }
+
+      if (isLast || allWords.length === 1) {
+        // Última linha: alinha à esquerda
+        let cx = sx
+        allWords.forEach((w, wi) => {
+          const f = w.bold ? fontBold : font
+          page.drawText(w.txt, { x: cx, y: ly, size: sz, font: f, color: rgb(0.1, 0.12, 0.22) })
+          cx += f.widthOfTextAtSize(w.txt, sz)
+          if (wi < allWords.length - 1) cx += font.widthOfTextAtSize(' ', sz)
+        })
+      } else {
+        // Justificado: distribui espaço extra entre palavras
+        const totalW = allWords.reduce((s, w) => {
+          const f = w.bold ? fontBold : font
+          return s + f.widthOfTextAtSize(w.txt, sz)
+        }, 0)
+        const gap = (maxW - totalW) / (allWords.length - 1)
+        let cx = sx
+        allWords.forEach((w, wi) => {
+          const f = w.bold ? fontBold : font
+          const color: [number,number,number] = w.bold ? [0.05, 0.08, 0.18] : [0.2, 0.22, 0.3]
+          page.drawText(w.txt, { x: cx, y: ly, size: sz, font: f, color: rgb(...color) })
+          cx += f.widthOfTextAtSize(w.txt, sz) + gap
+        })
+      }
+      ly -= sz * 1.45
     }
     return ly
+  }
+
+  // Extrai segmentos Markdown para uma fatia do texto plain
+  function getMdSegsForPlainSlice(mdStr: string, plainStart: number, plainLen: number): MdSeg[] {
+    // Gera o texto plain completo com mapeamento de posições
+    const allSegs = parseMd(mdStr)
+    let plainCursor = 0
+    const result: MdSeg[] = []
+    for (const seg of allSegs) {
+      const segEnd = plainCursor + seg.txt.length
+      if (segEnd <= plainStart) { plainCursor = segEnd; continue }
+      if (plainCursor >= plainStart + plainLen) break
+      const start = Math.max(0, plainStart - plainCursor)
+      const end = Math.min(seg.txt.length, plainStart + plainLen - plainCursor)
+      const sliced = seg.txt.slice(start, end)
+      if (sliced) result.push({ txt: sliced, bold: seg.bold })
+      plainCursor = segEnd
+    }
+    return result.length ? result : [{ txt: mdStr.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1').slice(plainStart, plainStart + plainLen), bold: false }]
   }
 
   if (contentBlocks.length > 0) y -= 8

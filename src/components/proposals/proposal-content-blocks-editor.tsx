@@ -254,6 +254,9 @@ export function ProposalContentBlocksEditor({
                 rows={2} placeholder="Digite o contexto ou introdução..." disabled={!canEdit}
                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-brand-700 resize-none disabled:bg-gray-50" />
               {savingIntro === b.id && <span className="text-xs text-gray-400">Salvando...</span>}
+              <p className="text-xs text-gray-400 mt-1">
+                Dica: <code className="bg-gray-100 px-0.5 rounded">**palavra**</code> = <strong>negrito</strong> · <code className="bg-gray-100 px-0.5 rounded">*palavra*</code> = <em>itálico</em>. O PDF justifica automaticamente.
+              </p>
             </div>
 
             {/* Modo de edição inline */}
