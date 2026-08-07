@@ -14,18 +14,21 @@ type Event = {
 }
 
 const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
-  note:                  { icon: '💬', color: '#f97316', bg: '#fff7ed', label: 'Nota' },
-  email:                 { icon: '✉️', color: '#3b5bdb', bg: '#eef3ff', label: 'E-mail' },
-  stage_change:          { icon: '🔄', color: '#1a7c3e', bg: '#eaf5ee', label: 'Mudança de etapa' },
-  pipeline_change:       { icon: '↗️', color: '#1a7c3e', bg: '#eaf5ee', label: 'Mudança de funil' },
-  file:                  { icon: '📎', color: '#3b5bdb', bg: '#eef3ff', label: 'Arquivo' },
-  automation_triggered:  { icon: '⚡', color: '#7c3aed', bg: '#f3e8ff', label: 'Automação' },
-  system:                { icon: '🔧', color: '#8892a4', bg: '#f1f3f8', label: 'Sistema' },
-  transfer:              { icon: '↔️', color: '#8892a4', bg: '#f1f3f8', label: 'Transferência' },
+  note:                 { icon: '💬', color: '#f97316', bg: '#fff7ed',  label: 'Nota' },
+  email:                { icon: '✉️', color: '#3b5bdb', bg: '#eef3ff',  label: 'E-mail' },
+  stage_change:         { icon: '🔄', color: '#1a7c3e', bg: '#eaf5ee',  label: 'Mudança de etapa' },
+  pipeline_change:      { icon: '↗️', color: '#1a7c3e', bg: '#eaf5ee',  label: 'Mudança de funil' },
+  file:                 { icon: '📎', color: '#3b5bdb', bg: '#eef3ff',  label: 'Arquivo' },
+  automation_triggered: { icon: '⚡', color: '#7c3aed', bg: '#f3e8ff',  label: 'Automação' },
+  system:               { icon: '🔧', color: '#8892a4', bg: '#f1f3f8',  label: 'Sistema' },
+  transfer:             { icon: '↔️', color: '#8892a4', bg: '#f1f3f8',  label: 'Transferência' },
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(d).toLocaleDateString('pt-BR', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
 }
 
 export function TimelineFeed({
@@ -51,7 +54,8 @@ export function TimelineFeed({
 
   async function handleAddNote() {
     if (!note.trim()) return
-    setSaving(true); setSaveError(null)
+    setSaving(true)
+    setSaveError(null)
     try {
       const res = await fetch('/api/activities', {
         method: 'POST',
@@ -59,16 +63,15 @@ export function TimelineFeed({
         body: JSON.stringify({ contract_id: contractId, type: 'note', content: note.trim() }),
       })
       const json = await res.json()
-      if (!res.ok) { setSaveError(json.error ?? 'Erro ao salvar nota'); setSaving(false); return }
+      if (!res.ok) { setSaveError(json.error ?? 'Erro ao salvar'); setSaving(false); return }
       setNote('')
       router.refresh()
-    } catch (e) {
+    } catch {
       setSaveError('Erro de rede. Tente novamente.')
     }
     setSaving(false)
   }
 
-  // Ponto 2: toggle real — inverte o valor atual
   async function handleTogglePin(id: string) {
     setPinningId(id)
     const res = await fetch(`/api/activities/${id}/pin`, { method: 'POST' })
@@ -77,23 +80,21 @@ export function TimelineFeed({
     setPinningId(null)
   }
 
-  // Ponto 3: delete só para admin
   async function handleDelete(id: string) {
-    if (!isAdmin) return
-    if (!confirm('Excluir esta nota permanentemente?')) return
+    if (!isAdmin || !confirm('Excluir esta nota permanentemente?')) return
     setDeletingId(id)
-    const res = await fetch(`/api/activities/${id}`, { method: 'DELETE' })
-    if (res.ok) router.refresh()
+    await fetch(`/api/activities/${id}`, { method: 'DELETE' })
+    router.refresh()
     setDeletingId(null)
   }
 
   const pinned = events.filter(e => localPins[e.id])
-  const rest   = events.filter(e => !localPins[e.id])
+  const rest = events.filter(e => !localPins[e.id])
   const sorted = [...pinned, ...rest]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Adicionar nota */}
+    <div>
+      {/* Campo de nota */}
       <div style={{ marginBottom: 24 }}>
         <textarea
           value={note}
@@ -102,11 +103,14 @@ export function TimelineFeed({
           rows={3}
           style={{
             width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8,
-            border: `0.5px solid ${saveError ? '#fca5a5' : '#d1d8e8'}`, outline: 'none',
-            resize: 'vertical', fontFamily: 'inherit', color: '#1a1f36', boxSizing: 'border-box',
+            border: `0.5px solid ${saveError ? '#fca5a5' : '#d1d8e8'}`,
+            outline: 'none', resize: 'vertical', fontFamily: 'inherit',
+            color: '#1a1f36', boxSizing: 'border-box',
           }}
         />
-        {saveError && <p style={{ fontSize: 11, color: '#b91c1c', margin: '4px 0 0' }}>{saveError}</p>}
+        {saveError && (
+          <p style={{ fontSize: 11, color: '#b91c1c', margin: '4px 0 0' }}>{saveError}</p>
+        )}
         <button
           onClick={handleAddNote}
           disabled={saving || !note.trim()}
@@ -114,36 +118,37 @@ export function TimelineFeed({
             marginTop: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600,
             borderRadius: 8, border: 'none', background: '#1B556B', color: '#fff',
             cursor: 'pointer', opacity: saving || !note.trim() ? 0.6 : 1,
-          }}>
+          }}
+        >
           {saving ? 'Salvando...' : '+ Adicionar nota'}
         </button>
       </div>
 
       {/* Timeline */}
-      {sorted.length === 0 && (
+      {sorted.length === 0 ? (
         <p style={{ fontSize: 12, color: '#b0b8c8', textAlign: 'center', padding: '32px 0' }}>
           Nenhum evento registrado ainda.
         </p>
-      )}
-      <div style={{ position: 'relative' }}>
-        <div style={{
-          position: 'absolute', left: 14, top: 0, bottom: 0, width: 2,
-          background: 'linear-gradient(to bottom, #e8edf5, #f1f3f8)', zIndex: 0,
-        }} />
+      ) : (
+        <div style={{ position: 'relative' }}>
+          {/* Linha vertical */}
+          <div style={{
+            position: 'absolute', left: 14, top: 0, bottom: 0, width: 2,
+            background: 'linear-gradient(to bottom, #e8edf5, #f1f3f8)', zIndex: 0,
+          }} />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {sorted.map((e) => {
+          {sorted.map(e => {
             const cfg = TYPE_CONFIG[e.type] ?? TYPE_CONFIG['note']
             const isPinned = !!localPins[e.id]
             const isNote = e.type === 'note'
 
             return (
               <div key={e.id} style={{ display: 'flex', gap: 14, paddingBottom: 20, position: 'relative', zIndex: 1 }}>
-                {/* Ícone circular */}
+                {/* Ícone */}
                 <div style={{
                   width: 30, height: 30, borderRadius: '50%',
                   background: isPinned ? '#fef3c7' : cfg.bg,
-                  border: `2px solid ${isPinned ? '#f59e0b' : cfg.color}22`,
+                  border: `2px solid ${isPinned ? '#f59e0b' : cfg.color}33`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 13, flexShrink: 0, zIndex: 2, boxShadow: '0 0 0 3px #fff',
                 }}>
@@ -153,18 +158,29 @@ export function TimelineFeed({
                 {/* Card */}
                 <div style={{
                   flex: 1, background: isPinned ? '#fffbeb' : '#fff',
-                  borderRadius: 10, border: isPinned ? '1px solid #fde68a' : '0.5px solid #e8edf5',
+                  borderRadius: 10,
+                  border: isPinned ? '1px solid #fde68a' : '0.5px solid #e8edf5',
                   padding: '10px 14px',
-                  boxShadow: isPinned ? '0 1px 4px rgba(245,158,11,0.1)' : '0 1px 3px rgba(0,0,0,0.04)',
+                  boxShadow: isPinned
+                    ? '0 1px 4px rgba(245,158,11,0.1)'
+                    : '0 1px 3px rgba(0,0,0,0.04)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: cfg.color,
+                        textTransform: 'uppercase', letterSpacing: '0.5px',
+                      }}>
                         {cfg.label}
-                        {isPinned && <span style={{ marginLeft: 6, color: '#f59e0b' }}>· Fixada</span>}
+                        {isPinned && (
+                          <span style={{ marginLeft: 6, color: '#f59e0b' }}>· Fixada</span>
+                        )}
                       </span>
                       {e.content && (
-                        <p style={{ fontSize: 13, color: '#1a1f36', margin: '4px 0 0', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                        <p style={{
+                          fontSize: 13, color: '#1a1f36', margin: '4px 0 0',
+                          lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                        }}>
                           {e.content}
                         </p>
                       )}
@@ -176,31 +192,33 @@ export function TimelineFeed({
                       </div>
                     </div>
 
-                    {/* Ações da nota */}
+                    {/* Ações — só em notas */}
                     {isNote && (
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        {/* Toggle pin */}
                         <button
                           onClick={() => handleTogglePin(e.id)}
                           disabled={pinningId === e.id}
                           title={isPinned ? 'Desfixar nota' : 'Fixar nota no topo'}
                           style={{
-                            fontSize: 14, background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: 14, background: 'none', border: 'none',
+                            cursor: 'pointer', padding: 2,
                             opacity: pinningId === e.id ? 0.4 : isPinned ? 1 : 0.35,
-                            filter: isPinned ? 'none' : 'grayscale(1)', padding: 2,
-                          }}>
+                            filter: isPinned ? 'none' : 'grayscale(1)',
+                          }}
+                        >
                           📌
                         </button>
-                        {/* Delete — só admin */}
                         {isAdmin && (
                           <button
                             onClick={() => handleDelete(e.id)}
                             disabled={deletingId === e.id}
                             title="Excluir nota"
                             style={{
-                              fontSize: 12, background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#fca5a5', opacity: deletingId === e.id ? 0.4 : 0.6, padding: 2,
-                            }}>
+                              fontSize: 12, background: 'none', border: 'none',
+                              cursor: 'pointer', color: '#fca5a5', padding: 2,
+                              opacity: deletingId === e.id ? 0.4 : 0.6,
+                            }}
+                          >
                             🗑️
                           </button>
                         )}
@@ -212,36 +230,7 @@ export function TimelineFeed({
             )
           })}
         </div>
-      </div>
+      )}
     </div>
   )
 }
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-
-type Event = {
-  id: string
-  type: string
-  content: string
-  created_at: string
-  profiles: { full_name: string } | null
-  metadata: any | null
-  is_pinned?: boolean | null
-}
-
-const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
-  note:                  { icon: '💬', color: '#f97316', bg: '#fff7ed', label: 'Nota' },
-  email:                 { icon: '✉️', color: '#3b5bdb', bg: '#eef3ff', label: 'E-mail' },
-  stage_change:          { icon: '🔄', color: '#1a7c3e', bg: '#eaf5ee', label: 'Mudança de etapa' },
-  pipeline_change:       { icon: '↗️', color: '#1a7c3e', bg: '#eaf5ee', label: 'Mudança de funil' },
-  file:                  { icon: '📎', color: '#3b5bdb', bg: '#eef3ff', label: 'Arquivo' },
-  automation_triggered:  { icon: '⚡', color: '#7c3aed', bg: '#f3e8ff', label: 'Automação' },
-  system:                { icon: '🔧', color: '#8892a4', bg: '#f1f3f8', label: 'Sistema' },
-  transfer:              { icon: '↔️', color: '#8892a4', bg: '#f1f3f8', label: 'Transferência' },
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
