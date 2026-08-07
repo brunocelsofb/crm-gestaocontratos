@@ -69,7 +69,7 @@ export function ActivitiesTable({
   async function handleToggle(a: Activity) {
     setTogglingId(a.id)
     const next = a.status === 'done' ? 'planned' : 'done'
-    await updateActivityStatus(a.id, contractId, next)
+    await updateActivityStatus(a.id, next)
     setTogglingId(null)
     router.refresh()
   }
@@ -77,7 +77,7 @@ export function ActivitiesTable({
   async function handleDelete(id: string) {
     if (!confirm('Excluir esta atividade?')) return
     setDeletingId(id)
-    await deleteActivity(id, contractId)
+    await deleteActivity(id)
     setDeletingId(null)
     router.refresh()
   }
