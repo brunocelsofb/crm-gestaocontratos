@@ -4,6 +4,7 @@ import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { TimelineFeed } from '@/components/contracts/timeline-feed'
 import { ActivityFeed } from '@/components/activities/activity-feed'
+import { ActivitiesTable } from '@/components/activities/activities-table'
 import { NoteForm } from '@/components/contracts/note-form'
 import { NpsSection } from '@/components/nps/nps-section'
 import { FilesSection } from '@/components/contracts/files-section'
@@ -439,11 +440,12 @@ export default async function ContractDetailPage({
             id: 'atividades',
             label: 'Atividades',
             content: (
-              <ActivityFeed
-                activities={(activities ?? []).filter((a: any) => !['stage_change','pipeline_change','automation_triggered','system','transfer'].includes(a.type))}
+              <ActivitiesTable
+                activities={(activities ?? []).filter((a: any) =>
+                  ['call', 'meeting', 'task', 'reminder', 'activity'].includes(a.type) ||
+                  ['call', 'meeting', 'task', 'reminder'].includes(a.activity_type)
+                )}
                 contractId={contract.id}
-                companyId={contract.company_id ?? null}
-                pipelineRunId={displayRun?.id ?? null}
                 profiles={allProfiles ?? []}
                 currentUserId={currentProfile?.id ?? ''}
               />

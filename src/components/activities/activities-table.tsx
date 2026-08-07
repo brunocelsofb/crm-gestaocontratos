@@ -1,0 +1,233 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { updateActivityStatus, deleteActivity } from '@/lib/actions/activities'
+import { CreateActivityModal } from './create-activity-modal'
+
+type Activity = {
+  id: string
+  type: string
+  activity_type?: string | null
+  title?: string | null
+  content: string
+  status?: string | null
+  activity_date?: string | null
+  activity_time?: string | null
+  duration_minutes?: number | null
+  created_at: string
+  user_id?: string | null
+  assigned_to?: string | null
+}
+
+type Profile = { id: string; full_name: string }
+
+const TYPE_META: Record<string, { icon: string; label: string }> = {
+  call:     { icon: '📞', label: 'Ligação' },
+  meeting:  { icon: '📅', label: 'Reunião' },
+  task:     { icon: '✅', label: 'Tarefa' },
+  reminder: { icon: '🔔', label: 'Lembrete' },
+  activity: { icon: '📝', label: 'Atividade' },
+}
+
+function fmtDate(date?: string | null, time?: string | null) {
+  if (!date) return '—'
+  const d = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return time ? `${d} ${time.slice(0, 5)}` : d
+}
+
+function isOverdue(a: Activity) {
+  if (a.status === 'done' || a.completed) return false
+  if (!a.activity_date) return false
+  return new Date(a.activity_date + 'T23:59:59') < new Date()
+}
+
+export function ActivitiesTable({
+  activities,
+  contractId,
+  profiles,
+  currentUserId,
+}: {
+  activities: Activity[]
+  contractId: string
+  profiles: Profile[]
+  currentUserId: string
+}) {
+  const router = useRouter()
+  const [tab, setTab] = useState<'planned' | 'done'>('planned')
+  const [showModal, setShowModal] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const profileById = new Map(profiles.map(p => [p.id, p.full_name]))
+
+  const planned = activities.filter(a => a.status !== 'done' && !a.completed)
+  const done    = activities.filter(a => a.status === 'done' || a.completed)
+  const rows    = tab === 'planned' ? planned : done
+
+  async function handleToggle(a: Activity) {
+    setTogglingId(a.id)
+    const next = a.status === 'done' ? 'planned' : 'done'
+    await updateActivityStatus(a.id, contractId, next)
+    setTogglingId(null)
+    router.refresh()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Excluir esta atividade?')) return
+    setDeletingId(id)
+    await deleteActivity(id, contractId)
+    setDeletingId(null)
+    router.refresh()
+  }
+
+  const th: React.CSSProperties = {
+    padding: '10px 12px', fontSize: 10, fontWeight: 700, color: '#8892a4',
+    textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'left',
+    borderBottom: '0.5px solid #e8edf5', background: '#f8f9fb',
+  }
+
+  const td: React.CSSProperties = {
+    padding: '12px 12px', fontSize: 12, color: '#1a1f36',
+    borderBottom: '0.5px solid #f1f3f8', verticalAlign: 'top',
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 0, background: '#f1f3f8', borderRadius: 8, padding: 3 }}>
+          {(['planned', 'done'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              padding: '5px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6,
+              border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+              background: tab === t ? '#fff' : 'transparent',
+              color: tab === t ? '#1a1f36' : '#8892a4',
+              boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}>
+              {t === 'planned' ? `Planejadas (${planned.length})` : `Concluídas (${done.length})`}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowModal(true)} style={{
+          padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+          border: 'none', background: '#1B556B', color: '#fff', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          + Nova atividade
+        </button>
+      </div>
+
+      {/* Tabela */}
+      {rows.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 0', color: '#b0b8c8', fontSize: 13 }}>
+          {tab === 'planned' ? 'Nenhuma atividade planejada.' : 'Nenhuma atividade concluída.'}
+        </div>
+      ) : (
+        <div style={{ borderRadius: 10, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, width: 40 }}></th>
+                <th style={th}>Data</th>
+                <th style={th}>Dur.</th>
+                <th style={th}>Tipo</th>
+                <th style={th}>Título</th>
+                <th style={th}>Resp.</th>
+                <th style={{ ...th, width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(a => {
+                const meta = TYPE_META[a.activity_type ?? a.type] ?? TYPE_META['activity']
+                const overdue = isOverdue(a)
+                const done = a.status === 'done' || !!a.completed
+                const respId = a.assigned_to ?? a.user_id
+                const resp = respId ? profileById.get(respId) : null
+                const rowBg = done ? '#fafafa' : overdue ? '#fef2f2' : '#fff'
+
+                return (
+                  <tr key={a.id} style={{ background: rowBg }}>
+                    {/* Checkbox */}
+                    <td style={{ ...td, textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleToggle(a)}
+                        disabled={togglingId === a.id}
+                        style={{
+                          width: 20, height: 20, borderRadius: 4, border: `2px solid ${done ? '#1a7c3e' : '#d1d8e8'}`,
+                          background: done ? '#1a7c3e' : '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          opacity: togglingId === a.id ? 0.5 : 1,
+                        }}>
+                        {done && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>✓</span>}
+                      </button>
+                    </td>
+
+                    {/* Data */}
+                    <td style={td}>
+                      <span style={{ color: overdue ? '#b91c1c' : '#52514e', fontWeight: overdue ? 600 : 400 }}>
+                        {fmtDate(a.activity_date, a.activity_time)}
+                      </span>
+                      {overdue && <div style={{ fontSize: 9, color: '#b91c1c', fontWeight: 600 }}>ATRASADA</div>}
+                    </td>
+
+                    {/* Duração */}
+                    <td style={{ ...td, color: '#8892a4' }}>
+                      {a.duration_minutes ? `${a.duration_minutes}min` : '—'}
+                    </td>
+
+                    {/* Tipo */}
+                    <td style={td}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                        <span>{meta.icon}</span>
+                        <span style={{ color: '#52514e' }}>{meta.label}</span>
+                      </span>
+                    </td>
+
+                    {/* Título + descrição */}
+                    <td style={td}>
+                      <p style={{ margin: 0, fontWeight: 500, textDecoration: done ? 'line-through' : 'none', color: done ? '#b0b8c8' : '#1a1f36' }}>
+                        {a.title || meta.label}
+                      </p>
+                      {a.content && (
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#8892a4', lineHeight: 1.4 }}>
+                          {a.content.slice(0, 120)}{a.content.length > 120 ? '…' : ''}
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Responsável */}
+                    <td style={{ ...td, fontSize: 11, color: '#8892a4' }}>
+                      {resp ?? '—'}
+                    </td>
+
+                    {/* Ações */}
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      <button
+                        onClick={() => handleDelete(a.id)}
+                        disabled={deletingId === a.id}
+                        style={{ fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', opacity: deletingId === a.id ? 0.5 : 0.7 }}
+                        title="Excluir">
+                        🗑️
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showModal && (
+        <CreateActivityModal
+          contractId={contractId}
+          onClose={() => setShowModal(false)}
+          profiles={profiles}
+          currentUserId={currentUserId}
+        />
+      )}
+    </div>
+  )
+}
