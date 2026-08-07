@@ -62,24 +62,32 @@ export function ActivitiesTable({
 
   const profileById = new Map(profiles.map(p => [p.id, p.full_name]))
 
-  const planned = activities.filter(a => a.status !== 'done' && !a.completed)
-  const done    = activities.filter(a => a.status === 'done' || a.completed)
+  const [localActivities, setLocalActivities] = useState(activities)
+
+  function handleCreated(newActivity: any) {
+    setLocalActivities(prev => [newActivity, ...prev])
+  }
+
+  const planned = localActivities.filter(a => a.status !== 'done' && !a.completed)
+  const done    = localActivities.filter(a => a.status === 'done' || a.completed)
   const rows    = tab === 'planned' ? planned : done
 
   async function handleToggle(a: Activity) {
     setTogglingId(a.id)
-    const next = a.status === 'done' ? 'planned' : 'done'
+    const next = (a.status === 'done' || a.completed) ? 'planned' : 'done'
     await updateActivityStatus(a.id, next)
+    setLocalActivities(prev => prev.map(x =>
+      x.id === a.id ? { ...x, status: next, completed: next === 'done' } : x
+    ))
     setTogglingId(null)
-    router.refresh()
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Excluir esta atividade?')) return
     setDeletingId(id)
     await deleteActivity(id)
+    setLocalActivities(prev => prev.filter(x => x.id !== id))
     setDeletingId(null)
-    router.refresh()
   }
 
   const th: React.CSSProperties = {
@@ -225,6 +233,7 @@ export function ActivitiesTable({
         <CreateActivityModal
           contractId={contractId}
           onClose={() => setShowModal(false)}
+          onCreated={handleCreated}
           profiles={profiles}
           currentUserId={currentUserId}
         />

@@ -16,8 +16,9 @@ const REMINDER_OPTIONS = [
 
 type Profile = { id: string; full_name: string }
 
-export function CreateActivityModal({ onClose, contractId, companyId, pipelineRunId, profiles, currentUserId }: {
+export function CreateActivityModal({ onClose, onCreated, contractId, companyId, pipelineRunId, profiles, currentUserId }: {
   onClose: () => void
+  onCreated?: (activity: any) => void
   contractId?: string | null
   companyId?: string | null
   pipelineRunId?: string | null
@@ -44,12 +45,32 @@ export function CreateActivityModal({ onClose, contractId, companyId, pipelineRu
   async function handleSave() {
     if (!title.trim() && !content.trim()) { setError('Preencha o título ou a descrição.'); return }
     setBusy(true); setError(null)
-    const result = await createActivity({ contractId, companyId, pipelineRunId, title, content, activityType: type, status, activityDate: date || null, activityTime: time || null, durationMinutes: duration, reminderMinutes: reminder, assignedTo, participants })
+    try {
+      const result = await createActivity({
+        contractId, companyId, pipelineRunId, title, content,
+        activityType: type, status, activityDate: date || null,
+        activityTime: time || null, durationMinutes: duration,
+        reminderMinutes: reminder, assignedTo, participants,
+      })
+      if (result.error) { setError(result.error); setBusy(false); return }
+      // Chama callback com a nova atividade para atualização imediata da lista
+      if (onCreated) {
+        onCreated({
+          id: result.id ?? crypto.randomUUID(),
+          type, activity_type: type, title, content, status,
+          activity_date: date || null, activity_time: time || null,
+          duration_minutes: duration, created_at: new Date().toISOString(),
+          user_id: currentUserId, assigned_to: assignedTo,
+          completed: status === 'done',
+        })
+      } else {
+        router.refresh()
+      }
+      onClose()
+    } catch (e) {
+      setError(`Erro inesperado: ${e instanceof Error ? e.message : 'Tente novamente.'}`)
+    }
     setBusy(false)
-    if (result.error) { setError(result.error); return }
-    // Fecha primeiro, depois recarrega — evita o modal travar
-    onClose()
-    router.refresh()
   }
 
   return (
