@@ -3,15 +3,8 @@
 import { useState } from 'react'
 import { setProposalPageOrder } from '@/lib/actions/proposals'
 
-type Template = { id: string; name: string }
-type PageEntry = { key: string; templateId: string | null; isStandardProposal: boolean }
-
-// Dicionário de templates por tipo de serviço
-const SERVICE_TEMPLATES: Record<string, { pages: string[]; serviceType: string }> = {
-  clinica:    { serviceType: 'clinica',    pages: ['Capa EC', 'Proposta Padrão', 'Anexo Metodologia EC', 'Anexo Equipe', 'Final EC'] },
-  hospitalar: { serviceType: 'hospitalar', pages: ['Capa EH', 'Proposta Padrão', 'Anexo Metodologia EH', 'Anexo Equipe', 'Anexo Leitos', 'Final EH'] },
-  avulso:     { serviceType: 'avulso',     pages: ['Proposta Padrão'] },
-}
+type Template = { id: string; name: string; sort_order?: number; is_miolo_after?: boolean; service_type?: string }
+type PageEntry = { key: string; templateId: string | null; isStandardProposal: boolean; name: string }
 
 export function ProposalPageOrderEditor({
   proposalId,
@@ -26,36 +19,70 @@ export function ProposalPageOrderEditor({
 }) {
   const [pages, setPages] = useState<PageEntry[]>(
     initialPages.length > 0
-      ? initialPages.map((p) => ({ key: crypto.randomUUID(), templateId: p.template_id, isStandardProposal: p.is_standard_proposal }))
-      : [{ key: crypto.randomUUID(), templateId: null, isStandardProposal: true }]
+      ? initialPages.map((p) => {
+          const tmpl = templates.find(t => t.id === p.template_id)
+          return { key: crypto.randomUUID(), templateId: p.template_id, isStandardProposal: p.is_standard_proposal, name: tmpl?.name ?? 'PDF' }
+        })
+      : [{ key: crypto.randomUUID(), templateId: null, isStandardProposal: true, name: 'Proposta padrão' }]
   )
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function applyServiceTemplate(service: string) {
     if (!service) return
-    const tmpl = SERVICE_TEMPLATES[service]
-    if (!tmpl) return
-    const newPages: PageEntry[] = tmpl.pages.map(name => {
-      if (name === 'Proposta Padrão') return { key: crypto.randomUUID(), templateId: null, isStandardProposal: true }
-      const found = templates.find(t => t.name.toLowerCase().includes(name.toLowerCase().split(' ')[1] ?? name.toLowerCase()))
-      return { key: crypto.randomUUID(), templateId: found?.id ?? templates[0]?.id ?? null, isStandardProposal: false }
-    })
-    if (!newPages.some(p => p.isStandardProposal)) {
-      newPages.splice(1, 0, { key: crypto.randomUUID(), templateId: null, isStandardProposal: true })
-    }
-    setPages(newPages)
+    setLoading(true)
+    try {
+      // Busca templates reais do banco para este service_type, em sort_order
+      const res = await fetch(`/api/proposals/templates-by-type?service_type=${service}`)
+      const { templates: serviceTemplates, miolo_after_id } = await res.json()
 
-    // Salva template_service_type na proposta
-    await fetch('/api/proposals/service-type', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proposal_id: proposalId, service_type: tmpl.serviceType }),
-    })
+      if (!serviceTemplates || serviceTemplates.length === 0) {
+        // Sem templates configurados — só a proposta padrão
+        setPages([{ key: crypto.randomUUID(), templateId: null, isStandardProposal: true, name: 'Proposta padrão' }])
+        setLoading(false)
+        return
+      }
+
+      // Reconstrói a lista respeitando a posição do miolo configurada no admin
+      const newPages: PageEntry[] = []
+      let mioloInserted = false
+
+      if (miolo_after_id === 'start') {
+        newPages.push({ key: crypto.randomUUID(), templateId: null, isStandardProposal: true, name: 'Proposta padrão' })
+        mioloInserted = true
+      }
+
+      for (const t of serviceTemplates) {
+        newPages.push({ key: crypto.randomUUID(), templateId: t.id, isStandardProposal: false, name: t.name })
+        if (t.is_miolo_after && !mioloInserted) {
+          newPages.push({ key: crypto.randomUUID(), templateId: null, isStandardProposal: true, name: 'Proposta padrão' })
+          mioloInserted = true
+        }
+      }
+
+      if (!mioloInserted) {
+        // Miolo no final (padrão se não configurado)
+        newPages.push({ key: crypto.randomUUID(), templateId: null, isStandardProposal: true, name: 'Proposta padrão' })
+      }
+
+      setPages(newPages)
+
+      // Salva service_type na proposta
+      await fetch('/api/proposals/service-type', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposal_id: proposalId, service_type: service }),
+      })
+    } catch (e) {
+      setError('Erro ao carregar template. Tente novamente.')
+    }
+    setLoading(false)
   }
 
   function addPage() {
-    setPages((prev) => [...prev, { key: crypto.randomUUID(), templateId: templates[0]?.id ?? null, isStandardProposal: false }])
+    const t = templates[0]
+    setPages((prev) => [...prev, { key: crypto.randomUUID(), templateId: t?.id ?? null, isStandardProposal: false, name: t?.name ?? 'PDF' }])
   }
 
   function removePage(key: string) {
@@ -75,13 +102,12 @@ export function ProposalPageOrderEditor({
 
   function setPageType(key: string, value: string) {
     setPages((prev) =>
-      prev.map((p) =>
-        p.key === key
-          ? value === 'standard'
-            ? { ...p, isStandardProposal: true, templateId: null }
-            : { ...p, isStandardProposal: false, templateId: value }
-          : p
-      )
+      prev.map((p) => {
+        if (p.key !== key) return p
+        if (value === 'standard') return { ...p, isStandardProposal: true, templateId: null, name: 'Proposta padrão' }
+        const tmpl = templates.find(t => t.id === value)
+        return { ...p, isStandardProposal: false, templateId: value, name: tmpl?.name ?? 'PDF' }
+      })
     )
   }
 
@@ -107,13 +133,14 @@ export function ProposalPageOrderEditor({
       <div className="flex items-center gap-3 rounded-lg border border-dashed border-brand-300 bg-brand-50 px-4 py-3">
         <div className="flex-1">
           <p className="text-xs font-semibold text-brand-700 mb-1">Template de Serviço</p>
-          <p className="text-xs text-brand-500">Selecione para auto-preencher as páginas padrão do serviço.</p>
+          <p className="text-xs text-brand-500">Selecione para carregar a ordem configurada no painel de Modelos.</p>
         </div>
         <select
           onChange={e => applyServiceTemplate(e.target.value)}
           defaultValue=""
-          className="rounded-md border border-brand-300 px-2 py-1.5 text-xs font-medium text-brand-700 bg-white focus:outline-none">
-          <option value="">Selecionar template...</option>
+          disabled={loading}
+          className="rounded-md border border-brand-300 px-2 py-1.5 text-xs font-medium text-brand-700 bg-white focus:outline-none disabled:opacity-50">
+          <option value="">{loading ? 'Carregando...' : 'Selecionar template...'}</option>
           <option value="clinica">Engenharia Clínica</option>
           <option value="hospitalar">Engenharia Hospitalar</option>
           <option value="avulso">Avulso</option>
