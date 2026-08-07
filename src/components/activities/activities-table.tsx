@@ -18,6 +18,7 @@ type Activity = {
   created_at: string
   user_id?: string | null
   assigned_to?: string | null
+  completed?: boolean | null
 }
 
 type Profile = { id: string; full_name: string }
