@@ -431,6 +431,7 @@ export default async function ContractDetailPage({
                   <TimelineFeed
                     events={activities ?? []}
                     contractId={contract.id}
+                    currentUserRole={currentProfile?.role ?? 'member'}
                   />
                 </div>
               </div>
@@ -442,8 +443,8 @@ export default async function ContractDetailPage({
             content: (
               <ActivitiesTable
                 activities={(activities ?? []).filter((a: any) =>
-                  ['call', 'meeting', 'task', 'reminder', 'activity'].includes(a.type) ||
-                  ['call', 'meeting', 'task', 'reminder'].includes(a.activity_type)
+                  ['call', 'meeting', 'task', 'reminder'].includes(a.type) ||
+                  ['call', 'meeting', 'task', 'reminder'].includes(a.activity_type ?? '')
                 )}
                 contractId={contract.id}
                 profiles={allProfiles ?? []}
