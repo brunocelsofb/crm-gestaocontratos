@@ -251,8 +251,9 @@ export function ProposalContentBlocksEditor({
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Texto de introdução para este item</label>
               <textarea defaultValue={b.introduction ?? ''} onBlur={e => saveIntro(b.id, e.target.value)}
-                rows={2} placeholder="Digite o contexto ou introdução..." disabled={!canEdit}
-                className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-brand-700 resize-none disabled:bg-gray-50" />
+                rows={5} placeholder="Digite o contexto ou introdução..." disabled={!canEdit}
+                className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-brand-700 resize-y disabled:bg-gray-50"
+                style={{ minHeight: '80px' }} />
               {savingIntro === b.id && <span className="text-xs text-gray-400">Salvando...</span>}
               <p className="text-xs text-gray-400 mt-1">
                 Dica: <code className="bg-gray-100 px-0.5 rounded">**palavra**</code> = <strong>negrito</strong> · <code className="bg-gray-100 px-0.5 rounded">*palavra*</code> = <em>itálico</em>. O PDF justifica automaticamente.
