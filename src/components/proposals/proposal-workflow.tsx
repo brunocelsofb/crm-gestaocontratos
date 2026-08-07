@@ -700,7 +700,7 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
               onClick={async () => {
                 const res = await fetch('/api/proposals/client-token', {
                   method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ contract_id: contractId }),
+                  body: JSON.stringify({ contract_id: contractId, proposal_id: proposalId }),
                 })
                 const json = await res.json()
                 if (json.token) window.open(`${window.location.origin}/proposals/client/${json.token}`, '_blank')

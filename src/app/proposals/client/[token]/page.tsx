@@ -6,12 +6,21 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
   const admin = createAdminClient()
 
   const { data: proposal } = await admin
-    .from('proposal_status')
+    .from('proposals')
     .select('*')
     .eq('client_review_token', token)
     .maybeSingle()
 
-  if (!proposal) {
+  // Fallback legado: proposal_status
+  const { data: legacyProposal } = !proposal ? await admin
+    .from('proposal_status')
+    .select('*')
+    .eq('client_review_token', token)
+    .maybeSingle() : { data: null }
+
+  const source = proposal ?? legacyProposal
+
+  if (!source) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f7f7' }}>
         <div style={{ background: '#fff', borderRadius: 14, padding: 32, textAlign: 'center', maxWidth: 400 }}>
@@ -23,7 +32,7 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
   }
 
   // Busca contrato separadamente — funciona com pipeline_run ou contract
-  const contractId = (proposal as any).contract_id
+  const contractId = (source as any).contract_id
   const { data: contractData } = await admin
     .from('contracts')
     .select('id, client_name, title, process_number')
@@ -70,7 +79,7 @@ export default async function ClientApprovalPage({ params }: { params: Promise<{
         <ClientApprovalForm
           token={token}
           contractId={contractId}
-          currentStatus={proposal.client_status ?? 'pendente'}
+          currentStatus={(source as any).client_status ?? 'pendente'}
         />
       </div>
     </div>
