@@ -14,7 +14,7 @@ export type CreateActivityInput = {
   pipelineRunId?: string | null
   title: string
   content: string
-  activityType: ActivityType
+  activityType: ActivityType | 'note'
   status: 'planned' | 'done'
   activityDate?: string | null
   activityTime?: string | null
