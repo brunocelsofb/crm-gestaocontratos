@@ -64,26 +64,6 @@ export function ActivityFeed({
     router.refresh()
   }
 
-  const [pinningId, setPinningId] = useState<string | null>(null)
-  const [pinnedIds, setPinnedIds] = useState<Set<string>>(
-    new Set(activities.filter(a => a.is_pinned).map(a => a.id))
-  )
-
-  async function handleTogglePin(activityId: string) {
-    setPinningId(activityId)
-    const res = await fetch(`/api/activities/${activityId}/pin`, { method: 'POST' })
-    const json = await res.json()
-    if (res.ok) {
-      setPinnedIds(prev => {
-        const next = new Set(prev)
-        if (json.is_pinned) next.add(activityId)
-        else next.delete(activityId)
-        return next
-      })
-    }
-    setPinningId(null)
-  }
-
   const isSystem = (a: Activity) =>
     ['stage_change', 'pipeline_change', 'automation_triggered', 'system', 'transfer'].includes(a.type)
 
@@ -109,18 +89,8 @@ export function ActivityFeed({
         const isDone = a.status === 'done'
         const isPlanned = a.status === 'planned'
 
-        const isPinned = pinnedIds.has(a.id)
-
         return (
-          <div key={a.id} style={{
-            display: 'flex', gap: 10, paddingBottom: 14, marginBottom: 14,
-            borderBottom: '0.5px solid #f1f3f8',
-            background: isPinned ? '#fffbeb' : 'transparent',
-            borderLeft: isPinned ? '3px solid #f59e0b' : '3px solid transparent',
-            paddingLeft: isPinned ? 10 : 0,
-            borderRadius: isPinned ? 6 : 0,
-            transition: 'all 0.15s',
-          }}>
+          <div key={a.id} style={{ display: 'flex', gap: 10, paddingBottom: 14, marginBottom: 14, borderBottom: '0.5px solid #f1f3f8' }}>
             {/* Ícone */}
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: isSystemEvent ? '#f1f3f8' : isPlanned ? '#eef3ff' : '#eaf5ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
               {icon}
@@ -137,21 +107,6 @@ export function ActivityFeed({
                 </div>
                 {!isSystemEvent && (
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    {/* Botão Pin */}
-                    <button
-                      onClick={() => handleTogglePin(a.id)}
-                      disabled={pinningId === a.id}
-                      title={isPinned ? 'Desafixar nota' : 'Fixar nota no topo'}
-                      style={{
-                        fontSize: 13, padding: '2px 6px', borderRadius: 6,
-                        border: isPinned ? '0.5px solid #f59e0b' : '0.5px solid #e8edf5',
-                        background: isPinned ? '#fef3c7' : '#fff',
-                        color: isPinned ? '#b45309' : '#b0b8c8',
-                        cursor: 'pointer', lineHeight: 1,
-                        opacity: pinningId === a.id ? 0.5 : 1,
-                      }}>
-                      📌
-                    </button>
                     {isPlanned && (
                       <button onClick={() => handleToggleDone(a.id, a.status ?? null)}
                         style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '0.5px solid #1a7c3e', background: '#eaf5ee', color: '#1a7c3e', cursor: 'pointer' }}>

@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
+import { TimelineFeed } from '@/components/contracts/timeline-feed'
 import { ActivityFeed } from '@/components/activities/activity-feed'
 import { NoteForm } from '@/components/contracts/note-form'
 import { NpsSection } from '@/components/nps/nps-section'
@@ -426,8 +427,10 @@ export default async function ContractDetailPage({
                 <ContractCustomFieldsSection contractId={contract.id} fields={customFields ?? []} values={customFieldValues} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <NoteForm contractId={contract.id} />
-                  <Timeline activities={activities} />
+                  <TimelineFeed
+                    events={activities ?? []}
+                    contractId={contract.id}
+                  />
                 </div>
               </div>
             ),
