@@ -93,30 +93,49 @@ function StatusBadge({ status }: { status: ProposalStatus }) {
 }
 
 // ── Subcomponente: Auditoria ────────────────────────────────────────────────
-function AuditRow({ icon, label, by, role, at, comment, restriction }: {
-  icon: string; label: string; by: string; role?: string; at?: string | null; comment?: string | null; restriction?: string | null
+const AUDIT_COLOR: Record<string, { bg: string; border: string; iconBg: string }> = {
+  '📤': { bg: '#eef3ff', border: '#c7d7ff', iconBg: '#3b5bdb' },
+  '🔧': { bg: '#eaf5ee', border: '#bbddc8', iconBg: '#1a7c3e' },
+  '✅': { bg: '#eaf5ee', border: '#bbddc8', iconBg: '#1a7c3e' },
+  '🤝': { bg: '#eaf5ee', border: '#bbddc8', iconBg: '#1a7c3e' },
+  '❌': { bg: '#fdecea', border: '#fca5a5', iconBg: '#b91c1c' },
+  '🔄': { bg: '#f3e8ff', border: '#d8b4fe', iconBg: '#7c3aed' },
+}
+
+function AuditRow({ icon, label, by, role, at, comment, restriction, isLast }: {
+  icon: string; label: string; by: string; role?: string
+  at?: string | null; comment?: string | null; restriction?: string | null; isLast?: boolean
 }) {
+  const colors = AUDIT_COLOR[icon] ?? { bg: '#f8f9fb', border: '#e8edf5', iconBg: '#52514e' }
   return (
-    <div style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '0.5px solid #f1f3f8' }}>
+    <div style={{ display: 'flex', gap: 14, position: 'relative', paddingBottom: isLast ? 0 : 24 }}>
+      {/* Linha vertical */}
+      {!isLast && (
+        <div style={{ position: 'absolute', left: 17, top: 38, bottom: 0, width: 2, background: '#f1f3f8', zIndex: 0 }} />
+      )}
+      {/* Ícone circular */}
       <div style={{
-        width: 36, height: 36, borderRadius: '50%', background: '#f8f9fb',
+        width: 36, height: 36, borderRadius: '50%',
+        background: colors.iconBg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, flexShrink: 0, border: '0.5px solid #e8edf5'
+        fontSize: 15, flexShrink: 0, zIndex: 1,
+        boxShadow: '0 0 0 3px #fff, 0 0 0 4px ' + colors.border,
       }}>{icon}</div>
-      <div style={{ flex: 1 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1f36', margin: '0 0 2px' }}>{label}</p>
-        <p style={{ fontSize: 11, color: '#8892a4', margin: 0 }}>
-          <strong style={{ color: '#52514e' }}>{by}</strong>
-          {role && <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 10, background: '#f1f3f8', fontSize: 10 }}>{role}</span>}
-          {at && <span style={{ marginLeft: 8 }}>· {at}</span>}
-        </p>
+      {/* Card */}
+      <div style={{ flex: 1, background: colors.bg, borderRadius: 10, border: `0.5px solid ${colors.border}`, padding: '10px 14px', marginTop: 2 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#1a1f36', margin: '0 0 4px' }}>{label}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#52514e' }}>{by}</span>
+          {role && <span style={{ fontSize: 10, padding: '1px 8px', borderRadius: 20, background: '#fff', border: '0.5px solid #e8edf5', color: '#8892a4' }}>{role}</span>}
+          {at && <span style={{ fontSize: 11, color: '#b0b8c8' }}>· {at}</span>}
+        </div>
         {comment && (
-          <p style={{ fontSize: 12, color: '#52514e', margin: '8px 0 0', padding: '8px 12px', background: '#f8f9fb', borderRadius: 6, borderLeft: '2px solid #d1d8e8', lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: '#52514e', margin: '8px 0 0', padding: '8px 12px', background: '#fff', borderRadius: 6, borderLeft: '3px solid ' + colors.border, lineHeight: 1.55, fontStyle: 'italic' }}>
             "{comment}"
           </p>
         )}
         {restriction && (
-          <p style={{ fontSize: 11, color: '#92400e', margin: '6px 0 0', padding: '6px 10px', background: '#fff8e6', borderRadius: 6, borderLeft: '2px solid #f59e0b' }}>
+          <p style={{ fontSize: 11, color: '#92400e', margin: '6px 0 0', padding: '6px 10px', background: '#fff8e6', borderRadius: 6, borderLeft: '3px solid #f59e0b' }}>
             ⚠ {restriction}
           </p>
         )}
@@ -536,11 +555,12 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       {(data.submitted_by_name || data.technical_approved_by_name || data.commercial_approved_by_name || data.client_approved_by_name) && card(
         <div>
           {sectionLabel('Histórico de Aprovações')}
-          <div style={{ marginTop: -4 }}>
+          <div style={{ marginTop: 8 }}>
             {data.submitted_by_name && (
               <AuditRow icon="📤" label="Enviada para Análise Técnica"
                 by={data.submitted_by_name} role={ROLE_LABELS['member']}
-                at={fmtDt(data.submitted_at) ?? undefined} />
+                at={fmtDt(data.submitted_at) ?? undefined}
+                isLast={!data.technical_approved_by_name && !data.commercial_approved_by_name && !data.client_approved_by_name} />
             )}
             {data.technical_approved_by_name && (
               <AuditRow icon="🔧" label="Aprovada Tecnicamente"
@@ -548,20 +568,23 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
                 role={ROLE_LABELS[(data as any).technical_approved_by_role ?? 'aprovador_tecnico']}
                 at={fmtDt(data.technical_approved_at) ?? undefined}
                 comment={data.technical_comment ?? undefined}
-                restriction={data.technical_restrictions ?? undefined} />
+                restriction={data.technical_restrictions ?? undefined}
+                isLast={!data.commercial_approved_by_name && !data.client_approved_by_name} />
             )}
             {data.commercial_approved_by_name && (
               <AuditRow icon="✅" label="Aprovada Comercialmente"
                 by={data.commercial_approved_by_name}
                 role={ROLE_LABELS[(data as any).commercial_approved_by_role ?? 'aprovador_comercial']}
-                at={fmtDt(data.commercial_approved_at) ?? undefined} />
+                at={fmtDt(data.commercial_approved_at) ?? undefined}
+                isLast={!data.client_approved_by_name} />
             )}
             {data.client_approved_by_name && (
               <AuditRow
                 icon={data.client_status === 'aprovado' ? '🤝' : '❌'}
                 label={data.client_status === 'aprovado' ? 'Aceita pelo Cliente' : 'Declinada pelo Cliente'}
                 by={data.client_approved_by_name}
-                at={fmtDt(data.client_approved_at) ?? undefined} />
+                at={fmtDt(data.client_approved_at) ?? undefined}
+                isLast />
             )}
           </div>
         </div>

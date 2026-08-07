@@ -146,16 +146,19 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             currentUserRole={currentUserRole}
             currentUserName={currentUserName}
           />
-          <ProposalTextsEditor
-            contractId={contractId}
-            proposalId={selectedId}
-            initialData={{
-              texto_objetivos: selected.texto_objetivos,
-              texto_atividades: selected.texto_atividades,
-              texto_estrutura_apoio: selected.texto_estrutura_apoio,
-            }}
-          />
-          {selected.workflow_status === 'aprovado_comercial' && (
+          {/* Textos e montagem — exclusivos para Comercial e Admin */}
+          {currentUserRole !== 'aprovador_tecnico' && (
+            <ProposalTextsEditor
+              contractId={contractId}
+              proposalId={selectedId}
+              initialData={{
+                texto_objetivos: selected.texto_objetivos,
+                texto_atividades: selected.texto_atividades,
+                texto_estrutura_apoio: selected.texto_estrutura_apoio,
+              }}
+            />
+          )}
+          {selected.workflow_status === 'aprovado_comercial' && currentUserRole !== 'aprovador_tecnico' && (
             <div id="montagem-proposta">
               <ProposalsSection
                 contractId={contractId}

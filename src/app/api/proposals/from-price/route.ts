@@ -117,15 +117,22 @@ export async function POST(req: Request) {
     ].filter(Boolean).join(' · ')
 
     // Monta itens da proposta
+    // Ponto 3: título derivado do tipo de engenharia — nunca hardcoded
+    const tituloServico = san(
+      snap.tituloItemServico?.trim()
+        ? snap.tituloItemServico
+        : snap.tipoEngenharia === 'Hospitalar'
+          ? 'Servico Continuo de Engenharia Hospitalar'
+          : 'Servico Continuo de Engenharia Clinica'
+    )
+
     // REGRA: só inclui itens com valor real (> 0) vindo da precificação.
-    // Itens zerados não têm origem na precificação e não devem aparecer.
     const items = [
-      // Item principal: Serviço MRR — sempre tem valor (= proposal_value)
       {
         position: 0,
         quantity: 1,
         category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
-        item: san(snap.tituloItemServico ?? 'Servico Continuo de Engenharia'),
+        item: tituloServico,
         characteristics: characteristics.slice(0, 500),
         type: 'MRR',
         delivery_forecast: null,

@@ -10,11 +10,8 @@ export async function POST(req: Request) {
   const { contract_id } = await req.json()
   const admin = createAdminClient()
 
-  // Conta versões existentes para esta oportunidade
-  const { count: versionCount } = await admin.from('proposals')
-    .select('id', { count: 'exact', head: true })
-    .eq('contract_id', contract_id)
-  const version = (versionCount ?? 0) + 1
+  // Nova proposta sempre nasce como v1 — versão só incrementa via "Criar versão"
+  const version = 1
 
   // Prefixo da organização
   const { data: orgSettings } = await admin.from('organization_settings')
