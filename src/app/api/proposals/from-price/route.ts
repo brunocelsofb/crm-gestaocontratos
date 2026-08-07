@@ -117,8 +117,10 @@ export async function POST(req: Request) {
     ].filter(Boolean).join(' · ')
 
     // Monta itens da proposta
+    // REGRA: só inclui itens com valor real (> 0) vindo da precificação.
+    // Itens zerados não têm origem na precificação e não devem aparecer.
     const items = [
-      // Item 1: Serviço MRR
+      // Item principal: Serviço MRR — sempre tem valor (= proposal_value)
       {
         position: 0,
         quantity: 1,
@@ -131,8 +133,8 @@ export async function POST(req: Request) {
         discount: 0,
         subtotal: Number(proposal_value),
       },
-      // Item 2: Peças e Insumos (se houver)
-      snap.tituloItemPecas && {
+      // Peças e Insumos: só inclui se tiver valor precificado real (pecasServicosTotal > 0)
+      (snap.pecasServicosTotal > 0 || snap._priceState?.pecasServicos?.totalPecas > 0) && snap.tituloItemPecas && {
         position: 1,
         quantity: 1,
         category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
@@ -140,12 +142,12 @@ export async function POST(req: Request) {
         characteristics: 'Fornecimento de pecas e insumos sob demanda',
         type: 'MRR',
         delivery_forecast: null,
-        unit_value: 0,
+        unit_value: Number(snap.pecasServicosTotal ?? snap._priceState?.pecasServicos?.totalPecas ?? 0),
         discount: 0,
-        subtotal: 0,
+        subtotal: Number(snap.pecasServicosTotal ?? snap._priceState?.pecasServicos?.totalPecas ?? 0),
       },
-      // Item 3: Serviços Externos (se houver)
-      snap.tituloItemServicosExternos && {
+      // Serviços Externos: só inclui se tiver valor precificado real (servicosExternosTotal > 0)
+      (snap.servicosExternosTotal > 0 || snap._priceState?.pecasServicos?.totalServicos > 0) && snap.tituloItemServicosExternos && {
         position: 2,
         quantity: 1,
         category: san(snap.tipoEngenharia === 'Hospitalar' ? 'Engenharia Hospitalar' : 'Engenharia Clinica'),
@@ -153,9 +155,9 @@ export async function POST(req: Request) {
         characteristics: 'Servicos especializados externos sob demanda',
         type: 'Pontual',
         delivery_forecast: null,
-        unit_value: 0,
+        unit_value: Number(snap.servicosExternosTotal ?? snap._priceState?.pecasServicos?.totalServicos ?? 0),
         discount: 0,
-        subtotal: 0,
+        subtotal: Number(snap.servicosExternosTotal ?? snap._priceState?.pecasServicos?.totalServicos ?? 0),
       },
     ].filter(Boolean) as any[]
 
