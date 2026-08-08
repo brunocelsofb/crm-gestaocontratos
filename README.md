@@ -76,3 +76,4 @@ com precisão.
 - O modelo de dados ainda reflete "funil comercial" nos dados de exemplo do
   `schema.sql`, não o cenário real de renovação de contratos que você
   descreveu — combinado para ajustar depois que a base estiver rodando
+# force redeploy Sat Aug  8 21:39:52 UTC 2026
