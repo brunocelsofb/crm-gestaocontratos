@@ -51,14 +51,28 @@ export async function POST(req: Request) {
 
   if (!legacyProposal) return NextResponse.json({ error: 'Token inválido' }, { status: 404 })
 
+  const legacyWorkflow = status === 'aprovado' ? 'cliente_aprovado' : 'cliente_recusado'
+
+  // Atualiza proposal_status (legado)
   await admin.from('proposal_status').update({
     client_status: status,
     client_approved_at: now,
     client_approved_by_name: name,
     client_approved_by_cpf: cpf || null,
-    status: status === 'aprovado' ? 'cliente_aprovado' : 'cliente_recusado',
+    status: legacyWorkflow,
     updated_at: now,
   }).eq('client_review_token', token)
+
+  // Sincroniza proposals (novo modelo) pelo contract_id — garante UI atualizada
+  await admin.from('proposals').update({
+    workflow_status: legacyWorkflow,
+    client_status: status,
+    client_approved_at: now,
+    client_approved_by_name: name,
+    client_approved_by_cpf: cpf || null,
+    updated_at: now,
+  }).eq('contract_id', legacyProposal.contract_id)
+    .not('workflow_status', 'eq', 'rascunho') // não sobrescreve propostas em rascunho
 
   await admin.from('activities').insert({
     contract_id: legacyProposal.contract_id,
