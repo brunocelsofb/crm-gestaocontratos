@@ -9,6 +9,7 @@ const BASE_NAV_ITEMS = [
   { href: '/pipeline', label: 'Funil', icon: KanbanSquare },
   { href: '/leads', label: 'Leads', icon: Target },
   { href: '/contracts', label: 'Oportunidades', icon: FileText },
+  { href: '/propostas', label: 'Propostas', icon: FileText },
   { href: '/carteira', label: 'Gestão de Carteira', icon: Briefcase },
   { href: '/companies', label: 'Empresas', icon: Building2 },
   { href: '/tickets', label: 'Atendimento', icon: LifeBuoy },
