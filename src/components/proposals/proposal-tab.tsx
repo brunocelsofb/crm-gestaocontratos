@@ -62,8 +62,8 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
   reprovado_tecnico:      { label: 'Reprovado',            color: '#b91c1c', bg: '#fdecea' },
   em_aprovacao_comercial: { label: 'Aprov. Comercial',     color: '#92400e', bg: '#fff8e6' },
   aprovado_comercial:     { label: 'Aguardando Cliente',   color: '#1a7c3e', bg: '#eaf5ee' },
-  cliente_aprovado:       { label: 'Cliente Aprovou ✓',    color: '#1a7c3e', bg: '#d1fae5' },
-  cliente_recusado:       { label: 'Cliente Recusou',      color: '#b91c1c', bg: '#fdecea' },
+  cliente_aprovado:       { label: '✅ Cliente Aprovou',    color: '#166534', bg: '#dcfce7' },
+  cliente_recusado:       { label: '❌ Cliente Recusou',    color: '#b91c1c', bg: '#fdecea' },
 }
 
 export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, currentUserName, catalogItems }: Props) {

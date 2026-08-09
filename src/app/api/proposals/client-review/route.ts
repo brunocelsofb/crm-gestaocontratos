@@ -24,23 +24,25 @@ export async function POST(req: Request) {
     .maybeSingle()
 
   if (newProposal) {
+    const newWorkflowStatus = status === 'aprovado' ? 'cliente_aprovado' : 'cliente_recusado'
     await admin.from('proposals').update({
       client_status: status,
       client_approved_at: now,
       client_approved_by_name: name,
       client_approved_by_cpf: cpf || null,
+      workflow_status: newWorkflowStatus,
       updated_at: now,
     }).eq('id', newProposal.id)
 
     await admin.from('activities').insert({
       contract_id: newProposal.contract_id,
-      type: 'note',
+      type: 'client_decision',
       content: `${label} — ${name}${role ? ` (${role})` : ''}${cpf ? ` · CPF: ${cpf}` : ''}${comment ? ` · Obs: ${comment}` : ''}.`,
     })
     return NextResponse.json({ ok: true })
   }
 
-  // Fallback legado: proposal_status
+  // Fallback legado
   const { data: legacyProposal } = await admin
     .from('proposal_status')
     .select('client_review_token, contract_id')
@@ -54,12 +56,13 @@ export async function POST(req: Request) {
     client_approved_at: now,
     client_approved_by_name: name,
     client_approved_by_cpf: cpf || null,
+    status: status === 'aprovado' ? 'cliente_aprovado' : 'cliente_recusado',
     updated_at: now,
   }).eq('client_review_token', token)
 
   await admin.from('activities').insert({
     contract_id: legacyProposal.contract_id,
-    type: 'note',
+    type: 'client_decision',
     content: `${label} — ${name}${role ? ` (${role})` : ''}${cpf ? ` · CPF: ${cpf}` : ''}${comment ? ` · Obs: ${comment}` : ''}.`,
   })
   return NextResponse.json({ ok: true })
