@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { TimelineFeed } from '@/components/contracts/timeline-feed'
+import { TransferSLABanner } from '@/components/contracts/transfer-sla-banner'
 import { ActivityFeed } from '@/components/activities/activity-feed'
 import { ActivitiesTable } from '@/components/activities/activities-table'
 import { NoteForm } from '@/components/contracts/note-form'
@@ -73,6 +74,7 @@ export default async function ContractDetailPage({
     { data: billingRecords },
     { data: proposals },
     { data: catalogItems },
+    { data: transferRequests },
   ] = await Promise.all([
     contract.company_id
       ? supabase.from('companies').select('id, name, city, state, cnpj').eq('id', contract.company_id).maybeSingle()
@@ -94,6 +96,7 @@ export default async function ContractDetailPage({
     supabase.from('billing_records').select('id, year, month, amount, file_storage_path, file_name, notes, confirmed_at').eq('contract_id', id).order('year', { ascending: false }).order('month', { ascending: false }),
     supabase.from('proposals').select('id, control_code, version, status, workflow_status, proposal_value, proposal_validity_days, created_at, updated_at, technical_snapshot, review_token, submitted_at, submitted_by_name, technical_approved_at, technical_approved_by_name, technical_approved_by_role, technical_comment, technical_restrictions, commercial_approved_at, commercial_approved_by_name, commercial_approved_by_role, client_status, client_approved_at, client_approved_by_name, client_review_token, texto_objetivos, texto_atividades, texto_estrutura_apoio').eq('contract_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
     supabase.from('proposal_catalog_items').select('id, name, category, type, characteristics, unit_value').order('name'),
+    supabase.from('transfer_requests').select('*').eq('contract_id', id).in('status', ['pending', 'in_progress']).order('created_at', { ascending: false }).limit(1),
   ])
 
   const currentTagId = currentContractTags?.[0]?.tag_id ?? null
@@ -428,13 +431,21 @@ export default async function ContractDetailPage({
                 <ContractCustomFieldsSection contractId={contract.id} fields={customFields ?? []} values={customFieldValues} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {transferRequests?.[0] && (
+                    <TransferSLABanner
+                      transfer={transferRequests[0] as any}
+                      contractId={contract.id}
+                      currentUserName={currentProfile?.id ? (allProfilesById.get(currentProfile.id)?.full_name ?? 'Usuário') : 'Usuário'}
+                      currentUserId={currentProfile?.id ?? ''}
+                      toUserId={(transferRequests[0] as any).to_user_id}
+                    />
+                  )}
                   <TimelineFeed
                     events={activities ?? []}
                     contractId={contract.id}
                     currentUserRole={currentProfile?.role ?? 'member'}
                   />
                 </div>
-              </div>
             ),
           },
           {
