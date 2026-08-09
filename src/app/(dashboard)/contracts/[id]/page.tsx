@@ -446,6 +446,7 @@ export default async function ContractDetailPage({
                     currentUserRole={currentProfile?.role ?? 'member'}
                   />
                 </div>
+              </div>
             ),
           },
           {
