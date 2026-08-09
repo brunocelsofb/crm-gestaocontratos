@@ -195,26 +195,13 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
   }
 
   async function handleReopen(p: ProposalRow) {
-    await fetch('/api/proposals/status', {
+    if (!confirm(`Reabrir "${p.control_code}"? Os dados de assinatura do cliente serão apagados — a proposta precisará ser assinada novamente.`)) return
+
+    // Volta para rascunho E limpa dados de assinatura (invalida assinatura anterior)
+    await fetch(`/api/proposals/${p.id}/reopen`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contract_id: contractId,
-        proposal_id: p.id,
-        status: 'rascunho',
-        actor_name: currentUserName,
-        comment: `Proposta ${p.control_code} reaberta por ${currentUserName}`,
-      }),
-    })
-    // Log na timeline
-    await fetch('/api/activities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contract_id: contractId,
-        type: 'system',
-        content: `🔄 Proposta ${p.control_code} reaberta por ${currentUserName}.`,
-      }),
+      body: JSON.stringify({ actor_name: currentUserName }),
     })
     router.refresh()
   }
