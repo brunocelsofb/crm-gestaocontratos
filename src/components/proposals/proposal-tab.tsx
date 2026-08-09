@@ -79,8 +79,16 @@ function ActionsMenu({
   const [open, setOpen] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const wStatus = proposal.workflow_status ?? 'rascunho'
-  const canReopen = REOPEN_STATUSES.includes(wStatus) && !!(proposal as any).client_approved_by_name
-  const publicToken = proposal.client_review_token
+
+  // Regra 2: proposta aprovada = documento fechado
+  const isApproved   = wStatus === 'cliente_aprovado'
+  // Regra 3: aguardando cliente = pode editar mas não reabrir
+  const isDeclined   = wStatus === 'cliente_recusado'
+  // Reabrir: só quando cliente já interagiu (aprovado ou recusado) e tem nome
+  const canReopen    = (isApproved || isDeclined) && !!proposal.client_approved_by_name
+  // Editar: bloqueado se aprovado (documento assinado)
+  const canEdit      = !isApproved
+  const publicToken  = proposal.client_review_token
 
   async function handleGeneratePdf() {
     setGeneratingPdf(true); setOpen(false)
@@ -105,15 +113,19 @@ function ActionsMenu({
         <>
           {/* Overlay para fechar */}
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{
-            position: 'absolute', right: 0, top: '110%', zIndex: 50,
+          <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 50,
             background: '#fff', borderRadius: 10, border: '0.5px solid #e8edf5',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 180, overflow: 'hidden',
-          }}>
-            {/* Visualizar / Editar */}
-            <MenuItem icon="✏️" label="Visualizar / Editar" onClick={() => { setOpen(false); onEdit() }} />
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 180, overflow: 'hidden' }}>
 
-            {/* Reabrir — só quando em status final e admin/comercial */}
+            {/* Regra 2: aprovada = não editar; Regra 3: outros = pode editar */}
+            {canEdit && (
+              <MenuItem icon="✏️" label="Visualizar / Editar" onClick={() => { setOpen(false); onEdit() }} />
+            )}
+            {isApproved && (
+              <MenuItem icon="🔒" label="Proposta assinada" onClick={() => {}} />
+            )}
+
+            {/* Reabrir: só quando aprovada/recusada com nome do cliente */}
             {canReopen && ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole) && (
               <MenuItem icon="🔄" label="Reabrir proposta" onClick={() => { setOpen(false); onReopen() }} />
             )}
