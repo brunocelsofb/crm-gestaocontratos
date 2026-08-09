@@ -253,7 +253,7 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ProposalWorkflow
-            key={selectedId}
+            key={`workflow-${selectedId}`}
             contractId={contractId}
             proposalId={selectedId}
             initialData={initialData}
@@ -263,6 +263,7 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
           />
           {currentUserRole !== 'aprovador_tecnico' && (
             <ProposalTextsEditor
+              key={`texts-${selectedId}`}
               contractId={contractId}
               proposalId={selectedId}
               initialData={{
@@ -287,15 +288,21 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             {proposals.length === 0 ? 'Nenhuma proposta criada ainda' : `${proposals.length} proposta${proposals.length > 1 ? 's' : ''}`}
           </p>
         </div>
-        <button onClick={handleNewProposal} disabled={creating} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '8px 18px', fontSize: 13, fontWeight: 600,
-          borderRadius: 8, border: 'none',
-          background: '#1B556B', color: '#fff', cursor: creating ? 'not-allowed' : 'pointer',
-          opacity: creating ? 0.7 : 1
-        }}>
-          {creating ? 'Criando...' : '+ Nova Proposta'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => router.refresh()} title="Atualizar lista" style={{
+            padding: '8px 12px', fontSize: 13, borderRadius: 8,
+            border: '0.5px solid #d1d8e8', background: '#fff', color: '#52514e', cursor: 'pointer'
+          }}>↻</button>
+          <button onClick={handleNewProposal} disabled={creating} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 18px', fontSize: 13, fontWeight: 600,
+            borderRadius: 8, border: 'none',
+            background: '#1B556B', color: '#fff', cursor: creating ? 'not-allowed' : 'pointer',
+            opacity: creating ? 0.7 : 1
+          }}>
+            {creating ? 'Criando...' : '+ Nova Proposta'}
+          </button>
+        </div>
       </div>
 
       {proposals.length === 0 ? (
