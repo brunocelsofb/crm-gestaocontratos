@@ -61,7 +61,8 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
   cliente_recusado:       { label: '❌ Cliente Recusou',   color: '#b91c1c', bg: '#fdecea' },
 }
 
-const REOPEN_STATUSES = ['aprovado_comercial', 'cliente_aprovado', 'cliente_recusado', 'reprovado_tecnico']
+// Bug 2: Reabrir só quando status final E cliente já interagiu (CPF preenchido)
+const REOPEN_STATUSES = ['cliente_aprovado', 'cliente_recusado']
 
 // Dropdown de ações por proposta
 function ActionsMenu({
@@ -78,7 +79,7 @@ function ActionsMenu({
   const [open, setOpen] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const wStatus = proposal.workflow_status ?? 'rascunho'
-  const canReopen = REOPEN_STATUSES.includes(wStatus)
+  const canReopen = REOPEN_STATUSES.includes(wStatus) && !!(proposal as any).client_approved_by_name
   const publicToken = proposal.client_review_token
 
   async function handleGeneratePdf() {
@@ -283,16 +284,6 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
                 texto_estrutura_apoio: selected.texto_estrutura_apoio,
               }}
             />
-          )}
-          {selected.workflow_status === 'aprovado_comercial' && currentUserRole !== 'aprovador_tecnico' && (
-            <div id="montagem-proposta">
-              <ProposalsSection
-                contractId={contractId}
-                proposals={proposals as any}
-                catalogItems={catalogItems}
-                hideCreate={true}
-              />
-            </div>
           )}
         </div>
       </div>
