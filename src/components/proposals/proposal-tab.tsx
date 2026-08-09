@@ -2,9 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ProposalWorkflow } from './proposal-workflow'
-import { ProposalTextsEditor } from './proposal-texts-editor'
-import { ProposalsSection } from './proposals-section'
 
 type ProposalRow = {
   id: string
@@ -15,10 +12,10 @@ type ProposalRow = {
   created_at: string
   updated_at: string | null
   proposal_validity_days: number | null
-  // campos do workflow
   status: string
   technical_snapshot?: any
   review_token?: string | null
+  client_review_token?: string | null
   submitted_at?: string | null
   submitted_by_name?: string | null
   technical_approved_at?: string | null
@@ -32,7 +29,6 @@ type ProposalRow = {
   client_status?: string | null
   client_approved_at?: string | null
   client_approved_by_name?: string | null
-  client_review_token?: string | null
   texto_objetivos?: string | null
   texto_atividades?: string | null
   texto_estrutura_apoio?: string | null
@@ -50,7 +46,6 @@ type Props = {
 function fmt(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 }
-
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR')
 }
@@ -62,9 +57,113 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
   reprovado_tecnico:      { label: 'Reprovado',            color: '#b91c1c', bg: '#fdecea' },
   em_aprovacao_comercial: { label: 'Aprov. Comercial',     color: '#92400e', bg: '#fff8e6' },
   aprovado_comercial:     { label: 'Aguardando Cliente',   color: '#1a7c3e', bg: '#eaf5ee' },
-  cliente_aprovado:       { label: '✅ Cliente Aprovou',    color: '#166534', bg: '#dcfce7' },
-  cliente_recusado:       { label: '❌ Cliente Recusou',    color: '#b91c1c', bg: '#fdecea' },
+  cliente_aprovado:       { label: '✅ Cliente Aprovou',   color: '#166534', bg: '#dcfce7' },
+  cliente_recusado:       { label: '❌ Cliente Recusou',   color: '#b91c1c', bg: '#fdecea' },
 }
+
+const REOPEN_STATUSES = ['aprovado_comercial', 'cliente_aprovado', 'cliente_recusado', 'reprovado_tecnico']
+
+// Dropdown de ações por proposta
+function ActionsMenu({
+  proposal, onEdit, onDelete, onReopen, contractId, currentUserRole, currentUserName
+}: {
+  proposal: ProposalRow
+  onEdit: () => void
+  onDelete: () => void
+  onReopen: () => void
+  contractId: string
+  currentUserRole: string
+  currentUserName: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const wStatus = proposal.workflow_status ?? 'rascunho'
+  const canReopen = REOPEN_STATUSES.includes(wStatus)
+  const publicToken = proposal.client_review_token
+
+  async function handleGeneratePdf() {
+    setGeneratingPdf(true); setOpen(false)
+    window.open(`/api/proposals/generate-pdf/${contractId}?proposal_id=${proposal.id}`, '_blank')
+    setGeneratingPdf(false)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          padding: '5px 12px', fontSize: 11, fontWeight: 600,
+          borderRadius: 6, border: '0.5px solid #d1d8e8',
+          background: '#fff', color: '#1a1f36', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+        Ações <span style={{ fontSize: 9 }}>▾</span>
+      </button>
+
+      {open && (
+        <>
+          {/* Overlay para fechar */}
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{
+            position: 'absolute', right: 0, top: '110%', zIndex: 50,
+            background: '#fff', borderRadius: 10, border: '0.5px solid #e8edf5',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 180, overflow: 'hidden',
+          }}>
+            {/* Visualizar / Editar */}
+            <MenuItem icon="✏️" label="Visualizar / Editar" onClick={() => { setOpen(false); onEdit() }} />
+
+            {/* Reabrir — só quando em status final e admin/comercial */}
+            {canReopen && ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole) && (
+              <MenuItem icon="🔄" label="Reabrir proposta" onClick={() => { setOpen(false); onReopen() }} />
+            )}
+
+            {/* Ver link público */}
+            {publicToken && (
+              <MenuItem icon="🔗" label="Ver link público" onClick={() => {
+                setOpen(false)
+                window.open(`${window.location.origin}/proposals/client/${publicToken}`, '_blank')
+              }} />
+            )}
+
+            {/* Gerar PDF */}
+            <MenuItem icon={generatingPdf ? '⏳' : '📄'} label="Gerar PDF" onClick={handleGeneratePdf} />
+
+            {/* Excluir — só admin */}
+            {currentUserRole === 'admin' && (
+              <>
+                <div style={{ height: '0.5px', background: '#f1f3f8', margin: '4px 0' }} />
+                <MenuItem icon="🗑️" label="Excluir" onClick={() => { setOpen(false); onDelete() }} danger />
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function MenuItem({ icon, label, onClick, danger }: { icon: string; label: string; onClick: () => void; danger?: boolean }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+        padding: '9px 14px', fontSize: 12, fontWeight: 500, textAlign: 'left',
+        background: hover ? (danger ? '#fef2f2' : '#f8f9fb') : 'transparent',
+        border: 'none', cursor: 'pointer',
+        color: danger ? '#b91c1c' : '#1a1f36',
+      }}>
+      <span style={{ fontSize: 13 }}>{icon}</span> {label}
+    </button>
+  )
+}
+
+import { ProposalWorkflow } from './proposal-workflow'
+import { ProposalTextsEditor } from './proposal-texts-editor'
+import { ProposalsSection } from './proposals-section'
 
 export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, currentUserName, catalogItems }: Props) {
   const router = useRouter()
@@ -82,17 +181,45 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
     })
     const data = await res.json()
     if (data.id) {
-      // Recarrega para buscar a nova proposta do servidor
       router.refresh()
-      // Abre a nova proposta após refresh
       setTimeout(() => setSelectedId(data.id), 500)
     }
     setCreating(false)
   }
 
+  async function handleDelete(id: string, code: string) {
+    if (!confirm(`Excluir ${code}? Esta ação não pode ser desfeita.`)) return
+    await fetch(`/api/proposals/${id}/delete`, { method: 'POST' })
+    router.refresh()
+  }
+
+  async function handleReopen(p: ProposalRow) {
+    await fetch('/api/proposals/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contract_id: contractId,
+        proposal_id: p.id,
+        status: 'rascunho',
+        actor_name: currentUserName,
+        comment: `Proposta ${p.control_code} reaberta por ${currentUserName}`,
+      }),
+    })
+    // Log na timeline
+    await fetch('/api/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contract_id: contractId,
+        type: 'system',
+        content: `🔄 Proposta ${p.control_code} reaberta por ${currentUserName}.`,
+      }),
+    })
+    router.refresh()
+  }
+
   // Vista de detalhes
   if (selectedId && selected) {
-    // Monta o initialData no formato que ProposalWorkflow espera
     const initialData = {
       status: (selected.workflow_status ?? 'rascunho') as any,
       proposal_value: selected.proposal_value,
@@ -100,6 +227,7 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
       updated_at: selected.updated_at,
       technical_snapshot: selected.technical_snapshot,
       review_token: selected.review_token,
+      client_review_token: selected.client_review_token,
       submitted_at: selected.submitted_at,
       submitted_by_name: selected.submitted_by_name,
       technical_approved_at: selected.technical_approved_at,
@@ -113,7 +241,6 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
       client_status: selected.client_status,
       client_approved_at: selected.client_approved_at,
       client_approved_by_name: selected.client_approved_by_name,
-      client_review_token: selected.client_review_token,
     }
 
     return (
@@ -121,7 +248,7 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1f36', margin: 0 }}>
-              {selected.control_code} · v{selected.version}
+              {selected.control_code}
             </p>
             <p style={{ fontSize: 12, color: '#8892a4', margin: '2px 0 0' }}>
               Criada em {fmtDate(selected.created_at)}
@@ -146,7 +273,6 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             currentUserRole={currentUserRole}
             currentUserName={currentUserName}
           />
-          {/* Textos e montagem — exclusivos para Comercial e Admin */}
           {currentUserRole !== 'aprovador_tecnico' && (
             <ProposalTextsEditor
               contractId={contractId}
@@ -173,14 +299,14 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
     )
   }
 
-  // Vista de lista
+  // Lista
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1f36', margin: 0 }}>Propostas</p>
           <p style={{ fontSize: 12, color: '#8892a4', margin: '2px 0 0' }}>
-            {proposals.length === 0 ? 'Nenhuma proposta criada ainda' : `${proposals.length} proposta${proposals.length > 1 ? 's' : ''} nesta oportunidade`}
+            {proposals.length === 0 ? 'Nenhuma proposta criada ainda' : `${proposals.length} proposta${proposals.length > 1 ? 's' : ''}`}
           </p>
         </div>
         <button onClick={handleNewProposal} disabled={creating} style={{
@@ -196,7 +322,7 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
 
       {proposals.length === 0 ? (
         <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
           padding: '64px 24px', background: '#fff', borderRadius: 12,
           border: '0.5px dashed #d1d8e8', textAlign: 'center'
         }}>
@@ -206,21 +332,20 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             Crie uma proposta para iniciar o fluxo de aprovação técnica e comercial.
           </p>
           <button onClick={handleNewProposal} disabled={creating} style={{
-            padding: '10px 24px', fontSize: 13, fontWeight: 600,
-            borderRadius: 8, border: 'none',
-            background: '#1B556B', color: '#fff', cursor: 'pointer'
+            padding: '10px 24px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+            border: 'none', background: '#1B556B', color: '#fff', cursor: 'pointer'
           }}>
             {creating ? 'Criando...' : '+ Nova Proposta'}
           </button>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', overflow: 'visible' }}>
           <div style={{
-            display: 'grid', gridTemplateColumns: '140px 2fr 1fr 1fr 1fr 80px 60px',
-            padding: '10px 20px', background: '#f8f9fb',
-            borderBottom: '0.5px solid #e8edf5'
+            display: 'grid', gridTemplateColumns: '140px 2fr 1fr 1fr 100px',
+            padding: '10px 20px', background: '#f8f9fb', borderBottom: '0.5px solid #e8edf5',
+            borderRadius: '12px 12px 0 0',
           }}>
-            {['Código', 'Status', 'Data', 'Valor', 'Validade', '', ''].map((h, i) => (
+            {['Código', 'Status', 'Data', 'Valor', 'Ações'].map((h, i) => (
               <span key={i} style={{ fontSize: 10, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{h}</span>
             ))}
           </div>
@@ -230,11 +355,10 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             const s = STATUS_LABEL[wStatus] ?? STATUS_LABEL['rascunho']
             return (
               <div key={p.id} style={{
-                display: 'grid', gridTemplateColumns: '140px 2fr 1fr 1fr 1fr 80px 60px',
-                padding: '14px 20px',
-                borderBottom: '0.5px solid #f1f3f8',
+                display: 'grid', gridTemplateColumns: '140px 2fr 1fr 1fr 100px',
+                padding: '14px 20px', borderBottom: '0.5px solid #f1f3f8', overflow: 'visible',
               }}>
-                <span style={{ fontSize: 11, color: '#1a1f36', fontWeight: 600, display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#1a1f36', fontFamily: 'monospace', display: 'flex', alignItems: 'center' }}>
                   {p.control_code}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -248,29 +372,17 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#1a7c3e', display: 'flex', alignItems: 'center' }}>
                   {p.proposal_value ? fmt(p.proposal_value) : '—'}
                 </span>
-                <span style={{ fontSize: 12, color: '#52514e', display: 'flex', alignItems: 'center' }}>
-                  {p.proposal_validity_days ?? 30} dias
-                </span>
-                <button onClick={() => setSelectedId(p.id)} style={{
-                  padding: '5px 12px', fontSize: 11, fontWeight: 600,
-                  borderRadius: 6, border: '0.5px solid #d1d8e8',
-                  background: '#fff', color: '#1B556B', cursor: 'pointer'
-                }}>
-                  ✏️ Editar
-                </button>
-                {currentUserRole === 'admin' && (
-                  <button onClick={async () => {
-                    if (!confirm(`Excluir ${p.control_code}? Esta ação não pode ser desfeita.`)) return
-                    await fetch(`/api/proposals/${p.id}/delete`, { method: 'POST' })
-                    router.refresh()
-                  }} style={{
-                    padding: '5px 8px', fontSize: 11,
-                    borderRadius: 6, border: '0.5px solid #fca5a5',
-                    background: '#fff', color: '#b91c1c', cursor: 'pointer'
-                  }} title="Excluir proposta">
-                    🗑️
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                  <ActionsMenu
+                    proposal={p}
+                    contractId={contractId}
+                    currentUserRole={currentUserRole}
+                    currentUserName={currentUserName}
+                    onEdit={() => setSelectedId(p.id)}
+                    onDelete={() => handleDelete(p.id, p.control_code)}
+                    onReopen={() => handleReopen(p)}
+                  />
+                </div>
               </div>
             )
           })}
