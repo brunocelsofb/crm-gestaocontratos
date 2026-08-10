@@ -59,6 +59,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
   aprovado_comercial:     { label: 'Aguardando Cliente',   color: '#1a7c3e', bg: '#eaf5ee' },
   cliente_aprovado:       { label: '✅ Cliente Aprovou',   color: '#166534', bg: '#dcfce7' },
   cliente_recusado:       { label: '❌ Cliente Recusou',   color: '#b91c1c', bg: '#fdecea' },
+  declinada:              { label: '🚫 Declinada',         color: '#6b7280', bg: '#f3f4f6' },
 }
 
 // Bug 2: Reabrir só quando status final E cliente já interagiu (CPF preenchido)
@@ -66,12 +67,13 @@ const REOPEN_STATUSES = ['cliente_aprovado', 'cliente_recusado']
 
 // Dropdown de ações por proposta
 function ActionsMenu({
-  proposal, onEdit, onDelete, onReopen, contractId, currentUserRole, currentUserName
+  proposal, onEdit, onDelete, onReopen, onDecline, contractId, currentUserRole, currentUserName
 }: {
   proposal: ProposalRow
   onEdit: () => void
   onDelete: () => void
   onReopen: () => void
+  onDecline: () => void
   contractId: string
   currentUserRole: string
   currentUserName: string
@@ -125,7 +127,12 @@ function ActionsMenu({
               <MenuItem icon="🔒" label="Proposta assinada" onClick={() => {}} />
             )}
 
-            {/* Reabrir: só quando aprovada/recusada com nome do cliente */}
+            {/* Declinar — propostas ativas que não foram aprovadas pelo cliente */}
+            {!isApproved && !isDeclined && wStatus !== 'declinada' && ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole) && (
+              <MenuItem icon="🚫" label="Declinar proposta" onClick={() => { setOpen(false); onDecline() }} />
+            )}
+
+            {/* Reabrir */}
             {canReopen && ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole) && (
               <MenuItem icon="🔄" label="Reabrir proposta" onClick={() => { setOpen(false); onReopen() }} />
             )}
@@ -203,6 +210,16 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
   async function handleDelete(id: string, code: string) {
     if (!confirm(`Excluir ${code}? Esta ação não pode ser desfeita.`)) return
     await fetch(`/api/proposals/${id}/delete`, { method: 'POST' })
+    router.refresh()
+  }
+
+  async function handleDecline(p: ProposalRow) {
+    if (!confirm(`Declinar "${p.control_code}"? A proposta será marcada como perdida.`)) return
+    await fetch(`/api/proposals/${p.id}/decline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actor_name: currentUserName }),
+    })
     router.refresh()
   }
 
@@ -378,6 +395,7 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
                     onEdit={() => setSelectedId(p.id)}
                     onDelete={() => handleDelete(p.id, p.control_code)}
                     onReopen={() => handleReopen(p)}
+                    onDecline={() => handleDecline(p)}
                   />
                 </div>
               </div>

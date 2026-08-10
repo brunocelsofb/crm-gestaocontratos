@@ -55,7 +55,8 @@ export async function POST(req: Request) {
 
     await admin.from('activities').insert({
       contract_id: newProposal.contract_id,
-      type: isAprovado ? 'client_decision' : 'client_rejection',
+      type: 'client_decision',
+      metadata: { outcome: isAprovado ? 'aprovado' : 'recusado' },
       content: logContent,
     })
     return NextResponse.json({ ok: true })
@@ -97,7 +98,8 @@ export async function POST(req: Request) {
 
   await admin.from('activities').insert({
     contract_id: legacyProposal.contract_id,
-    type: isAprovado ? 'client_decision' : 'client_rejection',
+    type: 'client_decision',
+      metadata: { outcome: isAprovado ? 'aprovado' : 'recusado' },
     content: legacyLogContent,
   })
   return NextResponse.json({ ok: true })

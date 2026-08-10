@@ -1,0 +1,35 @@
+import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const { actor_name } = await req.json()
+  const { id } = await params
+  const admin = createAdminClient()
+
+  const { data: proposal } = await admin
+    .from('proposals').select('id, contract_id, control_code').eq('id', id).maybeSingle()
+  if (!proposal) return NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 })
+
+  await admin.from('proposals').update({
+    workflow_status: 'declinada',
+    updated_at: new Date().toISOString(),
+  }).eq('id', id)
+
+  await admin.from('activities').insert({
+    contract_id: proposal.contract_id,
+    type: 'client_decision',
+    content: `❌ Proposta ${proposal.control_code} DECLINADA internamente por ${actor_name}.`,
+    metadata: { outcome: 'declinada' },
+    user_id: user.id,
+  })
+
+  return NextResponse.json({ ok: true })
+}

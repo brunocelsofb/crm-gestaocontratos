@@ -145,7 +145,10 @@ export function TimelineFeed({
           }} />
 
           {sorted.map(e => {
-            const cfg = TYPE_CONFIG[e.type] ?? TYPE_CONFIG['note']
+            const cfgKey = e.type === 'client_decision' && e.metadata?.outcome === 'recusado'
+              ? 'client_rejection'
+              : e.type
+            const cfg = TYPE_CONFIG[cfgKey] ?? TYPE_CONFIG['note']
             const isPinned = !!localPins[e.id]
             const isNote = e.type === 'note'
 

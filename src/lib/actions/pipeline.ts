@@ -438,6 +438,32 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
     .update({ status: outcome, ended_at: now })
     .eq('id', run.id)
 
+  // Cascata: ao perder a oportunidade, declina automaticamente todas as propostas ativas
+  if (outcome === 'lost') {
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const admin = createAdminClient()
+    const { data: activeProposals } = await admin
+      .from('proposals')
+      .select('id, control_code')
+      .eq('contract_id', contractId)
+      .is('deleted_at', null)
+      .not('workflow_status', 'in', '("declinada","cliente_recusado","rascunho")')
+
+    if (activeProposals && activeProposals.length > 0) {
+      await admin.from('proposals')
+        .update({ workflow_status: 'declinada', updated_at: now })
+        .in('id', activeProposals.map(p => p.id))
+
+      const codes = activeProposals.map(p => p.control_code).join(', ')
+      await admin.from('activities').insert({
+        contract_id: contractId,
+        type: 'system',
+        content: `🚫 Oportunidade marcada como Perdida — propostas ${codes} declinadas automaticamente.`,
+        user_id: user.id,
+      })
+    }
+  }
+
   const { data: pipeline } = await supabase
     .from('pipelines')
     .select('won_label, lost_label, won_target_pipeline_id, won_target_stage_id')
