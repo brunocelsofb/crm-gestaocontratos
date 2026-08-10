@@ -131,7 +131,7 @@ function ProposalHistory({ proposalId, contractId }: { proposalId: string; contr
           <AuditRow
             key={log.id}
             icon={icon}
-            label={log.content?.split('·')[0]?.trim() ?? log.content}
+            label={log.content?.split('·')[0]?.trim() ?? log.content ?? '—'}
             by={log.actor_name ?? '—'}
             at={fmtDt(log.created_at) ?? undefined}
             comment={log.metadata?.comment ?? undefined}
