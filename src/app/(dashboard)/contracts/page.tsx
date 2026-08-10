@@ -81,14 +81,35 @@ export default async function ContractsPage({
   const stageById = new Map((stages ?? []).map((s: any) => [s.id, s]))
   const validUntilById = new Map((validityData ?? []).map((c: any) => [c.id, c.valid_until]))
 
+  // Busca a soma das propostas ativas por contract_id
+  // Exclui: cliente_recusado (recusada), deleted_at não null
+  const EXCLUDED_STATUSES = ['cliente_recusado']
+  const proposalSumByContract = new Map<string, number>()
+  if (contractIds.length > 0) {
+    const { data: proposalAgg } = await supabase
+      .from('proposals')
+      .select('contract_id, proposal_value, workflow_status')
+      .in('contract_id', contractIds)
+      .is('deleted_at', null)
+      .not('workflow_status', 'in', `(${EXCLUDED_STATUSES.map(s => `"${s}"`).join(',')})`)
+
+    for (const p of proposalAgg ?? []) {
+      const prev = proposalSumByContract.get(p.contract_id) ?? 0
+      proposalSumByContract.set(p.contract_id, prev + Number(p.proposal_value ?? 0))
+    }
+  }
+
   const enriched = filteredRuns.map(r => {
     const c = contractById.get(r.contract_id) ?? { id: r.contract_id, process_number: '', title: '', client_name: '', created_at: '' }
+    // Usa soma de propostas ativas; fallback para pipeline_run.value se não houver propostas
+    const proposalSum = proposalSumByContract.get(r.contract_id)
+    const value = proposalSum !== undefined ? proposalSum : Number(r.value ?? 0)
     return {
       id: c.id,
       process_number: c.process_number,
       title: c.title,
       client_name: c.client_name,
-      value: r.value,
+      value,
       run_status: r.status,
       stage_id: r.stage_id,
       pipeline_id: r.pipeline_id,
