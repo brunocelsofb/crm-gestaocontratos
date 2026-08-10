@@ -82,7 +82,7 @@ export default async function PipelinePage({
     ...(allSalesRuns ?? []).map((r: any) => r.contract_id),
   ])]
 
-  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }, { data: allStagesData }, { data: allPipelineStages }] = await Promise.all([
+  const [{ data: contractsData }, { data: latestActivityRows }, { data: contractTagRows }, { data: allStagesData }, { data: allPipelineStages }, { data: proposalAgg }] = await Promise.all([
     allContractIds.length
       ? supabase.from('contracts').select('id, process_number, title, client_name, company_id').in('id', allContractIds)
       : Promise.resolve({ data: [] as any[] }),
@@ -95,14 +95,24 @@ export default async function PipelinePage({
     salesPipelineIds.length
       ? supabase.from('stages').select('id, name, order_index, pipeline_id, sla_days').in('pipeline_id', salesPipelineIds).order('order_index')
       : Promise.resolve({ data: [] as any[] }),
-    // Stages de TODOS os funis para transferência entre funis (avulso pode ir para qualquer um)
     supabase.from('stages').select('id, name, order_index, pipeline_id').in('pipeline_id', (pipelines ?? []).map(p => p.id)).order('order_index'),
+    // Soma de propostas ativas por contract_id (exclui recusadas)
+    allContractIds.length
+      ? supabase.from('proposals').select('contract_id, proposal_value, workflow_status').in('contract_id', allContractIds).is('deleted_at', null).neq('workflow_status', 'cliente_recusado')
+      : Promise.resolve({ data: [] as any[] }),
   ])
 
   const contractById = new Map((contractsData ?? []).map((c: any) => [c.id, c]))
   const stageById = new Map((stages ?? []).map((s) => [s.id, s]))
   const allStagesById = new Map((allStagesData ?? []).map((s: any) => [s.id, s]))
   const lostReasonById = new Map((lostReasons ?? []).map((r: any) => [r.id, r.name]))
+
+  // Soma das propostas ativas por contract_id
+  const proposalSumByContract = new Map<string, number>()
+  for (const p of proposalAgg ?? []) {
+    const prev = proposalSumByContract.get(p.contract_id) ?? 0
+    proposalSumByContract.set(p.contract_id, prev + Number(p.proposal_value ?? 0))
+  }
 
   const tagByContract = new Map<string, { id: string; name: string; color: string }>()
   for (const row of contractTagRows ?? []) {
@@ -136,7 +146,9 @@ export default async function PipelinePage({
       processNumber: contract?.process_number ?? '',
       clientName: contract?.client_name ?? '',
       title: contract?.title ?? '',
-      value: Number(r.value) || 0,
+      value: proposalSumByContract.has(r.contract_id)
+        ? proposalSumByContract.get(r.contract_id)!
+        : Number(r.value) || 0,
       stageEnteredAt: r.stage_entered_at,
       lastActivityAt: lastActivityByContract.get(r.contract_id) ?? null,
       validUntil: null,
