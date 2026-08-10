@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -74,15 +74,23 @@ function Item({ icon, label, onClick, danger }: { icon: string; label: string; o
 
 function DropdownMenu({ p, currentUserRole }: { p: ProposalRow; currentUserRole: string }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
   const wStatus    = p.workflow_status ?? 'rascunho'
   const isApproved = wStatus === 'cliente_aprovado'
   const isDeclined = wStatus === 'cliente_recusado'
   const canReopen  = (isApproved || isDeclined) && !!p.client_approved_by_name &&
     ['admin', 'member', 'aprovador_comercial'].includes(currentUserRole)
 
+  function handleOpen() {
+    if (menuPos) { setMenuPos(null); return }
+    const rect = btnRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+  }
+
   async function handleReopen() {
-    setOpen(false)
+    setMenuPos(null)
     if (!confirm(`Reabrir ${p.control_code}? A assinatura será invalidada.`)) return
     await fetch(`/api/proposals/${p.id}/reopen`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -93,30 +101,33 @@ function DropdownMenu({ p, currentUserRole }: { p: ProposalRow; currentUserRole:
 
   return (
     <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
+      <button ref={btnRef} onClick={handleOpen} style={{
         padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
         border: '0.5px solid #d1d8e8', background: '#fff', color: '#1a1f36',
         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
         Ações <span style={{ fontSize: 9 }}>▾</span>
       </button>
-      {open && (
+      {menuPos && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 50,
+          <div onClick={() => setMenuPos(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
+          <div style={{
+            position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999,
             background: '#fff', borderRadius: 10, border: '0.5px solid #e8edf5',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 190, overflow: 'hidden' }}>
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 190, overflow: 'hidden',
+          }}>
             {!isApproved && (
               <Item icon="✏️" label="Ver na oportunidade"
-                onClick={() => { setOpen(false); window.open(`/contracts/${p.contract_id}`, '_blank') }} />
+                onClick={() => { setMenuPos(null); window.open(`/contracts/${p.contract_id}`, '_blank') }} />
             )}
             {isApproved && <Item icon="🔒" label="Proposta assinada" onClick={() => {}} />}
             {canReopen && <Item icon="🔄" label="Reabrir proposta" onClick={handleReopen} />}
             {p.client_review_token && (
               <Item icon="🔗" label="Ver link público"
-                onClick={() => { setOpen(false); window.open(`/proposals/client/${p.client_review_token}`, '_blank') }} />
+                onClick={() => { setMenuPos(null); window.open(`/proposals/client/${p.client_review_token}`, '_blank') }} />
             )}
             <Item icon="📄" label="Gerar PDF"
-              onClick={() => { setOpen(false); window.open(`/api/proposals/generate-pdf/${p.contract_id}?proposal_id=${p.id}`, '_blank') }} />
+              onClick={() => { setMenuPos(null); window.open(`/api/proposals/generate-pdf/${p.contract_id}?proposal_id=${p.id}`, '_blank') }} />
           </div>
         </>
       )}
