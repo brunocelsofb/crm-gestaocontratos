@@ -596,7 +596,10 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       {card(
         <div>
           {sectionLabel('Histórico de Aprovações')}
-          <ProposalHistory proposalId={proposalId} contractId={contractId} />
+          {proposalId
+            ? <ProposalHistory proposalId={proposalId} contractId={contractId} />
+            : <p style={{ fontSize: 12, color: '#b0b8c8' }}>Proposta sem ID definido.</p>
+          }
         </div>
       )}
 
