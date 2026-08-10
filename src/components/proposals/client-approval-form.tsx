@@ -14,7 +14,7 @@ export function ClientApprovalForm({ token, contractId, currentStatus }: {
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(currentStatus !== 'pendente')
-  const [decision, setDecision] = useState<'aprovado' | 'declinado' | null>(null)
+  const [decision, setDecision] = useState<'aprovado' | 'recusado' | null>(null)
   const [error, setError] = useState('')
 
   const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8, border: '0.5px solid #d1d8e8', outline: 'none', color: '#1a1f36', background: '#fff', boxSizing: 'border-box' as const, fontFamily: 'inherit' }
@@ -22,7 +22,7 @@ export function ClientApprovalForm({ token, contractId, currentStatus }: {
   const cpfValido = isValidCPF(cpf)
   const cpfDigitado = cpf.replace(/\D/g, '').length === 11
 
-  async function handleSubmit(d: 'aprovado' | 'declinado') {
+  async function handleSubmit(d: 'aprovado' | 'recusado') {
     if (!name.trim()) { setError('Informe seu nome completo.'); return }
     if (!cpf.trim()) { setError('CPF é obrigatório para registrar a decisão.'); return }
     if (!cpfValido) { setError('CPF inválido. Verifique o número informado.'); return }
@@ -104,7 +104,7 @@ export function ClientApprovalForm({ token, contractId, currentStatus }: {
           style={{ flex: 1, padding: '14px', fontSize: 14, fontWeight: 600, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#1b556b,#32af9d)', color: '#fff', cursor: 'pointer', opacity: loading ? 0.6 : 1 }}>
           🤝 Aceitar proposta
         </button>
-        <button onClick={() => handleSubmit('declinado')} disabled={loading || !cpfValido || !name.trim()}
+        <button onClick={() => handleSubmit('recusado')} disabled={loading || !cpfValido || !name.trim()}
           style={{ flex: 1, padding: '14px', fontSize: 14, fontWeight: 600, borderRadius: 10, border: '0.5px solid #fca5a5', background: '#fff', color: '#b91c1c', cursor: 'pointer', opacity: loading ? 0.6 : 1 }}>
           ❌ Declinar
         </button>
