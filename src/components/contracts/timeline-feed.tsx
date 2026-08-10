@@ -11,6 +11,7 @@ type Event = {
   profiles: { full_name: string } | null
   metadata: any | null
   is_pinned?: boolean | null
+  opportunity_badge?: string | null
 }
 
 const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
@@ -37,11 +38,13 @@ export function TimelineFeed({
   contractId,
   currentUserRole,
   noteEndpointField = 'contract_id',
+  notePlaceholder = 'Adicione uma nota sobre esta oportunidade...',
 }: {
   events: Event[]
   contractId: string
   currentUserRole?: string
   noteEndpointField?: 'contract_id' | 'company_id'
+  notePlaceholder?: string
 }) {
   const router = useRouter()
   const [note, setNote] = useState('')
@@ -102,7 +105,7 @@ export function TimelineFeed({
         <textarea
           value={note}
           onChange={e => setNote(e.target.value)}
-          placeholder="Adicione uma nota sobre esta oportunidade..."
+          placeholder={notePlaceholder}
           rows={3}
           style={{
             width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8,
@@ -179,6 +182,17 @@ export function TimelineFeed({
                           <span style={{ marginLeft: 6, color: '#f59e0b' }}>· Fixada</span>
                         )}
                       </span>
+                      {/* Badge da oportunidade — só em events vindos de contract_id */}
+                      {e.opportunity_badge && (
+                        <span style={{
+                          display: 'inline-block', marginTop: 4,
+                          padding: '2px 8px', borderRadius: 20, fontSize: 10,
+                          fontWeight: 600, background: '#f1f3f8', color: '#52514e',
+                          border: '0.5px solid #e8edf5',
+                        }}>
+                          🔗 {e.opportunity_badge}
+                        </span>
+                      )}
                       {e.content && (
                         <p style={{
                           fontSize: 13, color: '#1a1f36', margin: '4px 0 0',

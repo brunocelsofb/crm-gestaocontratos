@@ -193,7 +193,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
             <div style={{ padding: 16 }}>
               {(() => {
-                const contractNameById = new Map((allCompanyContracts ?? []).map(c => [c.id, c.client_name ?? c.title ?? c.process_number]))
+                const contractNameById = new Map((allCompanyContracts ?? []).map(c => [
+                  c.id,
+                  [c.process_number, c.title].filter(Boolean).join(' · ') || c.id.slice(0, 8)
+                ]))
                 const allEvents = [...(activities ?? []), ...(contractActivities ?? [])]
                   .sort((a, b) => {
                     const ap = (a as any).is_pinned ? 1 : 0
@@ -205,10 +208,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     ...a,
                     profiles: null,
                     metadata: null,
-                    // Injeta badge da oportunidade no content se vier de um contrato
-                    content: (a as any).contract_id && contractNameById.has((a as any).contract_id)
-                      ? `[${contractNameById.get((a as any).contract_id)}] ${(a as any).content ?? ''}`
-                      : ((a as any).content ?? ''),
+                    // Badge da oportunidade como campo separado — não muta o content
+                    opportunity_badge: (a as any).contract_id && contractNameById.has((a as any).contract_id)
+                      ? contractNameById.get((a as any).contract_id)
+                      : null,
                   }))
                 // company_id como contractId para o endpoint de nota
                 return (
@@ -217,6 +220,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     contractId={company.id}
                     currentUserRole={userRole}
                     noteEndpointField="company_id"
+                    notePlaceholder="Adicione uma nota no cadastro desta empresa..."
                   />
                 )
               })()}
