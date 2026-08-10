@@ -102,7 +102,46 @@ const AUDIT_COLOR: Record<string, { bg: string; border: string; iconBg: string }
   '🔄': { bg: '#f3e8ff', border: '#d8b4fe', iconBg: '#7c3aed' },
 }
 
-function AuditRow({ icon, label, by, role, at, comment, restriction, isLast }: {
+// Histórico append-only: lê todas as activities de aprovação da proposta
+function ProposalHistory({ proposalId, contractId }: { proposalId: string; contractId: string }) {
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`/api/proposals/${proposalId}/history?contract_id=${contractId}`)
+      .then(r => r.ok ? r.json() : { logs: [] })
+      .then(d => { setLogs(d.logs ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [proposalId, contractId])
+
+  if (loading) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Carregando...</p>
+  if (logs.length === 0) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Nenhuma movimentação registrada ainda.</p>
+
+  const ICON_MAP: Record<string, string> = {
+    em_aprovacao_tecnica: '📤', aprovado_tecnico: '🔧', reprovado_tecnico: '🔧',
+    em_aprovacao_comercial: '💼', aprovado_comercial: '✅', reprovado_comercial: '❌',
+    cliente_aprovado: '🤝', cliente_recusado: '❌', rascunho: '🔄', declinada: '🚫', system: '🔧',
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {logs.map((log: any, i: number) => {
+        const icon = ICON_MAP[log.metadata?.new_status ?? log.type] ?? '📋'
+        return (
+          <AuditRow
+            key={log.id}
+            icon={icon}
+            label={log.content?.split('·')[0]?.trim() ?? log.content}
+            by={log.actor_name ?? '—'}
+            at={fmtDt(log.created_at) ?? undefined}
+            comment={log.metadata?.comment ?? undefined}
+            isLast={i === logs.length - 1}
+          />
+        )
+      })}
+    </div>
+  )
+}
   icon: string; label: string; by: string; role?: string
   at?: string | null; comment?: string | null; restriction?: string | null; isLast?: boolean
 }) {
@@ -552,41 +591,10 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       )}
 
       {/* ── Histórico de aprovações ───────────────────────────────── */}
-      {(data.submitted_by_name || data.technical_approved_by_name || data.commercial_approved_by_name || data.client_approved_by_name) && card(
+      {card(
         <div>
           {sectionLabel('Histórico de Aprovações')}
-          <div style={{ marginTop: 8 }}>
-            {data.submitted_by_name && (
-              <AuditRow icon="📤" label="Enviada para Análise Técnica"
-                by={data.submitted_by_name} role={ROLE_LABELS['member']}
-                at={fmtDt(data.submitted_at) ?? undefined}
-                isLast={!data.technical_approved_by_name && !data.commercial_approved_by_name && !data.client_approved_by_name} />
-            )}
-            {data.technical_approved_by_name && (
-              <AuditRow icon="🔧" label="Aprovada Tecnicamente"
-                by={data.technical_approved_by_name}
-                role={ROLE_LABELS[(data as any).technical_approved_by_role ?? 'aprovador_tecnico']}
-                at={fmtDt(data.technical_approved_at) ?? undefined}
-                comment={data.technical_comment ?? undefined}
-                restriction={data.technical_restrictions ?? undefined}
-                isLast={!data.commercial_approved_by_name && !data.client_approved_by_name} />
-            )}
-            {data.commercial_approved_by_name && (
-              <AuditRow icon="✅" label="Aprovada Comercialmente"
-                by={data.commercial_approved_by_name}
-                role={ROLE_LABELS[(data as any).commercial_approved_by_role ?? 'aprovador_comercial']}
-                at={fmtDt(data.commercial_approved_at) ?? undefined}
-                isLast={!data.client_approved_by_name} />
-            )}
-            {data.client_approved_by_name && (
-              <AuditRow
-                icon={data.client_status === 'aprovado' ? '🤝' : '❌'}
-                label={data.client_status === 'aprovado' ? 'Aceita pelo Cliente' : 'Declinada pelo Cliente'}
-                by={data.client_approved_by_name}
-                at={fmtDt(data.client_approved_at) ?? undefined}
-                isLast />
-            )}
-          </div>
+          <ProposalHistory proposalId={proposalId} contractId={contractId} />
         </div>
       )}
 
