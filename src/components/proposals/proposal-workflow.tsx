@@ -142,6 +142,8 @@ function ProposalHistory({ proposalId, contractId }: { proposalId: string; contr
     </div>
   )
 }
+
+function AuditRow({ icon, label, by, role, at, comment, restriction, isLast }: {
   icon: string; label: string; by: string; role?: string
   at?: string | null; comment?: string | null; restriction?: string | null; isLast?: boolean
 }) {
