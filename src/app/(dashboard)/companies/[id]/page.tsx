@@ -191,7 +191,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
             <div style={{ padding: 16 }}>
               {(() => {
-                const contractNameById = new Map((allContracts ?? []).map(c => [c.id, c.client_name ?? c.title ?? c.process_number]))
+                const contractNameById = new Map((allCompanyContracts ?? []).map(c => [c.id, c.client_name ?? c.title ?? c.process_number]))
                 const allEvents = [...(activities ?? []), ...(contractActivities ?? [])]
                   .sort((a, b) => {
                     const ap = (a as any).is_pinned ? 1 : 0
