@@ -23,7 +23,8 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; lab
   automation_triggered: { icon: '⚡', color: '#7c3aed', bg: '#f3e8ff',  label: 'Automação' },
   system:               { icon: '🔧', color: '#8892a4', bg: '#f1f3f8',  label: 'Sistema' },
   transfer:             { icon: '↔️', color: '#8892a4', bg: '#f1f3f8',  label: 'Transferência' },
-  client_decision:      { icon: '🤝', color: '#1a7c3e', bg: '#dcfce7',  label: 'Decisão do Cliente' },
+  client_decision:      { icon: '🤝', color: '#166534', bg: '#dcfce7',  label: 'Proposta Aceita' },
+  client_rejection:     { icon: '✕',  color: '#b91c1c', bg: '#fef2f2',  label: 'Proposta Recusada' },
 }
 
 function fmtDate(d: string) {

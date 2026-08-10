@@ -49,11 +49,11 @@ export async function POST(req: Request) {
 
     const logContent = status === 'aprovado'
       ? `✅ Proposta ${newProposal.control_code} aceita na oportunidade "${oppName}"${valueFmt ? ` · Valor: ${valueFmt}` : ''}. Aprovado por: ${name}${role ? ` (${role})` : ''}${cpfFmt ? ` · CPF: ${cpfFmt}` : ''}. Data/Hora: ${nowFmt}.`
-      : `❌ Proposta ${newProposal.control_code} recusada na oportunidade "${oppName}". Por: ${name}${role ? ` (${role})` : ''}${cpfFmt ? ` · CPF: ${cpfFmt}` : ''}${comment ? ` · Obs: ${comment}` : ''}. Data/Hora: ${nowFmt}.`
+      : `❌ Proposta ${newProposal.control_code} RECUSADA na oportunidade "${oppName}". Motivo: ${comment?.trim() || 'Não informado'}. Por: ${name}${role ? ` (${role})` : ''}${cpfFmt ? ` · CPF: ${cpfFmt}` : ''}. Data/Hora: ${nowFmt}.`
 
     await admin.from('activities').insert({
       contract_id: newProposal.contract_id,
-      type: 'client_decision',
+      type: status === 'aprovado' ? 'client_decision' : 'client_rejection',
       content: logContent,
     })
     return NextResponse.json({ ok: true })
@@ -91,10 +91,14 @@ export async function POST(req: Request) {
   }).eq('contract_id', legacyProposal.contract_id)
     .not('workflow_status', 'eq', 'rascunho') // não sobrescreve propostas em rascunho
 
+  const legacyLogContent = status === 'aprovado'
+    ? `✅ Proposta aceita pelo cliente — ${name}${cpf ? ` · CPF: ${cpf}` : ''}${comment ? ` · Obs: ${comment}` : ''}. Data/Hora: ${nowFmt}.`
+    : `❌ Proposta RECUSADA. Motivo: ${comment?.trim() || 'Não informado'}. Por: ${name}${cpf ? ` · CPF: ${cpf}` : ''}. Data/Hora: ${nowFmt}.`
+
   await admin.from('activities').insert({
     contract_id: legacyProposal.contract_id,
-    type: 'client_decision',
-    content: `${label} — ${name}${role ? ` (${role})` : ''}${cpf ? ` · CPF: ${cpf}` : ''}${comment ? ` · Obs: ${comment}` : ''}.`,
+    type: status === 'aprovado' ? 'client_decision' : 'client_rejection',
+    content: legacyLogContent,
   })
   return NextResponse.json({ ok: true })
 }
