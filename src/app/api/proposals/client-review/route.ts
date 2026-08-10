@@ -14,17 +14,30 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient()
   const now = new Date().toISOString()
-  const label = status === 'aprovado' ? '🤝 Proposta aceita pelo cliente' : '❌ Proposta declinada pelo cliente'
+  const nowFmt = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const label = status === 'aprovado'
+    ? `✅ Proposta aceita digitalmente pelo cliente`
+    : `❌ Proposta recusada pelo cliente`
 
   // Novo modelo: busca em proposals pelo token
   const { data: newProposal } = await admin
     .from('proposals')
-    .select('id, contract_id')
+    .select('id, contract_id, control_code, proposal_value')
     .eq('client_review_token', token)
     .maybeSingle()
 
   if (newProposal) {
     const newWorkflowStatus = status === 'aprovado' ? 'cliente_aprovado' : 'cliente_recusado'
+
+    // Busca dados da oportunidade para log rico
+    const { data: contractData } = await admin
+      .from('contracts').select('client_name, title').eq('id', newProposal.contract_id).maybeSingle()
+    const oppName = contractData?.client_name ?? contractData?.title ?? 'Oportunidade'
+    const cpfFmt = cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : null
+    const valueFmt = newProposal.proposal_value
+      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(newProposal.proposal_value))
+      : null
+
     await admin.from('proposals').update({
       client_status: status,
       client_approved_at: now,
@@ -34,10 +47,14 @@ export async function POST(req: Request) {
       updated_at: now,
     }).eq('id', newProposal.id)
 
+    const logContent = status === 'aprovado'
+      ? `✅ Proposta ${newProposal.control_code} aceita na oportunidade "${oppName}"${valueFmt ? ` · Valor: ${valueFmt}` : ''}. Aprovado por: ${name}${role ? ` (${role})` : ''}${cpfFmt ? ` · CPF: ${cpfFmt}` : ''}. Data/Hora: ${nowFmt}.`
+      : `❌ Proposta ${newProposal.control_code} recusada na oportunidade "${oppName}". Por: ${name}${role ? ` (${role})` : ''}${cpfFmt ? ` · CPF: ${cpfFmt}` : ''}${comment ? ` · Obs: ${comment}` : ''}. Data/Hora: ${nowFmt}.`
+
     await admin.from('activities').insert({
       contract_id: newProposal.contract_id,
       type: 'client_decision',
-      content: `${label} — ${name}${role ? ` (${role})` : ''}${cpf ? ` · CPF: ${cpf}` : ''}${comment ? ` · Obs: ${comment}` : ''}.`,
+      content: logContent,
     })
     return NextResponse.json({ ok: true })
   }

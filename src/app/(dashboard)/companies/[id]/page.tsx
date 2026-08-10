@@ -7,7 +7,7 @@ import { CompanyTagSelect } from '@/components/companies/company-tag-select'
 import { NewOpportunityButton } from '@/components/companies/new-opportunity-button'
 import { AddContactForm } from '@/components/companies/add-contact-form'
 import { RemoveContactButton } from '@/components/companies/remove-contact-button'
-import { ActivityFeed } from '@/components/activities/activity-feed'
+import { TimelineFeed } from '@/components/contracts/timeline-feed'
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   lead:           { bg: '#eef3ff', color: '#3b5bdb', label: 'Lead' },
@@ -46,7 +46,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     supabase.from('companies').select('*').eq('id', id).single(),
     supabase.from('contacts').select('id, name, role, email, phone, is_primary').eq('company_id', id).order('is_primary', { ascending: false }),
     supabase.from('contracts').select('id, process_number, title, created_at, company_id').eq('company_id', id).order('created_at', { ascending: false }),
-    supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to').eq('company_id', id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('activities').select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to, is_pinned, contract_id').eq('company_id', id).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('pipelines').select('id, name, is_default').eq('type', 'vendas').order('name'),
     supabase.from('tags').select('id, name, color, context').order('name'),
@@ -87,6 +87,18 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   }
 
   const contractIds = (allCompanyContracts ?? []).map(c => c.id)
+
+  // Ponto 2: soma de propostas ativas por contract_id para a empresa
+  const companyProposalAgg = contractIds.length
+    ? await supabase.from('proposals').select('contract_id, proposal_value, workflow_status').in('contract_id', contractIds).is('deleted_at', null).neq('workflow_status', 'cliente_recusado')
+    : { data: [] as any[] }
+
+  const proposalSumByContractCompany = new Map<string, number>()
+  for (const p of companyProposalAgg.data ?? []) {
+    const prev = proposalSumByContractCompany.get(p.contract_id) ?? 0
+    proposalSumByContractCompany.set(p.contract_id, prev + Number(p.proposal_value ?? 0))
+  }
+
   const { data: companyRuns } = contractIds.length
     ? await supabase
         .from('pipeline_runs')
@@ -99,7 +111,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const { data: contractActivities } = contractIds.length
     ? await supabase
         .from('activities')
-        .select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to')
+        .select('id, type, activity_type, title, content, status, activity_date, activity_time, duration_minutes, created_at, user_id, assigned_to, is_pinned, contract_id')
         .in('contract_id', contractIds)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -178,12 +190,34 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Histórico de Atividades</p>
             </div>
             <div style={{ padding: 16 }}>
-              <ActivityFeed
-              activities={[...(activities ?? []), ...(contractActivities ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
-              companyId={company.id}
-              profiles={profiles ?? []}
-              currentUserId={user?.id ?? ''}
-            />
+              {(() => {
+                const contractNameById = new Map((allContracts ?? []).map(c => [c.id, c.client_name ?? c.title ?? c.process_number]))
+                const allEvents = [...(activities ?? []), ...(contractActivities ?? [])]
+                  .sort((a, b) => {
+                    const ap = (a as any).is_pinned ? 1 : 0
+                    const bp = (b as any).is_pinned ? 1 : 0
+                    if (bp !== ap) return bp - ap
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  })
+                  .map(a => ({
+                    ...a,
+                    profiles: null,
+                    metadata: null,
+                    // Injeta badge da oportunidade no content se vier de um contrato
+                    content: (a as any).contract_id && contractNameById.has((a as any).contract_id)
+                      ? `[${contractNameById.get((a as any).contract_id)}] ${(a as any).content ?? ''}`
+                      : ((a as any).content ?? ''),
+                  }))
+                // company_id como contractId para o endpoint de nota
+                return (
+                  <TimelineFeed
+                    events={allEvents}
+                    contractId={company.id}
+                    currentUserRole={currentProfile?.role ?? 'member'}
+                    noteEndpointField="company_id"
+                  />
+                )
+              })()}
             </div>
           </div>
 
@@ -253,7 +287,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                       </div>
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36' }}>
-                      {Number(run.value) > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(run.value)) : '—'}
+                      {(() => {
+                        const pSum = proposalSumByContractCompany.get(run.contract_id)
+                        const val = pSum !== undefined ? pSum : Number(run.value)
+                        return val > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val) : '—'
+                      })()}
                     </span>
                   </div>
                 )

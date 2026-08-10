@@ -146,6 +146,12 @@ export default async function ContractDetailPage({
   const isCurrentlyInSalesPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'vendas' : false
   const isCurrentlyInContractsPipeline = displayRun ? pipelineById.get(displayRun.pipeline_id)?.type === 'gestao_contratos' : false
 
+  // Ponto 1: valor agregado das propostas ativas (exclui recusadas)
+  const proposalSum = (proposals ?? [])
+    .filter(p => p.workflow_status !== 'cliente_recusado')
+    .reduce((s, p) => s + Number(p.proposal_value ?? 0), 0)
+  const estimatedValue = proposalSum > 0 ? proposalSum : Number(displayRun?.value ?? 0)
+
   // Stages de todos os funis de vendas (para botão de transferência)
   const salesPipelineIds = (pipelines ?? []).filter(p => p.type === 'vendas').map(p => p.id)
   const { data: allStagesData } = salesPipelineIds.length > 1
@@ -330,7 +336,7 @@ export default async function ContractDetailPage({
                     </p>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayRun?.value || 0)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(estimatedValue)}
                       </p>
                       {canChangeStage && (
                         <InlineValueEditor contractId={contract.id} currentValue={Number(displayRun?.value) || 0} />

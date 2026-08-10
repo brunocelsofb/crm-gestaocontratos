@@ -36,10 +36,12 @@ export function TimelineFeed({
   events,
   contractId,
   currentUserRole,
+  noteEndpointField = 'contract_id',
 }: {
   events: Event[]
   contractId: string
   currentUserRole?: string
+  noteEndpointField?: 'contract_id' | 'company_id'
 }) {
   const router = useRouter()
   const [note, setNote] = useState('')
@@ -61,7 +63,7 @@ export function TimelineFeed({
       const res = await fetch('/api/activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contract_id: contractId, type: 'note', content: note.trim() }),
+        body: JSON.stringify({ [noteEndpointField]: contractId, type: 'note', content: note.trim() }),
       })
       const json = await res.json()
       if (!res.ok) { setSaveError(json.error ?? 'Erro ao salvar'); setSaving(false); return }
