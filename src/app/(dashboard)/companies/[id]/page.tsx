@@ -30,6 +30,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const { data: userProfile } = user ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle() : { data: null }
+  const userRole = userProfile?.role ?? 'member'
 
   const [
     isAdmin,
@@ -213,7 +215,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                   <TimelineFeed
                     events={allEvents}
                     contractId={company.id}
-                    currentUserRole={currentProfile?.role ?? 'member'}
+                    currentUserRole={userRole}
                     noteEndpointField="company_id"
                   />
                 )
