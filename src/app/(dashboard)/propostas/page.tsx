@@ -15,11 +15,12 @@ export default async function PropostasPage() {
     .from('proposals')
     .select('id, control_code, version, workflow_status, proposal_value, created_at, updated_at, proposal_validity_days, client_review_token, client_approved_by_name, contract_id')
     .is('deleted_at', null)
-    .not('workflow_status', 'eq', 'rascunho')
     .order('updated_at', { ascending: false })
     .limit(300)
 
-  if (error) console.error('[propostas page]', error)
+  if (error) console.error('[propostas page] query error:', JSON.stringify(error))
+
+  console.log('[propostas page] total encontradas:', proposals?.length ?? 0)
 
   const contractIds = [...new Set((proposals ?? []).map(p => p.contract_id).filter(Boolean))]
   const proposalIds = (proposals ?? []).map(p => p.id)
