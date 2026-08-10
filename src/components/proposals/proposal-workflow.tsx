@@ -106,6 +106,7 @@ const AUDIT_COLOR: Record<string, { bg: string; border: string; iconBg: string }
 function ProposalHistory({ proposalId, contractId }: { proposalId: string; contractId: string }) {
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [showOld, setShowOld] = useState(false)
 
   useEffect(() => {
     fetch(`/api/proposals/${proposalId}/history?contract_id=${contractId}`)
@@ -114,31 +115,73 @@ function ProposalHistory({ proposalId, contractId }: { proposalId: string; contr
       .catch(() => setLoading(false))
   }, [proposalId, contractId])
 
-  if (loading) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Carregando...</p>
+  if (loading) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Carregando histórico...</p>
   if (logs.length === 0) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Nenhuma movimentação registrada ainda.</p>
 
+  // Separa ciclos: cada "reaberta" inicia novo ciclo
+  const cycles: any[][] = [[]]
+  for (const log of logs) {
+    if (log.content?.includes('reaberta') && cycles[cycles.length - 1].length > 0) {
+      cycles.push([])
+    }
+    cycles[cycles.length - 1].push(log)
+  }
+
+  const currentCycle = cycles[cycles.length - 1]
+  const pastCycles = cycles.slice(0, -1)
+
   const ICON_MAP: Record<string, string> = {
-    em_aprovacao_tecnica: '📤', aprovado_tecnico: '🔧', reprovado_tecnico: '🔧',
-    em_aprovacao_comercial: '💼', aprovado_comercial: '✅', reprovado_comercial: '❌',
-    cliente_aprovado: '🤝', cliente_recusado: '❌', rascunho: '🔄', declinada: '🚫', system: '🔧',
+    em_aprovacao_tecnica: '📤', aprovado_tecnico: '🔧', reprovado_tecnico: '❌',
+    aprovado_comercial: '✅', reprovado_comercial: '❌', cliente_aprovado: '🤝',
+    cliente_recusado: '❌', rascunho: '🔄', declinada: '🚫', system: '🔧', proposal: '📋',
+  }
+
+  function renderLog(log: any, isLast: boolean) {
+    const status = log.metadata?.new_status ?? log.metadata?.status ?? log.type
+    const isRejection = log.metadata?.outcome === 'recusado' || log.content?.includes('RECUSADA') || log.content?.includes('DECLINADA')
+    const icon = isRejection ? '❌' : (ICON_MAP[status] ?? '📋')
+    return (
+      <AuditRow
+        key={log.id}
+        icon={icon}
+        label={log.content?.split('\n')[0]?.trim() ?? '—'}
+        by={log.actor_name ?? '—'}
+        at={fmtDt(log.created_at) ?? undefined}
+        isLast={isLast}
+      />
+    )
   }
 
   return (
     <div style={{ marginTop: 8 }}>
-      {logs.map((log: any, i: number) => {
-        const icon = ICON_MAP[log.metadata?.new_status ?? log.type] ?? '📋'
-        return (
-          <AuditRow
-            key={log.id}
-            icon={icon}
-            label={log.content?.split('·')[0]?.trim() ?? log.content ?? '—'}
-            by={log.actor_name ?? '—'}
-            at={fmtDt(log.created_at) ?? undefined}
-            comment={log.metadata?.comment ?? undefined}
-            isLast={i === logs.length - 1}
-          />
-        )
-      })}
+      {/* Ciclos anteriores em accordion */}
+      {pastCycles.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <button
+            onClick={() => setShowOld(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+              fontWeight: 600, color: '#8892a4', background: 'none', border: 'none',
+              cursor: 'pointer', padding: '6px 0', textDecoration: 'underline',
+            }}>
+            {showOld ? '▲ Ocultar' : '▼ Ver'} histórico de ciclos anteriores ({pastCycles.length} ciclo{pastCycles.length > 1 ? 's' : ''})
+          </button>
+          {showOld && pastCycles.map((cycle, ci) => (
+            <div key={ci} style={{
+              marginBottom: 12, padding: '10px 14px', borderRadius: 8,
+              background: '#f8f9fb', border: '0.5px solid #e8edf5', opacity: 0.85,
+            }}>
+              <p style={{ fontSize: 9, fontWeight: 700, color: '#b0b8c8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px' }}>
+                Ciclo {ci + 1}
+              </p>
+              {cycle.map((log, i) => renderLog(log, i === cycle.length - 1))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Ciclo atual */}
+      {currentCycle.map((log, i) => renderLog(log, i === currentCycle.length - 1))}
     </div>
   )
 }

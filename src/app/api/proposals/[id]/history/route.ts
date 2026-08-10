@@ -12,28 +12,29 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  // Busca activities de mudança de status relacionadas a esta proposta
+  // Busca TODOS os logs de aprovação de proposta (type=proposal) e decisões do cliente
   const { data: logs } = await admin
     .from('activities')
     .select('id, type, content, created_at, metadata')
     .eq('contract_id', contractId)
-    .in('type', ['stage_change', 'system', 'client_decision'])
-    .or(`metadata->>proposal_id.eq.${id},metadata->>proposal_id.is.null`)
+    .in('type', ['proposal', 'system', 'client_decision'])
     .order('created_at', { ascending: true })
 
-  // Filtra apenas logs relevantes para aprovação de proposta
-  const APPROVAL_KEYWORDS = [
-    'Análise Técnica', 'Aprovada Tecnic', 'Reprovada Tecnic', 'Reprovado Tecnic',
-    'Aprovação Comercial', 'Aprovada Comercial', 'Reprovada Comercial',
-    'cliente', 'reaberta', 'declinada', 'Proposta',
-  ]
+  // Filtra os relevantes para ESTA proposta (pelo proposal_id no metadata ou pelo content)
+  const filtered = (logs ?? []).filter(log => {
+    const pid = log.metadata?.proposal_id
+    // Inclui se metadata tem este proposal_id, ou se não tem proposal_id (log geral do contrato)
+    return !pid || pid === id
+  }).filter(log => {
+    // Exclui logs completamente sem relação com aprovações
+    const c = log.content?.toLowerCase() ?? ''
+    if (log.type === 'client_decision') return true
+    return c.includes('análise técnica') || c.includes('analise tecnica') ||
+      c.includes('aprovada') || c.includes('reprovada') || c.includes('reprovado') ||
+      c.includes('comercial') || c.includes('cliente') || c.includes('reaberta') ||
+      c.includes('declinada') || c.includes('proposta') || c.includes('enviada')
+  })
 
-  const filtered = (logs ?? []).filter(log =>
-    log.type === 'client_decision' ||
-    APPROVAL_KEYWORDS.some(kw => log.content?.toLowerCase().includes(kw.toLowerCase()))
-  )
-
-  // Extrai actor_name do content para exibição
   const enriched = filtered.map(log => ({
     ...log,
     actor_name: extractActor(log.content),
@@ -44,7 +45,6 @@ export async function GET(
 
 function extractActor(content: string | null): string {
   if (!content) return '—'
-  // Extrai nome após "por " ou "Aprovado por:"
-  const match = content.match(/(?:por|Aprovado por|reaberta por)[:\s]+([^.·\n]+)/i)
-  return match?.[1]?.trim().split(' ·')[0] ?? '—'
+  const match = content.match(/(?:por|aprovado por|reaberta por|enviada por)[:\s]+([^.·\n(]+)/i)
+  return match?.[1]?.trim() ?? '—'
 }

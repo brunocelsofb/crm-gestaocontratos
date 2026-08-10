@@ -23,6 +23,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; lab
   automation_triggered: { icon: '⚡', color: '#7c3aed', bg: '#f3e8ff',  label: 'Automação' },
   system:               { icon: '🔧', color: '#8892a4', bg: '#f1f3f8',  label: 'Sistema' },
   transfer:             { icon: '↔️', color: '#8892a4', bg: '#f1f3f8',  label: 'Transferência' },
+  proposal:             { icon: '📋', color: '#3b5bdb', bg: '#eef3ff',  label: 'Proposta' },
   client_decision:      { icon: '🤝', color: '#166534', bg: '#dcfce7',  label: 'Proposta Aceita' },
   client_rejection:     { icon: '✕',  color: '#b91c1c', bg: '#fef2f2',  label: 'Proposta Recusada' },
 }
@@ -145,7 +146,8 @@ export function TimelineFeed({
           }} />
 
           {sorted.map(e => {
-            const cfgKey = e.type === 'client_decision' && e.metadata?.outcome === 'recusado'
+            const cfgKey = (e.type === 'client_decision' && e.metadata?.outcome === 'recusado') ||
+              (e.type === 'proposal' && e.content?.includes('RECUSADA'))
               ? 'client_rejection'
               : e.type
             const cfg = TYPE_CONFIG[cfgKey] ?? TYPE_CONFIG['note']
