@@ -782,20 +782,9 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
             <button
               type="button"
               onClick={() => {
-                const el = document.getElementById('montagem-proposta')
-                if (!el) return
-                // Encontra o container scrollável mais próximo
-                let parent = el.parentElement
-                while (parent && parent !== document.body) {
-                  const { overflow, overflowY } = window.getComputedStyle(parent)
-                  if (/auto|scroll/.test(overflow + overflowY)) {
-                    parent.scrollTo({ top: parent.scrollTop + el.getBoundingClientRect().top - parent.getBoundingClientRect().top - 16, behavior: 'smooth' })
-                    return
-                  }
-                  parent = parent.parentElement
+                if (proposalId) {
+                  window.location.href = `/contracts/${contractId}/proposals/${proposalId}`
                 }
-                // Fallback: scroll do window
-                window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 16, behavior: 'smooth' })
               }}
               style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', fontSize: 13, fontWeight: 600, borderRadius: 9, border: 'none', background: '#1B556B', color: '#fff', cursor: 'pointer' }}>
               📄 Montar Proposta ↓
