@@ -12,28 +12,18 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  // Busca TODOS os logs de aprovação desta proposta + logs de sistema com proposal_id
+  // Busca APENAS logs com metadata.proposal_id = id (isolamento absoluto)
   const { data: logs, error } = await admin
     .from('activities')
     .select('id, type, content, created_at, metadata')
     .eq('contract_id', contractId)
     .in('type', ['proposal', 'system', 'client_decision'])
+    .filter('metadata->>proposal_id', 'eq', id)
     .order('created_at', { ascending: true })
 
   if (error) console.error('[history]', error)
 
-  // Filtra: inclui se metadata.proposal_id === id OU se não tem proposal_id (logs legados)
-  const filtered = (logs ?? []).filter(log => {
-    const pid = log.metadata?.proposal_id
-    // Se tem proposal_id de OUTRA proposta, exclui
-    if (pid && pid !== id) return false
-    // Sem proposal_id = log legado do contrato, inclui se conteúdo é relevante
-    const c = (log.content ?? '').toLowerCase()
-    if (log.type === 'client_decision') return true
-    return c.includes('proposta') || c.includes('análise') || c.includes('analise') ||
-      c.includes('aprovad') || c.includes('reprovad') || c.includes('reaberta') ||
-      c.includes('declinad') || c.includes('comercial') || c.includes('técnic') || c.includes('tecnic')
-  })
+  const filtered = logs ?? []
 
   const enriched = filtered.map(log => ({
     ...log,
