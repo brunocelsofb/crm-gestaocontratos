@@ -63,7 +63,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }>
 }
 
 // Bug 2: Reabrir só quando status final E cliente já interagiu (CPF preenchido)
-const REOPEN_STATUSES = ['cliente_aprovado', 'cliente_recusado']
+const REOPEN_STATUSES = ['cliente_aprovado', 'cliente_recusado', 'declinada']
 
 // Dropdown de ações por proposta
 function ActionsMenu({
@@ -85,9 +85,10 @@ function ActionsMenu({
   // Regra 2: proposta aprovada = documento fechado
   const isApproved   = wStatus === 'cliente_aprovado'
   // Regra 3: aguardando cliente = pode editar mas não reabrir
-  const isDeclined   = wStatus === 'cliente_recusado'
-  // Reabrir: só quando cliente já interagiu (aprovado ou recusado) e tem nome
-  const canReopen    = (isApproved || isDeclined) && !!proposal.client_approved_by_name
+  const isDeclined   = wStatus === 'cliente_recusado' || wStatus === 'declinada'
+  // Reabrir: declinada interna não exige client_approved_by_name
+  const canReopen    = (isApproved || isDeclined) &&
+    (wStatus === 'declinada' || !!proposal.client_approved_by_name)
   // Editar: bloqueado se aprovado (documento assinado)
   const canEdit      = !isApproved
   const publicToken  = proposal.client_review_token
