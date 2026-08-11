@@ -451,11 +451,15 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
   const isCommMember = ['member', 'admin', 'aprovador_comercial'].includes(currentUserRole)
   const TERMINAL_SUCCESS = ['cliente_aprovado']
   const TERMINAL_FAILURE = ['cliente_recusado', 'declinada']
+  const isFailure = TERMINAL_FAILURE.includes(data.status)
   const rawIdx = STEP_ORDER.indexOf(data.status)
   // Status terminal de sucesso = todos steps concluídos
+  // Status de falha = preserva progresso até o último step válido (aprovado_comercial = 4)
   const currentIdx = TERMINAL_SUCCESS.includes(data.status)
-    ? STEP_ORDER.length  // maior que qualquer stepIdx → todos isDone
-    : rawIdx
+    ? STEP_ORDER.length
+    : isFailure
+      ? STEP_ORDER.length - 1  // mostra todo progresso até "Ag. Cliente"
+      : rawIdx
 
   async function doAction(nextStatus: ProposalStatus, comment?: string) {
     setError(null)
@@ -646,20 +650,20 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
                     <div style={{
                       width: 32, height: 32, borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
-                      background: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#f1f3f8',
+                      background: isActive ? '#1b556b' : isDone ? (isFailure ? '#b91c1c' : '#1a7c3e') : '#f1f3f8',
                       color: isActive ? '#fff' : isDone ? '#fff' : '#b0b8c8',
-                      border: isActive ? '2px solid #32af9d' : isDone ? '2px solid #1a7c3e' : '2px solid transparent',
+                      border: isActive ? '2px solid #32af9d' : isDone ? `2px solid ${isFailure ? '#b91c1c' : '#1a7c3e'}` : '2px solid transparent',
                       boxShadow: isActive ? '0 0 0 4px rgba(50,175,157,0.15)' : 'none',
                       transition: 'all 0.2s'
                     }}>
-                      {isDone ? '✓' : step.short}
+                      {isDone ? (isFailure ? '✕' : '✓') : step.short}
                     </div>
-                    <p style={{ fontSize: 9, color: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#b0b8c8', fontWeight: isDone || isActive ? 700 : 400, margin: 0, textAlign: 'center', lineHeight: 1.3, maxWidth: 60 }}>
+                    <p style={{ fontSize: 9, color: isActive ? '#1b556b' : isDone ? (isFailure ? '#b91c1c' : '#1a7c3e') : '#b0b8c8', fontWeight: isDone || isActive ? 700 : 400, margin: 0, textAlign: 'center', lineHeight: 1.3, maxWidth: 60 }}>
                       {step.label}
                     </p>
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div style={{ flex: 1, height: 2, background: isDone ? '#1a7c3e' : '#f1f3f8', margin: '0 4px', marginBottom: 22, borderRadius: 1 }} />
+                    <div style={{ flex: 1, height: 2, background: isDone ? (isFailure ? '#fca5a5' : '#1a7c3e') : '#f1f3f8', margin: '0 4px', marginBottom: 22, borderRadius: 1 }} />
                   )}
                 </div>
               )

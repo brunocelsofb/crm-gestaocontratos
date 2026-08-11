@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     await admin.from('activities').insert({
       contract_id: newProposal.contract_id,
       type: 'client_decision',
-      metadata: { outcome: isAprovado ? 'aprovado' : 'recusado' },
+      metadata: { outcome: isAprovado ? 'aprovado' : 'recusado', proposal_id: newProposal.id },
       content: logContent,
     })
     return NextResponse.json({ ok: true })
