@@ -635,7 +635,7 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
       {card(
         <div>
           {sectionLabel('Progresso de Aprovação')}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, paddingTop: 8, paddingBottom: 4 }}>
             {STEPS.map((step, i) => {
               const stepIdx = STEP_ORDER.indexOf(step.key)
               const isDone = stepIdx < currentIdx
@@ -646,20 +646,20 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
                     <div style={{
                       width: 32, height: 32, borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
-                      background: isActive ? '#1b556b' : isDone ? '#eaf5ee' : '#f1f3f8',
-                      color: isActive ? '#fff' : isDone ? '#1a7c3e' : '#b0b8c8',
-                      border: isActive ? '2px solid #32af9d' : '2px solid transparent',
+                      background: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#f1f3f8',
+                      color: isActive ? '#fff' : isDone ? '#fff' : '#b0b8c8',
+                      border: isActive ? '2px solid #32af9d' : isDone ? '2px solid #1a7c3e' : '2px solid transparent',
                       boxShadow: isActive ? '0 0 0 4px rgba(50,175,157,0.15)' : 'none',
                       transition: 'all 0.2s'
                     }}>
                       {isDone ? '✓' : step.short}
                     </div>
-                    <p style={{ fontSize: 9, color: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#b0b8c8', fontWeight: isActive ? 700 : 400, margin: 0, textAlign: 'center', lineHeight: 1.3, maxWidth: 60 }}>
+                    <p style={{ fontSize: 9, color: isActive ? '#1b556b' : isDone ? '#1a7c3e' : '#b0b8c8', fontWeight: isDone || isActive ? 700 : 400, margin: 0, textAlign: 'center', lineHeight: 1.3, maxWidth: 60 }}>
                       {step.label}
                     </p>
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div style={{ flex: 1, height: 2, background: isDone ? '#32af9d' : '#f1f3f8', margin: '0 4px', marginBottom: 20, borderRadius: 1 }} />
+                    <div style={{ flex: 1, height: 2, background: isDone ? '#1a7c3e' : '#f1f3f8', margin: '0 4px', marginBottom: 22, borderRadius: 1 }} />
                   )}
                 </div>
               )
