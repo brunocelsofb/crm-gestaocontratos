@@ -99,7 +99,7 @@ export default async function ContractDetailPage({
     supabase.from('transfer_requests').select('*').eq('contract_id', id).in('status', ['pending', 'in_progress']).order('created_at', { ascending: false }).limit(1),
   ])
 
-  const currentTagId = currentContractTags?.[0]?.tag_id ?? null
+  const currentTagIds = (currentContractTags ?? []).map((t: any) => t.tag_id).filter(Boolean)
 
   // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato.
   const availableTemplates = (allSurveyTemplates ?? []).filter((t) => !t.tag_id || t.tag_id === currentTagId)
@@ -243,10 +243,10 @@ export default async function ContractDetailPage({
               <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, background: '#f1f3f8', color: '#52514e' }}>{contract.title}</span>
               <ValidityBadge validUntil={contract.valid_until} />
               <ContractTagSelect
-                key={currentTagId ?? 'none'}
+                key={currentTagIds.join(',')||'none'}
                 tags={allTags ?? []}
-                currentTagId={currentTagId}
-                action={setContractTag.bind(null, contract.id)}
+                currentTagIds={currentTagIds}
+                contractId={contract.id}
               />
               <AccountOwnerBadge
                 contractId={contract.id}
@@ -642,7 +642,7 @@ export default async function ContractDetailPage({
                 }}
                 contractNature={(contract as any).nature ?? null}
                 tags={allTags ?? []}
-                currentTagId={(currentContractTags ?? [])[0]?.tag_id ?? null}
+                currentTagIds={(currentContractTags ?? []).map((t: any) => t.tag_id).filter(Boolean)}
               />
             ),
           }] : []),
