@@ -193,8 +193,22 @@ function ProposalHistory({ proposalId, contractId }: { proposalId: string; contr
         </div>
       )}
 
-      {/* Ciclo atual */}
-      {currentCycle.map((log, i) => renderLog(log, i === currentCycle.length - 1))}
+      {/* Ciclo atual com cabeçalho */}
+      <div style={{
+        padding: '10px 14px', borderRadius: 8,
+        background: '#fff', border: '0.5px solid #e8edf5',
+      }}>
+        <p style={{
+          fontSize: 9, fontWeight: 700, color: '#1B556B',
+          textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px',
+        }}>
+          Ciclo Atual (Ciclo {pastCycles.length + 1})
+        </p>
+        {currentCycle.length === 0
+          ? <p style={{ fontSize: 12, color: '#b0b8c8' }}>Nenhuma movimentação neste ciclo ainda.</p>
+          : currentCycle.map((log, i) => renderLog(log, i === currentCycle.length - 1))
+        }
+      </div>
     </div>
   )
 }
