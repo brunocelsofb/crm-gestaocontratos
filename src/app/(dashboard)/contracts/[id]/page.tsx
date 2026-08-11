@@ -102,7 +102,7 @@ export default async function ContractDetailPage({
   const currentTagIds = (currentContractTags ?? []).map((t: any) => t.tag_id).filter(Boolean)
 
   // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato.
-  const availableTemplates = (allSurveyTemplates ?? []).filter((t) => !t.tag_id || t.tag_id === currentTagId)
+  const availableTemplates = (allSurveyTemplates ?? []).filter((t) => !t.tag_id || currentTagIds.includes(t.tag_id))
 
   // NOTA DE INCERTEZA: mesmo aviso de sempre — uso o header "host" pra
   // montar o link absoluto, funciona bem na Vercel mas não testei em
