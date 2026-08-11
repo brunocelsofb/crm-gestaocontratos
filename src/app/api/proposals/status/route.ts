@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     proposal_value ? `Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
   ].filter(Boolean).join(' · ') + '.'
 
-  await supabase.from('activities').insert({
+  const { error: actError } = await supabase.from('activities').insert({
     contract_id,
     type: 'proposal',
     content: activityContent,
@@ -127,6 +127,11 @@ export async function POST(req: Request) {
       comment: comment ?? null,
     },
   })
+
+  if (actError) {
+    console.error('[proposal/status] activities INSERT error:', actError)
+    // Não falha a requisição por erro no log, mas reporta
+  }
 
   // Busca dados do contrato para notificação
   const { data: contract } = await supabase
