@@ -64,7 +64,7 @@ export default async function ProposalDetailPage({
   return (
     <div className="max-w-3xl space-y-6">
       <Link href={`/contracts/${contractId}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-700">
-        ← Voltar para o contrato
+        ← Voltar para a oportunidade
       </Link>
 
       <div className="flex items-center justify-between">
