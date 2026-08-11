@@ -125,7 +125,7 @@ function ActionsMenu({
               <MenuItem icon="✏️" label="Visualizar / Editar" onClick={() => { setOpen(false); onEdit() }} />
             )}
             {isApproved && (
-              <MenuItem icon="🔒" label="Proposta assinada" onClick={() => {}} />
+              <MenuItem icon="👁️" label="Visualizar proposta assinada" onClick={() => { setOpen(false); onEdit() }} />
             )}
 
             {/* Declinar — propostas ativas que não foram aprovadas pelo cliente */}
@@ -251,6 +251,8 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
 
   // Vista de detalhes
   if (selectedId && selected) {
+    const wStatus = selected.workflow_status ?? 'rascunho'
+    const isReadOnly = ['cliente_aprovado', 'declinada', 'cliente_recusado'].includes(wStatus)
     const initialData = {
       status: (selected.workflow_status ?? 'rascunho') as any,
       proposal_value: selected.proposal_value,
@@ -294,6 +296,19 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
           </button>
         </div>
 
+        {/* Banner somente leitura */}
+        {isReadOnly && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+            borderRadius: 8, background: '#fffbeb', border: '0.5px solid #fde68a',
+            marginBottom: 16, fontSize: 12, color: '#92400e', fontWeight: 500,
+          }}>
+            🔒 Esta proposta está <strong style={{ marginLeft: 4 }}>
+              {wStatus === 'cliente_aprovado' ? 'assinada pelo cliente' : 'encerrada'}
+            </strong>. Modo somente leitura — consulte o histórico abaixo.
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ProposalWorkflow
             key={`workflow-${selectedId}`}
@@ -301,10 +316,10 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             proposalId={selectedId}
             initialData={initialData}
             priceUrl={priceUrl}
-            currentUserRole={currentUserRole}
+            currentUserRole={isReadOnly ? 'aprovador_tecnico' : currentUserRole}
             currentUserName={currentUserName}
           />
-          {currentUserRole !== 'aprovador_tecnico' && (
+          {!isReadOnly && currentUserRole !== 'aprovador_tecnico' && (
             <ProposalTextsEditor
               key={`texts-${selectedId}`}
               contractId={contractId}
