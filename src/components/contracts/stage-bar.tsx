@@ -244,8 +244,6 @@ export function StageBar({
         </div>
       )}
 
-      )}
-
       {/* Modal de Perda — motivo obrigatório */}
       {showLostModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
