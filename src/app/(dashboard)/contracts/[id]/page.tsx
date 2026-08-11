@@ -126,6 +126,7 @@ export default async function ContractDetailPage({
     { data: stages },
     { data: history },
     { data: activityProfiles },
+    { data: lostReasons },
   ] = await Promise.all([
     pipelineIds.length
       ? supabase.from('pipelines').select('id, name, won_label, lost_label, type').in('id', pipelineIds)
@@ -139,6 +140,7 @@ export default async function ContractDetailPage({
     userIds.length
       ? supabase.from('profiles').select('id, full_name').in('id', userIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    supabase.from('lost_reasons').select('id, name').eq('active', true).order('display_order'),
   ])
 
   const pipelineById = new Map((pipelines ?? []).map((p) => [p.id, p]))
@@ -290,6 +292,7 @@ export default async function ContractDetailPage({
       {displayRun && stages && stages.length > 0 ? (
         <StageBar
           contractId={contract.id}
+          lostReasons={lostReasons ?? []}
           stages={stages}
           currentStageId={displayRun.stage_id}
           timings={timings}

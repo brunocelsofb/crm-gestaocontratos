@@ -332,7 +332,7 @@ export async function moveContractStage(
 // Isso é o que permite marcar "Renovado" com o contrato ainda em
 // "Gestão de Contratos" — a etapa do processo e o desfecho final são
 // duas coisas independentes agora, não uma etapa fixa no funil.
-export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Promise<MoveResult> {
+export async function closeRun(contractId: string, outcome: 'won' | 'lost', lostReason?: string): Promise<MoveResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -438,7 +438,6 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
     .update({ status: outcome, ended_at: now })
     .eq('id', run.id)
 
-  // Cascata: ao perder a oportunidade, declina automaticamente todas as propostas ativas
   if (outcome === 'lost') {
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const admin = createAdminClient()
@@ -454,13 +453,15 @@ export async function closeRun(contractId: string, outcome: 'won' | 'lost'): Pro
         .update({ workflow_status: 'declinada', updated_at: now })
         .in('id', activeProposals.map(p => p.id))
 
-      const codes = activeProposals.map(p => p.control_code).join(', ')
-      await admin.from('activities').insert({
-        contract_id: contractId,
-        type: 'system',
-        content: `🚫 Oportunidade marcada como Perdida — propostas ${codes} declinadas automaticamente.`,
-        user_id: user.id,
-      })
+      const reasonText = lostReason ? `Oportunidade perdida — ${lostReason}` : 'Oportunidade marcada como Perdida'
+      for (const p of activeProposals) {
+        await admin.from('activities').insert({
+          contract_id: contractId,
+          type: 'client_decision',
+          content: `❌ Proposta ${p.control_code} DECLINADA automaticamente. Motivo: ${reasonText}.`,
+          metadata: { outcome: 'declinada', reason: reasonText, proposal_id: p.id, auto_cascade: true },
+        })
+      }
     }
   }
 

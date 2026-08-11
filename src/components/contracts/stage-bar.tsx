@@ -24,7 +24,7 @@ const CONTRACT_TYPES = [
 export function StageBar({
   contractId, stages, currentStageId, timings, status,
   wonLabel, lostLabel, canChangeStage, pipelineType,
-  contractNature, contractValue, otherPipelines,
+  contractNature, contractValue, otherPipelines, lostReasons,
 }: {
   contractId: string; stages: Stage[]; currentStageId: string
   timings: StageTiming[]; status: string; wonLabel: string; lostLabel: string
@@ -32,10 +32,13 @@ export function StageBar({
   contractNature?: string | null
   contractValue?: number
   otherPipelines?: OtherPipeline[]
+  lostReasons?: { id: string; name: string }[]
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showWonModal, setShowWonModal] = useState(false)
+  const [showLostModal, setShowLostModal] = useState(false)
+  const [selectedLostReason, setSelectedLostReason] = useState('')
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferPipelineId, setTransferPipelineId] = useState('')
   const [transferStageId, setTransferStageId] = useState('')
@@ -96,6 +99,7 @@ export function StageBar({
   function handleClose(outcome: 'won' | 'lost', extraData?: {
     validFrom?: string; validUntil?: string
     cnpjBilling?: string; contractType?: string; monthlyValue?: string
+    lostReason?: string
   }) {
     setError(null)
     startTransition(async () => {
@@ -119,7 +123,7 @@ export function StageBar({
           }
         } catch { setError('Erro de conexão.'); return }
       }
-      const result = await closeRun(contractId, outcome)
+      const result = await closeRun(contractId, outcome, extraData?.lostReason)
       if (result.error) setError(result.error)
       else setShowWonModal(false)
     })
@@ -240,6 +244,52 @@ export function StageBar({
         </div>
       )}
 
+      )}
+
+      {/* Modal de Perda — motivo obrigatório */}
+      {showLostModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1f36', margin: '0 0 4px' }}>Marcar como {lostLabel}</p>
+            <p style={{ fontSize: 12, color: '#8892a4', margin: '0 0 16px' }}>Selecione o motivo oficial para registrar esta perda.</p>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#52514e', display: 'block', marginBottom: 6 }}>
+              Motivo de perda <span style={{ color: '#b91c1c' }}>*</span>
+            </label>
+            {(lostReasons ?? []).length === 0 ? (
+              <p style={{ fontSize: 12, color: '#b0b8c8', marginBottom: 16 }}>
+                Nenhum motivo cadastrado. Acesse Configurações → Motivos de Perda.
+              </p>
+            ) : (
+              <select
+                value={selectedLostReason}
+                onChange={e => setSelectedLostReason(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '0.5px solid #d1d8e8', marginBottom: 16, outline: 'none' }}>
+                <option value="">Selecione um motivo...</option>
+                {(lostReasons ?? []).map(r => (
+                  <option key={r.id} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowLostModal(false); setSelectedLostReason('') }}
+                style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                disabled={!selectedLostReason || isPending}
+                onClick={() => {
+                  setShowLostModal(false)
+                  handleClose('lost', { lostReason: selectedLostReason } as any)
+                  setSelectedLostReason('')
+                }}
+                style={{ padding: '8px 20px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: 'none', cursor: !selectedLostReason ? 'not-allowed' : 'pointer', background: !selectedLostReason ? '#d1d8e8' : '#b91c1c', color: '#fff' }}>
+                {isPending ? 'Salvando...' : `Confirmar ${lostLabel}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
           Etapa atual: <span className="font-medium text-gray-900">{stages[currentIndex]?.name ?? '—'}</span>
@@ -258,7 +308,7 @@ export function StageBar({
               className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:cursor-not-allowed disabled:opacity-40">
               {wonLabel}
             </button>
-            <button onClick={() => handleClose('lost')} disabled={isPending || !canMarkLost}
+            <button onClick={() => setShowLostModal(true)} disabled={isPending || !canMarkLost}
               title={canMarkLost ? undefined : `Só é possível marcar "${lostLabel}" numa etapa habilitada`}
               className="rounded-md bg-negative-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-negative-700 disabled:cursor-not-allowed disabled:opacity-40">
               {lostLabel}

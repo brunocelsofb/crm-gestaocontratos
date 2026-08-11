@@ -10,7 +10,7 @@ export async function POST(
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { actor_name } = await req.json()
+  const { actor_name, reason } = await req.json()
   const { id } = await params
   const admin = createAdminClient()
 
@@ -23,11 +23,12 @@ export async function POST(
     updated_at: new Date().toISOString(),
   }).eq('id', id)
 
+  const motivo = reason?.trim() || 'Não informado'
   await admin.from('activities').insert({
     contract_id: proposal.contract_id,
     type: 'client_decision',
-    content: `❌ Proposta ${proposal.control_code} DECLINADA internamente por ${actor_name}.`,
-    metadata: { outcome: 'declinada' },
+    content: `❌ Proposta ${proposal.control_code} DECLINADA internamente por ${actor_name}. Motivo: ${motivo}.`,
+    metadata: { outcome: 'declinada', reason: motivo, proposal_id: id },
     user_id: user.id,
   })
 

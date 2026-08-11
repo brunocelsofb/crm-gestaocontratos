@@ -214,13 +214,26 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
     router.refresh()
   }
 
+  const [declineModal, setDeclineModal] = useState<{ proposal: ProposalRow } | null>(null)
+  const [declineReason, setDeclineReason] = useState('')
+  const [decliningId, setDecliningId] = useState<string | null>(null)
+
   async function handleDecline(p: ProposalRow) {
-    if (!confirm(`Declinar "${p.control_code}"? A proposta será marcada como perdida.`)) return
+    setDeclineModal({ proposal: p })
+    setDeclineReason('')
+  }
+
+  async function confirmDecline() {
+    if (!declineModal) return
+    const p = declineModal.proposal
+    setDecliningId(p.id)
     await fetch(`/api/proposals/${p.id}/decline`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actor_name: currentUserName }),
+      body: JSON.stringify({ actor_name: currentUserName, reason: declineReason.trim() || null }),
     })
+    setDeclineModal(null)
+    setDecliningId(null)
     router.refresh()
   }
 
@@ -402,6 +415,38 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Modal de declínio */}
+      {declineModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1f36', margin: '0 0 4px' }}>Declinar proposta</p>
+            <p style={{ fontSize: 12, color: '#8892a4', margin: '0 0 16px' }}>{declineModal.proposal.control_code}</p>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#52514e', display: 'block', marginBottom: 6 }}>
+              Motivo do cancelamento <span style={{ fontWeight: 400, color: '#b0b8c8' }}>(opcional)</span>
+            </label>
+            <textarea
+              value={declineReason}
+              onChange={e => setDeclineReason(e.target.value)}
+              placeholder="Ex: Cliente escolheu outro fornecedor, orçamento cortado..."
+              rows={3}
+              autoFocus
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '0.5px solid #d1d8e8', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDeclineModal(null)} style={{ padding: '8px 16px', fontSize: 12, borderRadius: 8, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={confirmDecline} disabled={!!decliningId} style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: 'none', background: '#b91c1c', color: '#fff', cursor: 'pointer', opacity: decliningId ? 0.6 : 1 }}>
+                {decliningId ? 'Declinando...' : 'Confirmar declínio'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
