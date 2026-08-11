@@ -31,14 +31,20 @@ type ProposalData = {
   client_approved_at?: string | null
 }
 
-const STATUS_CONFIG: Record<ProposalStatus, { label: string; color: string; bg: string; dot: string }> = {
+const STATUS_CONFIG_MAP: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   rascunho:               { label: 'Rascunho',                bg: '#f1f3f8', color: '#52514e', dot: '#b0b8c8' },
   em_aprovacao_tecnica:   { label: 'Em Análise Técnica',      bg: '#fff8e6', color: '#92400e', dot: '#f59e0b' },
   aprovado_tecnico:       { label: 'Aprovado Tecnicamente',   bg: '#eef3ff', color: '#3b5bdb', dot: '#3b5bdb' },
   reprovado_tecnico:      { label: 'Reprovado — Em Revisão',  bg: '#fdecea', color: '#b91c1c', dot: '#b91c1c' },
   em_aprovacao_comercial: { label: 'Em Aprovação Comercial',  bg: '#fff8e6', color: '#92400e', dot: '#f59e0b' },
-  aprovado_comercial:     { label: 'Aprovado Comercialmente', bg: '#eaf5ee', color: '#1a7c3e', dot: '#22c55e' },
+  aprovado_comercial:     { label: 'Ag. Cliente',             bg: '#eaf5ee', color: '#1a7c3e', dot: '#22c55e' },
+  cliente_aprovado:       { label: '✅ Cliente Aprovou',      bg: '#dcfce7', color: '#166534', dot: '#16a34a' },
+  cliente_recusado:       { label: '❌ Cliente Recusou',      bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
+  declinada:              { label: '🚫 Declinada',            bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' },
 }
+const STATUS_CONFIG_DEFAULT = { label: 'Desconhecido', bg: '#f1f3f8', color: '#52514e', dot: '#b0b8c8' }
+// Alias tipado para manter compatibilidade
+const STATUS_CONFIG = STATUS_CONFIG_MAP as Record<ProposalStatus, { label: string; color: string; bg: string; dot: string }>
 
 const STEPS = [
   { key: 'rascunho',               label: 'Rascunho',       short: '1' },
@@ -79,7 +85,7 @@ async function postStatus(contractId: string, status: ProposalStatus, actorName?
 
 // ── Subcomponente: Badge de status ─────────────────────────────────────────
 function StatusBadge({ status }: { status: ProposalStatus }) {
-  const c = STATUS_CONFIG[status]
+  const c = STATUS_CONFIG_MAP[status as string] ?? STATUS_CONFIG_DEFAULT
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
