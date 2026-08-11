@@ -98,7 +98,7 @@ export default async function PipelinePage({
     supabase.from('stages').select('id, name, order_index, pipeline_id').in('pipeline_id', (pipelines ?? []).map(p => p.id)).order('order_index'),
     // Soma de propostas ativas por contract_id (exclui recusadas)
     allContractIds.length
-      ? supabase.from('proposals').select('contract_id, proposal_value, workflow_status').in('contract_id', allContractIds).is('deleted_at', null).neq('workflow_status', 'cliente_recusado')
+      ? supabase.from('proposals').select('contract_id, proposal_value, workflow_status').in('contract_id', allContractIds).is('deleted_at', null).not('workflow_status', 'in', '("cliente_recusado","declinada")')
       : Promise.resolve({ data: [] as any[] }),
   ])
 

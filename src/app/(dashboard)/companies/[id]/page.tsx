@@ -92,7 +92,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   // Ponto 2: soma de propostas ativas por contract_id para a empresa
   const companyProposalAgg = contractIds.length
-    ? await supabase.from('proposals').select('contract_id, proposal_value, workflow_status').in('contract_id', contractIds).is('deleted_at', null).neq('workflow_status', 'cliente_recusado')
+    ? await supabase.from('proposals').select('contract_id, proposal_value, workflow_status').in('contract_id', contractIds).is('deleted_at', null).not('workflow_status', 'in', '("cliente_recusado","declinada")')
     : { data: [] as any[] }
 
   const proposalSumByContractCompany = new Map<string, number>()

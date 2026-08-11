@@ -83,7 +83,7 @@ export default async function ContractsPage({
 
   // Busca a soma das propostas ativas por contract_id
   // Exclui: cliente_recusado (recusada), deleted_at não null
-  const EXCLUDED_STATUSES = ['cliente_recusado']
+  const EXCLUDED_STATUSES = ['cliente_recusado', 'declinada']
   const proposalSumByContract = new Map<string, number>()
   if (contractIds.length > 0) {
     const { data: proposalAgg } = await supabase

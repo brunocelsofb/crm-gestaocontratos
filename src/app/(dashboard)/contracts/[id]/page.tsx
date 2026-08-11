@@ -148,7 +148,7 @@ export default async function ContractDetailPage({
 
   // Ponto 1: valor agregado das propostas ativas (exclui recusadas)
   const proposalSum = (proposals ?? [])
-    .filter(p => p.workflow_status !== 'cliente_recusado')
+    .filter(p => !['cliente_recusado', 'declinada'].includes(p.workflow_status ?? ''))
     .reduce((s, p) => s + Number(p.proposal_value ?? 0), 0)
   const estimatedValue = proposalSum > 0 ? proposalSum : Number(displayRun?.value ?? 0)
 

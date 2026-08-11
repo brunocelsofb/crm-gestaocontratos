@@ -25,7 +25,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; lab
   transfer:             { icon: '↔️', color: '#8892a4', bg: '#f1f3f8',  label: 'Transferência' },
   proposal:             { icon: '📋', color: '#3b5bdb', bg: '#eef3ff',  label: 'Proposta' },
   client_decision:      { icon: '🤝', color: '#166534', bg: '#dcfce7',  label: 'Proposta Aceita' },
-  client_rejection:     { icon: '✕',  color: '#b91c1c', bg: '#fef2f2',  label: 'Proposta Recusada' },
+  client_rejection:     { icon: '✕',  color: '#b91c1c', bg: '#fef2f2',  label: 'Proposta Encerrada' },
 }
 
 function fmtDate(d: string) {
@@ -146,7 +146,7 @@ export function TimelineFeed({
           }} />
 
           {sorted.map(e => {
-            const cfgKey = (e.type === 'client_decision' && e.metadata?.outcome === 'recusado') ||
+            const cfgKey = (e.type === 'client_decision' && (e.metadata?.outcome === 'recusado' || e.metadata?.outcome === 'declinada')) ||
               (e.type === 'proposal' && e.content?.includes('RECUSADA'))
               ? 'client_rejection'
               : e.type
