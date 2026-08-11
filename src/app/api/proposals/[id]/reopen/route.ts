@@ -36,17 +36,10 @@ export async function POST(
     updated_at: new Date().toISOString(),
   }).eq('id', id)
 
-  // Salva snapshot do ciclo anterior na activities antes de reabrir
-  const cycleSnapshot = [
-    proposal.submitted_by_name ? `Enviada por: ${proposal.submitted_by_name}` : null,
-    proposal.technical_approved_by_name ? `Téc: ${proposal.technical_approved_by_name}` : null,
-    proposal.commercial_approved_by_name ? `Com: ${proposal.commercial_approved_by_name}` : null,
-  ].filter(Boolean).join(' · ')
-
   await admin.from('activities').insert({
     contract_id: proposal.contract_id,
     type: 'system',
-    content: `🔄 Proposta ${proposal.control_code} reaberta por ${actor_name}. Assinatura anterior invalidada.${cycleSnapshot ? ` Ciclo anterior — ${cycleSnapshot}.` : ''}`,
+    content: `🔄 Proposta ${proposal.control_code} reaberta por ${actor_name}. Ciclo anterior encerrado.`,
     metadata: {
       proposal_id: id,
       new_status: 'rascunho',

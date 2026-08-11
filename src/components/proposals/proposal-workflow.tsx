@@ -10,6 +10,9 @@ type ProposalStatus =
   | 'reprovado_tecnico'
   | 'em_aprovacao_comercial'
   | 'aprovado_comercial'
+  | 'cliente_aprovado'
+  | 'cliente_recusado'
+  | 'declinada'
 
 type ProposalData = {
   status: ProposalStatus

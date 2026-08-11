@@ -100,21 +100,29 @@ export async function POST(req: Request) {
       .eq('status', 'open')
   }
 
+  const ROLE_LABELS_MAP: Record<string, string> = {
+    admin: 'Administrador',
+    member: 'Comercial',
+    aprovador_tecnico: 'Aprovador Técnico',
+    aprovador_comercial: 'Aprovador Comercial',
+  }
+
   const statusLabel: Record<string, string> = {
-    aprovado_comercial:     '✅ Aprovada comercialmente',
-    aprovado_tecnico:       '🔧 Aprovada tecnicamente',
-    reprovado_tecnico:      '❌ Reprovada — retornou para revisão',
+    aprovado_comercial:     '✅ Aprovação Comercial realizada',
+    aprovado_tecnico:       '✅ Aprovação Técnica realizada',
+    reprovado_tecnico:      '❌ Reprovado na Análise Técnica — retornou para revisão',
     em_aprovacao_tecnica:   '📤 Enviada para Análise Técnica',
     em_aprovacao_comercial: '💼 Enviada para Aprovação Comercial',
-    rascunho:               '🔄 Retornada para rascunho',
+    rascunho:               '🔄 Retornada para Rascunho',
   }
 
   const activityContent = [
     statusLabel[status] ?? status,
     loggedName ? `por ${loggedName}` : null,
-    comment ? `Comentário: ${comment}` : null,
+    actor_role ? `(${ROLE_LABELS_MAP[actor_role] ?? actor_role})` : null,
+    comment ? `Comentário: "${comment}"` : null,
     proposal_value ? `Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
-  ].filter(Boolean).join(' · ') + '.'
+  ].filter(Boolean).join(' · ') + `.`
 
   const { error: actError } = await supabase.from('activities').insert({
     contract_id,
