@@ -127,14 +127,13 @@ function ProposalHistory({ proposalId, contractId }: { proposalId: string; contr
   if (loading) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Carregando histórico...</p>
   if (logs.length === 0) return <p style={{ fontSize: 12, color: '#b0b8c8' }}>Nenhuma movimentação registrada ainda.</p>
 
-  // Separa ciclos: log de reabertura (is_reopen=true ou content contém "reaberta") inicia novo ciclo
+  // Separa ciclos: reopen FECHA o ciclo anterior e INICIA o novo como primeiro item
   const cycles: any[][] = [[]]
   for (const log of logs) {
     const isReopen = log.metadata?.is_reopen === true || log.content?.includes('reaberta')
     if (isReopen && cycles[cycles.length - 1].length > 0) {
-      // O log de reabertura fecha o ciclo anterior e inicia o próximo
-      cycles[cycles.length - 1].push(log)
-      cycles.push([])
+      // Fecha ciclo anterior (sem incluir o reopen nele)
+      cycles.push([log])  // reopen é o primeiro item do NOVO ciclo
     } else {
       cycles[cycles.length - 1].push(log)
     }
