@@ -22,13 +22,14 @@ export async function GET(
 
   if (error) console.error('[history]', error)
 
-  // Filtra: inclui se metadata.proposal_id === id OU se não tem proposal_id (log geral)
+  // Filtra: inclui se metadata.proposal_id === id OU se não tem proposal_id (logs legados)
   const filtered = (logs ?? []).filter(log => {
     const pid = log.metadata?.proposal_id
-    if (pid && pid !== id) return false // log de outra proposta — exclui
+    // Se tem proposal_id de OUTRA proposta, exclui
+    if (pid && pid !== id) return false
+    // Sem proposal_id = log legado do contrato, inclui se conteúdo é relevante
     const c = (log.content ?? '').toLowerCase()
     if (log.type === 'client_decision') return true
-    // Inclui logs de proposta relevantes
     return c.includes('proposta') || c.includes('análise') || c.includes('analise') ||
       c.includes('aprovad') || c.includes('reprovad') || c.includes('reaberta') ||
       c.includes('declinad') || c.includes('comercial') || c.includes('técnic') || c.includes('tecnic')

@@ -101,18 +101,25 @@ export async function POST(req: Request) {
   }
 
   const statusLabel: Record<string, string> = {
-    aprovado_comercial:     '✅ Proposta aprovada comercialmente',
-    aprovado_tecnico:       '🔧 Proposta aprovada tecnicamente',
-    reprovado_tecnico:      '❌ Proposta reprovada — retornou para revisão',
-    em_aprovacao_tecnica:   '⏳ Proposta enviada para aprovação técnica',
-    em_aprovacao_comercial: '⏳ Proposta enviada para aprovação comercial',
-    rascunho:               '📝 Proposta retornada para rascunho',
+    aprovado_comercial:     '✅ Aprovada comercialmente',
+    aprovado_tecnico:       '🔧 Aprovada tecnicamente',
+    reprovado_tecnico:      '❌ Reprovada — retornou para revisão',
+    em_aprovacao_tecnica:   '📤 Enviada para Análise Técnica',
+    em_aprovacao_comercial: '💼 Enviada para Aprovação Comercial',
+    rascunho:               '🔄 Retornada para rascunho',
   }
+
+  const activityContent = [
+    statusLabel[status] ?? status,
+    loggedName ? `por ${loggedName}` : null,
+    comment ? `Comentário: ${comment}` : null,
+    proposal_value ? `Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
+  ].filter(Boolean).join(' · ') + '.'
 
   await supabase.from('activities').insert({
     contract_id,
     type: 'proposal',
-    content: `${statusLabel[status] ?? status}${loggedName ? ` por ${loggedName}` : ''}${proposal_value ? ` · Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}.`,
+    content: activityContent,
     metadata: {
       proposal_id: proposal_id ?? null,
       new_status: status,
