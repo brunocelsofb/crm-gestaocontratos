@@ -320,16 +320,18 @@ export function ProposalTab({ contractId, proposals, priceUrl, currentUserRole, 
             currentUserName={currentUserName}
           />
           {!isReadOnly && currentUserRole !== 'aprovador_tecnico' && (
-            <ProposalTextsEditor
-              key={`texts-${selectedId}`}
-              contractId={contractId}
-              proposalId={selectedId}
-              initialData={{
-                texto_objetivos: selected.texto_objetivos,
-                texto_atividades: selected.texto_atividades,
-                texto_estrutura_apoio: selected.texto_estrutura_apoio,
-              }}
-            />
+            <div id="montagem-proposta">
+              <ProposalTextsEditor
+                key={`texts-${selectedId}`}
+                contractId={contractId}
+                proposalId={selectedId}
+                initialData={{
+                  texto_objetivos: selected.texto_objetivos,
+                  texto_atividades: selected.texto_atividades,
+                  texto_estrutura_apoio: selected.texto_estrutura_apoio,
+                }}
+              />
+            </div>
           )}
         </div>
       </div>
