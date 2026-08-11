@@ -12,27 +12,26 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  // Busca TODOS os logs de aprovação de proposta (type=proposal) e decisões do cliente
-  const { data: logs } = await admin
+  // Busca TODOS os logs de aprovação desta proposta + logs de sistema com proposal_id
+  const { data: logs, error } = await admin
     .from('activities')
     .select('id, type, content, created_at, metadata')
     .eq('contract_id', contractId)
     .in('type', ['proposal', 'system', 'client_decision'])
     .order('created_at', { ascending: true })
 
-  // Filtra os relevantes para ESTA proposta (pelo proposal_id no metadata ou pelo content)
+  if (error) console.error('[history]', error)
+
+  // Filtra: inclui se metadata.proposal_id === id OU se não tem proposal_id (log geral)
   const filtered = (logs ?? []).filter(log => {
     const pid = log.metadata?.proposal_id
-    // Inclui se metadata tem este proposal_id, ou se não tem proposal_id (log geral do contrato)
-    return !pid || pid === id
-  }).filter(log => {
-    // Exclui logs completamente sem relação com aprovações
-    const c = log.content?.toLowerCase() ?? ''
+    if (pid && pid !== id) return false // log de outra proposta — exclui
+    const c = (log.content ?? '').toLowerCase()
     if (log.type === 'client_decision') return true
-    return c.includes('análise técnica') || c.includes('analise tecnica') ||
-      c.includes('aprovada') || c.includes('reprovada') || c.includes('reprovado') ||
-      c.includes('comercial') || c.includes('cliente') || c.includes('reaberta') ||
-      c.includes('declinada') || c.includes('proposta') || c.includes('enviada')
+    // Inclui logs de proposta relevantes
+    return c.includes('proposta') || c.includes('análise') || c.includes('analise') ||
+      c.includes('aprovad') || c.includes('reprovad') || c.includes('reaberta') ||
+      c.includes('declinad') || c.includes('comercial') || c.includes('técnic') || c.includes('tecnic')
   })
 
   const enriched = filtered.map(log => ({

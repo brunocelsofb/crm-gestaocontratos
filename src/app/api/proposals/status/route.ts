@@ -72,13 +72,8 @@ export async function POST(req: Request) {
     if (actor_role) patch.commercial_approved_by_role = actor_role
   }
   if (status === 'rascunho') {
-    // Reset dos campos de auditoria ao voltar para rascunho
-    patch.submitted_at = null
-    patch.submitted_by_name = null
-    patch.technical_approved_at = null
-    patch.technical_approved_by_name = null
-    patch.commercial_approved_at = null
-    patch.commercial_approved_by_name = null
+    // NÃO limpa campos de auditoria — preserva audit trail
+    // A reabertura é registrada via log, não apagando o passado
   }
 
   // Salva no proposals (novo modelo 1:N) se vier proposal_id
@@ -118,6 +113,12 @@ export async function POST(req: Request) {
     contract_id,
     type: 'proposal',
     content: `${statusLabel[status] ?? status}${loggedName ? ` por ${loggedName}` : ''}${proposal_value ? ` · Valor: R$ ${Number(proposal_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}.`,
+    metadata: {
+      proposal_id: proposal_id ?? null,
+      new_status: status,
+      actor: loggedName,
+      comment: comment ?? null,
+    },
   })
 
   // Busca dados do contrato para notificação

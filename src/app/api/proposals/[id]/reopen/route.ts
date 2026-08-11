@@ -47,6 +47,12 @@ export async function POST(
     contract_id: proposal.contract_id,
     type: 'system',
     content: `🔄 Proposta ${proposal.control_code} reaberta por ${actor_name}. Assinatura anterior invalidada.${cycleSnapshot ? ` Ciclo anterior — ${cycleSnapshot}.` : ''}`,
+    metadata: {
+      proposal_id: id,
+      new_status: 'rascunho',
+      actor: actor_name,
+      is_reopen: true,
+    },
     user_id: user.id,
   })
 
