@@ -642,7 +642,7 @@ export default async function ContractDetailPage({
                 }}
                 contractNature={(contract as any).nature ?? null}
                 tags={allTags ?? []}
-                currentTagIds={(currentContractTags ?? []).map((t: any) => t.tag_id).filter(Boolean)}
+                currentTagId={(currentContractTags ?? [])[0]?.tag_id ?? null}
               />
             ),
           }] : []),
