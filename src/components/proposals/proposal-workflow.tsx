@@ -449,7 +449,13 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
   const isTech  = currentUserRole === 'aprovador_tecnico' || isAdmin
   const isComm  = currentUserRole === 'aprovador_comercial' || isAdmin
   const isCommMember = ['member', 'admin', 'aprovador_comercial'].includes(currentUserRole)
-  const currentIdx = STEP_ORDER.indexOf(data.status)
+  const TERMINAL_SUCCESS = ['cliente_aprovado']
+  const TERMINAL_FAILURE = ['cliente_recusado', 'declinada']
+  const rawIdx = STEP_ORDER.indexOf(data.status)
+  // Status terminal de sucesso = todos steps concluídos
+  const currentIdx = TERMINAL_SUCCESS.includes(data.status)
+    ? STEP_ORDER.length  // maior que qualquer stepIdx → todos isDone
+    : rawIdx
 
   async function doAction(nextStatus: ProposalStatus, comment?: string) {
     setError(null)
@@ -681,8 +687,8 @@ export function ProposalWorkflow({ contractId, proposalId, initialData, priceUrl
         </div>
       )}
 
-      {/* ── Ações ─────────────────────────────────────────────────── */}
-      {data.status !== 'aprovado_comercial' && card(
+      {/* ── Ações — oculto em status terminais ──────────────────── */}
+      {!['aprovado_comercial', 'cliente_aprovado', 'cliente_recusado', 'declinada'].includes(data.status) && card(
         <div>
           {sectionLabel('Ações Disponíveis')}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
