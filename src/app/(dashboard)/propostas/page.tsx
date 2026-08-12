@@ -28,7 +28,7 @@ export default async function PropostasPage() {
 
   // Query 2: contratos (admin bypassa RLS)
   const contractsResult = contractIds.length > 0
-    ? await admin.from('contracts').select('id, title, client_name, process_number, user_id').in('id', contractIds)
+    ? await admin.from('contracts').select('id, title, client_name, process_number').in('id', contractIds)
     : { data: [], error: null }
   const contracts = contractsResult.data
   const contractsError = (contractsResult as any).error
@@ -100,7 +100,7 @@ export default async function PropostasPage() {
       contract_id: p.contract_id,
       contract_title: contract?.client_name ?? contract?.title ?? contract?.process_number ?? '—',
       pipeline_stage: stageByContract.get((p.contract_id ?? '').trim().toLowerCase()) ?? null,
-      responsible: profileById.get(contract?.user_id ?? '') ?? '—',
+      responsible: '—',
       mrr,
       pontual,
       item_summary: itemSummary,
