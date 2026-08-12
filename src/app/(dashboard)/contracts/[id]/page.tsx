@@ -600,6 +600,7 @@ export default async function ContractDetailPage({
                 contractId={contract.id}
                 companyCity={(linkedCompany as any)?.city ?? null}
                 companyState={(linkedCompany as any)?.state ?? null}
+                wonDate={openRun?.started_at ? openRun.started_at.slice(0, 10) : null}
                 abcConfig={await (async () => {
                   const { data: cfgs } = await supabase.from('abc_config').select('*')
                   return {

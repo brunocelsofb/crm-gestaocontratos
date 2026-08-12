@@ -82,7 +82,7 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
   )
 }
 
-export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig, tags, currentTagId, activeFields }: {
+export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig, tags, currentTagId, activeFields, wonDate }: {
   contractId: string
   initial: PortfolioData
   contractNature?: string | null
@@ -91,19 +91,34 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
   abcConfig?: { clinica?: AbcConfig | null; hospitalar?: AbcConfig | null } | null
   tags?: { id: string; name: string; color: string }[]
   currentTagId?: string | null
-  activeFields?: string[] | null  // null = mostrar todos; array = mostrar só os listados
+  activeFields?: string[] | null
+  wonDate?: string | null  // YYYY-MM-DD da data de ganho do funil
 }) {
-  // Helper: retorna true se o campo deve ser exibido
   const show = (key: string) => !activeFields || activeFields.includes(key)
   const router = useRouter()
   const [tagId, setTagId] = useState(currentTagId ?? '')
   const [data, setData] = useState<PortfolioData>(() => ({
     ...initial,
-    // Pré-preenche município/UF/região da empresa se não havia nada
+    // Herda valid_from da data de ganho se não preenchido
+    valid_from: initial.valid_from || wonDate || null,
     municipality: initial.municipality || companyCity || null,
     uf: initial.uf || (companyState ? JSON.stringify([companyState]) : null),
     region: initial.region || (companyState && UF_REGIAO[companyState] ? JSON.stringify([UF_REGIAO[companyState]]) : null),
   }))
+
+  // Calcula vencimento automaticamente ao mudar início ou meses
+  useEffect(() => {
+    if (!data.valid_from || !data.validity_months) return
+    const start = new Date(data.valid_from + 'T12:00:00') // meio-dia evita problemas de timezone
+    start.setMonth(start.getMonth() + Number(data.validity_months))
+    const yyyy = start.getFullYear()
+    const mm = String(start.getMonth() + 1).padStart(2, '0')
+    const dd = String(start.getDate()).padStart(2, '0')
+    const calculated = `${yyyy}-${mm}-${dd}`
+    if (calculated !== data.valid_until) {
+      setData(prev => ({ ...prev, valid_until: calculated }))
+    }
+  }, [data.valid_from, data.validity_months])
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -249,7 +264,7 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
           <select style={{ ...inp, cursor: 'pointer' }} value={data.nature ?? ''} onChange={e => set('nature', e.target.value || null)}>
             <option value="">Selecione...</option>
             <option value="eng_clinica">Engenharia Clínica</option>
-            <option value="eng_hospitalar">Engenharia Hospitalar</option>
+            <option value="eng_predial">Engenharia Predial</option>
           </select>
         </div>
         <div>
@@ -266,8 +281,26 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
             </p>
           )}
         </div>
-        <div><label style={lbl}>Vencimento</label><input style={inp} type="date" value={data.valid_until ?? ''} onChange={e => set('valid_until', e.target.value || null)} /></div>
-        <div><label style={lbl}>Vigência (meses)</label><input style={inp} type="number" value={data.validity_months ?? ''} onChange={e => set('validity_months', e.target.value ? Number(e.target.value) : null)} /></div>
+        <div>
+          <label style={lbl}>Vigência (meses)</label>
+          <select style={{ ...inp, cursor: 'pointer' }} value={data.validity_months ?? ''} onChange={e => set('validity_months', e.target.value ? Number(e.target.value) : null)}>
+            <option value="">Selecione...</option>
+            {[1,2,3,4,5,6,7,8,9,10,11,12,24,36,48,60].map(m => (
+              <option key={m} value={m}>{m} {m === 1 ? 'mês' : 'meses'}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={lbl}>Vencimento</label>
+          <input style={{ ...inp, background: '#f8f9fb', cursor: 'default' }} type="date" value={data.valid_until ?? ''}
+            readOnly
+            title={data.valid_from && data.validity_months ? 'Calculado automaticamente: Início + Vigência' : 'Preencha Início e Vigência para calcular'}
+            onChange={e => set('valid_until', e.target.value || null)}
+          />
+          {data.valid_from && data.validity_months && (
+            <p style={{ fontSize: 10, color: '#1a7c3e', marginTop: 3 }}>✓ Calculado: início + {data.validity_months} meses</p>
+          )}
+        </div>
       </div>
 
       {/* Itens do contrato — condicionais por natureza */}
