@@ -28,9 +28,7 @@ export async function POST(req: Request) {
     .from('proposals')
     .select('id, contract_id, control_code, proposal_value')
     .eq('client_review_token', token)
-    .maybeSingle()
-
-  if (newProposal) {
+    .maybeSingle()  if (newProposal) {
     const newWorkflowStatus = isAprovado ? 'cliente_aprovado' : 'cliente_recusado'
     const { data: contractData } = await admin
       .from('contracts').select('client_name, title').eq('id', newProposal.contract_id).maybeSingle()
@@ -48,6 +46,27 @@ export async function POST(req: Request) {
       workflow_status: newWorkflowStatus,
       updated_at: now,
     }).eq('id', newProposal.id)
+
+    // Aditivo aprovado: substitui o valor do contrato na pipeline_run ativa
+    if (isAprovado && newProposal.proposal_value) {
+      const { data: openRun } = await admin
+        .from('pipeline_runs').select('id, value').eq('contract_id', newProposal.contract_id).eq('status', 'open').maybeSingle()
+      if (openRun) {
+        const oldValue = Number(openRun.value) || 0
+        const newVal   = Number(newProposal.proposal_value)
+        await admin.from('pipeline_runs').update({ value: newVal }).eq('id', openRun.id)
+        const pct = oldValue > 0 ? Math.round(((newVal - oldValue) / oldValue) * 1000) / 10 : null
+        const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+        await admin.from('activities').insert({
+          contract_id: newProposal.contract_id,
+          pipeline_run_id: openRun.id,
+          type: 'system',
+          content: pct !== null
+            ? `Valor do contrato atualizado para ${fmtBRL(newVal)} via proposta ${newProposal.control_code} (${pct >= 0 ? '+' : ''}${pct}% sobre ${fmtBRL(oldValue)}).`
+            : `Valor do contrato atualizado para ${fmtBRL(newVal)} via proposta ${newProposal.control_code}.`,
+        })
+      }
+    }
 
     const logContent = isAprovado
       ? `✅ Proposta ${newProposal.control_code} aceita na oportunidade "${oppName}"${valueFmt ? ` · Valor: ${valueFmt}` : ''}. Aprovado por: ${name}${role ? ` (${role})` : ''}${cpfFmt ? ` · CPF: ${cpfFmt}` : ''}. Data/Hora: ${nowFmt}.`

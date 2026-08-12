@@ -39,12 +39,20 @@ export function RenewalValueSection({ contractId, currentValue, canEdit }: { con
           <p className="text-lg font-semibold text-gray-900">{fmt(currentValue)}</p>
         </div>
         {!editing && canEdit && (
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
-          >
-            Definir novo valor da renovação
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditing(true)}
+              className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+            >
+              Reajuste direto (IPCA)
+            </button>
+            <a
+              href={`/contracts/${contractId}?tab=propostas`}
+              className="rounded-md border border-brand-700 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 no-underline"
+            >
+              Gerar proposta de aditivo
+            </a>
+          </div>
         )}
         {!canEdit && (
           <span className="text-xs text-gray-400">Só o dono da conta ou admin pode alterar</span>
