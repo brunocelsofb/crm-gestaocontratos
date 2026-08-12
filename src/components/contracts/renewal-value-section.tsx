@@ -8,11 +8,12 @@ function fmt(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 }
 
-export function RenewalValueSection({ contractId, currentValue, canEdit, canCreateProposal }: {
+export function RenewalValueSection({ contractId, currentValue, canEdit, canCreateProposal, isCurrentlyInContractsPipeline }: {
   contractId: string
   currentValue: number
   canEdit: boolean
   canCreateProposal?: boolean
+  isCurrentlyInContractsPipeline?: boolean
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -32,29 +33,29 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs text-gray-500">Valor do contrato (esta passagem)</p>
-          <p className="text-lg font-semibold text-gray-900">{fmt(currentValue)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            {isCurrentlyInContractsPipeline ? 'Valor vigente do contrato' : 'Valor estimado'}
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-gray-900 tabular-nums">
+            {fmt(currentValue)}
+          </p>
         </div>
 
-        {/* Botões — sempre visíveis, permissões granulares por ação */}
         {!editing && (
-          <div className="flex gap-2 flex-wrap justify-end">
-            {/* Reajuste direto: apenas owner/admin */}
+          <div className="flex items-center gap-3 flex-shrink-0">
             {canEdit ? (
               <button
                 onClick={() => setEditing(true)}
-                className="rounded-md border border-brand-700 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 whitespace-nowrap"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
               >
                 Reajuste monetário
               </button>
             ) : (
-              <span className="text-[11px] text-gray-400 self-center">Reajuste: apenas owner/admin</span>
+              <span className="text-xs text-gray-400">Reajuste: apenas owner/admin</span>
             )}
-
-            {/* Gerar proposta de aditivo: sempre visível para a equipe comercial */}
             <button
               type="button"
               onClick={(e) => {
@@ -62,9 +63,9 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
                 e.stopPropagation()
                 router.push(`/contracts/${contractId}?tab=proposta`)
               }}
-              className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 whitespace-nowrap cursor-pointer border-0"
+              className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 transition-colors whitespace-nowrap border-0 cursor-pointer"
             >
-              + Gerar proposta de aditivo
+              + Proposta de aditivo
             </button>
           </div>
         )}

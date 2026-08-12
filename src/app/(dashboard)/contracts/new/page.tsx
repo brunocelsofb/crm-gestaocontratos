@@ -94,27 +94,27 @@ export default function NewContractPage() {
   function show(key: string) { return fieldVis(key) !== 'hidden' }
   function req(key: string) { return fieldVis(key) === 'required' }
 
-  const inputCls = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none'
+  const inputCls = 'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-brand-700 focus:ring-2 focus:ring-brand-700/20 focus:outline-none transition-colors'
 
   return (
-    <div style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="max-w-xl mx-auto flex flex-col gap-2 pb-12">
       <Link href={companyIdParam ? `/companies/${companyIdParam}` : '/pipeline'}
-        style={{ fontSize: 12, color: '#8892a4', textDecoration: 'none' }}>
+        className="text-xs text-gray-400 hover:text-gray-600 no-underline transition-colors">
         ← Voltar
       </Link>
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+      <div className="mb-2">
+        <h1 className="text-xl font-semibold text-gray-900">
           {pipelineType === 'vendas' ? 'Nova Oportunidade' : 'Novo Contrato'}
         </h1>
-        {pipelineName && <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Funil: {pipelineName}</p>}
+        {pipelineName && <p className="text-sm text-gray-500 mt-0.5">Funil: {pipelineName}</p>}
         {fieldConfigs.length > 0 && (
-          <p style={{ fontSize: 11, color: '#b0b8c8', marginTop: 2 }}>
-            Campos com <span style={{ color: '#b91c1c' }}>*</span> são obrigatórios para este funil.
+          <p className="text-xs text-gray-400 mt-1">
+            Campos com <span className="text-red-600">*</span> são obrigatórios para este funil.
           </p>
         )}
       </div>
 
-      <form action={formAction} style={{ display: 'flex', flexDirection: 'column', gap: 16, background: '#fff', borderRadius: 12, border: '0.5px solid #e8edf5', padding: 24 }}>
+      <form action={formAction} className="flex flex-col space-y-5 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         {show('title') && (
           <div>
             <label className="block text-sm font-medium text-gray-700">Título {req('title') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
@@ -206,10 +206,10 @@ export default function NewContractPage() {
 
         <input type="hidden" name="pipeline_id" value={pipelineId ?? ''} />
 
-        {state.error && <p style={{ fontSize: 12, color: '#b91c1c' }}>{state.error}</p>}
+        {state.error && <p className="text-xs text-red-600">{state.error}</p>}
 
         <button type="submit" disabled={pending}
-          style={{ padding: '10px', fontSize: 13, fontWeight: 500, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1 }}>
+          className="w-full rounded-lg bg-gray-900 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
           {pending ? 'Salvando...' : pipelineType === 'vendas' ? 'Criar Oportunidade' : 'Criar Contrato'}
         </button>
       </form>

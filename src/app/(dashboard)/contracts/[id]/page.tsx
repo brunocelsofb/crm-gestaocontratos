@@ -335,17 +335,18 @@ export default async function ContractDetailPage({
                     currentValue={estimatedValue}
                     canEdit={canChangeStage}
                     canCreateProposal={['admin', 'member', 'aprovador_comercial'].includes(currentProfile?.role ?? '')}
+                    isCurrentlyInContractsPipeline={isCurrentlyInContractsPipeline}
                   />
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  {/* Valor com botão de alterar inline em Novos Negócios */}
-                  <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
-                    <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Valor estimado / contrato */}
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
                       {isCurrentlyInContractsPipeline ? 'Valor do contrato' : 'Valor estimado'}
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <p style={{ fontSize: 15, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-base font-semibold text-gray-900 tabular-nums">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(estimatedValue)}
                       </p>
                       {canChangeStage && (
@@ -353,29 +354,32 @@ export default async function ContractDetailPage({
                       )}
                     </div>
                   </div>
-                  {/* Vigência só em Gestão de Contratos */}
+
+                  {/* Vigência / Previsão */}
                   {isCurrentlyInContractsPipeline ? (
-                    <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
-                      <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Vigência</p>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Vigência</p>
+                      <p className="text-base font-semibold text-gray-900">
                         {contract.valid_until
                           ? `${contract.valid_from ? new Date(contract.valid_from).toLocaleDateString('pt-BR') : '?'} → ${new Date(contract.valid_until).toLocaleDateString('pt-BR')}`
                           : 'Não informada'}
                       </p>
                     </div>
                   ) : (
-                    <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
-                      <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Previsão de fechamento</p>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Previsão de fechamento</p>
+                      <p className="text-base font-semibold text-gray-900">
                         {displayRun?.expected_close_date
                           ? new Date(displayRun.expected_close_date).toLocaleDateString('pt-BR')
                           : 'Não informada'}
                       </p>
                     </div>
                   )}
-                  <div style={{ background: '#f8f9fb', borderRadius: 10, padding: 14, border: '0.5px solid #e8edf5' }}>
-                    <p style={{ fontSize: 10, color: '#8892a4', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Aberto desde</p>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1a1f36', margin: 0 }}>
+
+                  {/* Aberto desde */}
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Aberto desde</p>
+                    <p className="text-base font-semibold text-gray-900">
                       {new Date(contract.created_at).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
