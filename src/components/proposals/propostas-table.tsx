@@ -120,7 +120,10 @@ function DropdownMenu({ p, currentUserRole }: { p: ProposalRow; currentUserRole:
               <Item icon="✏️" label="Ver na oportunidade"
                 onClick={() => { setMenuPos(null); window.open(`/contracts/${p.contract_id}`, '_blank') }} />
             )}
-            {isApproved && <Item icon="🔒" label="Proposta assinada" onClick={() => {}} />}
+            {isApproved && (
+              <Item icon="👁️" label="Visualizar proposta assinada"
+                onClick={() => { setMenuPos(null); window.open(`/contracts/${p.contract_id}/proposals/${p.id}`, '_blank') }} />
+            )}
             {canReopen && <Item icon="🔄" label="Reabrir proposta" onClick={handleReopen} />}
             {p.client_review_token && (
               <Item icon="🔗" label="Ver link público"
