@@ -708,6 +708,11 @@ export async function updateRunValue(contractId: string, newValue: number): Prom
   const { error } = await supabase.from('pipeline_runs').update({ value: newValue }).eq('id', run.id)
   if (error) return { error: error.message }
 
+  // Sincroniza contracts.monthly_value — fonte única de verdade do MRR vigente
+  if (!isVendas) {
+    await supabase.from('contracts').update({ monthly_value: newValue }).eq('id', contractId)
+  }
+
   // Porcentagem de reajuste — só faz sentido em contratos (renovação),
   // não em oportunidades onde o valor ainda está sendo estimado
   const pctChange = !isVendas && oldValue > 0
