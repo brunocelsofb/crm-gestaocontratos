@@ -61,6 +61,12 @@ export default async function PropostasPage() {
   const contractById = new Map((contracts ?? []).map(c => [c.id, c]))
   const profileById  = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
 
+  // Diagnóstico
+  console.log('[propostas] proposals:', proposals?.length, 'contracts:', contracts?.length, 'profiles:', profiles?.length)
+  console.log('[propostas] contractIds:', contractIds.slice(0, 3))
+  console.log('[propostas] contractById keys:', [...contractById.keys()].slice(0, 3))
+  if (proposals?.[0]) console.log('[propostas] proposal[0].contract_id:', proposals[0].contract_id)
+
   // Agrupa itens por proposal_id
   const itemsByProposal = new Map<string, typeof items>()
   for (const item of items ?? []) {
