@@ -46,7 +46,7 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
                 onClick={() => setEditing(true)}
                 className="rounded-md border border-brand-700 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 whitespace-nowrap"
               >
-                Reajuste direto (IPCA)
+                Reajuste monetário
               </button>
             ) : (
               <span className="text-[11px] text-gray-400 self-center">Reajuste: apenas owner/admin</span>

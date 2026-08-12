@@ -621,7 +621,7 @@ export default async function ContractDetailPage({
                   sankhya_code: (contract as any).sankhya_code ?? null,
                   cnpj_billing: (contract as any).cnpj_billing ?? null,
                   contract_type: (contract as any).contract_type ?? null,
-                  monthly_value: estimatedValue > 0 ? estimatedValue : ((contract as any).monthly_value ?? null),
+                  monthly_value: Number(displayRun?.value) > 0 ? Number(displayRun.value) : ((contract as any).monthly_value ?? null),
                   validity_months: (contract as any).validity_months ?? null,
                   valid_until: (contract as any).valid_until ?? null,
                   engineer_name: (contract as any).engineer_name ?? null,
