@@ -609,8 +609,8 @@ export default async function ContractDetailPage({
                 })()}
                 activeFields={await (async () => {
                   const { data: orgSettings } = await supabase
-                    .from('organization_settings').select('carteira_sections').eq('id', 'default').maybeSingle()
-                  return orgSettings?.carteira_sections ? (orgSettings.carteira_sections as string[]) : null
+                    .from('organization_settings').select('carteira_active_fields').eq('id', 'default').maybeSingle()
+                  return orgSettings?.carteira_active_fields ? (orgSettings.carteira_active_fields as string[]) : null
                 })()}
                 initial={{
                   contract_number: (contract as any).contract_number ?? null,

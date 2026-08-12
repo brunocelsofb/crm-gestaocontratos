@@ -13,13 +13,13 @@ export async function POST(req: Request) {
   // Salva em organization_settings como JSON na coluna carteira_sections
   const { error } = await admin
     .from('organization_settings')
-    .upsert({ id: 'default', carteira_sections: activeFields }, { onConflict: 'id' })
+    .upsert({ id: 'default', carteira_active_fields: activeFields }, { onConflict: 'id' })
 
   if (error) {
     // Tenta como update se upsert falhar por schema
     const { error: e2 } = await admin
       .from('organization_settings')
-      .update({ carteira_sections: activeFields })
+      .update({ carteira_active_fields: activeFields })
       .eq('id', 'default')
     if (e2) return NextResponse.json({ error: e2.message }, { status: 400 })
   }
