@@ -41,6 +41,19 @@ export function CarteiraConfigManager() {
   const [newKey, setNewKey] = useState('')
   const [newSection, setNewSection] = useState('Identificação')
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function saveFields() {
+    setSaving(true)
+    const activeKeys = fields.filter(f => f.active).map(f => f.key)
+    await fetch('/api/settings/carteira-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activeFields: activeKeys }),
+    })
+    setSaving(false)
+    setSaved(true)
+  }
 
   const sections = [...new Set(fields.map(f => f.section))]
 
@@ -132,6 +145,14 @@ export function CarteiraConfigManager() {
       <p style={{ fontSize: 11, color: '#8892a4' }}>
         💡 As alterações aqui são visuais — os campos já existem no banco. Ativar/inativar controla apenas o que aparece na tela de dados da carteira.
       </p>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={saveFields} disabled={saving}
+          style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', background: '#1a1f36', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+          {saving ? 'Salvando...' : 'Salvar configurações'}
+        </button>
+        {saved && !saving && <span style={{ fontSize: 12, color: '#1a7c3e' }}>✓ Salvo</span>}
+      </div>
     </div>
   )
 }

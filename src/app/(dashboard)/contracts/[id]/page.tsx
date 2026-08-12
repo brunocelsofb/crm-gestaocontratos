@@ -607,6 +607,11 @@ export default async function ContractDetailPage({
                     hospitalar: cfgs?.find((c: any) => c.nature === 'eng_hospitalar') ?? null,
                   }
                 })()}
+                activeFields={await (async () => {
+                  const { data: orgSettings } = await supabase
+                    .from('organization_settings').select('carteira_sections').eq('id', 'default').maybeSingle()
+                  return orgSettings?.carteira_sections ? (orgSettings.carteira_sections as string[]) : null
+                })()}
                 initial={{
                   contract_number: (contract as any).contract_number ?? null,
                   sankhya_code: (contract as any).sankhya_code ?? null,

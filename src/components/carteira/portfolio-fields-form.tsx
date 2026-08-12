@@ -82,7 +82,7 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
   )
 }
 
-export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig, tags, currentTagId }: {
+export function PortfolioFieldsForm({ contractId, initial, contractNature, companyCity, companyState, abcConfig, tags, currentTagId, activeFields }: {
   contractId: string
   initial: PortfolioData
   contractNature?: string | null
@@ -91,7 +91,10 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
   abcConfig?: { clinica?: AbcConfig | null; hospitalar?: AbcConfig | null } | null
   tags?: { id: string; name: string; color: string }[]
   currentTagId?: string | null
+  activeFields?: string[] | null  // null = mostrar todos; array = mostrar só os listados
 }) {
+  // Helper: retorna true se o campo deve ser exibido
+  const show = (key: string) => !activeFields || activeFields.includes(key)
   const router = useRouter()
   const [tagId, setTagId] = useState(currentTagId ?? '')
   const [data, setData] = useState<PortfolioData>(() => ({
@@ -200,10 +203,18 @@ export function PortfolioFieldsForm({ contractId, initial, contractNature, compa
       {/* Identificação */}
       <p style={sec}>Identificação</p>
       <div style={g3}>
-        <div><label style={lbl}>Nº Contrato</label><input style={inp} value={data.contract_number ?? ''} onChange={e => set('contract_number', e.target.value)} placeholder="CT-2024-001" /></div>
-        <div><label style={lbl}>Cód. Sankhya</label><input style={inp} value={data.sankhya_code ?? ''} onChange={e => set('sankhya_code', e.target.value)} /></div>
-        <div><label style={lbl}>CNPJ Faturamento</label><input style={inp} value={data.cnpj_billing ?? ''} onChange={e => set('cnpj_billing', e.target.value)} placeholder="00.000.000/0000-00" /></div>
-        <div><label style={lbl}>Grupo Econômico</label><input style={inp} value={data.economic_group ?? ''} onChange={e => set('economic_group', e.target.value)} /></div>
+        {show('contract_number') && <div><label style={lbl}>Nº Contrato</label><input style={inp} value={data.contract_number ?? ''} onChange={e => set('contract_number', e.target.value)} placeholder="CT-2024-001" /></div>}
+        {show('sankhya_code') && <div><label style={lbl}>Cód. Sankhya</label><input style={inp} value={data.sankhya_code ?? ''} onChange={e => set('sankhya_code', e.target.value)} /></div>}
+        {show('cnpj_billing') &&
+          <div><label style={lbl}>CNPJ Faturamento</label>
+            <select style={inp} value={data.cnpj_billing ?? ''} onChange={e => set('cnpj_billing', e.target.value)}>
+              <option value="">Selecione...</option>
+              <option value="33.763.031/0001-53">CNPJ: 33.763.031/0001-53</option>
+              <option value="23.129.279/0001-03">CNPJ: 23.129.279/0001-03</option>
+              <option value="23.129.279/0002-94">CNPJ: 23.129.279/0002-94</option>
+            </select>
+          </div>}
+        {show('economic_group') && <div><label style={lbl}>Grupo Econômico</label><input style={inp} value={data.economic_group ?? ''} onChange={e => set('economic_group', e.target.value)} /></div>}
       {tags && tags.length > 0 && (
         <div>
           <label style={lbl}>Tag do Contrato</label>
