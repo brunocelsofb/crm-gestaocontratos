@@ -729,8 +729,9 @@ export async function updateRunValue(contractId: string, newValue: number): Prom
     content,
   })
 
-  revalidatePath(`/contracts/${contractId}`)
-  revalidatePath('/pipeline')
+  revalidatePath(`/contracts/${contractId}`, 'layout')
+  revalidatePath('/pipeline', 'layout')
+  revalidatePath('/contracts', 'layout')
   return { success: true }
 }
 

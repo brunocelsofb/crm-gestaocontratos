@@ -146,9 +146,7 @@ export default async function PipelinePage({
       processNumber: contract?.process_number ?? '',
       clientName: contract?.client_name ?? '',
       title: contract?.title ?? '',
-      value: proposalSumByContract.has(r.contract_id)
-        ? proposalSumByContract.get(r.contract_id)!
-        : Number(r.value) || 0,
+      value: Number(r.value) || 0,
       stageEnteredAt: r.stage_entered_at,
       lastActivityAt: lastActivityByContract.get(r.contract_id) ?? null,
       validUntil: null,
