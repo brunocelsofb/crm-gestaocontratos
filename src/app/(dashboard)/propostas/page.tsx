@@ -25,10 +25,10 @@ export default async function PropostasPage() {
   const contractIds = [...new Set((proposals ?? []).map(p => p.contract_id).filter(Boolean))]
   const proposalIds = (proposals ?? []).map(p => p.id)
 
-  // Query 2: contratos relacionados
+  // Query 2: contratos relacionados — inclui process_number como fallback
   const { data: contracts } = contractIds.length > 0
     ? await supabase.from('contracts')
-        .select('id, title, client_name, user_id')
+        .select('id, title, client_name, process_number, user_id')
         .in('id', contractIds)
     : { data: [] }
 
@@ -88,7 +88,7 @@ export default async function PropostasPage() {
       client_review_token: p.client_review_token,
       client_approved_by_name: p.client_approved_by_name,
       contract_id: p.contract_id,
-      contract_title: contract?.client_name ?? contract?.title ?? '—',
+      contract_title: contract?.client_name ?? contract?.title ?? contract?.process_number ?? '—',
       pipeline_stage: stageByContract.get(p.contract_id) ?? null,
       responsible: profileById.get(contract?.user_id ?? '') ?? '—',
       mrr,

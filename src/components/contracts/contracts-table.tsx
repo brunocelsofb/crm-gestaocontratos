@@ -67,7 +67,7 @@ export function ContractsTable({ contracts, q }: { contracts: Contract[]; q?: st
                 )}
               </td>
               <td style={{ padding: '12px 16px' }}>
-                <ValidityBadge validUntil={c.valid_until ?? null} />
+                <ValidityBadge validUntil={c.valid_until ?? null} runStatus={c.run_status} />
               </td>
               <td style={{ padding: '12px 16px' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: st.bg, color: st.color }}>
