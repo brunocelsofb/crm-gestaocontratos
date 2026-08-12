@@ -28,9 +28,25 @@ export default async function PropostasPage() {
   // Query 2: contratos relacionados
   const { data: contracts } = contractIds.length > 0
     ? await supabase.from('contracts')
-        .select('id, title, client_name, user_id, pipeline_stage')
+        .select('id, title, client_name, user_id')
         .in('id', contractIds)
     : { data: [] }
+
+  // Query 2b: etapa atual via pipeline_runs + stages
+  const { data: openRuns } = contractIds.length > 0
+    ? await supabase.from('pipeline_runs')
+        .select('contract_id, stage_id')
+        .in('contract_id', contractIds)
+        .eq('status', 'open')
+    : { data: [] }
+
+  const stageIds = [...new Set((openRuns ?? []).map(r => r.stage_id).filter(Boolean))]
+  const { data: stages } = stageIds.length > 0
+    ? await supabase.from('stages').select('id, name').in('id', stageIds)
+    : { data: [] }
+
+  const stageById = new Map((stages ?? []).map(s => [s.id, s.name]))
+  const stageByContract = new Map((openRuns ?? []).map(r => [r.contract_id, stageById.get(r.stage_id) ?? null]))
 
   // Query 3: itens das propostas (para coluna Itens)
   const { data: items } = proposalIds.length > 0
@@ -73,7 +89,7 @@ export default async function PropostasPage() {
       client_approved_by_name: p.client_approved_by_name,
       contract_id: p.contract_id,
       contract_title: contract?.client_name ?? contract?.title ?? '—',
-      pipeline_stage: contract?.pipeline_stage ?? null,
+      pipeline_stage: stageByContract.get(p.contract_id) ?? null,
       responsible: profileById.get(contract?.user_id ?? '') ?? '—',
       mrr,
       pontual,

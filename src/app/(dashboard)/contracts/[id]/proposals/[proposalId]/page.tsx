@@ -54,6 +54,12 @@ export default async function ProposalDetailPage({
   const total = (items ?? []).reduce((sum, it) => sum + Number(it.subtotal), 0)
   const canEditPages = proposal.status === 'draft'
 
+  // Modo leitura para propostas finalizadas (novo ou legado)
+  const READONLY_STATUSES = ['cliente_aprovado', 'cliente_recusado', 'declinada']
+  const READONLY_LEGACY   = ['approved', 'declined_client', 'declined_internal']
+  const isReadOnly = READONLY_STATUSES.includes(proposal.workflow_status ?? '')
+    || READONLY_LEGACY.includes(proposal.status ?? '')
+
   const profileById = new Map((allProfiles ?? []).map((p) => [p.id, p.full_name]))
   const technicalUsers = (allProfiles ?? []).filter((p) => p.department === 'tecnico').map((p) => ({ id: p.id, full_name: p.full_name }))
   const commercialUsers = (allProfiles ?? []).filter((p) => p.department === 'comercial').map((p) => ({ id: p.id, full_name: p.full_name }))
@@ -103,41 +109,53 @@ export default async function ProposalDetailPage({
         </div>
       )}
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-gray-900">Montagem do documento</h2>
-        {canEditPages ? (
-          <ProposalPageOrderEditor
+      {isReadOnly && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          🔒 <strong>Modo somente leitura</strong> — esta proposta está encerrada. Nenhuma alteração é permitida.
+        </div>
+      )}
+
+      {!isReadOnly && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-gray-900">Montagem do documento</h2>
+          {canEditPages ? (
+            <ProposalPageOrderEditor
+              proposalId={proposal.id}
+              contractId={contractId}
+              templates={templates ?? []}
+              initialPages={pages ?? []}
+            />
+          ) : (
+            <p className="text-sm text-gray-400">A montagem não pode mais ser alterada (a proposta já saiu do rascunho).</p>
+          )}
+        </div>
+      )}
+
+      {!isReadOnly && (
+        <>
+          <ProposalItemsEditor
             proposalId={proposal.id}
             contractId={contractId}
-            templates={templates ?? []}
-            initialPages={pages ?? []}
+            initialItems={items ?? []}
+            initialConditions={{
+              discount_type: proposal.discount_type ?? null,
+              discount_value: Number(proposal.discount_value) ?? 0,
+              payment_terms: proposal.payment_terms ?? null,
+              installments: proposal.installments ?? 1,
+              is_recurring: proposal.is_recurring ?? false,
+              currency: proposal.currency ?? 'BRL',
+            }}
+            canEdit={canEditPages}
           />
-        ) : (
-          <p className="text-sm text-gray-400">A montagem não pode mais ser alterada (a proposta já saiu do rascunho).</p>
-        )}
-      </div>
 
-      <ProposalItemsEditor
-        proposalId={proposal.id}
-        contractId={contractId}
-        initialItems={items ?? []}
-        initialConditions={{
-          discount_type: proposal.discount_type ?? null,
-          discount_value: Number(proposal.discount_value) ?? 0,
-          payment_terms: proposal.payment_terms ?? null,
-          installments: proposal.installments ?? 1,
-          is_recurring: proposal.is_recurring ?? false,
-          currency: proposal.currency ?? 'BRL',
-        }}
-        canEdit={canEditPages}
-      />
-
-      <ProposalContentBlocksEditor
-        proposalId={proposal.id}
-        contractId={contractId}
-        initialBlocks={contentBlocks ?? []}
-        canEdit={canEditPages}
-      />
+          <ProposalContentBlocksEditor
+            proposalId={proposal.id}
+            contractId={contractId}
+            initialBlocks={contentBlocks ?? []}
+            canEdit={canEditPages}
+          />
+        </>
+      )}
 
       {/* Histórico de decisões do sistema legado — mantido para auditoria */}
       {approvals && approvals.length > 0 && (
