@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 type FieldDef = { key: string; label: string; section: string; active: boolean }
 
