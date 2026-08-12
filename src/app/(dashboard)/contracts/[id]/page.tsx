@@ -332,7 +332,7 @@ export default async function ContractDetailPage({
                 {isCurrentlyInContractsPipeline && displayRun && (
                   <RenewalValueSection
                     contractId={contract.id}
-                    currentValue={Number(displayRun.value) || 0}
+                    currentValue={estimatedValue}
                     canEdit={canChangeStage}
                     canCreateProposal={['admin', 'member', 'aprovador_comercial'].includes(currentProfile?.role ?? '')}
                   />
