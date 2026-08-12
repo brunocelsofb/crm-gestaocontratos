@@ -124,14 +124,7 @@ export default function NewContractPage() {
 
         <CompanyContactSection preselectedCompanyId={companyIdParam ?? undefined} />
 
-        {/* CNPJ da ORBIS */}
-        {show('cnpj_orbis') && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">CNPJ da ORBIS (contratada) {req('cnpj_orbis') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
-            <input name="cnpj_orbis" defaultValue={orgCnpj} required={req('cnpj_orbis')} placeholder="00.000.000/0000-00" className={inputCls} />
-            {orgCnpj && <p style={{ fontSize: 10, color: '#8892a4', marginTop: 3 }}>Preenchido automaticamente com o CNPJ da organização</p>}
-          </div>
-        )}
+        {/* CNPJ da ORBIS removido — preenchido silenciosamente no submit */}
 
         {/* Tag */}
         {show('tag') && tags.length > 0 && (
@@ -144,19 +137,7 @@ export default function NewContractPage() {
           </div>
         )}
 
-        {show('classification') && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Classificação {req('classification') && <span style={{ color: '#b91c1c' }}>*</span>}</label>
-            <select name="classification" required={req('classification')} className={inputCls}>
-              <option value="">Selecione...</option>
-              <option value="prospeccao">Prospecção</option>
-              <option value="ativo">Ativo</option>
-              <option value="renovacao">Renovação</option>
-              <option value="expansao">Expansão</option>
-              <option value="reativacao">Reativação</option>
-            </select>
-          </div>
-        )}
+        {/* Classificação removida do formulário de entrada */}
 
         {show('segment') && (
           <div>
