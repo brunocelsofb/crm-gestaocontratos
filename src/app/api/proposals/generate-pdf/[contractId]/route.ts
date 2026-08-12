@@ -96,19 +96,20 @@ export async function GET(
       await appendPdf(ordered[i].file_storage_path)
       if (i === mioloAfterIdx) await appendMiolo()
     }
-    // Caso o miolo seja após o último
-    if (mioloAfterIdx === ordered.length - 1) { /* já adicionado */ }
   }
 
   const pdfBytes = await merged.save()
 
+  const { data: proposalMeta } = await admin.from('proposals').select('control_code').eq('id', proposalId!).maybeSingle()
   const { data: contract } = await admin.from('contracts').select('client_name').eq('id', contractId).maybeSingle()
-  const clientName = contract?.client_name?.replace(/\s+/g, '-').slice(0, 30) ?? contractId.slice(0, 8)
+  const controlCode = proposalMeta?.control_code ?? 'PROP'
+  const clientRaw = (contract?.client_name ?? '').replace(/[/\\?%*:|"<>]/g, '').trim() || contractId.slice(0, 8)
+  const fileName = `${controlCode} - ${clientRaw}.pdf`
 
   return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="proposta-${clientName}.pdf"`,
+      'Content-Disposition': `attachment; filename="${fileName}"`,
     }
   })
 }
