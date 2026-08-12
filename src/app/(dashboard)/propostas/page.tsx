@@ -1,10 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { PropostasTable } from '@/components/proposals/propostas-table'
+
+// Client admin no schema public (para contracts, stages, pipeline_runs)
+function createAdminPublicClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { db: { schema: 'public' }, auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export default async function PropostasPage() {
   const supabase = await createClient()
   const admin = createAdminClient()
+  const adminPublic = createAdminPublicClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -27,14 +38,14 @@ export default async function PropostasPage() {
 
   // Query 2: contratos (admin bypassa RLS)
   const { data: contracts } = contractIds.length > 0
-    ? await admin.from('contracts')
+    ? await adminPublic.from('contracts')
         .select('id, title, client_name, process_number, user_id')
         .in('id', contractIds)
     : { data: [] }
 
   // Query 2b: etapa atual via pipeline_runs + stages
   const { data: openRuns } = contractIds.length > 0
-    ? await admin.from('pipeline_runs')
+    ? await adminPublic.from('pipeline_runs')
         .select('contract_id, stage_id')
         .in('contract_id', contractIds)
         .eq('status', 'open')
@@ -42,7 +53,7 @@ export default async function PropostasPage() {
 
   const stageIds = [...new Set((openRuns ?? []).map(r => r.stage_id).filter(Boolean))]
   const { data: stages } = stageIds.length > 0
-    ? await admin.from('stages').select('id, name').in('id', stageIds)
+    ? await adminPublic.from('stages').select('id, name').in('id', stageIds)
     : { data: [] }
 
   const stageById = new Map((stages ?? []).map(s => [s.id, s.name]))
@@ -56,7 +67,7 @@ export default async function PropostasPage() {
     : { data: [] }
 
   // Query 4: perfis para responsável
-  const { data: profiles } = await admin.from('profiles').select('id, full_name')
+  const { data: profiles } = await adminPublic.from('profiles').select('id, full_name')
 
   const contractById = new Map((contracts ?? []).map(c => [c.id.trim().toLowerCase(), c]))
   const profileById  = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
