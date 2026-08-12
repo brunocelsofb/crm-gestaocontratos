@@ -339,22 +339,7 @@ export default async function ContractDetailPage({
                   />
                 )}
 
-                <div className="grid grid-cols-3 gap-3">
-                  {/* Valor estimado / contrato */}
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
-                      {isCurrentlyInContractsPipeline ? 'Valor do contrato' : 'Valor estimado'}
-                    </p>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-base font-semibold text-gray-900 tabular-nums">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(estimatedValue)}
-                      </p>
-                      {canChangeStage && (
-                        <InlineValueEditor contractId={contract.id} currentValue={Number(displayRun?.value) || 0} />
-                      )}
-                    </div>
-                  </div>
-
+                <div className="grid grid-cols-2 gap-3">
                   {/* Vigência / Previsão */}
                   {isCurrentlyInContractsPipeline ? (
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">

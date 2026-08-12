@@ -49,9 +49,10 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
             {canEdit ? (
               <button
                 onClick={() => setEditing(true)}
+                title="Pode ser mudança de valor, reajuste monetário e afins."
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
               >
-                Reajuste monetário
+                Mudança de valor
               </button>
             ) : (
               <span className="text-xs text-gray-400">Reajuste: apenas owner/admin</span>
