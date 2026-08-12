@@ -1,30 +1,21 @@
 'use client'
 
-import { useState, useEffect, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, type ReactNode, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
-export function ContractTabs({ tabs }: { tabs: { id: string; label: string; content: ReactNode }[] }) {
+function ContractTabsInner({ tabs }: { tabs: { id: string; label: string; content: ReactNode }[] }) {
   const [activeId, setActiveId] = useState(tabs[0]?.id)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  // Lê ?tab= da URL ao montar — ao retornar do Price, força refresh dos dados
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const tabParam = params.get('tab')
-    const fromPrice = params.get('from') === 'price'
-
+    const tabParam = searchParams.get('tab')
+    const fromPrice = searchParams.get('from') === 'price'
     if (tabParam && tabs.find(t => t.id === tabParam)) {
       setActiveId(tabParam)
-      if (fromPrice) {
-        // Recarrega dados do servidor para mostrar snapshot recém enviado
-        router.refresh()
-      }
-      const url = new URL(window.location.href)
-      url.searchParams.delete('tab')
-      url.searchParams.delete('from')
-      window.history.replaceState({}, '', url.toString())
+      if (fromPrice) router.refresh()
     }
-  }, [])
+  }, [searchParams])
 
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
 
@@ -47,5 +38,13 @@ export function ContractTabs({ tabs }: { tabs: { id: string; label: string; cont
       </div>
       <div className="pt-4">{active?.content}</div>
     </div>
+  )
+}
+
+export function ContractTabs({ tabs }: { tabs: { id: string; label: string; content: ReactNode }[] }) {
+  return (
+    <Suspense fallback={null}>
+      <ContractTabsInner tabs={tabs} />
+    </Suspense>
   )
 }

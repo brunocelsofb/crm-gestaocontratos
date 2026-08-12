@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateRunValue } from '@/lib/actions/pipeline'
 
 function fmt(v: number) {
@@ -13,6 +14,7 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
   canEdit: boolean
   canCreateProposal?: boolean
 }) {
+  const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [newValue, setNewValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -58,7 +60,7 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                window.location.href = `/contracts/${contractId}?tab=proposta`
+                router.push(`/contracts/${contractId}?tab=proposta`)
               }}
               className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 whitespace-nowrap cursor-pointer border-0"
             >
