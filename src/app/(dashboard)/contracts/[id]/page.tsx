@@ -328,7 +328,12 @@ export default async function ContractDetailPage({
             content: (
               <div className="space-y-6">
                 {isCurrentlyInContractsPipeline && displayRun && (
-                  <RenewalValueSection contractId={contract.id} currentValue={Number(displayRun.value) || 0} canEdit={canChangeStage} />
+                  <RenewalValueSection
+                    contractId={contract.id}
+                    currentValue={Number(displayRun.value) || 0}
+                    canEdit={canChangeStage}
+                    canCreateProposal={['admin', 'member', 'aprovador_comercial'].includes(currentProfile?.role ?? '')}
+                  />
                 )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
