@@ -21,21 +21,14 @@ export default async function PropostasPage() {
     .order('updated_at', { ascending: false })
     .limit(300)
 
-  if (error) console.error('[propostas page] query error:', JSON.stringify(error))
-
   const contractIds = [...new Set((proposals ?? []).map(p => p.contract_id).filter(Boolean))]
   const proposalIds = (proposals ?? []).map(p => p.id)
 
   // Query 2: contratos (admin bypassa RLS)
   const contractsResult = contractIds.length > 0
-    ? await admin.from('contracts').select('id, title, client_name, process_number').in('id', contractIds)
+    ? await admin.from('contracts').select('id, title, client_name, process_number, owner_id').in('id', contractIds)
     : { data: [], error: null }
   const contracts = contractsResult.data
-  const contractsError = (contractsResult as any).error
-
-  // Debug extra: busca sem filtro para ver se a tabela tem dados
-  const { data: contractsSample } = await admin.from('contracts').select('id, client_name').limit(3)
-
   // Query 2b: etapa atual via pipeline_runs + stages
   const { data: openRuns } = contractIds.length > 0
     ? await admin.from('pipeline_runs')
@@ -64,12 +57,6 @@ export default async function PropostasPage() {
 
   const contractById = new Map((contracts ?? []).map(c => [c.id.trim().toLowerCase(), c]))
   const profileById  = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
-
-  // Diagnóstico
-  console.log('[propostas] proposals:', proposals?.length, 'contracts:', contracts?.length, 'profiles:', profiles?.length)
-  console.log('[propostas] contractIds:', contractIds.slice(0, 3))
-  console.log('[propostas] contractById keys:', [...contractById.keys()].slice(0, 3))
-  if (proposals?.[0]) console.log('[propostas] proposal[0].contract_id:', proposals[0].contract_id)
 
   // Agrupa itens por proposal_id
   const itemsByProposal = new Map<string, typeof items>()
@@ -100,24 +87,12 @@ export default async function PropostasPage() {
       contract_id: p.contract_id,
       contract_title: contract?.client_name ?? contract?.title ?? contract?.process_number ?? '—',
       pipeline_stage: stageByContract.get((p.contract_id ?? '').trim().toLowerCase()) ?? null,
-      responsible: '—',
+      responsible: profileById.get((contract as any)?.owner_id ?? '') ?? '—',
       mrr,
       pontual,
       item_summary: itemSummary,
     }
   })
-
-  // Debug visual — remover após diagnóstico
-  const debugInfo = {
-    proposalsCount: proposals?.length ?? 0,
-    contractsCount: contracts?.length ?? 0,
-    contractsError: contractsError?.message ?? null,
-    contractsSample: contractsSample ?? [],
-    firstProposalContractId: proposals?.[0]?.contract_id ?? 'N/A',
-    contractIdsFromProposals: contractIds.slice(0, 3),
-    contractIdsFromDB: (contracts ?? []).map(c => c.id).slice(0, 3),
-    mapHit: proposals?.[0] ? contractById.has((proposals[0].contract_id ?? '').trim().toLowerCase()) : false,
-  }
 
   return (
     <div className="space-y-6">
@@ -127,9 +102,6 @@ export default async function PropostasPage() {
           Visão global de todas as propostas ativas · {rows.length} proposta{rows.length !== 1 ? 's' : ''}
         </p>
       </div>
-      <pre style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: 12, fontSize: 10, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-        🔍 DEBUG (remover após fix): {JSON.stringify(debugInfo, null, 2)}
-      </pre>
       <PropostasTable proposals={rows} currentUserRole={profile?.role ?? 'member'} />
     </div>
   )
