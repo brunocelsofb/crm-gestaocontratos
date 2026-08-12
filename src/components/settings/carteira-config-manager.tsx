@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 type FieldDef = { key: string; label: string; section: string; active: boolean }
 
@@ -42,6 +41,19 @@ export function CarteiraConfigManager() {
   const [newSection, setNewSection] = useState('Identificação')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/settings/carteira-fields')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.activeFields && Array.isArray(d.activeFields)) {
+          setFields(prev => prev.map(f => ({ ...f, active: d.activeFields.includes(f.key) })))
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
 
   async function saveFields() {
     setSaving(true)

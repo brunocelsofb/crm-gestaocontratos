@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+
+export async function GET() {
+  const admin = createAdminClient()
+  const { data } = await admin
+    .from('organization_settings')
+    .select('carteira_active_fields')
+    .eq('id', 'default')
+    .maybeSingle()
+  return NextResponse.json({ activeFields: data?.carteira_active_fields ?? null })
+}
 
 export async function POST(req: Request) {
   const userClient = await createClient()
@@ -8,21 +19,23 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const { activeFields } = await req.json()
+  if (!Array.isArray(activeFields)) return NextResponse.json({ error: 'activeFields deve ser array' }, { status: 400 })
+
   const admin = createAdminClient()
 
-  // Salva em organization_settings como JSON na coluna carteira_sections
+  // UPDATE direto (registro 'default' sempre existe)
   const { error } = await admin
     .from('organization_settings')
-    .upsert({ id: 'default', carteira_active_fields: activeFields }, { onConflict: 'id' })
+    .update({ carteira_active_fields: activeFields })
+    .eq('id', 'default')
 
   if (error) {
-    // Tenta como update se upsert falhar por schema
-    const { error: e2 } = await admin
-      .from('organization_settings')
-      .update({ carteira_active_fields: activeFields })
-      .eq('id', 'default')
-    if (e2) return NextResponse.json({ error: e2.message }, { status: 400 })
+    console.error('[carteira-fields] save error:', error)
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true })
+  // Invalida cache de todos os contratos para leitura fresca
+  revalidatePath('/contracts/[id]', 'page')
+
+  return NextResponse.json({ ok: true, saved: activeFields.length })
 }

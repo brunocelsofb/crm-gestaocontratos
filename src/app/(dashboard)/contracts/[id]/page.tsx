@@ -608,8 +608,9 @@ export default async function ContractDetailPage({
                   }
                 })()}
                 activeFields={await (async () => {
-                  const { data: orgSettings } = await supabase
+                  const { data: orgSettings, error: orgErr } = await supabase
                     .from('organization_settings').select('carteira_active_fields').eq('id', 'default').maybeSingle()
+                  console.log('[carteira] activeFields from DB:', orgSettings?.carteira_active_fields, 'error:', orgErr?.message)
                   return orgSettings?.carteira_active_fields ? (orgSettings.carteira_active_fields as string[]) : null
                 })()}
                 initial={{
