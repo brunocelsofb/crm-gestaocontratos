@@ -33,6 +33,9 @@ export default async function PropostasPage() {
   const contracts = contractsResult.data
   const contractsError = (contractsResult as any).error
 
+  // Debug extra: busca sem filtro para ver se a tabela tem dados
+  const { data: contractsSample } = await admin.from('contracts').select('id, client_name').limit(3)
+
   // Query 2b: etapa atual via pipeline_runs + stages
   const { data: openRuns } = contractIds.length > 0
     ? await admin.from('pipeline_runs')
@@ -109,10 +112,8 @@ export default async function PropostasPage() {
     proposalsCount: proposals?.length ?? 0,
     contractsCount: contracts?.length ?? 0,
     contractsError: contractsError?.message ?? null,
+    contractsSample: contractsSample ?? [],
     firstProposalContractId: proposals?.[0]?.contract_id ?? 'N/A',
-    firstContractId: contracts?.[0]?.id ?? 'N/A',
-    firstContractName: contracts?.[0]?.client_name ?? 'N/A',
-    firstContractTitle: contracts?.[0]?.title ?? 'N/A',
     contractIdsFromProposals: contractIds.slice(0, 3),
     contractIdsFromDB: (contracts ?? []).map(c => c.id).slice(0, 3),
     mapHit: proposals?.[0] ? contractById.has((proposals[0].contract_id ?? '').trim().toLowerCase()) : false,
