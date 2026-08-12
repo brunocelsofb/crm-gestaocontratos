@@ -1,5 +1,7 @@
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
 import { StageBar } from '@/components/contracts/stage-bar'
 import { Timeline } from '@/components/contracts/timeline'
 import { TimelineFeed } from '@/components/contracts/timeline-feed'
