@@ -28,7 +28,9 @@ export async function POST(req: Request) {
     .from('proposals')
     .select('id, contract_id, control_code, proposal_value')
     .eq('client_review_token', token)
-    .maybeSingle()  if (newProposal) {
+    .maybeSingle()
+
+  if (newProposal) {
     const newWorkflowStatus = isAprovado ? 'cliente_aprovado' : 'cliente_recusado'
     const { data: contractData } = await admin
       .from('contracts').select('client_name, title').eq('id', newProposal.contract_id).maybeSingle()
