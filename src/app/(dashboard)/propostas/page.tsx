@@ -46,7 +46,7 @@ export default async function PropostasPage() {
     : { data: [] }
 
   const stageById = new Map((stages ?? []).map(s => [s.id, s.name]))
-  const stageByContract = new Map((openRuns ?? []).map(r => [r.contract_id, stageById.get(r.stage_id) ?? null]))
+  const stageByContract = new Map((openRuns ?? []).map(r => [(r.contract_id ?? '').trim().toLowerCase(), stageById.get(r.stage_id) ?? null]))
 
   // Query 3: itens das propostas (para coluna Itens)
   const { data: items } = proposalIds.length > 0
@@ -58,7 +58,7 @@ export default async function PropostasPage() {
   // Query 4: perfis para responsável
   const { data: profiles } = await admin.from('profiles').select('id, full_name')
 
-  const contractById = new Map((contracts ?? []).map(c => [c.id, c]))
+  const contractById = new Map((contracts ?? []).map(c => [c.id.trim().toLowerCase(), c]))
   const profileById  = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
 
   // Diagnóstico
@@ -76,7 +76,7 @@ export default async function PropostasPage() {
   }
 
   const rows = (proposals ?? []).map(p => {
-    const contract = contractById.get(p.contract_id)
+    const contract = contractById.get((p.contract_id ?? '').trim().toLowerCase())
     const pItems = itemsByProposal.get(p.id) ?? []
     const mrr     = pItems.filter(i => i.type === 'MRR').reduce((s, i) => s + Number(i.subtotal), 0)
     const pontual = pItems.filter(i => i.type !== 'MRR').reduce((s, i) => s + Number(i.subtotal), 0)
@@ -95,13 +95,26 @@ export default async function PropostasPage() {
       client_approved_by_name: p.client_approved_by_name,
       contract_id: p.contract_id,
       contract_title: contract?.client_name ?? contract?.title ?? contract?.process_number ?? '—',
-      pipeline_stage: stageByContract.get(p.contract_id) ?? null,
+      pipeline_stage: stageByContract.get((p.contract_id ?? '').trim().toLowerCase()) ?? null,
       responsible: profileById.get(contract?.user_id ?? '') ?? '—',
       mrr,
       pontual,
       item_summary: itemSummary,
     }
   })
+
+  // Debug visual — remover após diagnóstico
+  const debugInfo = {
+    proposalsCount: proposals?.length ?? 0,
+    contractsCount: contracts?.length ?? 0,
+    firstProposalContractId: proposals?.[0]?.contract_id ?? 'N/A',
+    firstContractId: contracts?.[0]?.id ?? 'N/A',
+    firstContractName: contracts?.[0]?.client_name ?? 'N/A',
+    firstContractTitle: contracts?.[0]?.title ?? 'N/A',
+    contractIdsFromProposals: contractIds.slice(0, 3),
+    contractIdsFromDB: (contracts ?? []).map(c => c.id).slice(0, 3),
+    mapHit: proposals?.[0] ? contractById.has((proposals[0].contract_id ?? '').trim().toLowerCase()) : false,
+  }
 
   return (
     <div className="space-y-6">
@@ -111,6 +124,9 @@ export default async function PropostasPage() {
           Visão global de todas as propostas ativas · {rows.length} proposta{rows.length !== 1 ? 's' : ''}
         </p>
       </div>
+      <pre style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: 12, fontSize: 10, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+        🔍 DEBUG (remover após fix): {JSON.stringify(debugInfo, null, 2)}
+      </pre>
       <PropostasTable proposals={rows} currentUserRole={profile?.role ?? 'member'} />
     </div>
   )
