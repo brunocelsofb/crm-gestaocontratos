@@ -54,10 +54,11 @@ export function RenewalValueSection({ contractId, currentValue, canEdit, canCrea
 
             {/* Gerar proposta de aditivo: sempre visível para a equipe comercial */}
             <button
-              onClick={() => {
-                const url = new URL(window.location.href)
-                url.searchParams.set('tab', 'proposta')
-                window.location.href = url.toString()
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                window.location.href = `/contracts/${contractId}?tab=proposta`
               }}
               className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 whitespace-nowrap cursor-pointer border-0"
             >
