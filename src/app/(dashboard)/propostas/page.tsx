@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { PropostasTable } from '@/components/proposals/propostas-table'
 
 export default async function PropostasPage() {
   const supabase = await createClient()
+  const admin = createAdminClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -10,8 +12,8 @@ export default async function PropostasPage() {
   const { data: profile } = await supabase
     .from('profiles').select('role').eq('id', user.id).maybeSingle()
 
-  // Query 1: todas as propostas não-rascunho
-  const { data: proposals, error } = await supabase
+  // Query 1: todas as propostas
+  const { data: proposals, error } = await admin
     .from('proposals')
     .select('id, control_code, version, workflow_status, proposal_value, created_at, updated_at, proposal_validity_days, client_review_token, client_approved_by_name, contract_id')
     .is('deleted_at', null)
@@ -20,21 +22,19 @@ export default async function PropostasPage() {
 
   if (error) console.error('[propostas page] query error:', JSON.stringify(error))
 
-  console.log('[propostas page] total encontradas:', proposals?.length ?? 0)
-
   const contractIds = [...new Set((proposals ?? []).map(p => p.contract_id).filter(Boolean))]
   const proposalIds = (proposals ?? []).map(p => p.id)
 
-  // Query 2: contratos relacionados — inclui process_number como fallback
+  // Query 2: contratos (admin bypassa RLS)
   const { data: contracts } = contractIds.length > 0
-    ? await supabase.from('contracts')
+    ? await admin.from('contracts')
         .select('id, title, client_name, process_number, user_id')
         .in('id', contractIds)
     : { data: [] }
 
   // Query 2b: etapa atual via pipeline_runs + stages
   const { data: openRuns } = contractIds.length > 0
-    ? await supabase.from('pipeline_runs')
+    ? await admin.from('pipeline_runs')
         .select('contract_id, stage_id')
         .in('contract_id', contractIds)
         .eq('status', 'open')
@@ -42,7 +42,7 @@ export default async function PropostasPage() {
 
   const stageIds = [...new Set((openRuns ?? []).map(r => r.stage_id).filter(Boolean))]
   const { data: stages } = stageIds.length > 0
-    ? await supabase.from('stages').select('id, name').in('id', stageIds)
+    ? await admin.from('stages').select('id, name').in('id', stageIds)
     : { data: [] }
 
   const stageById = new Map((stages ?? []).map(s => [s.id, s.name]))
@@ -50,13 +50,13 @@ export default async function PropostasPage() {
 
   // Query 3: itens das propostas (para coluna Itens)
   const { data: items } = proposalIds.length > 0
-    ? await supabase.from('proposal_items')
+    ? await admin.from('proposal_items')
         .select('proposal_id, item, type, subtotal')
         .in('proposal_id', proposalIds)
     : { data: [] }
 
   // Query 4: perfis para responsável
-  const { data: profiles } = await supabase.from('profiles').select('id, full_name')
+  const { data: profiles } = await admin.from('profiles').select('id, full_name')
 
   const contractById = new Map((contracts ?? []).map(c => [c.id, c]))
   const profileById  = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
