@@ -32,6 +32,19 @@ export default async function CustomSurveyPublicPage({
     questions = (template?.questions ?? []) as Question[]
   }
 
+  const { data: orgSettings } = await adminClient
+    .from('organization_settings')
+    .select('company_name, logo_storage_path, survey_bg_url')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  const rawLogo = orgSettings?.logo_storage_path
+  const rawSurveyBg = (orgSettings as any)?.survey_bg_url
+  const logoUrl = (rawLogo && rawLogo.trim() && rawLogo !== 'null')
+    ? adminClient.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
+    : null
+  const surveyBgUrl = (rawSurveyBg && rawSurveyBg.startsWith('https://')) ? rawSurveyBg : null
+
   const GRADIENT = 'linear-gradient(to bottom right, #1B556B, #0D3B4C, #32AF9D)'
   const bgStyle = {
     minHeight: '100vh',
