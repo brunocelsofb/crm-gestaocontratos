@@ -180,6 +180,8 @@ export function OrganizationSettingsForm({
               style={{ backgroundImage: `url(${currentSupportBgUrl})` }} />
           )}
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Théo (US$)</label>
           <input
             name="assistant_monthly_budget_usd"
             type="number"
