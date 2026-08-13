@@ -2,6 +2,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { CustomSurveyForm } from '@/components/surveys/custom-survey-form'
 import type { Question } from '@/lib/actions/custom-surveys'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function CustomSurveyPublicPage({
   params,
 }: {
@@ -29,25 +32,40 @@ export default async function CustomSurveyPublicPage({
     questions = (template?.questions ?? []) as Question[]
   }
 
+  const GRADIENT = 'linear-gradient(to bottom right, #1B556B, #0D3B4C, #32AF9D)'
+  const bgStyle = {
+    minHeight: '100vh',
+    backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}'), ${GRADIENT}` : GRADIENT,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
-      <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        {!survey ? (
-          <p className="text-center text-sm text-gray-500">
-            Este link não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.
-          </p>
-        ) : survey.status === 'answered' ? (
-          <div className="text-center">
-            <p className="text-lg font-medium text-gray-900">Obrigado!</p>
-            <p className="mt-1 text-sm text-gray-500">Suas respostas já foram registradas anteriormente.</p>
-          </div>
-        ) : (
-          <>
-            <h1 className="mb-4 text-base font-medium text-gray-900">{templateName}</h1>
-            <CustomSurveyForm token={token} questions={questions} />
-          </>
+    <main className="min-h-screen w-full flex flex-col items-center justify-start py-10" style={bgStyle}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {logoUrl && (
+          <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
         )}
+        <div className="w-full rounded-2xl bg-white shadow-2xl p-8">
+          {!survey ? (
+            <p className="text-center text-sm text-gray-500">
+              Este link não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.
+            </p>
+          ) : survey.status === 'answered' ? (
+            <div className="text-center">
+              <p className="text-lg font-medium text-gray-900">Obrigado!</p>
+              <p className="mt-1 text-sm text-gray-500">Suas respostas já foram registradas anteriormente.</p>
+            </div>
+          ) : (
+            <>
+              <h1 className="mb-4 text-base font-medium text-gray-900">{templateName}</h1>
+              <CustomSurveyForm token={token} questions={questions} />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   )
 }

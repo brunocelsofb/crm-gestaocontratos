@@ -17,6 +17,7 @@ export function OrganizationSettingsForm({
   currentBrandColor,
   currentAssistantBudget,
   currentSupportBgUrl,
+  currentSurveyBgUrl,
 }: {
   currentName: string
   currentCompanyName: string
@@ -27,6 +28,7 @@ export function OrganizationSettingsForm({
   currentBrandColor: string
   currentAssistantBudget: number
   currentSupportBgUrl?: string | null
+  currentSurveyBgUrl?: string | null
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
   const [logoPath, setLogoPath] = useState(currentLogoPath)
@@ -37,6 +39,10 @@ export function OrganizationSettingsForm({
   const [uploadingBg, setUploadingBg] = useState(false)
   const [bgError, setBgError] = useState<string | null>(null)
   const [bgPath, setBgPath] = useState(currentSupportBgUrl ?? null)
+  const surveyBgInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingSurveyBg, setUploadingSurveyBg] = useState(false)
+  const [surveyBgError, setSurveyBgError] = useState<string | null>(null)
+  const [surveyBgPath, setSurveyBgPath] = useState(currentSurveyBgUrl ?? null)
 
   async function handleLogoUpload() {
     const file = fileInputRef.current?.files?.[0]
@@ -95,6 +101,26 @@ export function OrganizationSettingsForm({
     setUploadingBg(false)
     if (!res.ok) setBgError('Erro ao salvar URL do wallpaper')
     else setBgPath(publicUrl)
+  }
+
+  async function handleSurveyBgUpload() {
+    const file = surveyBgInputRef.current?.files?.[0]
+    if (!file) return
+    setUploadingSurveyBg(true)
+    setSurveyBgError(null)
+    const supabase = createClient()
+    const storagePath = `survey-bg/${Date.now()}-${sanitizeStorageFileName(file.name)}`
+    const { error: uploadError } = await supabase.storage.from('public-assets').upload(storagePath, file)
+    if (uploadError) { setSurveyBgError(`Falha no upload: ${uploadError.message}`); setUploadingSurveyBg(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('public-assets').getPublicUrl(storagePath)
+    const res = await fetch('/api/settings/survey-bg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: publicUrl }),
+    })
+    setUploadingSurveyBg(false)
+    if (!res.ok) setSurveyBgError('Erro ao salvar URL do wallpaper de pesquisa')
+    else setSurveyBgPath(publicUrl)
   }
 
   return (
@@ -229,6 +255,31 @@ export function OrganizationSettingsForm({
             Tamanho recomendado: 1920×1080 pixels (Full HD). Formato JPG ou PNG. Máximo de 2MB para garantir carregamento rápido.
           </p>
           {bgError && <p className="mt-1 text-xs text-red-600">{bgError}</p>}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper das pesquisas de satisfação / NPS</label>
+          {(() => {
+            const activePreview = surveyBgPath || currentSurveyBgUrl
+            return activePreview ? (
+              <div className="mt-2 mb-2 relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={activePreview} alt="Wallpaper Pesquisas" className="w-full h-full object-cover" />
+              </div>
+            ) : null
+          })()}
+          <div className="flex items-center gap-2 mt-1">
+            <input ref={surveyBgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" onClick={handleSurveyBgUpload} disabled={uploadingSurveyBg}
+              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {uploadingSurveyBg ? 'Enviando...' : 'Enviar imagem'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Tamanho recomendado: 1920×1080 pixels (Full HD). Formato JPG, PNG ou WebP. Máximo de 2MB. Recomenda-se imagens leves/claras com respiro no centro para melhor leitura das perguntas.
+          </p>
+          {surveyBgError && <p className="mt-1 text-xs text-red-600">{surveyBgError}</p>}
+          {(surveyBgPath || currentSurveyBgUrl) && !uploadingSurveyBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper de pesquisas configurado</p>}
+        </div>
           {(bgPath ?? currentSupportBgUrl) && !uploadingBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper configurado</p>}
         </div>
         <div>

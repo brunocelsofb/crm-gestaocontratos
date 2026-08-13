@@ -1,6 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NpsForm } from '@/components/nps/nps-form'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function NpsPublicPage({
   params,
 }: {
@@ -21,10 +24,17 @@ export default async function NpsPublicPage({
   // respondendo — antes estava invertido.
   const { data: orgSettings } = await adminClient
     .from('organization_settings')
-    .select('company_name')
+    .select('company_name, logo_storage_path, survey_bg_url')
     .eq('id', 'default')
     .maybeSingle()
   const organizationName = orgSettings?.company_name || 'nossa empresa'
+  const rawLogo = orgSettings?.logo_storage_path
+  const rawSurveyBg = (orgSettings as any)?.survey_bg_url
+  const logoUrl = (rawLogo && rawLogo.trim() && rawLogo !== 'null')
+    ? adminClient.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
+    : null
+  const surveyBgUrl = (rawSurveyBg && rawSurveyBg.startsWith('https://')) ? rawSurveyBg : null
+
 
   if (survey) {
     const { data: contract } = await adminClient
@@ -45,9 +55,23 @@ export default async function NpsPublicPage({
     }
   }
 
+  const GRADIENT = 'linear-gradient(to bottom right, #1B556B, #0D3B4C, #32AF9D)'
+  const bgStyle = {
+    minHeight: '100vh',
+    backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}'), ${GRADIENT}` : GRADIENT,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+    <main className="min-h-screen w-full flex flex-col items-center justify-start py-10" style={bgStyle}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {logoUrl && (
+          <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
+        )}
+      <div className="w-full rounded-2xl bg-white shadow-2xl p-8">
         {!survey ? (
           <p className="text-center text-sm text-gray-500">
             Este link de pesquisa não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.
@@ -66,6 +90,7 @@ export default async function NpsPublicPage({
           </>
         )}
       </div>
-    </div>
+      </div>
+    </main>
   )
 }
