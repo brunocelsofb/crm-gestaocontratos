@@ -66,9 +66,22 @@ export default async function NpsPublicPage({
   }
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-start py-10" style={bgStyle}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="relative min-h-screen w-full">
+      {/* Camada de fundo congelada */}
+      <div
+        className="fixed inset-0 pointer-events-none -z-10"
+        style={{
+          backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}')` : undefined,
+          backgroundColor: '#1B556B',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      {/* Overlay */}
+      <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: 'rgba(0,0,0,0.2)' }} />
+      <main className="min-h-screen w-full flex flex-col items-center justify-start py-10 px-4">
+        <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {logoUrl && (
           <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
         )}
@@ -92,6 +105,8 @@ export default async function NpsPublicPage({
         )}
       </div>
       </div>
+      </div>
     </main>
+    </div>
   )
 }
