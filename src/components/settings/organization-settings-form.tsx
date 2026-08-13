@@ -201,7 +201,7 @@ export function OrganizationSettingsForm({
         <div>
           <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de suporte</label>
           <p className="text-xs text-gray-400 mb-2">Imagem de fundo da página /suporte. Se não houver imagem, usa o degradê padrão da marca.</p>
-          {bgPath && (
+          {bgPath && bgPath.startsWith('https://') && (
             <div className="mb-2 h-20 w-full rounded-md bg-cover bg-center border border-gray-200"
               style={{ backgroundImage: `url(${bgPath})` }} />
           )}
