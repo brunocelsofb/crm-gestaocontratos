@@ -93,7 +93,6 @@ export default async function CustomSurveyPublicPage({
           )}
         </div>
       </div>
-      </div>
     </main>
     </div>
   )

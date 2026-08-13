@@ -105,7 +105,6 @@ export default async function NpsPublicPage({
         )}
       </div>
       </div>
-      </div>
     </main>
     </div>
   )
