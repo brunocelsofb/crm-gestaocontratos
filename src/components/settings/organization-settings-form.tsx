@@ -33,6 +33,10 @@ export function OrganizationSettingsForm({
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bgInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingBg, setUploadingBg] = useState(false)
+  const [bgError, setBgError] = useState<string | null>(null)
+  const [bgPath, setBgPath] = useState(currentSupportBgUrl ?? null)
 
   async function handleLogoUpload() {
     const file = fileInputRef.current?.files?.[0]
@@ -54,6 +58,35 @@ export function OrganizationSettingsForm({
     setUploadingLogo(false)
     if (result.error) setLogoError(result.error)
     else setLogoPath(storagePath)
+  }
+
+  async function handleBgUpload() {
+    const file = bgInputRef.current?.files?.[0]
+    if (!file) return
+    setUploadingBg(true)
+    setBgError(null)
+
+    const supabase = createClient()
+    const storagePath = `support-bg/${Date.now()}-${sanitizeStorageFileName(file.name)}`
+    const { error: uploadError } = await supabase.storage.from('proposal-files').upload(storagePath, file)
+
+    if (uploadError) {
+      setBgError(`Falha no upload: ${uploadError.message}`)
+      setUploadingBg(false)
+      return
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('proposal-files').getPublicUrl(storagePath)
+
+    // Salva a URL pública direto (não o path, pois é imagem pública)
+    const res = await fetch('/api/settings/support-bg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: publicUrl }),
+    })
+    setUploadingBg(false)
+    if (!res.ok) setBgError('Erro ao salvar URL do wallpaper')
+    else setBgPath(publicUrl)
   }
 
   return (
@@ -167,18 +200,20 @@ export function OrganizationSettingsForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de suporte</label>
-          <p className="text-xs text-gray-400 mb-1">URL de imagem para o fundo da página /suporte. Deixe vazio para usar o degradê padrão da marca.</p>
-          <input
-            name="support_bg_url"
-            type="url"
-            defaultValue={currentSupportBgUrl ?? ''}
-            placeholder="https://exemplo.com/imagem.jpg"
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-          {currentSupportBgUrl && (
-            <div className="mt-2 h-16 w-full rounded-md bg-cover bg-center border border-gray-200"
-              style={{ backgroundImage: `url(${currentSupportBgUrl})` }} />
+          <p className="text-xs text-gray-400 mb-2">Imagem de fundo da página /suporte. Se não houver imagem, usa o degradê padrão da marca.</p>
+          {bgPath && (
+            <div className="mb-2 h-20 w-full rounded-md bg-cover bg-center border border-gray-200"
+              style={{ backgroundImage: `url(${bgPath})` }} />
           )}
+          <div className="flex items-center gap-2">
+            <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" onClick={handleBgUpload} disabled={uploadingBg}
+              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {uploadingBg ? 'Enviando...' : 'Enviar imagem'}
+            </button>
+          </div>
+          {bgError && <p className="mt-1 text-xs text-red-600">{bgError}</p>}
+          {bgPath && !uploadingBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper configurado</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Théo (US$)</label>

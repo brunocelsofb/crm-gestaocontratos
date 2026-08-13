@@ -10,6 +10,15 @@ export default async function PublicSupportPage() {
     .maybeSingle()
 
   const bgUrl = settings?.support_bg_url ?? null
+  
+  // Gera URL pública da logo via Storage
+  let logoUrl: string | null = null
+  if (settings?.logo_storage_path) {
+    const { data: { publicUrl } } = admin.storage
+      .from('proposal-files')
+      .getPublicUrl(settings.logo_storage_path)
+    logoUrl = publicUrl || null
+  }
 
   return (
     <div
@@ -25,12 +34,8 @@ export default async function PublicSupportPage() {
       <div className="relative z-10 w-full max-w-md space-y-5">
         {/* Logo / marca */}
         <div className="text-center">
-          {settings?.logo_storage_path ? (
-            <img src={settings.logo_storage_path} alt="Logo" className="mx-auto h-12 object-contain mb-3" />
-          ) : (
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
-              <span className="text-2xl font-bold text-white">O</span>
-            </div>
+          {logoUrl && (
+            <img src={logoUrl} alt="Logo" className="mx-auto h-12 object-contain mb-3" />
           )}
           <h1 className="text-2xl font-bold text-white drop-shadow">Abrir chamado de suporte</h1>
           <p className="mt-1 text-sm text-white/80">Conta pra gente o que está acontecendo.</p>
