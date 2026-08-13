@@ -46,7 +46,7 @@ export function OrganizationSettingsForm({
 
     const supabase = createClient()
     const storagePath = `logo/${Date.now()}-${sanitizeStorageFileName(file.name)}`
-    const { error: uploadError } = await supabase.storage.from('proposal-files').upload(storagePath, file)
+    const { error: uploadError } = await supabase.storage.from('public-assets').upload(storagePath, file)
 
     if (uploadError) {
       setLogoError(`Falha no upload: ${uploadError.message}`)
@@ -54,10 +54,18 @@ export function OrganizationSettingsForm({
       return
     }
 
-    const result = await updateOrganizationLogo(storagePath)
+    // Pega URL pública do bucket public-assets
+    const { data: { publicUrl: logoPubUrl } } = supabase.storage.from('public-assets').getPublicUrl(storagePath)
+    
+    // Salva URL pública no banco (mesmo padrão do wallpaper)
+    const logoRes = await fetch('/api/settings/logo-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: logoPubUrl, path: storagePath }),
+    })
     setUploadingLogo(false)
-    if (result.error) setLogoError(result.error)
-    else setLogoPath(storagePath)
+    if (!logoRes.ok) setLogoError('Erro ao salvar URL da logo')
+    else setLogoPath(logoPubUrl)
   }
 
   async function handleBgUpload() {
@@ -68,7 +76,7 @@ export function OrganizationSettingsForm({
 
     const supabase = createClient()
     const storagePath = `support-bg/${Date.now()}-${sanitizeStorageFileName(file.name)}`
-    const { error: uploadError } = await supabase.storage.from('proposal-files').upload(storagePath, file)
+    const { error: uploadError } = await supabase.storage.from('public-assets').upload(storagePath, file)
 
     if (uploadError) {
       setBgError(`Falha no upload: ${uploadError.message}`)
@@ -76,7 +84,7 @@ export function OrganizationSettingsForm({
       return
     }
 
-    const { data: { publicUrl } } = supabase.storage.from('proposal-files').getPublicUrl(storagePath)
+    const { data: { publicUrl } } = supabase.storage.from('public-assets').getPublicUrl(storagePath)
 
     // Salva a URL pública direto (não o path, pois é imagem pública)
     const res = await fetch('/api/settings/support-bg', {

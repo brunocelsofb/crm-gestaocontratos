@@ -20,7 +20,7 @@ export default async function PublicSupportPage() {
 
   // Logo via getPublicUrl — salva path relativo no banco
   const finalLogoUrl = (rawLogo && rawLogo.trim() && rawLogo !== 'null')
-    ? admin.storage.from('proposal-files').getPublicUrl(rawLogo).data.publicUrl
+    ? admin.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
     : null
 
   // Wallpaper já é URL pública completa salva pelo upload
