@@ -61,7 +61,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token')
+    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token, support_bg_url')
     .eq('id', 'default')
     .maybeSingle()
 

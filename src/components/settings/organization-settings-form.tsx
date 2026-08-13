@@ -209,10 +209,15 @@ export function OrganizationSettingsForm({
         <div>
           <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de suporte</label>
           <p className="text-xs text-gray-400 mb-2">Imagem de fundo da página /suporte. Se não houver imagem, usa o degradê padrão da marca.</p>
-          {(bgPath ?? currentSupportBgUrl) && (bgPath ?? currentSupportBgUrl)!.startsWith('https://') && (
-            <div className="mb-2 h-20 w-full rounded-md bg-cover bg-center border border-gray-200"
-              style={{ backgroundImage: `url(${bgPath ?? currentSupportBgUrl})` }} />
-          )}
+          {(() => {
+            const activePreview = bgPath || currentSupportBgUrl
+            return activePreview ? (
+              <div className="mt-2 mb-2 relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={activePreview} alt="Wallpaper Atual" className="w-full h-full object-cover" />
+              </div>
+            ) : null
+          })()}
           <div className="flex items-center gap-2">
             <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" onClick={handleBgUpload} disabled={uploadingBg}
