@@ -1,0 +1,5 @@
+/* Reset do background do body para a página de suporte */
+body {
+  background: transparent !important;
+  background-color: transparent !important;
+}
