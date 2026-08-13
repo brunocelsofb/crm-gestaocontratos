@@ -11,20 +11,19 @@ export default async function PublicSupportPage() {
     .eq('id', 'default')
     .maybeSingle()
 
-  // Log server-side para diagnóstico
-  console.log('[suporte] settings:', JSON.stringify({ support_bg_url: settings?.support_bg_url, logo_storage_path: settings?.logo_storage_path, error: error?.message }))
+  // Log removido após diagnóstico
 
-  // support_bg_url já é URL pública completa (salva pelo handleBgUpload via getPublicUrl)
+  // support_bg_url já é URL pública completa
   const wallpaperUrl = settings?.support_bg_url ?? null
 
-  // Logo: converte path relativo em URL pública
+  // Logo: extrai base URL do Supabase a partir da support_bg_url ou usa a env var
   let logoUrl: string | null = null
   if (settings?.logo_storage_path) {
-    const { data } = admin.storage
-      .from('proposal-files')
-      .getPublicUrl(settings.logo_storage_path)
-    logoUrl = data?.publicUrl ?? null
-    console.log('[suporte] logoUrl gerado:', logoUrl)
+    // Extrai base do projeto Supabase (ex: https://xxx.supabase.co)
+    const supabaseBase = wallpaperUrl
+      ? wallpaperUrl.split('/storage/')[0]
+      : process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+    logoUrl = `${supabaseBase}/storage/v1/object/public/proposal-files/${settings.logo_storage_path}`
   }
 
   const gradientStyle = {
