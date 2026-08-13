@@ -55,12 +55,13 @@ export default async function NpsPublicPage({
     }
   }
 
-  const GRADIENT = 'linear-gradient(to bottom right, #1B556B, #0D3B4C, #32AF9D)'
   const bgStyle = {
     minHeight: '100vh',
-    backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}'), ${GRADIENT}` : GRADIENT,
+    backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}')` : undefined,
+    backgroundColor: '#1B556B',
     backgroundSize: 'cover',
-    backgroundPosition: 'center',
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
     backgroundAttachment: 'fixed',
   }
 
