@@ -15,36 +15,39 @@ export default async function PublicSupportPage() {
 
   let logoUrl: string | null = null
   if (settings?.logo_storage_path) {
-    const { data } = admin.storage
-      .from('proposal-files')
-      .getPublicUrl(settings.logo_storage_path)
+    const { data } = admin.storage.from('proposal-files').getPublicUrl(settings.logo_storage_path)
     logoUrl = data.publicUrl
   }
 
-  const bg = wallpaperUrl
-    ? { backgroundImage: `url(${wallpaperUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: 'linear-gradient(135deg, #1B556B 0%, #0D3B4C 50%, #32AF9D 100%)' }
+  // Valida server-side — sem onError (Server Component não suporta event handlers)
+  const isValidLogo = typeof logoUrl === 'string' && logoUrl.startsWith('https://')
+  const isValidWallpaper = typeof wallpaperUrl === 'string' && wallpaperUrl.startsWith('https://')
 
   return (
-    <div style={{ minHeight: '100vh', ...bg, position: 'relative' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} />
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 16px', minHeight: '100vh' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24, width: '100%', maxWidth: 448 }}>
-          {logoUrl && (
+    <main
+      className={`min-h-screen w-full flex flex-col items-center justify-center relative ${!isValidWallpaper ? 'bg-gradient-to-br from-[#1B556B] via-[#0D3B4C] to-[#32AF9D]' : ''}`}
+      style={isValidWallpaper ? { backgroundImage: `url(${wallpaperUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+    >
+      <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+
+      <div className="relative z-10 w-full max-w-md px-4 py-12 flex flex-col gap-6">
+        <div className="text-center">
+          {isValidLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo" style={{ height: 48, objectFit: 'contain', margin: '0 auto 12px', display: 'block' }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          )}
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#fff', margin: 0, textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>Abrir chamado de suporte</h1>
-          <p style={{ marginTop: 6, fontSize: 14, color: 'rgba(255,255,255,0.8)' }}>Conta pra gente o que está acontecendo.</p>
+            <img src={logoUrl!} alt="Logo" className="mx-auto mb-3 h-12 object-contain" />
+          ) : null}
+          <h1 className="text-2xl font-bold text-white drop-shadow">Abrir chamado de suporte</h1>
+          <p className="mt-1 text-sm text-white/80">Conta pra gente o que está acontecendo.</p>
         </div>
-        <div style={{ width: '100%', maxWidth: 448, borderRadius: 16, background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', padding: 24 }}>
+
+        <div className="rounded-2xl bg-white shadow-2xl p-6">
           <SupportForm />
         </div>
-        <p style={{ marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+
+        <p className="text-center text-xs text-white/40">
           {settings?.company_name ?? 'ORBIS Engenharia'} © {new Date().getFullYear()}
         </p>
       </div>
-    </div>
+    </main>
   )
 }
