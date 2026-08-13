@@ -209,9 +209,9 @@ export function OrganizationSettingsForm({
         <div>
           <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de suporte</label>
           <p className="text-xs text-gray-400 mb-2">Imagem de fundo da página /suporte. Se não houver imagem, usa o degradê padrão da marca.</p>
-          {bgPath && bgPath.startsWith('https://') && (
+          {(bgPath ?? currentSupportBgUrl) && (bgPath ?? currentSupportBgUrl)!.startsWith('https://') && (
             <div className="mb-2 h-20 w-full rounded-md bg-cover bg-center border border-gray-200"
-              style={{ backgroundImage: `url(${bgPath})` }} />
+              style={{ backgroundImage: `url(${bgPath ?? currentSupportBgUrl})` }} />
           )}
           <div className="flex items-center gap-2">
             <input ref={bgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
@@ -220,8 +220,11 @@ export function OrganizationSettingsForm({
               {uploadingBg ? 'Enviando...' : 'Enviar imagem'}
             </button>
           </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Tamanho recomendado: 1920×1080 pixels (Full HD). Formato JPG ou PNG. Máximo de 2MB para garantir carregamento rápido.
+          </p>
           {bgError && <p className="mt-1 text-xs text-red-600">{bgError}</p>}
-          {bgPath && !uploadingBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper configurado</p>}
+          {(bgPath ?? currentSupportBgUrl) && !uploadingBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper configurado</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Théo (US$)</label>
