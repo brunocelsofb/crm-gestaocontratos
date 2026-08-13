@@ -17,7 +17,9 @@ export function OrganizationSettingsForm({
   currentBrandColor,
   currentAssistantBudget,
   currentSupportBgUrl,
-  currentSurveyBgUrl,
+  currentNpsBgUrl,
+  currentSurveyClinicaBgUrl,
+  currentSurveyHospitalarBgUrl,
 }: {
   currentName: string
   currentCompanyName: string
@@ -28,7 +30,9 @@ export function OrganizationSettingsForm({
   currentBrandColor: string
   currentAssistantBudget: number
   currentSupportBgUrl?: string | null
-  currentSurveyBgUrl?: string | null
+  currentNpsBgUrl?: string | null
+  currentSurveyClinicaBgUrl?: string | null
+  currentSurveyHospitalarBgUrl?: string | null
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
   const [logoPath, setLogoPath] = useState(currentLogoPath)
@@ -39,10 +43,42 @@ export function OrganizationSettingsForm({
   const [uploadingBg, setUploadingBg] = useState(false)
   const [bgError, setBgError] = useState<string | null>(null)
   const [bgPath, setBgPath] = useState(currentSupportBgUrl ?? null)
-  const surveyBgInputRef = useRef<HTMLInputElement>(null)
-  const [uploadingSurveyBg, setUploadingSurveyBg] = useState(false)
-  const [surveyBgError, setSurveyBgError] = useState<string | null>(null)
-  const [surveyBgPath, setSurveyBgPath] = useState(currentSurveyBgUrl ?? null)
+
+  // Helper genérico de upload para wallpapers públicos
+  async function uploadPublicAsset(
+    file: File, folder: string, column: string,
+    setUploading: (v: boolean) => void,
+    setError: (v: string | null) => void,
+    setPath: (v: string) => void
+  ) {
+    setUploading(true); setError(null)
+    const sb = createClient()
+    const storagePath = `${folder}/${Date.now()}-${sanitizeStorageFileName(file.name)}`
+    const { error: uploadError } = await sb.storage.from('public-assets').upload(storagePath, file)
+    if (uploadError) { setError(uploadError.message); setUploading(false); return }
+    const { data: { publicUrl } } = sb.storage.from('public-assets').getPublicUrl(storagePath)
+    const res = await fetch('/api/settings/public-asset', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: publicUrl, column }),
+    })
+    setUploading(false)
+    if (res.ok) setPath(publicUrl); else setError('Erro ao salvar')
+  }
+
+  const npsRef = useRef<HTMLInputElement>(null)
+  const [npsBg, setNpsBg] = useState(currentNpsBgUrl ?? null)
+  const [uploadingNps, setUploadingNps] = useState(false)
+  const [npsErr, setNpsErr] = useState<string | null>(null)
+
+  const clinicaRef = useRef<HTMLInputElement>(null)
+  const [clinicaBg, setClinicaBg] = useState(currentSurveyClinicaBgUrl ?? null)
+  const [uploadingClinica, setUploadingClinica] = useState(false)
+  const [clinicaErr, setClinicaErr] = useState<string | null>(null)
+
+  const hospitalarRef = useRef<HTMLInputElement>(null)
+  const [hospitalarBg, setHospitalarBg] = useState(currentSurveyHospitalarBgUrl ?? null)
+  const [uploadingHospitalar, setUploadingHospitalar] = useState(false)
+  const [hospitalarErr, setHospitalarErr] = useState<string | null>(null)
 
   async function handleLogoUpload() {
     const file = fileInputRef.current?.files?.[0]
@@ -255,32 +291,41 @@ export function OrganizationSettingsForm({
             Tamanho recomendado: 1920×1080 pixels (Full HD). Formato JPG ou PNG. Máximo de 2MB para garantir carregamento rápido.
           </p>
           {bgError && <p className="mt-1 text-xs text-red-600">{bgError}</p>}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper das pesquisas de satisfação / NPS</label>
-          {(() => {
-            const activePreview = surveyBgPath || currentSurveyBgUrl
-            return activePreview ? (
-              <div className="mt-2 mb-2 relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={activePreview} alt="Wallpaper Pesquisas" className="w-full h-full object-cover" />
-              </div>
-            ) : null
-          })()}
-          <div className="flex items-center gap-2 mt-1">
-            <input ref={surveyBgInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
-            <button type="button" onClick={handleSurveyBgUpload} disabled={uploadingSurveyBg}
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-              {uploadingSurveyBg ? 'Enviando...' : 'Enviar imagem'}
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Tamanho recomendado: 1920×1080 pixels (Full HD). Formato JPG, PNG ou WebP. Máximo de 2MB. Recomenda-se imagens leves/claras com respiro no centro para melhor leitura das perguntas.
-          </p>
-          {surveyBgError && <p className="mt-1 text-xs text-red-600">{surveyBgError}</p>}
-          {(surveyBgPath || currentSurveyBgUrl) && !uploadingSurveyBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper de pesquisas configurado</p>}
-        </div>
           {(bgPath ?? currentSupportBgUrl) && !uploadingBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper configurado</p>}
+        </div>
+
+        {/* NPS */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper — NPS</label>
+          {(npsBg || currentNpsBgUrl) && <div className="mt-2 mb-2 w-full h-24 rounded-lg overflow-hidden border border-gray-200"><img src={(npsBg || currentNpsBgUrl)!} alt="nps bg" className="w-full h-full object-cover" /></div>}
+          <div className="flex items-center gap-2 mt-1">
+            <input ref={npsRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" disabled={uploadingNps} onClick={() => { const f = npsRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'nps-bg', 'nps_bg_url', setUploadingNps, setNpsErr, setNpsBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingNps ? 'Enviando...' : 'Enviar imagem'}</button>
+          </div>
+          {npsErr && <p className="mt-1 text-xs text-red-600">{npsErr}</p>}
+        </div>
+
+        {/* Pesquisa Clínica */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper — Pesquisa Eng. Clínica</label>
+          {(clinicaBg || currentSurveyClinicaBgUrl) && <div className="mt-2 mb-2 w-full h-24 rounded-lg overflow-hidden border border-gray-200"><img src={(clinicaBg || currentSurveyClinicaBgUrl)!} alt="clínica bg" className="w-full h-full object-cover" /></div>}
+          <div className="flex items-center gap-2 mt-1">
+            <input ref={clinicaRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" disabled={uploadingClinica} onClick={() => { const f = clinicaRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'survey-clinica', 'survey_clinica_bg_url', setUploadingClinica, setClinicaErr, setClinicaBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingClinica ? 'Enviando...' : 'Enviar imagem'}</button>
+          </div>
+          {clinicaErr && <p className="mt-1 text-xs text-red-600">{clinicaErr}</p>}
+        </div>
+
+        {/* Pesquisa Hospitalar/Predial */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper — Pesquisa Eng. Hospitalar/Predial</label>
+          {(hospitalarBg || currentSurveyHospitalarBgUrl) && <div className="mt-2 mb-2 w-full h-24 rounded-lg overflow-hidden border border-gray-200"><img src={(hospitalarBg || currentSurveyHospitalarBgUrl)!} alt="hospitalar bg" className="w-full h-full object-cover" /></div>}
+          <div className="flex items-center gap-2 mt-1">
+            <input ref={hospitalarRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" disabled={uploadingHospitalar} onClick={() => { const f = hospitalarRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'survey-hospitalar', 'survey_hospitalar_bg_url', setUploadingHospitalar, setHospitalarErr, setHospitalarBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingHospitalar ? 'Enviando...' : 'Enviar imagem'}</button>
+          </div>
+          {hospitalarErr && <p className="mt-1 text-xs text-red-600">{hospitalarErr}</p>}
+          <p className="text-xs text-gray-500 mt-1">Recomendado: 1920×1080px, JPG/PNG/WebP, máx 2MB.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Théo (US$)</label>

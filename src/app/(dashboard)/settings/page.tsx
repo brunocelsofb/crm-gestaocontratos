@@ -61,7 +61,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token, support_bg_url, survey_bg_url')
+    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token, support_bg_url, nps_bg_url, survey_clinica_bg_url, survey_hospitalar_bg_url')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -106,7 +106,9 @@ export default async function SettingsPage() {
           currentBrandColor={settings?.proposal_brand_color ?? '#1e3a5f'}
           currentAssistantBudget={settings?.assistant_monthly_budget_usd ?? 10}
           currentSupportBgUrl={(settings as any)?.support_bg_url ?? null}
-          currentSurveyBgUrl={(settings as any)?.survey_bg_url ?? null}
+          currentNpsBgUrl={(settings as any)?.nps_bg_url ?? null}
+          currentSurveyClinicaBgUrl={(settings as any)?.survey_clinica_bg_url ?? null}
+          currentSurveyHospitalarBgUrl={(settings as any)?.survey_hospitalar_bg_url ?? null}
         />
         <NumberingSettingsForm
           currentTicketPrefix={settings?.ticket_number_prefix ?? 'TK'}

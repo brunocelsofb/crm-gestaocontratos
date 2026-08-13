@@ -24,12 +24,12 @@ export default async function NpsPublicPage({
   // respondendo — antes estava invertido.
   const { data: orgSettings } = await adminClient
     .from('organization_settings')
-    .select('company_name, logo_storage_path, survey_bg_url')
+    .select('company_name, logo_storage_path, nps_bg_url')
     .eq('id', 'default')
     .maybeSingle()
   const organizationName = orgSettings?.company_name || 'nossa empresa'
   const rawLogo = orgSettings?.logo_storage_path
-  const rawSurveyBg = (orgSettings as any)?.survey_bg_url
+  const rawSurveyBg = (orgSettings as any)?.nps_bg_url
   const logoUrl = (rawLogo && rawLogo.trim() && rawLogo !== 'null')
     ? adminClient.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
     : null
@@ -97,6 +97,10 @@ export default async function NpsPublicPage({
           </div>
         ) : (
           <>
+            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6">
+              <h1 className="text-2xl font-bold text-[#1B556B]">Pesquisa de Satisfação NPS</h1>
+              <p className="text-sm text-slate-500 mt-2">Sua opinião é muito importante para nós.</p>
+            </div>
             {clientDisplayName && (
               <p className="mb-4 text-xs text-gray-400">Olá, {clientDisplayName}</p>
             )}
