@@ -16,6 +16,7 @@ export function OrganizationSettingsForm({
   currentFooterText,
   currentBrandColor,
   currentAssistantBudget,
+  currentSupportBgUrl,
 }: {
   currentName: string
   currentCompanyName: string
@@ -25,6 +26,7 @@ export function OrganizationSettingsForm({
   currentFooterText: string
   currentBrandColor: string
   currentAssistantBudget: number
+  currentSupportBgUrl?: string | null
 }) {
   const [state, formAction, pending] = useActionState(updateOrganizationSettings, initialState)
   const [logoPath, setLogoPath] = useState(currentLogoPath)
@@ -164,7 +166,20 @@ export function OrganizationSettingsForm({
         <input type="hidden" name="proposal_brand_color" value={currentBrandColor} />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">🤖 Orçamento mensal do Théo (US$)</label>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de suporte</label>
+          <p className="text-xs text-gray-400 mb-1">URL de imagem para o fundo da página /suporte. Deixe vazio para usar o degradê padrão da marca.</p>
+          <input
+            name="support_bg_url"
+            type="url"
+            defaultValue={currentSupportBgUrl ?? ''}
+            placeholder="https://exemplo.com/imagem.jpg"
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
+          />
+          {currentSupportBgUrl && (
+            <div className="mt-2 h-16 w-full rounded-md bg-cover bg-center border border-gray-200"
+              style={{ backgroundImage: `url(${currentSupportBgUrl})` }} />
+          )}
+        </div>
           <input
             name="assistant_monthly_budget_usd"
             type="number"

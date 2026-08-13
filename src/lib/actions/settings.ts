@@ -39,6 +39,7 @@ export async function updateOrganizationSettings(
   const proposal_brand_color = (formData.get('proposal_brand_color') as string)?.trim() || '#1B556B'
   const assistantBudgetRaw = formData.get('assistant_monthly_budget_usd') as string
   const assistant_monthly_budget_usd = assistantBudgetRaw ? Number(assistantBudgetRaw) : 10
+  const support_bg_url = (formData.get('support_bg_url') as string)?.trim() || null
   if (!name) return { error: 'Nome é obrigatório.' }
 
   const supabase = await createClient()
@@ -52,6 +53,7 @@ export async function updateOrganizationSettings(
       proposal_footer_text,
       proposal_brand_color,
       assistant_monthly_budget_usd,
+      support_bg_url,
       updated_at: new Date().toISOString(),
     })
     .eq('id', 'default')

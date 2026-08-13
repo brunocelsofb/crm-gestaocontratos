@@ -105,6 +105,7 @@ export default async function SettingsPage() {
           currentFooterText={settings?.proposal_footer_text ?? ''}
           currentBrandColor={settings?.proposal_brand_color ?? '#1e3a5f'}
           currentAssistantBudget={settings?.assistant_monthly_budget_usd ?? 10}
+          currentSupportBgUrl={(settings as any)?.support_bg_url ?? null}
         />
         <NumberingSettingsForm
           currentTicketPrefix={settings?.ticket_number_prefix ?? 'TK'}
