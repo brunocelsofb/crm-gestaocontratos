@@ -22,31 +22,37 @@ export default async function PublicSupportPage() {
 
   return (
     <div
-      className="relative min-h-screen bg-cover bg-center bg-no-repeat flex items-start justify-center px-4 py-12"
-      style={bgUrl
-        ? { backgroundImage: `url(${bgUrl})` }
-        : { background: 'linear-gradient(135deg, #1B556B 0%, #0D3B4C 50%, #32AF9D 100%)' }
-      }
+      style={{
+        minHeight: '100vh',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        padding: '48px 16px',
+        position: 'relative',
+        ...(bgUrl
+          ? { backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
+          : { background: 'linear-gradient(135deg, #1B556B 0%, #0D3B4C 50%, #32AF9D 100%)' }
+        )
+      }}
     >
       {/* Overlay sutil para contraste */}
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
 
-      <div className="relative z-10 w-full max-w-md space-y-5">
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 448, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Logo / marca */}
-        <div className="text-center">
-          {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="mx-auto h-12 object-contain mb-3" />
-          )}
-          <h1 className="text-2xl font-bold text-white drop-shadow">Abrir chamado de suporte</h1>
-          <p className="mt-1 text-sm text-white/80">Conta pra gente o que está acontecendo.</p>
+        <div style={{ textAlign: 'center' }}>
+          {logoUrl ? <img src={logoUrl} alt="Logo" style={{ margin: '0 auto 12px', height: 48, objectFit: 'contain', display: 'block' }} /> : null}
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.3)', margin: 0 }}>Abrir chamado de suporte</h1>
+          <p style={{ marginTop: 4, fontSize: 14, color: 'rgba(255,255,255,0.8)' }}>Conta pra gente o que está acontecendo.</p>
         </div>
 
         {/* Card do formulário */}
-        <div className="rounded-2xl bg-white/95 shadow-2xl backdrop-blur-md p-6">
+        <div style={{ borderRadius: 16, background: 'rgba(255,255,255,0.97)', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)', padding: 24 }}>
           <SupportForm />
         </div>
 
-        <p className="text-center text-xs text-white/50">
+        <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
           {settings?.company_name ?? 'ORBIS Engenharia'} © {new Date().getFullYear()}
         </p>
       </div>
