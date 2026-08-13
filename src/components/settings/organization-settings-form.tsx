@@ -139,26 +139,6 @@ export function OrganizationSettingsForm({
     else setBgPath(publicUrl)
   }
 
-  async function handleSurveyBgUpload() {
-    const file = surveyBgInputRef.current?.files?.[0]
-    if (!file) return
-    setUploadingSurveyBg(true)
-    setSurveyBgError(null)
-    const supabase = createClient()
-    const storagePath = `survey-bg/${Date.now()}-${sanitizeStorageFileName(file.name)}`
-    const { error: uploadError } = await supabase.storage.from('public-assets').upload(storagePath, file)
-    if (uploadError) { setSurveyBgError(`Falha no upload: ${uploadError.message}`); setUploadingSurveyBg(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('public-assets').getPublicUrl(storagePath)
-    const res = await fetch('/api/settings/survey-bg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: publicUrl }),
-    })
-    setUploadingSurveyBg(false)
-    if (!res.ok) setSurveyBgError('Erro ao salvar URL do wallpaper de pesquisa')
-    else setSurveyBgPath(publicUrl)
-  }
-
   return (
     <div className="max-w-md space-y-6">
       <div className="rounded-lg border border-gray-200 bg-white p-6">
