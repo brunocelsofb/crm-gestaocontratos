@@ -17,8 +17,6 @@ export default async function PublicSupportPage() {
   const rawLogoPath = settings?.logo_storage_path
   const rawWallpaper = settings?.support_bg_url
 
-  const rawLogoPath = settings?.logo_storage_path
-
   let finalLogoUrl: string | null = null
   if (rawLogoPath && rawLogoPath.trim() && rawLogoPath !== 'null') {
     if (rawLogoPath.startsWith('http')) {

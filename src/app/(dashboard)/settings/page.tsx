@@ -76,6 +76,8 @@ export default async function SettingsPage() {
       logoPublicUrl = publicUrl
     }
   }
+
+  return (
     <div className="space-y-8">
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Configurações</h1>
