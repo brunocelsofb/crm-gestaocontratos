@@ -5,18 +5,14 @@ export function LogoBadge({ src }: { src?: string }) {
 
   return (
     <div className="flex-shrink-0 flex items-center justify-center">
-      <div
-        className="h-12 w-40 bg-[#E98C5F]"
+      <img
+        src={src}
+        alt="Logo ORBIS"
+        className="h-10 md:h-12 w-auto object-contain"
         style={{
-          WebkitMaskImage: `url('${src}')`,
-          WebkitMaskSize: 'contain',
-          WebkitMaskPosition: 'center',
-          WebkitMaskRepeat: 'no-repeat',
-          maskImage: `url('${src}')`,
-          maskSize: 'contain',
-          maskPosition: 'center',
-          maskRepeat: 'no-repeat',
+          filter: 'invert(66%) sepia(55%) saturate(3062%) hue-rotate(331deg) brightness(96%) contrast(89%)'
         }}
+        onError={(e) => { e.currentTarget.style.display = 'none' }}
       />
     </div>
   )
