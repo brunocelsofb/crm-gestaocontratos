@@ -20,14 +20,13 @@ export default async function PublicSupportPage() {
     ? admin.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
     : null
 
-  // Wallpaper puro — sem gradient sobreposto
   const wallpaperUrl = (rawWallpaper && rawWallpaper.startsWith('https://'))
     ? rawWallpaper
     : null
 
   return (
     <div className="relative min-h-screen w-full">
-      {/* Fundo puro sem filtros */}
+      {/* Fundo fixo — sem overlay */}
       <div className="fixed inset-0 pointer-events-none -z-10" style={{
         backgroundImage: wallpaperUrl ? `url('${wallpaperUrl}')` : undefined,
         backgroundColor: '#1B556B',
@@ -37,35 +36,38 @@ export default async function PublicSupportPage() {
       }} />
 
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-12 px-4">
-        <div style={{ width: '100%', maxWidth: 768, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Logo */}
-          {logoUrl && (
-            <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
-          )}
+        <div className="w-full max-w-2xl flex flex-col gap-5">
 
-          {/* Card com cabeçalho padrão ORBIS */}
-          <div style={{ width: '100%', maxWidth: 768, borderRadius: 16, background: 'rgba(255,255,255,0.97)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
-            <div style={{ padding: '24px 24px 0' }}>
-              <div style={{ borderBottom: '4px solid #E98C5F', paddingBottom: 16, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Card formulário */}
+          <div className="w-full rounded-2xl bg-white/97 shadow-2xl overflow-hidden">
+
+            {/* Cabeçalho ORBIS */}
+            <div className="p-6 pb-0">
+              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex items-center gap-4">
+                {/* Logo como div bg — sem <img> quebrada em Server Component */}
                 {logoUrl && (
-                  <div style={{ width: 56, height: 56, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', flexShrink: 0 }} />
+                  <div style={{
+                    width: 48, height: 48, flexShrink: 0,
+                    backgroundImage: `url('${logoUrl}')`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                  }} />
                 )}
                 <div>
-                  <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1B556B', margin: 0 }}>
-                    Abrir chamado de suporte
-                  </h1>
-                  <p style={{ fontSize: 14, color: '#32AF9D', fontWeight: 500, margin: '4px 0 0' }}>
-                    Conta pra gente o que está acontecendo.
-                  </p>
+                  <h1 className="text-2xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
+                  <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
                 </div>
               </div>
             </div>
-            <div style={{ padding: '0 24px 24px' }}>
+
+            {/* Formulário */}
+            <div className="p-6 pt-0">
               <SupportForm />
             </div>
           </div>
 
-          <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+          <p className="text-center text-xs text-white/50">
             {settings?.company_name ?? 'ORBIS Engenharia'} © {new Date().getFullYear()}
           </p>
         </div>
