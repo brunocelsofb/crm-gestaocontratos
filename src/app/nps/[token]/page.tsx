@@ -60,16 +60,6 @@ export default async function NpsPublicPage({
     }
   }
 
-  const bgStyle = {
-    minHeight: '100vh',
-    backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}')` : undefined,
-    backgroundColor: '#1B556B',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center center',
-    backgroundRepeat: 'no-repeat',
-    backgroundAttachment: 'fixed',
-  }
-
   const rawSurveyBg = (orgSettings as any)?.nps_bg_url
   const surveyBgUrl = (rawSurveyBg && rawSurveyBg.startsWith('https://')) ? rawSurveyBg : null
 
