@@ -19,7 +19,7 @@ export default async function PublicTicketTrackingPage({ params }: { params: Pro
 
   const [{ data: ticket }, { data: orgSettings }] = await Promise.all([
     supabase.from('tickets')
-      .select('id, ticket_number, subject, status, priority, created_at, satisfaction_responded_at, satisfaction_rating')
+      .select('id, ticket_number, subject, status, priority, created_at, satisfaction_responded_at, satisfaction_rating, satisfaction_comment')
       .eq('public_token', token).maybeSingle(),
     supabase.from('organization_settings')
       .select('support_bg_url, logo_storage_path, company_name')
@@ -90,10 +90,33 @@ export default async function PublicTicketTrackingPage({ params }: { params: Pro
           {/* Avaliação / Reply */}
           {isFinalized ? (
             ticket.satisfaction_responded_at ? (
-              <div className="bg-white/90 backdrop-blur p-6 rounded-xl shadow-lg border border-gray-200 text-center">
-                <h3 className="text-lg font-bold text-[#1B556B]">Obrigado pela sua avaliação!</h3>
-                <p className="text-sm text-gray-600 mt-2">Seu feedback é fundamental para melhorarmos nosso atendimento.</p>
-                <p className="text-xs text-gray-400 mt-1">Nota enviada: {ticket.satisfaction_rating}/5</p>
+              <div className="bg-white/95 backdrop-blur p-6 rounded-xl shadow-lg border border-gray-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-[#32AF9D] text-white p-2 rounded-full flex-shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-[#1B556B]">Avaliação enviada</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-500">Sua nota para o atendimento:</p>
+                    <p className="text-base font-medium text-gray-800 mt-1">
+                      {ticket.satisfaction_rating === 1 && '😞 Muito insatisfeito'}
+                      {ticket.satisfaction_rating === 2 && '😐 Insatisfeito'}
+                      {ticket.satisfaction_rating === 3 && '😶 Nem satisfeito, nem insatisfeito'}
+                      {ticket.satisfaction_rating === 4 && '😊 Satisfeito'}
+                      {ticket.satisfaction_rating === 5 && '🤩 Muito satisfeito'}
+                    </p>
+                  </div>
+                  {(ticket as any).satisfaction_comment && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-500">Seu comentário:</p>
+                      <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md mt-1 border border-gray-100">
+                        {(ticket as any).satisfaction_comment}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="bg-white/95 rounded-xl shadow-xl p-4">
