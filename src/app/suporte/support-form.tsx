@@ -5,7 +5,7 @@ import { createTicket } from '@/lib/actions/tickets'
 import { PRIORITY_LABELS, GRAVITY_CATEGORIES } from '@/lib/utils/gut-matrix'
 
 const inp = 'mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-[#1B556B] focus:ring-2 focus:ring-[#1B556B]/20 focus:outline-none transition-colors'
-const lbl = 'block text-sm font-medium text-gray-700'
+const lbl = 'block text-sm font-semibold text-[#1B556B]'
 
 export function SupportForm() {
   const [busy, setBusy] = useState(false)

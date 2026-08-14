@@ -37,22 +37,27 @@ export default async function PublicSupportPage() {
       }} />
 
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-12 px-4">
-        <div style={{ width: '100%', maxWidth: 448, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ width: '100%', maxWidth: 768, display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Logo */}
           {logoUrl && (
             <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
           )}
 
           {/* Card com cabeçalho padrão ORBIS */}
-          <div style={{ borderRadius: 16, background: 'rgba(255,255,255,0.97)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', maxWidth: 768, borderRadius: 16, background: 'rgba(255,255,255,0.97)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
             <div style={{ padding: '24px 24px 0' }}>
-              <div style={{ borderBottom: '4px solid #E98C5F', paddingBottom: 16, marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1B556B', margin: 0 }}>
-                  Abrir chamado de suporte
-                </h1>
-                <p style={{ fontSize: 14, color: '#64748b', marginTop: 6, margin: '6px 0 0' }}>
-                  Conta pra gente o que está acontecendo.
-                </p>
+              <div style={{ borderBottom: '4px solid #E98C5F', paddingBottom: 16, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
+                {logoUrl && (
+                  <div style={{ width: 56, height: 56, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', flexShrink: 0 }} />
+                )}
+                <div>
+                  <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1B556B', margin: 0 }}>
+                    Abrir chamado de suporte
+                  </h1>
+                  <p style={{ fontSize: 14, color: '#32AF9D', fontWeight: 500, margin: '4px 0 0' }}>
+                    Conta pra gente o que está acontecendo.
+                  </p>
+                </div>
               </div>
             </div>
             <div style={{ padding: '0 24px 24px' }}>
