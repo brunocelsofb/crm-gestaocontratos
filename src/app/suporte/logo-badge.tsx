@@ -12,8 +12,7 @@ export function LogoBadge({ src }: { src?: string }) {
       <img
         src={src}
         alt="Logo ORBIS"
-        className="h-10 md:h-12 w-auto object-contain"
-        style={{ filter: 'invert(66%) sepia(55%) saturate(3062%) hue-rotate(331deg) brightness(96%) contrast(89%)' }}
+        className="h-12 md:h-16 w-auto object-contain"
         onError={() => setHasError(true)}
       />
     </div>
