@@ -64,13 +64,21 @@ export default async function PublicTicketTrackingPage({ params }: { params: Pro
             <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto 8px' }} />
           )}
 
-          {/* Header do ticket */}
-          <div className="rounded-xl bg-white/95 shadow-xl p-4">
-            <p className="text-xs text-gray-400">{ticket.ticket_number}</p>
-            <h1 className="text-lg font-semibold text-gray-900">{ticket.subject}</h1>
-            <span className="mt-1 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-              {STATUS_LABELS[ticket.status]}
-            </span>
+          {/* Header do ticket — padrão NPS */}
+          <div className="rounded-xl bg-white/95 shadow-xl p-6">
+            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-2">
+              <p className="text-xs font-semibold text-gray-400 mb-1">{ticket.ticket_number}</p>
+              <h1 className="text-2xl font-bold text-[#1B556B]">{ticket.subject}</h1>
+              <div className="mt-3">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  ticket.status === 'fechado' ? 'bg-gray-100 text-gray-800' :
+                  ticket.status === 'aberto' ? 'bg-green-100 text-green-800' :
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {STATUS_LABELS[ticket.status]}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Mensagens */}
