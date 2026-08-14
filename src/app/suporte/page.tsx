@@ -54,7 +54,7 @@ export default async function PublicSupportPage() {
                 <div className="flex-shrink-0">
                   <LogoBadge src={finalLogoUrl ?? undefined} />
                 </div>
-                <div className="text-center md:text-right">
+                <div className="text-center md:text-left">
                   <h1 className="text-2xl md:text-3xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
                   <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
                 </div>
