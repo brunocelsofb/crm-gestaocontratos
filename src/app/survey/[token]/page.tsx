@@ -40,6 +40,11 @@ export default async function CustomSurveyPublicPage({
     .maybeSingle()
 
   const rawLogo = orgSettings?.logo_storage_path
+  let finalLogoUrl: string | null = null
+  if (rawLogo && rawLogo.trim() && rawLogo !== 'null') {
+    if (rawLogo.startsWith('http')) { finalLogoUrl = rawLogo }
+    else { const { data } = adminClient.storage.from('public-assets').getPublicUrl(rawLogo); finalLogoUrl = data.publicUrl }
+  }
   const isHospitalar = templateName.toLowerCase().includes('hospitalar') || templateName.toLowerCase().includes('predial')
   const rawSurveyBg = isHospitalar
     ? (orgSettings as any)?.survey_hospitalar_bg_url
