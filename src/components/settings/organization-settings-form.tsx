@@ -86,20 +86,13 @@ export function OrganizationSettingsForm({
     setUploadingLogo(true)
     setLogoError(null)
 
-    const storagePath = `logo/${Date.now()}-${sanitizeStorageFileName(file.name)}`
+    const formData = new FormData()
+    formData.append('file', file)
 
-    // Converte arquivo para base64 e envia via endpoint admin
-    const arrayBuffer = await file.arrayBuffer()
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-
-    const res = await fetch('/api/settings/logo-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: storagePath, base64, mimeType: file.type }),
-    })
+    const res = await fetch('/api/settings/logo-url', { method: 'POST', body: formData })
     setUploadingLogo(false)
     if (!res.ok) {
-      const err = await res.json()
+      const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }))
       setLogoError(err.error || 'Erro ao fazer upload')
     } else {
       const { url } = await res.json()
