@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NpsForm } from '@/components/nps/nps-form'
+import { LogoBadge } from '@/components/ui/logo-badge'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -28,12 +29,16 @@ export default async function NpsPublicPage({
     .eq('id', 'default')
     .maybeSingle()
   const organizationName = orgSettings?.company_name || 'nossa empresa'
-  const rawLogo = orgSettings?.logo_storage_path
-  const rawSurveyBg = (orgSettings as any)?.nps_bg_url
-  const logoUrl = (rawLogo && rawLogo.trim() && rawLogo !== 'null')
-    ? adminClient.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
-    : null
-  const surveyBgUrl = (rawSurveyBg && rawSurveyBg.startsWith('https://')) ? rawSurveyBg : null
+  const rawLogoPath = orgSettings?.logo_storage_path
+  let finalLogoUrl: string | null = null
+  if (rawLogoPath && rawLogoPath.trim() && rawLogoPath !== 'null') {
+    if (rawLogoPath.startsWith('http')) {
+      finalLogoUrl = rawLogoPath
+    } else {
+      const { data } = adminClient.storage.from('public-assets').getPublicUrl(rawLogoPath)
+      finalLogoUrl = data.publicUrl
+    }
+  }
 
 
   if (survey) {
@@ -65,51 +70,44 @@ export default async function NpsPublicPage({
     backgroundAttachment: 'fixed',
   }
 
+  const rawSurveyBg = (orgSettings as any)?.nps_bg_url
+  const surveyBgUrl = (rawSurveyBg && rawSurveyBg.startsWith('https://')) ? rawSurveyBg : null
+
   return (
     <div className="relative min-h-screen w-full">
-      {/* Camada de fundo congelada */}
-      <div
-        className="fixed inset-0 pointer-events-none -z-10"
-        style={{
-          backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}')` : undefined,
-          backgroundColor: '#1B556B',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
-      {/* Overlay */}
+      <div className="fixed inset-0 pointer-events-none -z-10" style={{ backgroundImage: surveyBgUrl ? `url('${surveyBgUrl}')` : undefined, backgroundColor: '#1B556B', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
       <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: 'rgba(0,0,0,0.2)' }} />
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-10 px-4">
-        <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {logoUrl && (
-          <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
-        )}
-      <div className="w-full rounded-2xl bg-white shadow-2xl p-8">
-        {!survey ? (
-          <p className="text-center text-sm text-gray-500">
-            Este link de pesquisa não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.
-          </p>
-        ) : survey.status === 'answered' ? (
-          <div className="text-center">
-            <p className="text-lg font-medium text-gray-900">Obrigado!</p>
-            <p className="mt-1 text-sm text-gray-500">Sua resposta a esta pesquisa já foi registrada anteriormente.</p>
-          </div>
-        ) : (
-          <>
-            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6">
-              <h1 className="text-2xl font-bold text-[#1B556B]">Pesquisa de Satisfação NPS</h1>
-              <p className="text-sm text-slate-500 mt-2">Sua opinião é muito importante para nós.</p>
+        <div className="w-full max-w-2xl flex flex-col gap-5">
+          <div className="w-full bg-white/95 shadow-xl rounded-2xl p-6 md:p-8">
+            {/* Cabeçalho padronizado ORBIS */}
+            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-end justify-between gap-4">
+              <div className="flex-shrink-0">
+                <LogoBadge src={finalLogoUrl ?? undefined} />
+              </div>
+              <div className="text-center md:text-left">
+                <h1 className="text-xl md:text-2xl font-bold text-[#1B556B]">Pesquisa de Satisfação</h1>
+                <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Avalie nossos serviços de engenharia clínica e predial. Sua opinião é fundamental.</p>
+              </div>
             </div>
-            {clientDisplayName && (
-              <p className="mb-4 text-xs text-gray-400">Olá, {clientDisplayName}</p>
+
+            {!survey ? (
+              <p className="text-center text-sm text-gray-500">Este link de pesquisa não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.</p>
+            ) : survey.status === 'answered' ? (
+              <div className="text-center">
+                <p className="text-lg font-medium text-gray-900">Obrigado!</p>
+                <p className="mt-1 text-sm text-gray-500">Sua resposta a esta pesquisa já foi registrada anteriormente.</p>
+              </div>
+            ) : (
+              <>
+                {clientDisplayName && <p className="mb-4 text-xs text-gray-400">Olá, {clientDisplayName}</p>}
+                <NpsForm token={token} companyName={organizationName} />
+              </>
             )}
-            <NpsForm token={token} companyName={organizationName} />
-          </>
-        )}
-      </div>
-      </div>
-    </main>
+          </div>
+          <p className="text-center text-xs text-white/40">{organizationName} © {new Date().getFullYear()}</p>
+        </div>
+      </main>
     </div>
   )
 }

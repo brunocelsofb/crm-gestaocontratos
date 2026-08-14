@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SupportForm } from './support-form'
-import { LogoBadge } from './logo-badge'
+import { LogoBadge } from '@/components/ui/logo-badge'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

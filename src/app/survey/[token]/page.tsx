@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CustomSurveyForm } from '@/components/surveys/custom-survey-form'
+import { LogoBadge } from '@/components/ui/logo-badge'
 import type { Question } from '@/lib/actions/custom-surveys'
 
 export const dynamic = 'force-dynamic'
@@ -75,9 +76,13 @@ export default async function CustomSurveyPublicPage({
       <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: 'rgba(0,0,0,0.2)' }} />
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-10 px-4">
         <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {logoUrl && (
-          <div style={{ width: 160, height: 48, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', margin: '0 auto' }} />
-        )}
+        <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-end justify-between gap-4">
+              <div className="flex-shrink-0"><LogoBadge src={finalLogoUrl ?? undefined} /></div>
+              <div className="text-center md:text-left">
+                <h1 className="text-xl md:text-2xl font-bold text-[#1B556B]">{templateName || 'Pesquisa de Satisfação'}</h1>
+                <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Avalie nossos serviços de engenharia clínica e predial. Sua opinião é fundamental.</p>
+              </div>
+            </div>
         <div className="w-full rounded-2xl bg-white shadow-2xl p-8">
           {!survey ? (
             <p className="text-center text-sm text-gray-500">
@@ -90,10 +95,7 @@ export default async function CustomSurveyPublicPage({
             </div>
           ) : (
             <>
-              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6">
-                <h1 className="text-2xl font-bold text-[#1B556B]">{templateName || 'Pesquisa de Satisfação'}</h1>
-                <p className="text-sm text-slate-500 mt-2">Sua opinião é muito importante para nós.</p>
-              </div>
+
               <CustomSurveyForm token={token} questions={questions} />
             </>
           )}
