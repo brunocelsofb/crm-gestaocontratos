@@ -79,7 +79,7 @@ export function CustomSurveyForm({ token, questions }: { token: string; question
 
       {questions.map((q) => (
         <div key={q.id}>
-          <label className="block text-sm font-medium text-gray-900">{q.label}</label>
+          <label className="block text-sm font-semibold text-[#1B556B]">{q.label}</label>
 
           {q.type === 'text' && (
             <input

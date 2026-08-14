@@ -80,33 +80,30 @@ export default async function CustomSurveyPublicPage({
       {/* Overlay */}
       <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: 'rgba(0,0,0,0.2)' }} />
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-10 px-4">
-        <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-end justify-between gap-4">
+        <div className="w-full max-w-2xl flex flex-col gap-5">
+          <div className="w-full bg-white/95 shadow-xl rounded-2xl p-6 md:p-8">
+            {/* Cabeçalho dentro do card */}
+            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-end justify-between gap-4">
               <div className="flex-shrink-0"><LogoBadge src={finalLogoUrl ?? undefined} /></div>
               <div className="text-center md:text-left">
                 <h1 className="text-xl md:text-2xl font-bold text-[#1B556B]">{templateName || 'Pesquisa de Satisfação'}</h1>
                 <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Avalie nossos serviços de engenharia clínica e predial. Sua opinião é fundamental.</p>
               </div>
             </div>
-        <div className="w-full rounded-2xl bg-white shadow-2xl p-8">
-          {!survey ? (
-            <p className="text-center text-sm text-gray-500">
-              Este link não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.
-            </p>
-          ) : survey.status === 'answered' ? (
-            <div className="text-center">
-              <p className="text-lg font-medium text-gray-900">Obrigado!</p>
-              <p className="mt-1 text-sm text-gray-500">Suas respostas já foram registradas anteriormente.</p>
-            </div>
-          ) : (
-            <>
 
+            {!survey ? (
+              <p className="text-center text-sm text-gray-500">Este link não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.</p>
+            ) : survey.status === 'answered' ? (
+              <div className="text-center">
+                <p className="text-lg font-medium text-gray-900">Obrigado!</p>
+                <p className="mt-1 text-sm text-gray-500">Suas respostas já foram registradas anteriormente.</p>
+              </div>
+            ) : (
               <CustomSurveyForm token={token} questions={questions} />
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
     </div>
   )
 }
