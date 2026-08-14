@@ -78,7 +78,7 @@ export default async function CustomSurveyPublicPage({
         }}
       />
       {/* Overlay */}
-      <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: 'rgba(0,0,0,0.2)' }} />
+      <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: 'rgba(0,0,0,0.1)' }} />
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-10 px-4">
         <div className="w-full max-w-2xl flex flex-col gap-5">
           <div className="w-full bg-white/95 shadow-xl rounded-2xl p-6 md:p-8">
