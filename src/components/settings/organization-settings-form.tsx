@@ -135,7 +135,12 @@ export function OrganizationSettingsForm({
         <label className="block text-sm font-medium text-gray-700">Logo da empresa</label>
         <p className="mt-0.5 text-xs text-gray-400">Usado no cabeçalho do PDF das propostas comerciais.</p>
         {logoPath && (
-          <img src={`/api/settings/logo?path=${encodeURIComponent(logoPath)}`} alt="Logo atual" className="mt-2 h-16 object-contain" />
+          <img
+            src={logoPath.startsWith('http') ? logoPath : `/api/settings/logo?path=${encodeURIComponent(logoPath)}`}
+            alt="Logo atual"
+            className="mt-2 h-16 object-contain"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
         )}
         <div className="mt-2 flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" className="text-xs" />

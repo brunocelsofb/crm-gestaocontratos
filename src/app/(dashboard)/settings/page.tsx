@@ -65,7 +65,17 @@ export default async function SettingsPage() {
     .eq('id', 'default')
     .maybeSingle()
 
-  return (
+  // Converte path relativo da logo para URL pública
+  const rawLogoPath = settings?.logo_storage_path
+  let logoPublicUrl: string | null = null
+  if (rawLogoPath) {
+    if (rawLogoPath.startsWith('http')) {
+      logoPublicUrl = rawLogoPath
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('public-assets').getPublicUrl(rawLogoPath)
+      logoPublicUrl = publicUrl
+    }
+  }
     <div className="space-y-8">
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Configurações</h1>
@@ -100,7 +110,7 @@ export default async function SettingsPage() {
           currentName={settings?.name ?? 'Contract CRM'}
           currentCompanyName={settings?.company_name ?? ''}
           currentCompanyCnpj={settings?.company_cnpj ?? ''}
-          currentLogoPath={settings?.logo_storage_path ?? null}
+          currentLogoPath={logoPublicUrl}
           currentHeaderText={settings?.proposal_header_text ?? ''}
           currentFooterText={settings?.proposal_footer_text ?? ''}
           currentBrandColor={settings?.proposal_brand_color ?? '#1e3a5f'}
