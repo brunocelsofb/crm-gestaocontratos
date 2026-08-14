@@ -54,8 +54,8 @@ export default async function PublicSupportPage() {
                 {/* Logo sempre renderizada — onError via Client Component */}
                 <LogoBadge src={finalLogoUrl ?? undefined} />
                 <div className="flex-1 flex flex-col justify-center mt-2 md:mt-0">
-                  <h1 className="text-2xl font-bold text-[#1B556B]">Suporte Técnico e Manutenção</h1>
-                  <p className="text-sm font-medium text-[#32AF9D] mt-1">Relate problemas em equipamentos ou infraestrutura predial diretamente para a nossa equipe técnica.</p>
+                  <h1 className="text-2xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
+                  <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
                 </div>
               </div>
             </div>
