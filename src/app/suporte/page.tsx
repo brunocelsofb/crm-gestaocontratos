@@ -17,9 +17,14 @@ export default async function PublicSupportPage() {
   const rawLogo = settings?.logo_storage_path
   const rawWallpaper = settings?.support_bg_url
 
-  const logoUrl = (rawLogo && rawLogo.trim() && rawLogo !== 'null')
-    ? admin.storage.from('public-assets').getPublicUrl(rawLogo).data.publicUrl
-    : null
+  // Logo: tenta public-assets (novo bucket público) primeiro
+  // Se o path ainda estiver no proposal-files (bucket privado), a URL retorna 404
+  // O LogoBadge tem onError para esconder automaticamente
+  let logoUrl: string | null = null
+  if (rawLogo && rawLogo.trim() && rawLogo !== 'null') {
+    const { data: d1 } = admin.storage.from('public-assets').getPublicUrl(rawLogo)
+    logoUrl = d1.publicUrl
+  }
 
   const wallpaperUrl = (rawWallpaper && rawWallpaper.startsWith('https://'))
     ? rawWallpaper
