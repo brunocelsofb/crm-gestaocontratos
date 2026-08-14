@@ -86,28 +86,25 @@ export function OrganizationSettingsForm({
     setUploadingLogo(true)
     setLogoError(null)
 
-    const supabase = createClient()
     const storagePath = `logo/${Date.now()}-${sanitizeStorageFileName(file.name)}`
-    const { error: uploadError } = await supabase.storage.from('public-assets').upload(storagePath, file)
 
-    if (uploadError) {
-      setLogoError(`Falha no upload: ${uploadError.message}`)
-      setUploadingLogo(false)
-      return
-    }
+    // Converte arquivo para base64 e envia via endpoint admin
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
 
-    // Pega URL pública do bucket public-assets
-    const { data: { publicUrl: logoPubUrl } } = supabase.storage.from('public-assets').getPublicUrl(storagePath)
-    
-    // Salva URL pública no banco (mesmo padrão do wallpaper)
-    const logoRes = await fetch('/api/settings/logo-url', {
+    const res = await fetch('/api/settings/logo-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: logoPubUrl, path: storagePath }),
+      body: JSON.stringify({ path: storagePath, base64, mimeType: file.type }),
     })
     setUploadingLogo(false)
-    if (!logoRes.ok) setLogoError('Erro ao salvar URL da logo')
-    else setLogoPath(logoPubUrl)
+    if (!res.ok) {
+      const err = await res.json()
+      setLogoError(err.error || 'Erro ao fazer upload')
+    } else {
+      const { url } = await res.json()
+      setLogoPath(url)
+    }
   }
 
   async function handleBgUpload() {
