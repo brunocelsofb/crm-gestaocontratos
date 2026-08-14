@@ -55,8 +55,8 @@ export default async function PublicSupportPage() {
                   <LogoBadge src={finalLogoUrl ?? undefined} />
                 </div>
                 <div className="text-center md:text-left">
-                  <h1 className="text-2xl md:text-3xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
-                  <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
+                  <h1 className="text-xl md:text-2xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
+                  <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
                 </div>
               </div>
             </div>
