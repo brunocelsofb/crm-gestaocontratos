@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SupportForm } from './support-form'
+import { LogoBadge } from './logo-badge'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -43,18 +44,10 @@ export default async function PublicSupportPage() {
 
             {/* Cabeçalho ORBIS */}
             <div className="p-6 pb-0">
-              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex items-center gap-4">
-                {/* Logo como div bg — sem <img> quebrada em Server Component */}
-                {logoUrl && (
-                  <div style={{
-                    width: 48, height: 48, flexShrink: 0,
-                    backgroundImage: `url('${logoUrl}')`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                  }} />
-                )}
-                <div>
+              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-4 md:gap-6">
+                {/* Logo sempre renderizada — onError via Client Component */}
+                <LogoBadge src={logoUrl ?? '/logo.png'} />
+                <div className="flex-1 mt-2 md:mt-0">
                   <h1 className="text-2xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
                   <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
                 </div>
