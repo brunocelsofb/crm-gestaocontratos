@@ -50,10 +50,10 @@ export default async function PublicSupportPage() {
 
             {/* Cabeçalho ORBIS */}
             <div className="p-6 pb-0">
-              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-4 md:gap-6">
+              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-6 md:gap-10">
                 {/* Logo sempre renderizada — onError via Client Component */}
                 <LogoBadge src={finalLogoUrl ?? undefined} />
-                <div className="flex-1 flex flex-col justify-center mt-2 md:mt-0">
+                <div className="flex-1 flex flex-col justify-center mt-2 md:mt-0 md:ml-2">
                   <h1 className="text-2xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
                   <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
                 </div>

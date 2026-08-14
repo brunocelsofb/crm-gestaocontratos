@@ -12,7 +12,7 @@ export function LogoBadge({ src }: { src?: string }) {
       <img
         src={src}
         alt="Logo ORBIS"
-        className="h-12 md:h-16 w-auto object-contain"
+        className="h-9 md:h-12 w-auto object-contain"
         onError={() => setHasError(true)}
       />
     </div>
