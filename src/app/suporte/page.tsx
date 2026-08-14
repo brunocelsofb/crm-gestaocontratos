@@ -14,16 +14,19 @@ export default async function PublicSupportPage() {
     .eq('id', 'default')
     .maybeSingle()
 
-  const rawLogo = settings?.logo_storage_path
+  const rawLogoPath = settings?.logo_storage_path
   const rawWallpaper = settings?.support_bg_url
 
-  // Logo: tenta public-assets (novo bucket público) primeiro
-  // Se o path ainda estiver no proposal-files (bucket privado), a URL retorna 404
-  // O LogoBadge tem onError para esconder automaticamente
-  let logoUrl: string | null = null
-  if (rawLogo && rawLogo.trim() && rawLogo !== 'null') {
-    const { data: d1 } = admin.storage.from('public-assets').getPublicUrl(rawLogo)
-    logoUrl = d1.publicUrl
+  const rawLogoPath = settings?.logo_storage_path
+
+  let finalLogoUrl: string | null = null
+  if (rawLogoPath && rawLogoPath.trim() && rawLogoPath !== 'null') {
+    if (rawLogoPath.startsWith('http')) {
+      finalLogoUrl = rawLogoPath
+    } else {
+      const { data } = admin.storage.from('public-assets').getPublicUrl(rawLogoPath)
+      finalLogoUrl = data.publicUrl
+    }
   }
 
   const wallpaperUrl = (rawWallpaper && rawWallpaper.startsWith('https://'))
@@ -51,7 +54,7 @@ export default async function PublicSupportPage() {
             <div className="p-6 pb-0">
               <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-4 md:gap-6">
                 {/* Logo sempre renderizada — onError via Client Component */}
-                <LogoBadge src={logoUrl ?? undefined} />
+                <LogoBadge src={finalLogoUrl ?? undefined} />
                 <div className="flex-1 mt-2 md:mt-0">
                   <h1 className="text-2xl font-bold text-[#1B556B]">Abrir chamado de suporte</h1>
                   <p className="text-sm font-medium text-[#32AF9D] mt-1">Conta pra gente o que está acontecendo.</p>
