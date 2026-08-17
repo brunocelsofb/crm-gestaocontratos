@@ -35,15 +35,7 @@ export function NpsSection({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-gray-900">Pesquisa de satisfação (NPS)</h2>
-        <form action={createNpsSurvey.bind(null, contractId)}>
-          <button
-            type="submit"
-            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
-          >
-            + Enviar pesquisa NPS
-          </button>
-        </form>
+        <h2 className="text-sm font-medium text-[#1B556B]">Pesquisa de satisfação (NPS)</h2>
       </div>
 
       {surveys.length === 0 && (

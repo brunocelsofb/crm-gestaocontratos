@@ -47,7 +47,7 @@ export function CustomSurveyForm({ token, questions }: { token: string; question
   if (done) {
     return (
       <div className="text-center">
-        <p className="text-lg font-medium text-gray-900">Obrigado pela sua resposta!</p>
+        <p className="text-lg font-medium text-[#1B556B]">Obrigado pela sua resposta!</p>
         <p className="mt-1 text-sm text-gray-500">Suas respostas foram registradas com sucesso.</p>
       </div>
     )
