@@ -107,16 +107,27 @@ export default async function ContractDetailPage({
   const availableTemplates = (allSurveyTemplates ?? []).filter((t: any) => {
     try {
       const target = t.target_type || 'any'
-      // Bloqueia avulso em contratos
+
+      // Bloqueia avulso sempre em contratos
       if (target === 'avulso') return false
-      if (target === 'any' || target === 'contracts') return true
+
+      // Formulários vinculados a funil específico
       if (target === 'pipeline') {
         return displayRun ? (t.target_pipeline_id ?? null) === displayRun.pipeline_id : false
       }
+
+      // Formulários vinculados a tag
       if (target === 'tag') {
         const tagId = t.target_tag_id || t.tag_id
-        return tagId ? currentTagIds.includes(tagId) : true
+        return tagId ? currentTagIds.includes(tagId) : false
       }
+
+      // 'any' e 'contracts': se o formulário tem tag_id legado, filtra pela tag
+      if (t.tag_id) return currentTagIds.includes(t.tag_id)
+
+      // Se o contrato tem tags e o formulário é 'any' sem restrição de tag:
+      // mostra apenas se NÃO há outro formulário com tag específica para este contrato
+      // (para evitar poluir com formulários genéricos quando há pesquisas específicas)
       return true
     } catch { return true }
   })
