@@ -1,4 +1,4 @@
-import { sendCustomSurvey } from '@/lib/actions/custom-surveys'
+import { sendCustomSurvey, deletePendingSurveyResponse } from '@/lib/actions/custom-surveys'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
 import { calculateResponseScore } from '@/lib/utils/survey-score'
@@ -31,12 +31,14 @@ export function CustomSurveysSection({
   allTemplates,
   sentSurveys,
   linkBase,
+  isAdmin = false,
 }: {
   contractId: string
   templates: Template[]
   allTemplates: Template[]
   sentSurveys: SentSurvey[]
   linkBase: string
+  isAdmin?: boolean
 }) {
   // IMPORTANTE: o mapa usado para EXIBIR respostas já enviadas usa a
   // lista COMPLETA de formulários (allTemplates), não a lista filtrada
@@ -92,6 +94,20 @@ export function CustomSurveysSection({
                 <div className="mt-2 flex items-center gap-2">
                   <input readOnly value={link} className="flex-1 truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500" />
                   <CopyLinkButton link={link} />
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!confirm('Deseja realmente excluir esta pesquisa pendente? O link gerado será invalidado.')) return
+                        const res = await deletePendingSurveyResponse(s.id)
+                        if (res.error) alert(res.error)
+                      }}
+                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      title="Excluir pesquisa pendente"
+                    >
+                      🗑 Excluir
+                    </button>
+                  )}
                 </div>
               </div>
             )

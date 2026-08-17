@@ -525,6 +525,7 @@ export default async function ContractDetailPage({
                   allTemplates={allSurveyTemplates ?? []}
                   sentSurveys={sentCustomSurveys ?? []}
                   linkBase={linkBase}
+                  isAdmin={currentProfile?.role === 'admin'}
                 />
               </div>
             ),

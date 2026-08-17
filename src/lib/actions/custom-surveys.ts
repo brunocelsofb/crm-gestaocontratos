@@ -230,3 +230,31 @@ export async function saveSurveyTemplate(
   revalidatePath('/settings/forms')
   return {}
 }
+
+export async function deletePendingSurveyResponse(surveyId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+
+  // Verifica autenticação e role
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'admin') return { error: 'Apenas administradores podem excluir pesquisas pendentes.' }
+
+  // Verifica se a pesquisa existe e está pendente
+  const { data: survey } = await supabase
+    .from('custom_surveys')
+    .select('id, status, contract_id')
+    .eq('id', surveyId)
+    .maybeSingle()
+
+  if (!survey) return { error: 'Pesquisa não encontrada.' }
+  if (survey.status === 'answered') return { error: 'Pesquisas já respondidas não podem ser excluídas.' }
+
+  // Exclui o registro
+  const { error } = await supabase.from('custom_surveys').delete().eq('id', surveyId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/contracts/${survey.contract_id}`)
+  revalidatePath('/nps-dashboard')
+  return {}
+}
