@@ -231,30 +231,44 @@ export async function saveSurveyTemplate(
   return {}
 }
 
-export async function deletePendingSurveyResponse(surveyId: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
+export async function deletePendingSurveyResponse(surveyId: string): Promise<{ error?: string; success?: boolean }> {
+  try {
+    console.log('[DELETE_SURVEY] Iniciando exclusão ID:', surveyId)
 
-  // Verifica autenticação e role
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autenticado.' }
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-  if (profile?.role !== 'admin') return { error: 'Apenas administradores podem excluir pesquisas pendentes.' }
+    if (!surveyId) return { error: 'ID não fornecido.' }
 
-  // Verifica se a pesquisa existe e está pendente
-  const { data: survey } = await supabase
-    .from('custom_surveys')
-    .select('id, status, contract_id')
-    .eq('id', surveyId)
-    .maybeSingle()
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    console.log('[DELETE_SURVEY] user:', user?.id, 'authError:', authError?.message)
+    if (!user) return { error: 'Não autenticado.' }
 
-  if (!survey) return { error: 'Pesquisa não encontrada.' }
-  if (survey.status === 'answered') return { error: 'Pesquisas já respondidas não podem ser excluídas.' }
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    console.log('[DELETE_SURVEY] role:', profile?.role)
+    if (profile?.role !== 'admin') return { error: 'Apenas administradores podem excluir pesquisas pendentes.' }
 
-  // Exclui o registro
-  const { error } = await supabase.from('custom_surveys').delete().eq('id', surveyId)
-  if (error) return { error: error.message }
+    // Usa adminClient para o delete (bypassa RLS)
+    const admin = createAdminClient()
+    const { data: survey, error: fetchErr } = await admin
+      .from('custom_surveys')
+      .select('id, status, contract_id')
+      .eq('id', surveyId)
+      .maybeSingle()
+    console.log('[DELETE_SURVEY] survey:', survey, 'fetchErr:', fetchErr?.message)
 
-  revalidatePath(`/contracts/${survey.contract_id}`)
-  revalidatePath('/nps-dashboard')
-  return {}
+    if (fetchErr) return { error: fetchErr.message }
+    if (!survey) return { error: 'Pesquisa não encontrada.' }
+    if (survey.status === 'answered') return { error: 'Pesquisas já respondidas não podem ser excluídas.' }
+
+    const { error: delErr } = await admin.from('custom_surveys').delete().eq('id', surveyId)
+    console.log('[DELETE_SURVEY] delErr:', delErr?.message)
+    if (delErr) return { error: delErr.message }
+
+    revalidatePath(`/contracts/${survey.contract_id}`)
+    revalidatePath('/nps-dashboard')
+    console.log('[DELETE_SURVEY] Sucesso!')
+    return { success: true }
+  } catch (e: any) {
+    console.error('[DELETE_SURVEY] Erro fatal:', e)
+    return { error: e?.message ?? 'Erro desconhecido ao excluir.' }
+  }
 }

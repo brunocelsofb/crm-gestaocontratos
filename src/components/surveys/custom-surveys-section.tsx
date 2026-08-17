@@ -62,6 +62,7 @@ export function CustomSurveysSection({
       const res = await deletePendingSurveyResponse(id)
       setDeletingId(null)
       if (res.error) setDeleteError(res.error)
+      // se success, revalidatePath no server já vai remover da lista
     })
   }
 
