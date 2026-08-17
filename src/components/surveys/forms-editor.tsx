@@ -100,7 +100,7 @@ export function FormsEditor({ initialTemplates, availableTags = [], availablePip
     setSaving(true); setError(null)
     const res = await saveSurveyTemplate(
       editingId === 'new' ? null : editingId!,
-      editName, editCategory, editQuestions,
+      editName, 'geral', editQuestions,
       editTargetType, editTargetTagId || null, editTargetPipelineId || null
     )
     if (res.error) { setError(res.error); setSaving(false); return }
@@ -142,13 +142,6 @@ export function FormsEditor({ initialTemplates, availableTags = [], availablePip
               placeholder="Ex: Pesquisa de Satisfação - Engenharia Clínica"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:ring-2 focus:ring-[#1B556B]/20 focus:outline-none"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-[#1B556B] mb-1">Categoria</label>
-            <select value={editCategory} onChange={e => setEditCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
-              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
           </div>
           <div>
             <label className="block text-sm font-semibold text-[#1B556B] mb-1">Vincular formulário a</label>
@@ -266,9 +259,6 @@ export function FormsEditor({ initialTemplates, availableTags = [], availablePip
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-[#1B556B] text-sm">{t.name}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_BADGE[t.category] ?? CATEGORY_BADGE.geral}`}>
-                {CATEGORIES.find(c => c.value === t.category)?.label ?? t.category}
-              </span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TARGET_BADGE[t.target_type] ?? TARGET_BADGE.any}`}>
                 {t.target_type === 'any' && '🌐 Todos os funis'}
                 {t.target_type === 'pipeline' && `📊 Funil: ${availablePipelines.find(p => p.id === t.target_pipeline_id)?.name ?? 'Específico'}`}
