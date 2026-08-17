@@ -5,7 +5,27 @@ import { QuestionEditor } from './question-editor'
 import { saveSurveyTemplate, deleteSurveyTemplate, duplicateSurveyTemplate } from '@/lib/actions/custom-surveys'
 import type { Question } from '@/lib/actions/custom-surveys'
 
-type Template = { id: string; name: string; category: string; questions: Question[]; created_at: string }
+type Template = {
+  id: string; name: string; category: string; questions: Question[]
+  target_type: 'any' | 'contracts' | 'avulso' | 'tag'
+  target_tag_id?: string | null
+  created_at: string
+}
+type Tag = { id: string; name: string }
+
+const TARGET_OPTIONS = [
+  { value: 'any',       label: 'Qualquer funil (sem restrição)' },
+  { value: 'contracts', label: 'Apenas Funil de Contratos' },
+  { value: 'avulso',    label: 'Apenas Funil de Serviços Avulsos' },
+  { value: 'tag',       label: 'Por Tag específica' },
+]
+
+const TARGET_BADGE: Record<string, string> = {
+  any:       'bg-gray-100 text-gray-600',
+  contracts: 'bg-[#1B556B]/10 text-[#1B556B]',
+  avulso:    'bg-orange-100 text-orange-700',
+  tag:       'bg-purple-100 text-purple-700',
+}
 
 const CATEGORIES = [
   { value: 'eng_clinica', label: 'Engenharia Clínica' },
@@ -25,29 +45,25 @@ function newQuestion(): Question {
   return { id: crypto.randomUUID(), label: '', type: 'likert', required: true }
 }
 
-export function FormsEditor({ initialTemplates }: { initialTemplates: Template[] }) {
+export function FormsEditor({ initialTemplates, availableTags = [] }: { initialTemplates: Template[], availableTags?: Tag[] }) {
   const [templates, setTemplates] = useState<Template[]>(initialTemplates)
   const [editingId, setEditingId] = useState<string | 'new' | null>(null)
   const [editName, setEditName] = useState('')
   const [editCategory, setEditCategory] = useState('geral')
+  const [editTargetType, setEditTargetType] = useState<string>('any')
+  const [editTargetTagId, setEditTargetTagId] = useState<string>('')
   const [editQuestions, setEditQuestions] = useState<Question[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function startNew() {
-    setEditingId('new')
-    setEditName('')
-    setEditCategory('geral')
-    setEditQuestions([newQuestion()])
-    setError(null)
+    setEditingId('new'); setEditName(''); setEditCategory('geral')
+    setEditTargetType('any'); setEditTargetTagId(''); setEditQuestions([newQuestion()]); setError(null)
   }
 
   function startEdit(t: Template) {
-    setEditingId(t.id)
-    setEditName(t.name)
-    setEditCategory(t.category ?? 'geral')
-    setEditQuestions(t.questions ?? [])
-    setError(null)
+    setEditingId(t.id); setEditName(t.name); setEditCategory(t.category ?? 'geral')
+    setEditTargetType(t.target_type ?? 'any'); setEditTargetTagId(t.target_tag_id ?? ''); setEditQuestions(t.questions ?? []); setError(null)
   }
 
   function cancelEdit() { setEditingId(null); setError(null) }
@@ -83,7 +99,8 @@ export function FormsEditor({ initialTemplates }: { initialTemplates: Template[]
     setSaving(true); setError(null)
     const res = await saveSurveyTemplate(
       editingId === 'new' ? null : editingId!,
-      editName, editCategory, editQuestions
+      editName, editCategory, editQuestions,
+      editTargetType, editTargetTagId || null
     )
     if (res.error) { setError(res.error); setSaving(false); return }
     setSaving(false)
@@ -127,13 +144,33 @@ export function FormsEditor({ initialTemplates }: { initialTemplates: Template[]
           </div>
           <div>
             <label className="block text-sm font-semibold text-[#1B556B] mb-1">Categoria</label>
-            <select
-              value={editCategory}
-              onChange={e => setEditCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none"
-            >
+            <select value={editCategory} onChange={e => setEditCategory(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
               {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-[#1B556B] mb-1">Vincular formulário a</label>
+            <select value={editTargetType} onChange={e => setEditTargetType(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
+              {TARGET_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {editTargetType === 'tag' && (
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 mb-1">Selecione a tag</label>
+                <select value={editTargetTagId} onChange={e => setEditTargetTagId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
+                  <option value="">Selecione uma tag...</option>
+                  {availableTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-400">
+              {editTargetType === 'any' && 'Aparecerá em contratos e oportunidades avulsas.'}
+              {editTargetType === 'contracts' && 'Aparecerá apenas na aba Pesquisas dos Contratos.'}
+              {editTargetType === 'avulso' && 'Aparecerá apenas em Oportunidades de Serviços Avulsos.'}
+              {editTargetType === 'tag' && 'Aparecerá em contratos/oportunidades com esta tag.'}
+            </p>
           </div>
         </div>
 
@@ -206,6 +243,9 @@ export function FormsEditor({ initialTemplates }: { initialTemplates: Template[]
               <span className="font-semibold text-[#1B556B] text-sm">{t.name}</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_BADGE[t.category] ?? CATEGORY_BADGE.geral}`}>
                 {CATEGORIES.find(c => c.value === t.category)?.label ?? t.category}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TARGET_BADGE[t.target_type] ?? TARGET_BADGE.any}`}>
+                {TARGET_OPTIONS.find(o => o.value === t.target_type)?.label ?? 'Qualquer funil'}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-gray-400">

@@ -190,24 +190,31 @@ export async function submitCustomSurveyResponse(
   return { success: true }
 }
 
+export type SurveyTemplate = {
+  id: string
+  name: string
+  category: string
+  questions: Question[]
+  target_type: 'any' | 'contracts' | 'avulso' | 'tag'
+  target_tag_id?: string | null
+  created_at: string
+}
+
 export async function saveSurveyTemplate(
   templateId: string | null,
   name: string,
   category: string,
-  questions: Question[]
+  questions: Question[],
+  target_type: string = 'any',
+  target_tag_id: string | null = null
 ): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient()
+  const payload = { name, category, questions, target_type, target_tag_id: target_tag_id || null, updated_at: new Date().toISOString() }
   if (templateId) {
-    const { error } = await supabase
-      .from('survey_templates')
-      .update({ name, category, questions, updated_at: new Date().toISOString() })
-      .eq('id', templateId)
+    const { error } = await supabase.from('survey_templates').update(payload).eq('id', templateId)
     if (error) return { error: error.message }
   } else {
-    const { data, error } = await supabase
-      .from('survey_templates')
-      .insert({ name, category, questions })
-      .select('id').single()
+    const { data, error } = await supabase.from('survey_templates').insert(payload).select('id').single()
     if (error) return { error: error.message }
     revalidatePath('/settings/forms')
     return { id: data.id }
