@@ -168,19 +168,21 @@ export function CustomSurveyForm({ token, questions }: { token: string; question
               <div className="grid grid-cols-11 gap-1">
                 {Array.from({ length: 11 }, (_, n) => n).map((n) => (
                   <button key={n} type="button" onClick={() => setAnswer(q.id, String(n))}
-                    className={`rounded-md border py-2 text-xs font-bold ${
+                    className={`rounded-md border py-2 text-xs font-bold transition-colors ${
                       answers[q.id] === String(n)
                         ? n <= 6 ? 'bg-red-600 border-red-600 text-white'
-                          : n <= 8 ? 'bg-yellow-500 border-yellow-500 text-white'
-                          : 'bg-green-600 border-green-600 text-white'
-                        : n <= 6 ? 'border-red-200 text-red-700 hover:bg-red-50'
-                          : n <= 8 ? 'border-yellow-200 text-yellow-700 hover:bg-yellow-50'
-                          : 'border-green-200 text-green-700 hover:bg-green-50'
+                          : n <= 8 ? 'bg-amber-500 border-amber-500 text-white'
+                          : 'bg-emerald-600 border-emerald-600 text-white'
+                        : n <= 6 ? 'border-red-200 text-red-500 hover:border-red-400'
+                          : n <= 8 ? 'border-amber-200 text-amber-500 hover:border-amber-400'
+                          : 'border-emerald-200 text-emerald-600 hover:border-emerald-400'
                     }`}>{n}</button>
                 ))}
               </div>
-              <div className="flex justify-between text-[11px] text-gray-400">
-                <span>😞 Detrator (0-6)</span><span>😐 Neutro (7-8)</span><span>🤩 Promotor (9-10)</span>
+              <div className="flex justify-between text-[11px] font-medium">
+                <span className="text-red-400">Detrator (0-6)</span>
+                <span className="text-amber-400">Neutro (7-8)</span>
+                <span className="text-emerald-500">Promotor (9-10)</span>
               </div>
             </div>
           )}
