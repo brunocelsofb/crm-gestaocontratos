@@ -92,7 +92,6 @@ export default async function CustomSurveyPublicPage({
                 <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Sua opinião é muito importante.</p>
               </div>
             </div>
-            </div>
 
             {!survey ? (
               <p className="text-center text-sm text-gray-500">Este link não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.</p>

@@ -80,11 +80,6 @@ export default async function NpsPublicPage({
                 <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Sua opinião é muito importante.</p>
               </div>
             </div>
-              <div className="text-center md:text-left">
-                <h1 className="text-xl md:text-2xl font-bold text-[#1B556B]">Pesquisa de Satisfação</h1>
-                <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Sua opinião é muito importante.</p>
-              </div>
-            </div>
 
             {!survey ? (
               <p className="text-center text-sm text-gray-500">Este link de pesquisa não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.</p>
