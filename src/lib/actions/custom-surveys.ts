@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export type Question = {
   id: string
-  type: 'text' | 'textarea' | 'single_choice' | 'multiple_choice' | 'rating' | 'likert'
+  type: 'text' | 'textarea' | 'single_choice' | 'multiple_choice' | 'rating' | 'likert' | 'nps' | 'yesno'
   label: string
   options?: string[]
 }
@@ -187,4 +187,36 @@ export async function submitCustomSurveyResponse(
   if (error) return { error: error.message }
 
   return { success: true }
+}
+
+export async function updateSurveyTemplate(
+  templateId: string,
+  name: string,
+  category: string,
+  questions: Question[]
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('survey_templates')
+    .update({ name, category, questions, updated_at: new Date().toISOString() })
+    .eq('id', templateId)
+  if (error) return { error: error.message }
+  revalidatePath('/settings/forms')
+  return {}
+}
+
+export async function createSurveyTemplate(
+  name: string,
+  category: string,
+  questions: Question[]
+): Promise<{ error?: string; id?: string }> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('survey_templates')
+    .insert({ name, category, questions })
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  revalidatePath('/settings/forms')
+  return { id: data.id }
 }

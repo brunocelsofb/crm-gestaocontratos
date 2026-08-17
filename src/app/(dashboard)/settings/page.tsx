@@ -35,7 +35,7 @@ const CONFIG_SECTIONS = [
   {
     title: 'Pesquisas',
     items: [
-      { href: '/surveys', label: 'Formulários', description: 'Formulários de pesquisa e coleta de dados' },
+      { href: '/settings/forms', label: 'Formulários', description: 'Crie e edite formulários de pesquisa (NPS, Likert, Texto, Sim/Não)' },
     ],
   },
   {

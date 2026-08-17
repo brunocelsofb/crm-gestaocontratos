@@ -163,6 +163,39 @@ export function CustomSurveyForm({ token, questions }: { token: string; question
               ))}
             </div>
           )}
+          {q.type === 'nps' && (
+            <div className="mt-2 space-y-2">
+              <div className="grid grid-cols-11 gap-1">
+                {Array.from({ length: 11 }, (_, n) => n).map((n) => (
+                  <button key={n} type="button" onClick={() => setAnswer(q.id, String(n))}
+                    className={`rounded-md border py-2 text-xs font-bold ${
+                      answers[q.id] === String(n)
+                        ? n <= 6 ? 'bg-red-600 border-red-600 text-white'
+                          : n <= 8 ? 'bg-yellow-500 border-yellow-500 text-white'
+                          : 'bg-green-600 border-green-600 text-white'
+                        : n <= 6 ? 'border-red-200 text-red-700 hover:bg-red-50'
+                          : n <= 8 ? 'border-yellow-200 text-yellow-700 hover:bg-yellow-50'
+                          : 'border-green-200 text-green-700 hover:bg-green-50'
+                    }`}>{n}</button>
+                ))}
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-400">
+                <span>😞 Detrator (0-6)</span><span>😐 Neutro (7-8)</span><span>🤩 Promotor (9-10)</span>
+              </div>
+            </div>
+          )}
+          {q.type === 'yesno' && (
+            <div className="mt-2 flex gap-3">
+              {['Sim', 'Não'].map(opt => (
+                <button key={opt} type="button" onClick={() => setAnswer(q.id, opt)}
+                  className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold transition-colors ${
+                    answers[q.id] === opt
+                      ? opt === 'Sim' ? 'bg-green-600 border-green-600 text-white' : 'bg-red-600 border-red-600 text-white'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}>{opt === 'Sim' ? '✓ Sim' : '✗ Não'}</button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 
