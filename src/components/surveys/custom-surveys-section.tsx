@@ -81,6 +81,8 @@ function SendSurveyButton({ contractId, template }: { contractId: string; templa
     </div>
   )
 }
+
+export function CustomSurveysSection({
   contractId,
   templates,
   allTemplates,
