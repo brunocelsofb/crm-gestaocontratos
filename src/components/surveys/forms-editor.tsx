@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { QuestionEditor } from './question-editor'
-import { createSurveyTemplate, updateSurveyTemplate, deleteSurveyTemplate, duplicateSurveyTemplate } from '@/lib/actions/custom-surveys'
+import { saveSurveyTemplate, deleteSurveyTemplate, duplicateSurveyTemplate } from '@/lib/actions/custom-surveys'
 import type { Question } from '@/lib/actions/custom-surveys'
 
 type Template = { id: string; name: string; category: string; questions: Question[]; created_at: string }
@@ -81,13 +81,11 @@ export function FormsEditor({ initialTemplates }: { initialTemplates: Template[]
     if (emptyQ) { setError('Preencha o texto de todas as perguntas.'); return }
 
     setSaving(true); setError(null)
-    if (editingId === 'new') {
-      const res = await createSurveyTemplate(editName, editCategory, editQuestions)
-      if (res.error) { setError(res.error); setSaving(false); return }
-    } else {
-      const res = await updateSurveyTemplate(editingId!, editName, editCategory, editQuestions)
-      if (res.error) { setError(res.error); setSaving(false); return }
-    }
+    const res = await saveSurveyTemplate(
+      editingId === 'new' ? null : editingId!,
+      editName, editCategory, editQuestions
+    )
+    if (res.error) { setError(res.error); setSaving(false); return }
     setSaving(false)
     setEditingId(null)
     // Recarrega a lista via router refresh

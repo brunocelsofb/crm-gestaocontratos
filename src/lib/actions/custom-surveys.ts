@@ -189,34 +189,28 @@ export async function submitCustomSurveyResponse(
   return { success: true }
 }
 
-export async function updateSurveyTemplate(
-  templateId: string,
-  name: string,
-  category: string,
-  questions: Question[]
-): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('survey_templates')
-    .update({ name, category, questions, updated_at: new Date().toISOString() })
-    .eq('id', templateId)
-  if (error) return { error: error.message }
-  revalidatePath('/settings/forms')
-  return {}
-}
-
-export async function createSurveyTemplate(
+export async function saveSurveyTemplate(
+  templateId: string | null,
   name: string,
   category: string,
   questions: Question[]
 ): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('survey_templates')
-    .insert({ name, category, questions })
-    .select('id')
-    .single()
-  if (error) return { error: error.message }
+  if (templateId) {
+    const { error } = await supabase
+      .from('survey_templates')
+      .update({ name, category, questions, updated_at: new Date().toISOString() })
+      .eq('id', templateId)
+    if (error) return { error: error.message }
+  } else {
+    const { data, error } = await supabase
+      .from('survey_templates')
+      .insert({ name, category, questions })
+      .select('id').single()
+    if (error) return { error: error.message }
+    revalidatePath('/settings/forms')
+    return { id: data.id }
+  }
   revalidatePath('/settings/forms')
-  return { id: data.id }
+  return {}
 }
