@@ -3,6 +3,10 @@ import { FormsEditor } from '@/components/surveys/forms-editor'
 
 export default async function FormsSettingsPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id ?? '').maybeSingle()
+  const isAdmin = profile?.role === 'admin'
+
   const [{ data: templates }, { data: tags }, { data: pipelines }] = await Promise.all([
     supabase.from('survey_templates')
       .select('id, name, category, questions, target_type, target_tag_id, target_pipeline_id, created_at')
@@ -20,7 +24,7 @@ export default async function FormsSettingsPage() {
           Use em contratos ou mini-pesquisas de serviços avulsos.
         </p>
       </div>
-      <FormsEditor initialTemplates={(templates ?? []) as any} availableTags={tags ?? []} availablePipelines={pipelines ?? []} />
+      <FormsEditor initialTemplates={(templates ?? []) as any} availableTags={tags ?? []} availablePipelines={pipelines ?? []} isAdmin={isAdmin} />
     </div>
   )
 }

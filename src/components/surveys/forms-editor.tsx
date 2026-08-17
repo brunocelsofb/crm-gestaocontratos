@@ -45,7 +45,7 @@ function newQuestion(): Question {
   return { id: crypto.randomUUID(), label: '', type: 'likert', required: true }
 }
 
-export function FormsEditor({ initialTemplates, availableTags = [], availablePipelines = [] }: { initialTemplates: Template[], availableTags?: Tag[], availablePipelines?: Pipeline[] }) {
+export function FormsEditor({ initialTemplates, availableTags = [], availablePipelines = [], isAdmin = false }: { initialTemplates: Template[], availableTags?: Tag[], availablePipelines?: Pipeline[], isAdmin?: boolean }) {
   const [templates, setTemplates] = useState<Template[]>(initialTemplates)
   const [editingId, setEditingId] = useState<string | 'new' | null>(null)
   const [editName, setEditName] = useState('')
@@ -286,10 +286,12 @@ export function FormsEditor({ initialTemplates, availableTags = [], availablePip
               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
               Duplicar
             </button>
-            <button onClick={() => handleDelete(t.id)}
-              className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-              Excluir
-            </button>
+            {isAdmin && (
+              <button onClick={() => handleDelete(t.id)}
+                className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                Excluir
+              </button>
+            )}
           </div>
         </div>
       ))}
