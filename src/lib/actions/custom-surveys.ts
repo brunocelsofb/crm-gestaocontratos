@@ -126,11 +126,9 @@ export async function deleteSurveyTemplate(templateId: string) {
   revalidatePath('/surveys')
 }
 
-export async function sendCustomSurvey(contractId: string, templateId: string) {
+export async function sendCustomSurvey(contractId: string, templateId: string, expiresAt?: string | null) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
   const token = crypto.randomUUID()
@@ -140,6 +138,7 @@ export async function sendCustomSurvey(contractId: string, templateId: string) {
     template_id: templateId,
     token,
     created_by: user.id,
+    ...(expiresAt ? { expires_at: expiresAt } : {}),
   })
 
   revalidatePath(`/contracts/${contractId}`)
@@ -171,12 +170,13 @@ export async function submitCustomSurveyResponse(
 
   const { data: survey } = await adminClient
     .from('custom_surveys')
-    .select('id, status')
+    .select('id, status, expires_at')
     .eq('token', token)
     .maybeSingle()
 
   if (!survey) return { error: 'Link inválido ou expirado.' }
   if (survey.status === 'answered') return { error: 'Este formulário já foi respondido.' }
+  if (survey.expires_at && new Date(survey.expires_at) < new Date()) return { error: 'O prazo de resposta desta pesquisa foi encerrado.' }
 
   const { error } = await adminClient
     .from('custom_surveys')

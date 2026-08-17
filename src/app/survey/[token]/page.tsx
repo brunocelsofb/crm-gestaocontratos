@@ -16,7 +16,7 @@ export default async function CustomSurveyPublicPage({
 
   const { data: survey } = await adminClient
     .from('custom_surveys')
-    .select('id, status, template_id')
+    .select('id, status, template_id, expires_at')
     .eq('token', token)
     .maybeSingle()
 
@@ -95,6 +95,15 @@ export default async function CustomSurveyPublicPage({
 
             {!survey ? (
               <p className="text-center text-sm text-gray-500">Este link não é válido. Se você acredita que isso é um erro, entre em contato com quem enviou o link.</p>
+            ) : (survey as any).expires_at && new Date((survey as any).expires_at) < new Date() ? (
+              <div className="text-center space-y-2">
+                <p className="text-lg font-bold text-[#1B556B]">Pesquisa Encerrada</p>
+                <p className="text-sm text-gray-500">
+                  O prazo para envio das respostas desta pesquisa foi encerrado em{' '}
+                  <strong>{new Date((survey as any).expires_at).toLocaleDateString('pt-BR')}</strong>.
+                </p>
+                <p className="text-xs text-gray-400">Caso precise de atendimento, entre em contato conosco.</p>
+              </div>
             ) : survey.status === 'answered' ? (
               <div className="text-center">
                 <p className="text-lg font-medium text-gray-900">Obrigado!</p>

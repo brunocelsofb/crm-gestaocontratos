@@ -14,6 +14,7 @@ type SentSurvey = {
   status: string
   sent_at: string
   answered_at: string | null
+  expires_at?: string | null
   respondent_name: string | null
   respondent_email?: string | null
   respondent_phone?: string | null
@@ -28,7 +29,58 @@ function formatAnswer(value: string | string[] | undefined) {
 }
 
 // PERFORMANCE: também virou apresentacional — mesma lógica do NpsSection.
-export function CustomSurveysSection({
+function SendSurveyButton({ contractId, template }: { contractId: string; template: Template }) {
+  const [open, setOpen] = useState(false)
+  const [hasExpiry, setHasExpiry] = useState(false)
+  const [expiresAt, setExpiresAt] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function handleSend() {
+    setSending(true)
+    await sendCustomSurvey(contractId, template.id, hasExpiry && expiresAt ? expiresAt : null)
+    setSending(false)
+    setOpen(false)
+    setHasExpiry(false)
+    setExpiresAt('')
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="rounded-md border border-brand-700 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100">
+        + Enviar &quot;{template.name}&quot;
+      </button>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-brand-700/30 bg-brand-50/30 p-3 space-y-2 w-full">
+      <p className="text-xs font-semibold text-brand-800">{template.name}</p>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={hasExpiry} onChange={e => setHasExpiry(e.target.checked)}
+          className="rounded border-gray-300 text-brand-700" />
+        <span className="text-xs text-gray-600">Estipular prazo limite para resposta?</span>
+      </label>
+      {hasExpiry && (
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Data de encerramento</label>
+          <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
+            className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-700 focus:outline-none" />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button onClick={handleSend} disabled={sending || (hasExpiry && !expiresAt)}
+          className="rounded-md bg-brand-700 px-3 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+          {sending ? 'Enviando...' : 'Confirmar envio'}
+        </button>
+        <button onClick={() => setOpen(false)}
+          className="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
   contractId,
   templates,
   allTemplates,
@@ -83,14 +135,7 @@ export function CustomSurveysSection({
 
       <div className="flex flex-wrap gap-2">
         {templates.map((t) => (
-          <form key={t.id} action={sendCustomSurvey.bind(null, contractId, t.id)}>
-            <button
-              type="submit"
-              className="rounded-md border border-brand-700 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
-            >
-              + Enviar &quot;{t.name}&quot;
-            </button>
-          </form>
+          <SendSurveyButton key={t.id} contractId={contractId} template={t} />
         ))}
       </div>
 
@@ -106,23 +151,30 @@ export function CustomSurveysSection({
           const score = s.status === 'answered' ? calculateResponseScore(questions, s.responses) : null
 
           if (s.status === 'pending') {
+            const isExpired = s.expires_at ? new Date(s.expires_at) < new Date() : false
             return (
-              <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
+              <div key={s.id} className={`rounded-lg border bg-white p-3 text-sm ${isExpired ? 'border-gray-200 opacity-70' : 'border-gray-200'}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-900">{templateName}</span>
-                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-medium text-yellow-800">Pendente</span>
+                  <div className="flex items-center gap-1.5">
+                    {isExpired
+                      ? <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">Expirada</span>
+                      : <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-medium text-yellow-800">Pendente</span>
+                    }
+                    {s.expires_at && (
+                      <span className="text-[10px] text-gray-400">
+                        {isExpired ? 'Encerrada em' : 'Expira em'} {new Date(s.expires_at).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <input readOnly value={link} className="flex-1 truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500" />
-                  <CopyLinkButton link={link} />
+                  {!isExpired && <CopyLinkButton link={link} />}
                   {isAdmin && (
-                    <button
-                      type="button"
-                      disabled={deletingId === s.id || isPending}
+                    <button type="button" disabled={deletingId === s.id || isPending}
                       onClick={() => handleDelete(s.id)}
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
-                      title="Excluir pesquisa pendente"
-                    >
+                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40">
                       {deletingId === s.id ? 'Excluindo...' : '🗑 Excluir'}
                     </button>
                   )}
