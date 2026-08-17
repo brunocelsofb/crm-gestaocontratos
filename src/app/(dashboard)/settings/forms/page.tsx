@@ -3,11 +3,12 @@ import { FormsEditor } from '@/components/surveys/forms-editor'
 
 export default async function FormsSettingsPage() {
   const supabase = await createClient()
-  const [{ data: templates }, { data: tags }] = await Promise.all([
+  const [{ data: templates }, { data: tags }, { data: pipelines }] = await Promise.all([
     supabase.from('survey_templates')
-      .select('id, name, category, questions, target_type, target_tag_id, created_at')
+      .select('id, name, category, questions, target_type, target_tag_id, target_pipeline_id, created_at')
       .order('created_at', { ascending: false }),
     supabase.from('tags').select('id, name').order('name'),
+    supabase.from('pipelines').select('id, name, type').order('name'),
   ])
 
   return (
@@ -19,7 +20,7 @@ export default async function FormsSettingsPage() {
           Use em contratos ou mini-pesquisas de serviços avulsos.
         </p>
       </div>
-      <FormsEditor initialTemplates={(templates ?? []) as any} availableTags={tags ?? []} />
+      <FormsEditor initialTemplates={(templates ?? []) as any} availableTags={tags ?? []} availablePipelines={pipelines ?? []} />
     </div>
   )
 }

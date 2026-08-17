@@ -106,8 +106,11 @@ export default async function ContractDetailPage({
   // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato.
   const availableTemplates = (allSurveyTemplates ?? []).filter((t: any) => {
     const target = t.target_type ?? 'any'
-    if (target === 'avulso') return false  // não aparece em contratos
-    if (target === 'contracts' || target === 'any') return true
+    if (target === 'any') return true
+    if (target === 'pipeline') {
+      // Verifica se o pipeline do contrato bate com o target
+      return displayRun ? t.target_pipeline_id === displayRun.pipeline_id : false
+    }
     if (target === 'tag') return t.target_tag_id ? currentTagIds.includes(t.target_tag_id) : currentTagIds.includes(t.tag_id)
     return !t.tag_id || currentTagIds.includes(t.tag_id)
   })

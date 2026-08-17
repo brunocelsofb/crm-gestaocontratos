@@ -7,24 +7,24 @@ import type { Question } from '@/lib/actions/custom-surveys'
 
 type Template = {
   id: string; name: string; category: string; questions: Question[]
-  target_type: 'any' | 'contracts' | 'avulso' | 'tag'
+  target_type: 'any' | 'pipeline' | 'tag'
   target_tag_id?: string | null
+  target_pipeline_id?: string | null
   created_at: string
 }
 type Tag = { id: string; name: string }
+type Pipeline = { id: string; name: string; type: string }
 
 const TARGET_OPTIONS = [
-  { value: 'any',       label: 'Qualquer funil (sem restrição)' },
-  { value: 'contracts', label: 'Apenas Funil de Contratos' },
-  { value: 'avulso',    label: 'Apenas Funil de Serviços Avulsos' },
-  { value: 'tag',       label: 'Por Tag específica' },
+  { value: 'any',      icon: '🌐', label: 'Qualquer Funil (Sem restrição)' },
+  { value: 'pipeline', icon: '📊', label: 'Por Funil Específico' },
+  { value: 'tag',      icon: '🏷️', label: 'Por Tag de Serviço' },
 ]
 
 const TARGET_BADGE: Record<string, string> = {
-  any:       'bg-gray-100 text-gray-600',
-  contracts: 'bg-[#1B556B]/10 text-[#1B556B]',
-  avulso:    'bg-orange-100 text-orange-700',
-  tag:       'bg-purple-100 text-purple-700',
+  any:      'bg-gray-100 text-gray-600',
+  pipeline: 'bg-[#1B556B]/10 text-[#1B556B]',
+  tag:      'bg-purple-100 text-purple-700',
 }
 
 const CATEGORIES = [
@@ -45,25 +45,26 @@ function newQuestion(): Question {
   return { id: crypto.randomUUID(), label: '', type: 'likert', required: true }
 }
 
-export function FormsEditor({ initialTemplates, availableTags = [] }: { initialTemplates: Template[], availableTags?: Tag[] }) {
+export function FormsEditor({ initialTemplates, availableTags = [], availablePipelines = [] }: { initialTemplates: Template[], availableTags?: Tag[], availablePipelines?: Pipeline[] }) {
   const [templates, setTemplates] = useState<Template[]>(initialTemplates)
   const [editingId, setEditingId] = useState<string | 'new' | null>(null)
   const [editName, setEditName] = useState('')
   const [editCategory, setEditCategory] = useState('geral')
   const [editTargetType, setEditTargetType] = useState<string>('any')
   const [editTargetTagId, setEditTargetTagId] = useState<string>('')
+  const [editTargetPipelineId, setEditTargetPipelineId] = useState<string>('')
   const [editQuestions, setEditQuestions] = useState<Question[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function startNew() {
     setEditingId('new'); setEditName(''); setEditCategory('geral')
-    setEditTargetType('any'); setEditTargetTagId(''); setEditQuestions([newQuestion()]); setError(null)
+    setEditTargetType('any'); setEditTargetTagId(''); setEditTargetPipelineId(''); setEditQuestions([newQuestion()]); setError(null)
   }
 
   function startEdit(t: Template) {
     setEditingId(t.id); setEditName(t.name); setEditCategory(t.category ?? 'geral')
-    setEditTargetType(t.target_type ?? 'any'); setEditTargetTagId(t.target_tag_id ?? ''); setEditQuestions(t.questions ?? []); setError(null)
+    setEditTargetType(t.target_type ?? 'any'); setEditTargetTagId(t.target_tag_id ?? ''); setEditTargetPipelineId(t.target_pipeline_id ?? ''); setEditQuestions(t.questions ?? []); setError(null)
   }
 
   function cancelEdit() { setEditingId(null); setError(null) }
@@ -100,7 +101,7 @@ export function FormsEditor({ initialTemplates, availableTags = [] }: { initialT
     const res = await saveSurveyTemplate(
       editingId === 'new' ? null : editingId!,
       editName, editCategory, editQuestions,
-      editTargetType, editTargetTagId || null
+      editTargetType, editTargetTagId || null, editTargetPipelineId || null
     )
     if (res.error) { setError(res.error); setSaving(false); return }
     setSaving(false)
@@ -151,13 +152,37 @@ export function FormsEditor({ initialTemplates, availableTags = [] }: { initialT
           </div>
           <div>
             <label className="block text-sm font-semibold text-[#1B556B] mb-1">Vincular formulário a</label>
-            <select value={editTargetType} onChange={e => setEditTargetType(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
-              {TARGET_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <div className="grid grid-cols-3 gap-2">
+              {TARGET_OPTIONS.map(o => (
+                <button key={o.value} type="button"
+                  onClick={() => setEditTargetType(o.value)}
+                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors ${
+                    editTargetType === o.value
+                      ? 'border-[#1B556B] bg-[#1B556B]/5 text-[#1B556B]'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}>
+                  <span className="block text-base mb-0.5">{o.icon}</span>
+                  <span className="block text-xs leading-tight">{o.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {editTargetType === 'pipeline' && (
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 mb-1">Selecione o funil</label>
+                <select value={editTargetPipelineId} onChange={e => setEditTargetPipelineId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
+                  <option value="">Selecione um funil...</option>
+                  {availablePipelines.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {editTargetType === 'tag' && (
               <div className="mt-2">
-                <label className="block text-xs text-gray-500 mb-1">Selecione a tag</label>
+                <label className="block text-xs text-gray-500 mb-1">Selecione a tag de serviço</label>
                 <select value={editTargetTagId} onChange={e => setEditTargetTagId(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
                   <option value="">Selecione uma tag...</option>
@@ -165,11 +190,11 @@ export function FormsEditor({ initialTemplates, availableTags = [] }: { initialT
                 </select>
               </div>
             )}
-            <p className="mt-1 text-xs text-gray-400">
-              {editTargetType === 'any' && 'Aparecerá em contratos e oportunidades avulsas.'}
-              {editTargetType === 'contracts' && 'Aparecerá apenas na aba Pesquisas dos Contratos.'}
-              {editTargetType === 'avulso' && 'Aparecerá apenas em Oportunidades de Serviços Avulsos.'}
-              {editTargetType === 'tag' && 'Aparecerá em contratos/oportunidades com esta tag.'}
+
+            <p className="mt-1.5 text-xs text-gray-400">
+              {editTargetType === 'any' && '🌐 Disponível em todos os contratos e oportunidades.'}
+              {editTargetType === 'pipeline' && '📊 Aparecerá apenas no funil selecionado acima.'}
+              {editTargetType === 'tag' && '🏷️ Aparecerá em contratos/oportunidades com esta tag.'}
             </p>
           </div>
         </div>
@@ -245,7 +270,9 @@ export function FormsEditor({ initialTemplates, availableTags = [] }: { initialT
                 {CATEGORIES.find(c => c.value === t.category)?.label ?? t.category}
               </span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TARGET_BADGE[t.target_type] ?? TARGET_BADGE.any}`}>
-                {TARGET_OPTIONS.find(o => o.value === t.target_type)?.label ?? 'Qualquer funil'}
+                {t.target_type === 'any' && '🌐 Todos os funis'}
+                {t.target_type === 'pipeline' && `📊 Funil: ${availablePipelines.find(p => p.id === t.target_pipeline_id)?.name ?? 'Específico'}`}
+                {t.target_type === 'tag' && `🏷️ Tag: ${availableTags.find(tg => tg.id === t.target_tag_id)?.name ?? 'Específica'}`}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-gray-400">

@@ -206,10 +206,11 @@ export async function saveSurveyTemplate(
   category: string,
   questions: Question[],
   target_type: string = 'any',
-  target_tag_id: string | null = null
+  target_tag_id: string | null = null,
+  target_pipeline_id: string | null = null
 ): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient()
-  const payload = { name, category, questions, target_type, target_tag_id: target_tag_id || null, updated_at: new Date().toISOString() }
+  const payload = { name, category, questions, target_type, target_tag_id: target_tag_id || null, target_pipeline_id: target_pipeline_id || null, updated_at: new Date().toISOString() }
   if (templateId) {
     const { error } = await supabase.from('survey_templates').update(payload).eq('id', templateId)
     if (error) return { error: error.message }
