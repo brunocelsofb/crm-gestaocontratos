@@ -107,7 +107,9 @@ export default async function ContractDetailPage({
   const availableTemplates = (allSurveyTemplates ?? []).filter((t: any) => {
     try {
       const target = t.target_type || 'any'
-      if (target === 'any') return true
+      // Bloqueia avulso em contratos
+      if (target === 'avulso') return false
+      if (target === 'any' || target === 'contracts') return true
       if (target === 'pipeline') {
         return displayRun ? (t.target_pipeline_id ?? null) === displayRun.pipeline_id : false
       }
@@ -115,9 +117,6 @@ export default async function ContractDetailPage({
         const tagId = t.target_tag_id || t.tag_id
         return tagId ? currentTagIds.includes(tagId) : true
       }
-      // contratos/avulso legados
-      if (target === 'contracts') return true
-      if (target === 'avulso') return false
       return true
     } catch { return true }
   })
@@ -517,12 +516,9 @@ export default async function ContractDetailPage({
           }] : []),
           ...(!isCurrentlyInSalesPipeline ? [{
             id: 'pesquisas',
-            label: isCurrentlyInContractsPipeline ? 'Pesquisas & NPS' : 'Pesquisa',
+            label: 'Pesquisas',
             content: (
               <div className="space-y-6">
-                {isCurrentlyInContractsPipeline && (
-                  <NpsSection contractId={contract.id} surveys={npsSurveys ?? []} linkBase={linkBase} />
-                )}
                 <CustomSurveysSection
                   contractId={contract.id}
                   templates={availableTemplates}
