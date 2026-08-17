@@ -63,7 +63,7 @@ export function NpsForm({ token, companyName }: { token: string; companyName: st
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <p className="text-base font-semibold text-[#1B556B]">
-          Em uma escala de 0 a 10, o quanto você recomendaria {companyName || 'nossa empresa'} a um colega ou parceiro?
+          Em uma escala de 0 a 10, o quanto você recomendaria nossos serviços a um amigo ou parceiro?
         </p>
         <div className="mt-3 grid grid-cols-11 gap-1">
           {Array.from({ length: 11 }, (_, i) => i).map((n) => (

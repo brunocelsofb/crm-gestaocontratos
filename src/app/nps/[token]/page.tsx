@@ -71,13 +71,13 @@ export default async function NpsPublicPage({
         <div className="w-full max-w-2xl flex flex-col gap-5">
           <div className="w-full bg-white/95 shadow-xl rounded-2xl p-6 md:p-8">
             {/* Cabeçalho padronizado ORBIS */}
-            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center md:items-end justify-between gap-4">
+            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
               <div className="flex-shrink-0">
                 <LogoBadge src={finalLogoUrl ?? undefined} />
               </div>
               <div className="text-center md:text-left">
                 <h1 className="text-xl md:text-2xl font-bold text-[#1B556B]">Pesquisa de Satisfação</h1>
-                <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Avalie nossos serviços de engenharia clínica e predial. Sua opinião é fundamental.</p>
+                <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Sua opinião é muito importante.</p>
               </div>
             </div>
 
