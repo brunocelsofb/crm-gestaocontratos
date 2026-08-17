@@ -90,7 +90,7 @@ export default async function ContractDetailPage({
     supabase.from('tags').select('id, name, color').order('name'),
     supabase.from('contract_tags').select('tag_id').eq('contract_id', id),
     supabase.from('nps_surveys').select('id, token, score, comment, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone').eq('contract_id', id).order('sent_at', { ascending: false }),
-    supabase.from('survey_templates').select('id, name, tag_id, questions, target_type, target_tag_id').order('name'),
+    supabase.from('survey_templates').select('id, name, tag_id, questions, target_type, target_tag_id, target_pipeline_id').order('name'),
     supabase.from('custom_surveys').select('id, token, status, sent_at, answered_at, respondent_name, respondent_email, respondent_phone, template_id, responses').eq('contract_id', id).order('sent_at', { ascending: false }),
     supabase.from('action_plan_items').select('id, description, responsible_department, status, created_at, resolved_at').eq('contract_id', id).order('created_at', { ascending: false }),
     supabase.from('dimensioning_reviews').select('id, file_storage_path, file_name, sent_at, status, reviewed_at, review_notes').eq('contract_id', id).order('sent_at', { ascending: false }),
@@ -105,14 +105,21 @@ export default async function ContractDetailPage({
 
   // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato.
   const availableTemplates = (allSurveyTemplates ?? []).filter((t: any) => {
-    const target = t.target_type ?? 'any'
-    if (target === 'any') return true
-    if (target === 'pipeline') {
-      // Verifica se o pipeline do contrato bate com o target
-      return displayRun ? t.target_pipeline_id === displayRun.pipeline_id : false
-    }
-    if (target === 'tag') return t.target_tag_id ? currentTagIds.includes(t.target_tag_id) : currentTagIds.includes(t.tag_id)
-    return !t.tag_id || currentTagIds.includes(t.tag_id)
+    try {
+      const target = t.target_type || 'any'
+      if (target === 'any') return true
+      if (target === 'pipeline') {
+        return displayRun ? (t.target_pipeline_id ?? null) === displayRun.pipeline_id : false
+      }
+      if (target === 'tag') {
+        const tagId = t.target_tag_id || t.tag_id
+        return tagId ? currentTagIds.includes(tagId) : true
+      }
+      // contratos/avulso legados
+      if (target === 'contracts') return true
+      if (target === 'avulso') return false
+      return true
+    } catch { return true }
   })
 
   // NOTA DE INCERTEZA: mesmo aviso de sempre — uso o header "host" pra
