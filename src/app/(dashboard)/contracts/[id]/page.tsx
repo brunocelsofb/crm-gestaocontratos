@@ -103,31 +103,47 @@ export default async function ContractDetailPage({
 
   const currentTagIds = (currentContractTags ?? []).map((t: any) => t.tag_id).filter(Boolean)
 
+  // Busca nomes das tags para fallback de comparação por nome
+  let currentTagNames: string[] = []
+  if (currentTagIds.length > 0) {
+    const { data: tagNames } = await supabase.from('tags').select('id, name').in('id', currentTagIds)
+    currentTagNames = (tagNames ?? []).map((t: any) => t.name?.toLowerCase() ?? '')
+  }
+
   // Só mostra formulários sem tag (gerais) ou da MESMA tag do contrato.
   const availableTemplates = (allSurveyTemplates ?? []).filter((t: any) => {
     try {
       const target = t.target_type || 'any'
-
-      // Bloqueia avulso sempre em contratos
       if (target === 'avulso') return false
-
-      // Formulários vinculados a funil específico
       if (target === 'pipeline') {
         return displayRun ? (t.target_pipeline_id ?? null) === displayRun.pipeline_id : false
       }
-
-      // Formulários vinculados a tag
       if (target === 'tag') {
         const tagId = t.target_tag_id || t.tag_id
         return tagId ? currentTagIds.includes(tagId) : false
       }
 
-      // 'any' e 'contracts': se o formulário tem tag_id legado, filtra pela tag
-      if (t.tag_id) return currentTagIds.includes(t.tag_id)
+      // Para 'any' e 'contracts': se contrato tem tags, filtra por nome do template
+      if (currentTagNames.length > 0) {
+        const tName = (t.name ?? '').toLowerCase()
+        const tCategory = (t.category ?? '').toLowerCase()
 
-      // Se o contrato tem tags e o formulário é 'any' sem restrição de tag:
-      // mostra apenas se NÃO há outro formulário com tag específica para este contrato
-      // (para evitar poluir com formulários genéricos quando há pesquisas específicas)
+        // Verifica se o formulário menciona uma tag que NÃO é do contrato
+        const ALL_TAG_KEYWORDS = ['clínica', 'clinica', 'hospitalar', 'predial', 'metrologia', 'avulso']
+        const mentionedKeywords = ALL_TAG_KEYWORDS.filter(kw => tName.includes(kw) || tCategory.includes(kw))
+
+        if (mentionedKeywords.length > 0) {
+          // O formulário menciona alguma especialidade — verifica se bate com o contrato
+          return mentionedKeywords.some(kw =>
+            currentTagNames.some(tagName => tagName.includes(kw))
+          )
+        }
+        // Formulário sem keyword de especialidade → exibe normalmente
+        return true
+      }
+
+      // Contrato sem tags — tag_id legado
+      if (t.tag_id) return currentTagIds.includes(t.tag_id)
       return true
     } catch { return true }
   })
