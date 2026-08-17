@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import { sendCustomSurvey, deletePendingSurveyResponse } from '@/lib/actions/custom-surveys'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
@@ -49,6 +50,20 @@ export function CustomSurveysSection({
   // a resposta já existindo. O filtro por tag só vale pra decidir quais
   // botões de "+ Enviar" aparecem, nunca pra esconder histórico.
   const templateById = new Map(allTemplates.map((t) => [t.id, t]))
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function handleDelete(id: string) {
+    if (!confirm('Deseja realmente excluir esta pesquisa pendente? O link gerado será invalidado.')) return
+    setDeletingId(id)
+    setDeleteError(null)
+    startTransition(async () => {
+      const res = await deletePendingSurveyResponse(id)
+      setDeletingId(null)
+      if (res.error) setDeleteError(res.error)
+    })
+  }
 
   if (templates.length === 0 && sentSurveys.length === 0) {
     return (
@@ -79,6 +94,9 @@ export function CustomSurveysSection({
       </div>
 
       <div className="space-y-2">
+        {deleteError && (
+          <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">{deleteError}</p>
+        )}
         {sentSurveys.map((s) => {
           const link = `${linkBase}/survey/${s.token}`
           const template = templateById.get(s.template_id)
@@ -99,15 +117,12 @@ export function CustomSurveysSection({
                   {isAdmin && (
                     <button
                       type="button"
-                      onClick={async () => {
-                        if (!confirm('Deseja realmente excluir esta pesquisa pendente? O link gerado será invalidado.')) return
-                        const res = await deletePendingSurveyResponse(s.id)
-                        if (res.error) alert(res.error)
-                      }}
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      disabled={deletingId === s.id || isPending}
+                      onClick={() => handleDelete(s.id)}
+                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
                       title="Excluir pesquisa pendente"
                     >
-                      🗑 Excluir
+                      {deletingId === s.id ? 'Excluindo...' : '🗑 Excluir'}
                     </button>
                   )}
                 </div>
