@@ -1,3 +1,5 @@
+'use client'
+
 import { sendCustomSurvey, deletePendingSurveyResponse } from '@/lib/actions/custom-surveys'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
