@@ -180,9 +180,6 @@ export function CustomSurveyForm({ token, questions }: { token: string; question
                 ))}
               </div>
               <div className="flex justify-between text-[11px] font-medium">
-                <span className="text-red-400">Detrator (0-6)</span>
-                <span className="text-amber-400">Neutro (7-8)</span>
-                <span className="text-emerald-500">Promotor (9-10)</span>
               </div>
             </div>
           )}
