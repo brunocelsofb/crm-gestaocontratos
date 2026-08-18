@@ -70,3 +70,23 @@ export function calculateAverageScore(scores: ResponseScore[]): { value: number;
   const avg = valid.reduce((sum, s) => sum + s.value, 0) / valid.length
   return { value: Math.round(avg * 10) / 10, max }
 }
+
+import type { Question } from '@/lib/actions/custom-surveys'
+
+/** Extrai a nota NPS (0-10) de uma resposta, se houver pergunta do tipo nps */
+export function extractNpsScore(questions: Question[], responses: Record<string, string | string[]>): number | null {
+  for (const q of questions) {
+    if (q.type !== 'nps') continue
+    const val = responses[q.id]
+    const n = Number(Array.isArray(val) ? val[0] : val)
+    if (!isNaN(n) && n >= 0 && n <= 10) return n
+  }
+  return null
+}
+
+/** Média NPS de um conjunto de respostas */
+export function averageNpsScore(npsScores: (number | null)[]): number | null {
+  const valid = npsScores.filter((n): n is number => n !== null)
+  if (!valid.length) return null
+  return Math.round((valid.reduce((s, n) => s + n, 0) / valid.length) * 10) / 10
+}

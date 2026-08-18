@@ -7,7 +7,7 @@ import { NpsCharts } from '@/components/dashboard/nps-charts'
 import { ExportReportButton } from '@/components/surveys/export-report-button'
 import { BulkSurveyDispatch } from '@/components/surveys/bulk-survey-dispatch'
 import { calculateNps, categorizeScore } from '@/lib/utils/nps'
-import { calculateResponseScore, calculateAverageScore } from '@/lib/utils/survey-score'
+import { calculateResponseScore, calculateAverageScore, extractNpsScore, averageNpsScore } from '@/lib/utils/survey-score'
 import type { Question } from '@/lib/actions/custom-surveys'
 
 const NPS_CATEGORY_LABELS = { promoter: 'Promotor', passive: 'Neutro', detractor: 'Detrator' } as const
@@ -239,17 +239,15 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
 
   const responsesWithScore = (responses ?? []).map((r: any) => {
     const score = calculateResponseScore(questions, r.responses)
+    const npsScore = extractNpsScore(questions, r.responses ?? {})
     const isDetractor = score
       ? (String(score.scale).toLowerCase() === 'nps' && score.value <= 6) ||
         (String(score.scale).toLowerCase() === 'likert' && score.value <= 2)
-      : false
-    return { ...r, score, isDetractor }
+      : npsScore !== null && npsScore <= 6
+    return { ...r, score, npsScore, isDetractor }
   })
   const averageScore = calculateAverageScore(responsesWithScore.map((r: any) => r.score))
-
-  // Filtro por classificação
-  const searchParams2 = new URLSearchParams()
-  const filterParam = (await (Promise.resolve(undefined) as any))?.filter ?? 'all'
+  const avgNps = averageNpsScore(responsesWithScore.map((r: any) => r.npsScore))
 
   return (
     <div className="space-y-4">
@@ -289,15 +287,34 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
             ))}
           </div>
 
-          {averageScore && (
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Pontuação média</p>
-                <p className="text-lg font-bold text-[#1B556B]">{averageScore.value} / {averageScore.max}</p>
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-gray-400">{selectedTemplate?.name} · {questions.length} pergunta{questions.length !== 1 ? 's' : ''}</p>
-              </div>
+          {(averageScore || avgNps !== null) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {averageScore && (
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Pontuação média (Likert)</p>
+                    <p className="text-lg font-bold text-[#1B556B]">{averageScore.value} / {averageScore.max}</p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400">{selectedTemplate?.name} · {questions.length} pergunta{questions.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              )}
+              {avgNps !== null && (
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Média NPS do formulário</p>
+                    <p className={`text-lg font-bold ${avgNps <= 6 ? 'text-red-600' : avgNps <= 8 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                      {avgNps} / 10
+                    </p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400">
+                      {avgNps <= 6 ? '⚠️ Zona de risco' : avgNps <= 8 ? '😐 Zona neutra' : '✓ Zona de excelência'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -325,22 +342,19 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
               {responsesWithScore.map((r: any) => {
                 const contract = contractById.get(r.contract_id)
                 const inTime = !r.expires_at || new Date(r.answered_at) <= new Date(r.expires_at)
-                const badgeClass = r.isDetractor
-                  ? 'bg-red-600 text-white'
-                  : r.score && r.score.value >= 4 ? 'bg-green-100 text-green-800' : 'bg-blue-50 text-blue-700'
-                const badgeLabel = r.isDetractor
-                  ? `🚨 ${r.score ? `${String(r.score.scale).toLowerCase() === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max} (Detrator - Atenção)` : 'Atenção'}`
-                  : r.score ? `${String(r.score.scale).toLowerCase() === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max}` : ''
+                const likertBadge = r.score
+                  ? { label: r.isDetractor ? `🚨 Satisfação ${r.score.value}/${r.score.max} (Atenção)` : `Satisfação ${r.score.value}/${r.score.max}`, cls: r.isDetractor ? 'bg-red-600 text-white' : r.score.value >= 4 ? 'bg-green-100 text-green-800' : 'bg-blue-50 text-blue-700' }
+                  : null
+                const npsBadge = r.npsScore !== null
+                  ? { label: `NPS: ${r.npsScore}/10 · ${r.npsScore <= 6 ? 'Detrator' : r.npsScore <= 8 ? 'Neutro' : 'Promotor'}`, cls: r.npsScore <= 6 ? 'bg-red-600 text-white' : r.npsScore <= 8 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }
+                  : null
                 return (
                   <ExpandableRow key={r.id} summary={
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-gray-900">{r.respondent_name}</span>
-                        {badgeLabel && (
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
-                            {badgeLabel}
-                          </span>
-                        )}
+                        {likertBadge && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${likertBadge.cls}`}>{likertBadge.label}</span>}
+                        {npsBadge && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${npsBadge.cls}`}>{npsBadge.label}</span>}
                         {!inTime && <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-50 text-amber-700">Fora do prazo</span>}
                       </div>
                       <p className="text-xs text-gray-400">
