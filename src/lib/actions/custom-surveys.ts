@@ -228,7 +228,7 @@ export async function submitCustomSurveyResponse(
         // Cria tarefa no plano de ação do contrato
         await adminClient.from('action_plan_items').insert({
           contract_id: surveyFull.contract_id,
-          description: `🚨 TRATATIVA DE DETRATOR: ${respondentName} respondeu nota ${lowestScore}. Entre em contato em até 24 horas para entender os pontos de insatisfação.`,
+          description: `🚨 TRATATIVA DE DETRATOR: ${respondent_name || 'Cliente'} respondeu nota ${lowestScore}. Entre em contato em até 24 horas para entender os pontos de insatisfação.`,
           responsible_department: 'Comercial',
           status: 'pending',
         })
