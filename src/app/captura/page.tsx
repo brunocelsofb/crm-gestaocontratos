@@ -10,12 +10,12 @@ export default async function PublicCapturePage({ searchParams }: { searchParams
   const admin = createAdminClient()
   const { data: settings } = await admin
     .from('organization_settings')
-    .select('support_bg_url, logo_storage_path, company_name')
+    .select('support_bg_url, lead_bg_url, logo_storage_path, company_name')
     .eq('id', 'default')
     .maybeSingle()
 
   const rawLogo = settings?.logo_storage_path
-  const rawBg   = settings?.support_bg_url  // reutiliza o mesmo wallpaper de suporte
+  const rawBg   = (settings as any)?.lead_bg_url || settings?.support_bg_url
 
   let finalLogoUrl: string | null = null
   if (rawLogo && rawLogo.trim() && rawLogo !== 'null') {
@@ -40,7 +40,7 @@ export default async function PublicCapturePage({ searchParams }: { searchParams
       }} />
 
       <main className="min-h-screen w-full flex flex-col items-center justify-start py-12 px-4">
-        <div className="w-full max-w-md flex flex-col gap-5">
+        <div className="w-full max-w-2xl flex flex-col gap-5">
 
           {/* Card com cabeçalho ORBIS */}
           <div className="w-full rounded-2xl bg-white/97 shadow-2xl overflow-hidden">

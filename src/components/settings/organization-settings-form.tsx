@@ -17,6 +17,7 @@ export function OrganizationSettingsForm({
   currentBrandColor,
   currentAssistantBudget,
   currentSupportBgUrl,
+  currentLeadBgUrl,
   currentNpsBgUrl,
   currentSurveyClinicaBgUrl,
   currentSurveyHospitalarBgUrl,
@@ -30,6 +31,7 @@ export function OrganizationSettingsForm({
   currentBrandColor: string
   currentAssistantBudget: number
   currentSupportBgUrl?: string | null
+  currentLeadBgUrl?: string | null
   currentNpsBgUrl?: string | null
   currentSurveyClinicaBgUrl?: string | null
   currentSurveyHospitalarBgUrl?: string | null
@@ -43,6 +45,10 @@ export function OrganizationSettingsForm({
   const [uploadingBg, setUploadingBg] = useState(false)
   const [bgError, setBgError] = useState<string | null>(null)
   const [bgPath, setBgPath] = useState(currentSupportBgUrl ?? null)
+  const leadBgRef = useRef<HTMLInputElement>(null)
+  const [leadBg, setLeadBg] = useState(currentLeadBgUrl ?? null)
+  const [uploadingLeadBg, setUploadingLeadBg] = useState(false)
+  const [leadBgError, setLeadBgError] = useState<string | null>(null)
 
   // Helper genérico de upload para wallpapers públicos
   async function uploadPublicAsset(
@@ -266,6 +272,17 @@ export function OrganizationSettingsForm({
             Tamanho recomendado: 1920×1080 pixels (Full HD). Formato JPG ou PNG. Máximo de 2MB para garantir carregamento rápido.
           </p>
           {bgError && <p className="mt-1 text-xs text-red-600">{bgError}</p>}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de Leads (/captura)</label>
+          {(leadBg || currentLeadBgUrl) && <div className="mt-2 mb-2 w-full h-24 rounded-lg overflow-hidden border border-gray-200"><img src={(leadBg || currentLeadBgUrl)!} alt="lead bg" className="w-full h-full object-cover" /></div>}
+          <div className="flex items-center gap-2 mt-1">
+            <input ref={leadBgRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" disabled={uploadingLeadBg} onClick={() => { const f = leadBgRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'lead-bg', 'lead_bg_url', setUploadingLeadBg, setLeadBgError, setLeadBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingLeadBg ? 'Enviando...' : 'Enviar imagem'}</button>
+          </div>
+          {leadBgError && <p className="mt-1 text-xs text-red-600">{leadBgError}</p>}
+          <p className="text-xs text-gray-500 mt-1">Se não configurado, usa o wallpaper do formulário de suporte como fallback.</p>
+        </div>
           {(bgPath ?? currentSupportBgUrl) && !uploadingBg && <p className="mt-1 text-xs text-green-600">✓ Wallpaper configurado</p>}
         </div>
 
