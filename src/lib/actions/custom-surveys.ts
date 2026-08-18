@@ -224,18 +224,14 @@ export async function submitCustomSurveyResponse(
       }
 
       if (isDetractor && surveyFull.contract_id) {
-        const now = new Date()
-        const deadline = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
 
         // Cria tarefa no plano de ação do contrato
         await adminClient.from('action_plan_items').insert({
           contract_id: surveyFull.contract_id,
-          title: `Tratar feedback insatisfeito do cliente (Nota: ${lowestScore}) — Prazo: 24h`,
-          due_date: deadline,
+          description: `🚨 TRATATIVA DE DETRATOR: ${respondentName} respondeu nota ${lowestScore}. Entre em contato em até 24 horas para entender os pontos de insatisfação.`,
+          responsible_department: 'Comercial',
           status: 'pending',
-          priority: 'high',
-          source: 'survey_detractor',
-        }).select().maybeSingle()
+        })
 
         // Cria notificação para o responsável
         const { data: contract } = await adminClient
