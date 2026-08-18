@@ -240,7 +240,8 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
   const responsesWithScore = (responses ?? []).map((r: any) => {
     const score = calculateResponseScore(questions, r.responses)
     const isDetractor = score
-      ? (score.scale === 'nps' && score.value <= 6) || (score.scale === 'likert' && score.value <= 2)
+      ? (String(score.scale).toLowerCase() === 'nps' && score.value <= 6) ||
+        (String(score.scale).toLowerCase() === 'likert' && score.value <= 2)
       : false
     return { ...r, score, isDetractor }
   })
@@ -328,8 +329,8 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
                   ? 'bg-red-600 text-white'
                   : r.score && r.score.value >= 4 ? 'bg-green-100 text-green-800' : 'bg-blue-50 text-blue-700'
                 const badgeLabel = r.isDetractor
-                  ? `🚨 ${r.score ? `${r.score.scale === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max} (Detrator - Atenção)` : 'Atenção'}`
-                  : r.score ? `${r.score.scale === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max}` : ''
+                  ? `🚨 ${r.score ? `${String(r.score.scale).toLowerCase() === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max} (Detrator - Atenção)` : 'Atenção'}`
+                  : r.score ? `${String(r.score.scale).toLowerCase() === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max}` : ''
                 return (
                   <ExpandableRow key={r.id} summary={
                     <div>
