@@ -272,3 +272,54 @@ export async function deletePendingSurveyResponse(surveyId: string): Promise<{ e
     return { error: e?.message ?? 'Erro desconhecido ao excluir.' }
   }
 }
+
+export async function sendBulkSurvey(
+  templateId: string,
+  tagFilter: string, // 'all' ou UUID de tag
+  expiresAt: string
+): Promise<{ sent?: number; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Não autenticado.' }
+
+    const admin = createAdminClient()
+
+    // Busca contratos ativos (com pipeline_run aberta no funil de gestão_contratos)
+    const { data: openRuns } = await admin
+      .from('pipeline_runs')
+      .select('contract_id')
+      .eq('status', 'open')
+
+    let contractIds = [...new Set((openRuns ?? []).map((r: any) => r.contract_id).filter(Boolean))]
+
+    // Filtra por tag se necessário
+    if (tagFilter !== 'all') {
+      const { data: taggedContracts } = await admin
+        .from('contract_tags')
+        .select('contract_id')
+        .eq('tag_id', tagFilter)
+        .in('contract_id', contractIds)
+      contractIds = (taggedContracts ?? []).map((r: any) => r.contract_id)
+    }
+
+    if (contractIds.length === 0) return { error: 'Nenhum contrato ativo encontrado com esse filtro.' }
+
+    // Insere uma pesquisa por contrato
+    const inserts = contractIds.map(contractId => ({
+      contract_id: contractId,
+      template_id: templateId,
+      token: crypto.randomUUID(),
+      created_by: user.id,
+      expires_at: expiresAt,
+    }))
+
+    const { error } = await admin.from('custom_surveys').insert(inserts)
+    if (error) return { error: error.message }
+
+    revalidatePath('/surveys-dashboard')
+    return { sent: inserts.length }
+  } catch (e: any) {
+    return { error: e?.message ?? 'Erro ao disparar pesquisas.' }
+  }
+}
