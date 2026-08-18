@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { sendCustomSurvey, deletePendingSurveyResponse } from '@/lib/actions/custom-surveys'
+import { SurveyShareButtons } from './survey-share-buttons'
 import { CopyLinkButton } from '@/components/nps/copy-link-button'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
 import { calculateResponseScore } from '@/lib/utils/survey-score'
@@ -173,6 +174,13 @@ export function CustomSurveysSection({
                 <div className="mt-2 flex items-center gap-2">
                   <input readOnly value={link} className="flex-1 truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500" />
                   {!isExpired && <CopyLinkButton link={link} />}
+                  {!isExpired && (
+                    <SurveyShareButtons
+                      link={link}
+                      expiresAt={s.expires_at}
+                      surveyName={templateName}
+                    />
+                  )}
                   {isAdmin && (
                     <button type="button" disabled={deletingId === s.id || isPending}
                       onClick={() => handleDelete(s.id)}

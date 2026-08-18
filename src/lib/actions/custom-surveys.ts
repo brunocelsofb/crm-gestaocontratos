@@ -192,6 +192,75 @@ export async function submitCustomSurveyResponse(
 
   if (error) return { error: error.message }
 
+  // Tratativa automática de detratores
+  try {
+    // Busca template para analisar as respostas
+    const { data: surveyFull } = await adminClient
+      .from('custom_surveys')
+      .select('contract_id, template_id')
+      .eq('id', survey.id)
+      .maybeSingle()
+
+    if (surveyFull) {
+      const { data: template } = await adminClient
+        .from('survey_templates')
+        .select('questions')
+        .eq('id', surveyFull.template_id)
+        .maybeSingle()
+
+      const questions = (template?.questions ?? []) as Question[]
+
+      // Detecta notas baixas: NPS 0-6, Likert 1-2, yesno "Não"
+      let isDetractor = false
+      let lowestScore: string | null = null
+
+      for (const q of questions) {
+        const answer = responses[q.id]
+        const val = Array.isArray(answer) ? answer[0] : answer
+        if (!val) continue
+        if (q.type === 'nps' && Number(val) <= 6) { isDetractor = true; lowestScore = val }
+        if (q.type === 'likert' && Number(val) <= 2) { isDetractor = true; lowestScore = val }
+        if (q.type === 'yesno' && val === 'Não') { isDetractor = true; lowestScore = 'Não' }
+      }
+
+      if (isDetractor && surveyFull.contract_id) {
+        const now = new Date()
+        const deadline = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+
+        // Cria tarefa no plano de ação do contrato
+        await adminClient.from('action_plan_items').insert({
+          contract_id: surveyFull.contract_id,
+          title: `Tratar feedback insatisfeito do cliente (Nota: ${lowestScore}) — Prazo: 24h`,
+          due_date: deadline,
+          status: 'pending',
+          priority: 'high',
+          source: 'survey_detractor',
+        }).select().maybeSingle()
+
+        // Cria notificação para o responsável
+        const { data: contract } = await adminClient
+          .from('contracts')
+          .select('owner_id, client_name')
+          .eq('id', surveyFull.contract_id)
+          .maybeSingle()
+
+        if (contract?.owner_id) {
+          await adminClient.from('notifications').insert({
+            user_id: contract.owner_id,
+            title: '⚠️ Detrator identificado',
+            body: `${respondent_name} (${contract.client_name}) avaliou com nota ${lowestScore}. Ação necessária em 24h.`,
+            type: 'detractor_alert',
+            contract_id: surveyFull.contract_id,
+            read: false,
+          })
+        }
+      }
+    }
+  } catch (e) {
+    // Não bloqueia o fluxo principal se a tratativa falhar
+    console.error('[detractor] erro ao processar:', e)
+  }
+
   return { success: true }
 }
 

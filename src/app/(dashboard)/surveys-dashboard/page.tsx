@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { PeriodSelector } from '@/components/dashboard/period-selector'
 import { ExpandableRow } from '@/components/surveys/expandable-row'
 import { NpsCharts } from '@/components/dashboard/nps-charts'
-import { BulkSurveyDispatch } from '@/components/surveys/bulk-survey-dispatch'
+import { ExportReportButton } from '@/components/surveys/export-report-button'
 import { calculateNps, categorizeScore } from '@/lib/utils/nps'
 import { calculateResponseScore, calculateAverageScore } from '@/lib/utils/survey-score'
 import type { Question } from '@/lib/actions/custom-surveys'
@@ -41,9 +41,15 @@ export default async function SurveysDashboardPage({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Pesquisas & NPS</h1>
-          <p className="text-sm text-gray-500">Satisfação dos clientes consolidada por período.</p>
+          <p className="text-sm text-gray-500">Satisfação dos clientes consolidada por período. <span className="print:inline hidden font-medium text-[#1B556B]">Período: {from} a {to}</span></p>
         </div>
-        {/* BulkSendNpsButton removido — disparos via aba Pesquisas Customizadas */}
+        <ExportReportButton from={from} to={to} tab={tab} />
+      </div>
+
+      {/* Cabeçalho visível apenas na impressão */}
+      <div className="hidden print:block border-b-4 border-[#E98C5F] pb-4 mb-4">
+        <h1 className="text-2xl font-bold text-[#1B556B]">Relatório de Satisfação — ORBIS Engenharia</h1>
+        <p className="text-sm text-gray-500">Período: {from} a {to} · Gerado em {new Date().toLocaleDateString('pt-BR')}</p>
       </div>
 
       {/* Tabs */}
