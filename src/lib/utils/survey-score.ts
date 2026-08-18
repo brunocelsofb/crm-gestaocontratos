@@ -71,8 +71,6 @@ export function calculateAverageScore(scores: ResponseScore[]): { value: number;
   return { value: Math.round(avg * 10) / 10, max }
 }
 
-import type { Question } from '@/lib/actions/custom-surveys'
-
 /** Extrai a nota NPS (0-10) de uma resposta, se houver pergunta do tipo nps */
 export function extractNpsScore(questions: Question[], responses: Record<string, string | string[]>): number | null {
   for (const q of questions) {
