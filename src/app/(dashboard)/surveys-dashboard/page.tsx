@@ -201,25 +201,32 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
   const selectedTemplate = templates?.find(t => t.id === templateId)
   const questions = (selectedTemplate?.questions ?? []) as Question[]
 
-  // Engajamento: todas as pesquisas deste template no período (pendentes + respondidas + expiradas)
+  // KPIs: busca TODOS os disparos do template (sem filtro de data no disparo)
+  // e filtra respondidas pelo período de answered_at
   const { data: allDispatched } = templateId
     ? await admin.from('custom_surveys')
         .select('id, status, answered_at, expires_at, contract_id')
         .eq('template_id', templateId)
-        .gte('created_at', `${from}T00:00:00`)
-        .lte('created_at', `${to}T23:59:59`)
     : { data: [] as any[] }
 
   const now = new Date()
+  const fromDate = new Date(`${from}T00:00:00`)
+  const toDate = new Date(`${to}T23:59:59`)
+
   const totalSent = (allDispatched ?? []).length
   const answered = (allDispatched ?? []).filter((s: any) => s.status === 'answered')
-  // Respondidas dentro do prazo (se tiver expires_at)
-  const answeredInTime = answered.filter((s: any) =>
+  // Respondidas dentro do período de answered_at
+  const answeredInPeriod = answered.filter((s: any) => {
+    if (!s.answered_at) return false
+    const d = new Date(s.answered_at)
+    return d >= fromDate && d <= toDate
+  })
+  const answeredInTime = answeredInPeriod.filter((s: any) =>
     !s.expires_at || new Date(s.answered_at) <= new Date(s.expires_at)
   )
   const pending = (allDispatched ?? []).filter((s: any) => s.status === 'pending' && (!s.expires_at || new Date(s.expires_at) >= now))
   const expired = (allDispatched ?? []).filter((s: any) => s.status === 'pending' && s.expires_at && new Date(s.expires_at) < now)
-  const responseRate = totalSent > 0 ? Math.round((answered.length / totalSent) * 100) : 0
+  const responseRate = totalSent > 0 ? Math.round((answeredInPeriod.length / totalSent) * 100) : 0
 
   // Respostas para exibição detalhada
   const { data: responses } = templateId
@@ -230,8 +237,18 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
   const { data: contracts } = contractIds.length ? await supabase.from('contracts').select('id, client_name, process_number').in('id', contractIds) : { data: [] as any[] }
   const contractById = new Map((contracts ?? []).map((c: any) => [c.id, c]))
 
-  const responsesWithScore = (responses ?? []).map((r: any) => ({ ...r, score: calculateResponseScore(questions, r.responses) }))
+  const responsesWithScore = (responses ?? []).map((r: any) => {
+    const score = calculateResponseScore(questions, r.responses)
+    const isDetractor = score
+      ? (score.scale === 'nps' && score.value <= 6) || (score.scale === 'likert' && score.value <= 2)
+      : false
+    return { ...r, score, isDetractor }
+  })
   const averageScore = calculateAverageScore(responsesWithScore.map((r: any) => r.score))
+
+  // Filtro por classificação
+  const searchParams2 = new URLSearchParams()
+  const filterParam = (await (Promise.resolve(undefined) as any))?.filter ?? 'all'
 
   return (
     <div className="space-y-4">
@@ -258,8 +275,8 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
           {/* KPIs de engajamento */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Enviadas', value: totalSent, sub: 'no período', color: '#1B556B' },
-              { label: 'Respondidas', value: answered.length, sub: `${answeredInTime.length} dentro do prazo`, color: '#32AF9D' },
+              { label: 'Enviadas', value: totalSent, sub: 'total de disparos', color: '#1B556B' },
+              { label: 'Respondidas', value: answeredInPeriod.length, sub: `${answeredInTime.length} dentro do prazo`, color: '#32AF9D' },
               { label: 'Taxa de resposta', value: `${responseRate}%`, sub: 'respondidas / enviadas', color: responseRate >= 70 ? '#1a7c3e' : responseRate >= 40 ? '#92400e' : '#b91c1c' },
               { label: 'Pendentes / Expiradas', value: `${pending.length} / ${expired.length}`, sub: 'aguardando · vencidas', color: '#8892a4' },
             ].map(k => (
@@ -283,7 +300,21 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
             </div>
           )}
 
-          {/* Lista de respostas */}
+          {/* Filtros rápidos */}
+          <div className="flex gap-1.5 flex-wrap">
+            {[
+              { value: 'all', label: 'Todas as respostas' },
+              { value: 'detractor', label: '🚨 Detratores' },
+              { value: 'promoter', label: '✓ Promotores' },
+            ].map(f => (
+              <a key={f.value}
+                href={`/surveys-dashboard?tab=surveys&template=${templateId}&from=${from}&to=${to}&filter=${f.value}`}
+                className="rounded-full px-3 py-0.5 text-xs border no-underline transition-colors bg-white border-gray-200 text-gray-600 hover:border-gray-400">
+                {f.label}
+              </a>
+            ))}
+          </div>
+
           <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-medium text-gray-900">Respostas individuais</p>
@@ -293,12 +324,22 @@ async function SurveysTab({ supabase, from, to, selectedTemplateId }: {
               {responsesWithScore.map((r: any) => {
                 const contract = contractById.get(r.contract_id)
                 const inTime = !r.expires_at || new Date(r.answered_at) <= new Date(r.expires_at)
+                const badgeClass = r.isDetractor
+                  ? 'bg-red-600 text-white'
+                  : r.score && r.score.value >= 4 ? 'bg-green-100 text-green-800' : 'bg-blue-50 text-blue-700'
+                const badgeLabel = r.isDetractor
+                  ? `🚨 ${r.score ? `${r.score.scale === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max} (Detrator - Atenção)` : 'Atenção'}`
+                  : r.score ? `${r.score.scale === 'nps' ? 'NPS' : 'Satisfação'} ${r.score.value}/${r.score.max}` : ''
                 return (
                   <ExpandableRow key={r.id} summary={
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-gray-900">{r.respondent_name}</span>
-                        {r.score && <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-700">{r.score.scale === 'likert' ? 'Satisfação' : 'Nota'} {r.score.value}/{r.score.max}</span>}
+                        {badgeLabel && (
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
+                            {badgeLabel}
+                          </span>
+                        )}
                         {!inTime && <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-50 text-amber-700">Fora do prazo</span>}
                       </div>
                       <p className="text-xs text-gray-400">
