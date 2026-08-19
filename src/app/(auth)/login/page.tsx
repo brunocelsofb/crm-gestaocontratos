@@ -4,11 +4,11 @@ import { LoginForm } from './login-form'
 export const dynamic = 'force-dynamic'
 
 export default async function LoginPage() {
-  const { wallpaperUrl, bgColor, logoUrl, companyName } = await getPublicBranding()
+  const { wallpaperUrl, loginBgUrl, bgColor, logoUrl, companyName } = await getPublicBranding()
 
   const bgStyle = {
     backgroundColor: bgColor,
-    backgroundImage: wallpaperUrl ? `url('${wallpaperUrl}')` : undefined,
+    backgroundImage: (loginBgUrl || wallpaperUrl) ? `url('${loginBgUrl || wallpaperUrl}')` : undefined,
     backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
   }
 

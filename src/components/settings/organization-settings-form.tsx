@@ -18,6 +18,7 @@ export function OrganizationSettingsForm({
   currentAssistantBudget,
   currentSupportBgUrl,
   currentBgColor = '#1B556B',
+  currentLoginBgUrl,
   currentLeadBgUrl,
   currentNpsBgUrl,
   currentSurveyClinicaBgUrl,
@@ -33,6 +34,7 @@ export function OrganizationSettingsForm({
   currentAssistantBudget: number
   currentSupportBgUrl?: string | null
   currentBgColor?: string
+  currentLoginBgUrl?: string | null
   currentLeadBgUrl?: string | null
   currentNpsBgUrl?: string | null
   currentSurveyClinicaBgUrl?: string | null
@@ -49,6 +51,10 @@ export function OrganizationSettingsForm({
   const [bgPath, setBgPath] = useState(currentSupportBgUrl ?? null)
   const [bgColor, setBgColorState] = useState(currentBgColor ?? '#1B556B')
   const [savingColor, setSavingColor] = useState(false)
+  const loginBgRef = useRef<HTMLInputElement>(null)
+  const [loginBg, setLoginBg] = useState(currentLoginBgUrl ?? null)
+  const [uploadingLoginBg, setUploadingLoginBg] = useState(false)
+  const [loginBgError, setLoginBgError] = useState<string | null>(null)
   const leadBgRef = useRef<HTMLInputElement>(null)
   const [leadBg, setLeadBg] = useState(currentLeadBgUrl ?? null)
   const [uploadingLeadBg, setUploadingLeadBg] = useState(false)
@@ -264,6 +270,19 @@ export function OrganizationSettingsForm({
         <input type="hidden" name="proposal_brand_color" value={currentBrandColor} />
 
         <div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper da Tela de Login (/login)</label>
+          {(loginBg || currentLoginBgUrl) && <div className="mt-2 mb-2 w-full h-24 rounded-lg overflow-hidden border border-gray-200"><img src={(loginBg || currentLoginBgUrl)!} alt="login bg" className="w-full h-full object-cover" /></div>}
+          <div className="flex items-center gap-2 mt-1">
+            <input ref={loginBgRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+            <button type="button" disabled={uploadingLoginBg} onClick={() => { const f = loginBgRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'login-bg', 'login_bg_url', setUploadingLoginBg, setLoginBgError, setLoginBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingLoginBg ? 'Enviando...' : 'Enviar imagem'}</button>
+            {(loginBg || currentLoginBgUrl) && <button type="button" onClick={() => removeWallpaper('login_bg_url', () => setLoginBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
+          </div>
+          {loginBgError && <p className="mt-1 text-xs text-red-600">{loginBgError}</p>}
+          <p className="text-xs text-gray-500 mt-1">Se não configurado, usa o wallpaper de suporte como fallback.</p>
+        </div>
+
           <label className="block text-sm font-medium text-gray-700">🎨 Cor de fundo (fallback sem wallpaper)</label>
           <div className="flex items-center gap-3 mt-1">
             <input type="color" value={bgColor} onChange={e => setBgColorState(e.target.value)}

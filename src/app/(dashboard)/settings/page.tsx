@@ -121,6 +121,7 @@ export default async function SettingsPage() {
           currentNpsBgUrl={(settings as any)?.nps_bg_url ?? null}
           currentSurveyClinicaBgUrl={(settings as any)?.survey_clinica_bg_url ?? null}
           currentSurveyHospitalarBgUrl={(settings as any)?.survey_hospitalar_bg_url ?? null}
+          currentLoginBgUrl={(settings as any)?.login_bg_url ?? null}
           currentLeadBgUrl={(settings as any)?.lead_bg_url ?? null}
           currentBgColor={(settings as any)?.public_bg_color ?? '#1B556B'}
         />
