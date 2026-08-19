@@ -58,8 +58,7 @@ export default async function DashboardLayout({
           <img
             src={sidebarLogoUrl}
             alt={orgName}
-            className="h-6 w-auto object-contain"
-            onError={undefined}
+            className="h-6 w-auto object-contain brightness-0 invert"
           />
           <span className="truncate text-sm font-medium text-white">{orgName}</span>
         </div>
