@@ -54,7 +54,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="flex w-56 shrink-0 flex-col bg-brand-800 p-4">
-        <div className="mb-8 flex items-center justify-center px-1 pt-2">
+        <div className="mb-6 flex justify-center py-4">
           <img
             src={sidebarLogoUrl}
             alt={orgName}
