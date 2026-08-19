@@ -6,7 +6,7 @@ type PriceUser = {
   id: string
   email: string
   full_name: string
-  role: 'admin' | 'reviewer'
+  role: 'admin' | 'editor' | 'reviewer'
   created_at: string
   is_banned?: boolean
 }
@@ -113,7 +113,8 @@ export default function PriceUsersPage() {
               <label style={{ fontSize: 11, color: '#8892a4', display: 'block', marginBottom: 4 }}>Perfil *</label>
               <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={{ ...inp, cursor: 'pointer' }}>
                 <option value="reviewer">👁 Somente leitura (Aprovador)</option>
-                <option value="admin">✏️ Editor (Precificador)</option>
+                <option value="editor">✏️ Editor (Precificador)</option>
+                <option value="admin">⚙️ Admin</option>
               </select>
             </div>
           </div>
@@ -153,7 +154,8 @@ export default function PriceUsersPage() {
                     <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
                       style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '0.5px solid #d1d8e8', background: '#fff', cursor: 'pointer' }}>
                       <option value="reviewer">👁 Somente leitura</option>
-                      <option value="admin">✏️ Editor</option>
+                      <option value="editor">✏️ Editor</option>
+                      <option value="admin">⚙️ Admin</option>
                     </select>
                     {savedId === u.id && (
                       <span style={{ fontSize: 11, color: '#1a7c3e', fontWeight: 500 }}>✅ Salvo</span>

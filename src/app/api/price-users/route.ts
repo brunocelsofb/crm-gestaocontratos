@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   }
 
   // Garante valores aceitos pela constraint price_profiles_role_check
-  const validPriceRoles = ['admin', 'reviewer']
+  const validPriceRoles = ['admin', 'editor', 'reviewer']
   const safeRole = validPriceRoles.includes(role) ? role : 'reviewer'
 
   try {
@@ -94,7 +94,7 @@ export async function PATCH(req: Request) {
   }
 
   // Garante valores aceitos pela constraint price_profiles_role_check
-  const validPriceRoles = ['admin', 'reviewer']
+  const validPriceRoles = ['admin', 'editor', 'reviewer']
   const safeRole = validPriceRoles.includes(role) ? role : 'reviewer'
 
   // Atualiza o price_profiles
