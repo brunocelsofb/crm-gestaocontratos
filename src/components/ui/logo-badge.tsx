@@ -3,17 +3,25 @@
 import { useState } from 'react'
 
 export function LogoBadge({ src }: { src?: string }) {
-  const [hasError, setHasError] = useState(false)
+  const fallback = '/drone.png'
+  const [imgSrc, setImgSrc] = useState(src || fallback)
+  const [failed, setFailed] = useState(false)
 
-  if (!src || hasError) return null
+  if (!src && failed) return null
 
   return (
     <div className="flex-shrink-0 flex items-center justify-center">
       <img
-        src={src}
-        alt="Logo ORBIS"
+        src={imgSrc}
+        alt="Logo"
         className="h-8 md:h-10 w-auto object-contain"
-        onError={() => setHasError(true)}
+        onError={() => {
+          if (imgSrc !== fallback) {
+            setImgSrc(fallback)
+          } else {
+            setFailed(true)
+          }
+        }}
       />
     </div>
   )

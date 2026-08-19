@@ -32,20 +32,35 @@ export default async function DashboardLayout({
 
   const { data: orgSettings } = await supabase
     .from('organization_settings')
-    .select('name')
+    .select('name, logo_storage_path')
     .eq('id', 'default')
     .maybeSingle()
 
   const isAdmin = profile?.role === 'admin'
-  const orgName = orgSettings?.name ?? 'Contract CRM'
+  const orgName = orgSettings?.name ?? 'DRONE'
+
+  // Logo dinâmica: storage path -> URL pública, fallback /drone.png
+  const adminSupa = (await import('@/lib/supabase/admin')).createAdminClient()
+  const rawLogo = (orgSettings as any)?.logo_storage_path
+  let sidebarLogoUrl = '/drone.png'
+  if (rawLogo && rawLogo.trim() && rawLogo !== 'null') {
+    if (rawLogo.startsWith('http')) { sidebarLogoUrl = rawLogo }
+    else {
+      const { data } = adminSupa.storage.from('public-assets').getPublicUrl(rawLogo)
+      sidebarLogoUrl = data.publicUrl
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="flex w-56 shrink-0 flex-col bg-brand-800 p-4">
         <div className="mb-8 flex items-center gap-2 px-1">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-positive-600 text-xs font-medium text-brand-900">
-            C
-          </div>
+          <img
+            src={sidebarLogoUrl}
+            alt={orgName}
+            className="h-6 w-auto object-contain"
+            onError={undefined}
+          />
           <span className="truncate text-sm font-medium text-white">{orgName}</span>
         </div>
         <div className="flex-1">

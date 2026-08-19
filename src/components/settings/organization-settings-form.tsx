@@ -158,8 +158,8 @@ export function OrganizationSettingsForm({
   return (
     <div className="max-w-md space-y-6">
       <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <label className="block text-sm font-medium text-gray-700">Logo da empresa</label>
-        <p className="mt-0.5 text-xs text-gray-400">Usado no cabeçalho do PDF das propostas comerciais.</p>
+        <label className="block text-sm font-medium text-gray-700">Logo da empresa (White Label)</label>
+        <p className="mt-0.5 text-xs text-gray-400">Aparece no login, formulários públicos e propostas. Sem logo configurada, usa a logo DRONE como padrão.</p>
         {logoPath && (
           <img
             src={logoPath.startsWith('http') ? logoPath : `/api/settings/logo?path=${encodeURIComponent(logoPath)}`}
