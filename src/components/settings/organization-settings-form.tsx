@@ -308,6 +308,7 @@ export function OrganizationSettingsForm({
           <div className="flex items-center gap-2 mt-1">
             <input ref={leadBgRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" disabled={uploadingLeadBg} onClick={() => { const f = leadBgRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'lead-bg', 'lead_bg_url', setUploadingLeadBg, setLeadBgError, setLeadBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingLeadBg ? 'Enviando...' : 'Enviar imagem'}</button>
+            {(leadBg || currentLeadBgUrl) && <button type="button" onClick={() => removeWallpaper('lead_bg_url', () => setLeadBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
           </div>
           {leadBgError && <p className="mt-1 text-xs text-red-600">{leadBgError}</p>}
           <p className="text-xs text-gray-500 mt-1">Se não configurado, usa o wallpaper do formulário de suporte como fallback.</p>
@@ -322,6 +323,7 @@ export function OrganizationSettingsForm({
           <div className="flex items-center gap-2 mt-1">
             <input ref={npsRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" disabled={uploadingNps} onClick={() => { const f = npsRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'nps-bg', 'nps_bg_url', setUploadingNps, setNpsErr, setNpsBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingNps ? 'Enviando...' : 'Enviar imagem'}</button>
+            {(npsBg || currentNpsBgUrl) && <button type="button" onClick={() => removeWallpaper('nps_bg_url', () => setNpsBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
           </div>
           {npsErr && <p className="mt-1 text-xs text-red-600">{npsErr}</p>}
         </div>
@@ -333,6 +335,7 @@ export function OrganizationSettingsForm({
           <div className="flex items-center gap-2 mt-1">
             <input ref={clinicaRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" disabled={uploadingClinica} onClick={() => { const f = clinicaRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'survey-clinica', 'survey_clinica_bg_url', setUploadingClinica, setClinicaErr, setClinicaBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingClinica ? 'Enviando...' : 'Enviar imagem'}</button>
+            {(clinicaBg || currentClinicaBgUrl) && <button type="button" onClick={() => removeWallpaper('survey_clinica_bg_url', () => setClinicaBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
           </div>
           {clinicaErr && <p className="mt-1 text-xs text-red-600">{clinicaErr}</p>}
         </div>
@@ -344,6 +347,7 @@ export function OrganizationSettingsForm({
           <div className="flex items-center gap-2 mt-1">
             <input ref={hospitalarRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" disabled={uploadingHospitalar} onClick={() => { const f = hospitalarRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'survey-hospitalar', 'survey_hospitalar_bg_url', setUploadingHospitalar, setHospitalarErr, setHospitalarBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingHospitalar ? 'Enviando...' : 'Enviar imagem'}</button>
+            {(hospitalarBg || currentHospitalarBgUrl) && <button type="button" onClick={() => removeWallpaper('survey_hospitalar_bg_url', () => setHospitalarBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
           </div>
           {hospitalarErr && <p className="mt-1 text-xs text-red-600">{hospitalarErr}</p>}
           <p className="text-xs text-gray-500 mt-1">Recomendado: 1920×1080px, JPG/PNG/WebP, máx 2MB.</p>

@@ -36,12 +36,35 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Coluna não permitida' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { error } = await admin.from('organization_settings').update({ [column]: null }).eq('id', 'default')
+
+  // Busca a URL atual para apagar do Storage
+  const { data: settings } = await admin
+    .from('organization_settings')
+    .select(column)
+    .eq('id', 'default')
+    .maybeSingle()
+
+  const currentUrl: string | null = settings?.[column as keyof typeof settings] as string | null
+
+  // Apaga do banco
+  const { error } = await admin
+    .from('organization_settings')
+    .update({ [column]: null })
+    .eq('id', 'default')
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  // Apaga do Storage se for URL do Supabase (extrai o path do bucket public-assets)
+  if (currentUrl && currentUrl.includes('/public-assets/')) {
+    try {
+      const path = currentUrl.split('/public-assets/').pop()
+      if (path) await admin.storage.from('public-assets').remove([decodeURIComponent(path)])
+    } catch { /* ignora erro de storage */ }
+  }
 
   revalidatePath('/suporte')
   revalidatePath('/nps', 'layout')
   revalidatePath('/survey', 'layout')
   revalidatePath('/(auth)/login', 'layout')
+  revalidatePath('/captura')
   return NextResponse.json({ ok: true })
 }
