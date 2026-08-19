@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       password,
       email_confirm: true,
       user_metadata: { full_name, role: safeRole },
+      app_metadata: { role: safeRole },
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
@@ -95,7 +96,16 @@ export async function PATCH(req: Request) {
   // Garante valores aceitos pela constraint price_profiles_role_check
   const validPriceRoles = ['admin', 'reviewer']
   const safeRole = validPriceRoles.includes(role) ? role : 'reviewer'
+
+  // Atualiza o price_profiles
   await price.from('price_profiles').update({ role: safeRole }).eq('id', id)
+
+  // Atualiza também os user_metadata para garantir que o JWT reflita a role
+  // (ORBIS Price pode ler a role do JWT em vez do banco)
+  await price.auth.admin.updateUserById(id, {
+    user_metadata: { role: safeRole },
+    app_metadata: { role: safeRole },
+  })
   return NextResponse.json({ ok: true })
 }
 
