@@ -51,20 +51,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Preencha todos os campos' }, { status: 400 })
   }
 
+  // Garante valores aceitos pela constraint price_profiles_role_check
+  const validPriceRoles = ['admin', 'reviewer']
+  const safeRole = validPriceRoles.includes(role) ? role : 'reviewer'
+
   try {
     const price = createPriceAdminClient()
     const { data: newUser, error } = await price.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name, role },
+      user_metadata: { full_name, role: safeRole },
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     await price.from('price_profiles').upsert({
       id: newUser.user.id,
       full_name,
-      role,
+      role: safeRole,
       email,
     })
 
@@ -88,7 +92,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true })
   }
 
-  await price.from('price_profiles').update({ role }).eq('id', id)
+  // Garante valores aceitos pela constraint price_profiles_role_check
+  const validPriceRoles = ['admin', 'reviewer']
+  const safeRole = validPriceRoles.includes(role) ? role : 'reviewer'
+  await price.from('price_profiles').update({ role: safeRole }).eq('id', id)
   return NextResponse.json({ ok: true })
 }
 
