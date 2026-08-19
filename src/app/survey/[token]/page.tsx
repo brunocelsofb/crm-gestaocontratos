@@ -83,11 +83,11 @@ export default async function CustomSurveyPublicPage({
         <div className="w-full max-w-2xl flex flex-col gap-5">
           <div className="w-full bg-white/95 shadow-xl rounded-2xl p-6 md:p-8">
             {/* Cabeçalho dentro do card */}
-            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-row items-center justify-between gap-4">
+            <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-row items-center justify-between gap-6">
               <div className="flex-shrink-0">
                 <LogoBadge src={finalLogoUrl ?? undefined} />
               </div>
-              <div className="text-right flex-1">
+              <div className="text-right flex-1 flex flex-col justify-center">
                 <h1 className="text-lg md:text-xl font-bold text-[#1B556B] md:whitespace-nowrap">{templateName || 'Pesquisa de Satisfação'}</h1>
                 <p className="text-xs md:text-sm font-medium text-[#32AF9D] mt-1">Sua opinião é muito importante.</p>
               </div>
