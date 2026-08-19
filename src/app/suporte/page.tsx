@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getPublicBranding } from '@/lib/utils/public-branding'
 import { SupportForm } from './support-form'
 import { LogoBadge } from '@/components/ui/logo-badge'
 

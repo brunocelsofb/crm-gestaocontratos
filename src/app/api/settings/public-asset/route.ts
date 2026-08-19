@@ -3,24 +3,26 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-const ALLOWED_COLS = ['support_bg_url','nps_bg_url','survey_clinica_bg_url','survey_hospitalar_bg_url','lead_bg_url']
+const ALLOWED_COLS = ['support_bg_url','nps_bg_url','survey_clinica_bg_url','survey_hospitalar_bg_url','lead_bg_url','public_bg_color']
 
 export async function POST(req: Request) {
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { url, column } = await req.json()
+  const { url, value, column } = await req.json()
   if (!ALLOWED_COLS.includes(column))
     return NextResponse.json({ error: 'Coluna não permitida' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { error } = await admin.from('organization_settings').update({ [column]: url || null }).eq('id', 'default')
+  const { error } = await admin.from('organization_settings').update({ [column]: value ?? url ?? null }).eq('id', 'default')
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
   revalidatePath('/nps', 'layout')
   revalidatePath('/survey', 'layout')
   revalidatePath('/suporte')
+  revalidatePath('/(auth)/login', 'layout')
+  revalidatePath('/captura')
   return NextResponse.json({ ok: true })
 }
 

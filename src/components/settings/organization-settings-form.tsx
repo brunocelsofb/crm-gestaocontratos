@@ -17,6 +17,7 @@ export function OrganizationSettingsForm({
   currentBrandColor,
   currentAssistantBudget,
   currentSupportBgUrl,
+  currentBgColor = '#1B556B',
   currentLeadBgUrl,
   currentNpsBgUrl,
   currentSurveyClinicaBgUrl,
@@ -31,6 +32,7 @@ export function OrganizationSettingsForm({
   currentBrandColor: string
   currentAssistantBudget: number
   currentSupportBgUrl?: string | null
+  currentBgColor?: string
   currentLeadBgUrl?: string | null
   currentNpsBgUrl?: string | null
   currentSurveyClinicaBgUrl?: string | null
@@ -45,6 +47,8 @@ export function OrganizationSettingsForm({
   const [uploadingBg, setUploadingBg] = useState(false)
   const [bgError, setBgError] = useState<string | null>(null)
   const [bgPath, setBgPath] = useState(currentSupportBgUrl ?? null)
+  const [bgColor, setBgColorState] = useState(currentBgColor ?? '#1B556B')
+  const [savingColor, setSavingColor] = useState(false)
   const leadBgRef = useRef<HTMLInputElement>(null)
   const [leadBg, setLeadBg] = useState(currentLeadBgUrl ?? null)
   const [uploadingLeadBg, setUploadingLeadBg] = useState(false)
@@ -260,6 +264,21 @@ export function OrganizationSettingsForm({
         <input type="hidden" name="proposal_brand_color" value={currentBrandColor} />
 
         <div>
+          <label className="block text-sm font-medium text-gray-700">🎨 Cor de fundo (fallback sem wallpaper)</label>
+          <div className="flex items-center gap-3 mt-1">
+            <input type="color" value={bgColor} onChange={e => setBgColorState(e.target.value)}
+              className="h-10 w-16 rounded border border-gray-300 cursor-pointer" />
+            <span className="text-sm font-mono text-gray-600">{bgColor}</span>
+            <button type="button" disabled={savingColor} onClick={async () => {
+              setSavingColor(true)
+              await fetch('/api/settings/public-asset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ column: 'public_bg_color', value: bgColor }) })
+              setSavingColor(false)
+            }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {savingColor ? 'Salvando...' : 'Salvar cor'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Usada em Login, Leads e Pesquisas quando não há wallpaper configurado.</p>
+
           <label className="block text-sm font-medium text-gray-700">🖼️ Wallpaper do formulário de suporte</label>
           <p className="text-xs text-gray-400 mb-2">Imagem de fundo da página /suporte. Se não houver imagem, usa o degradê padrão da marca.</p>
           {(() => {
