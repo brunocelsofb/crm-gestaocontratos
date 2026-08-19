@@ -182,16 +182,8 @@ export function OrganizationSettingsForm({
       </div>
 
       <form action={formAction} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Nome do sistema</label>
-          <input
-            name="name"
-            required
-            defaultValue={currentName}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          />
-          <p className="mt-1 text-xs text-gray-400">Aparece no menu lateral (ex: nome interno do sistema, tipo "Drone").</p>
-        </div>
+        {/* Nome do sistema oculto — logo substitui o texto no sidebar */}
+        <input type="hidden" name="name" value={currentName} />
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Nome da empresa (contratada)</label>

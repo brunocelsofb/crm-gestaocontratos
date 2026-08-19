@@ -54,13 +54,12 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="flex w-56 shrink-0 flex-col bg-brand-800 p-4">
-        <div className="mb-8 flex items-center gap-2 px-1">
+        <div className="mb-8 flex items-center justify-center px-1 pt-2">
           <img
             src={sidebarLogoUrl}
             alt={orgName}
-            className="h-6 w-auto object-contain brightness-0 invert"
+            className="h-8 w-auto object-contain brightness-0 invert"
           />
-          <span className="truncate text-sm font-medium text-white">{orgName}</span>
         </div>
         <div className="flex-1">
           <SidebarNav isAdmin={isAdmin} />
