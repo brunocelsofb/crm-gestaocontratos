@@ -335,7 +335,7 @@ export function OrganizationSettingsForm({
           <div className="flex items-center gap-2 mt-1">
             <input ref={clinicaRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" disabled={uploadingClinica} onClick={() => { const f = clinicaRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'survey-clinica', 'survey_clinica_bg_url', setUploadingClinica, setClinicaErr, setClinicaBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingClinica ? 'Enviando...' : 'Enviar imagem'}</button>
-            {(clinicaBg || currentClinicaBgUrl) && <button type="button" onClick={() => removeWallpaper('survey_clinica_bg_url', () => setClinicaBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
+            {(clinicaBg || currentSurveyClinicaBgUrl) && <button type="button" onClick={() => removeWallpaper('survey_clinica_bg_url', () => setClinicaBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
           </div>
           {clinicaErr && <p className="mt-1 text-xs text-red-600">{clinicaErr}</p>}
         </div>
@@ -347,7 +347,7 @@ export function OrganizationSettingsForm({
           <div className="flex items-center gap-2 mt-1">
             <input ref={hospitalarRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-xs" />
             <button type="button" disabled={uploadingHospitalar} onClick={() => { const f = hospitalarRef.current?.files?.[0]; if (f) uploadPublicAsset(f, 'survey-hospitalar', 'survey_hospitalar_bg_url', setUploadingHospitalar, setHospitalarErr, setHospitalarBg) }} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">{uploadingHospitalar ? 'Enviando...' : 'Enviar imagem'}</button>
-            {(hospitalarBg || currentHospitalarBgUrl) && <button type="button" onClick={() => removeWallpaper('survey_hospitalar_bg_url', () => setHospitalarBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
+            {(hospitalarBg || currentSurveyHospitalarBgUrl) && <button type="button" onClick={() => removeWallpaper('survey_hospitalar_bg_url', () => setHospitalarBg(null))} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover</button>}
           </div>
           {hospitalarErr && <p className="mt-1 text-xs text-red-600">{hospitalarErr}</p>}
           <p className="text-xs text-gray-500 mt-1">Recomendado: 1920×1080px, JPG/PNG/WebP, máx 2MB.</p>
