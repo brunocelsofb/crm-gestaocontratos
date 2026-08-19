@@ -23,3 +23,23 @@ export async function POST(req: Request) {
   revalidatePath('/suporte')
   return NextResponse.json({ ok: true })
 }
+
+export async function DELETE(req: Request) {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const { column } = await req.json()
+  if (!ALLOWED_COLS.includes(column))
+    return NextResponse.json({ error: 'Coluna não permitida' }, { status: 400 })
+
+  const admin = createAdminClient()
+  const { error } = await admin.from('organization_settings').update({ [column]: null }).eq('id', 'default')
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  revalidatePath('/suporte')
+  revalidatePath('/nps', 'layout')
+  revalidatePath('/survey', 'layout')
+  revalidatePath('/(auth)/login', 'layout')
+  return NextResponse.json({ ok: true })
+}

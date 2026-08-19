@@ -135,6 +135,16 @@ export function OrganizationSettingsForm({
     else setBgPath(publicUrl)
   }
 
+  async function removeWallpaper(column: string, clearState: () => void) {
+    if (!confirm('Remover o wallpaper? As telas voltarão ao gradiente padrão.')) return
+    const res = await fetch('/api/settings/public-asset', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ column }),
+    })
+    if (res.ok) clearState()
+  }
+
   return (
     <div className="max-w-md space-y-6">
       <div className="rounded-lg border border-gray-200 bg-white p-6">

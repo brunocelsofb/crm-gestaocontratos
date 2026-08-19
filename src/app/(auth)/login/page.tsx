@@ -1,85 +1,62 @@
-'use client'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { LoginForm } from './login-form'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+export const dynamic = 'force-dynamic'
 
-export default function LoginPage() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+export default async function LoginPage() {
+  const admin = createAdminClient()
+  const { data: settings } = await admin
+    .from('organization_settings')
+    .select('support_bg_url, logo_storage_path, company_name')
+    .eq('id', 'default')
+    .maybeSingle()
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+  const rawLogo = settings?.logo_storage_path
+  const rawBg   = settings?.support_bg_url
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
+  let finalLogoUrl: string | null = null
+  if (rawLogo && rawLogo.trim() && rawLogo !== 'null') {
+    if (rawLogo.startsWith('http')) { finalLogoUrl = rawLogo }
+    else {
+      const { data } = admin.storage.from('public-assets').getPublicUrl(rawLogo)
+      finalLogoUrl = data.publicUrl
     }
-
-    router.push('/')
-    router.refresh()
   }
 
+  const wallpaperUrl = (rawBg && rawBg.startsWith('https://')) ? rawBg : null
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm space-y-6 rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Entrar</h1>
-          <p className="text-sm text-gray-500">Acesse o CRM de Contratos</p>
+    <div className="relative min-h-screen w-full">
+      <div className="fixed inset-0 pointer-events-none -z-10" style={{
+        backgroundImage: wallpaperUrl ? `url('${wallpaperUrl}')` : undefined,
+        backgroundColor: '#1B556B',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }} />
+      <main className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm flex flex-col gap-5">
+          <div className="w-full rounded-2xl bg-white/97 shadow-2xl overflow-hidden">
+            <div className="p-6 pb-0">
+              <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-row items-center justify-between gap-4">
+                {finalLogoUrl && (
+                  <div style={{ width: 40, height: 40, flexShrink: 0, backgroundImage: `url('${finalLogoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />
+                )}
+                <div className="text-right flex-1">
+                  <h1 className="text-xl font-bold text-[#1B556B]">Entrar</h1>
+                  <p className="text-xs font-medium text-[#32AF9D] mt-0.5">Acesse o CRM de Contratos</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 pt-0">
+              <LoginForm />
+            </div>
+          </div>
+          <p className="text-center text-xs text-white/40">
+            {settings?.company_name ?? 'ORBIS Engenharia'} © {new Date().getFullYear()}
+          </p>
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">E-mail</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Senha</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500">
-          Não tem conta?{' '}
-          <a href="/register" className="font-medium text-gray-900 underline">
-            Criar conta
-          </a>
-        </p>
-      </div>
+      </main>
     </div>
   )
 }
