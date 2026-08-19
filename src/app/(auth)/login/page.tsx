@@ -20,9 +20,13 @@ export default async function LoginPage() {
           <div className="w-full rounded-2xl bg-white/97 shadow-2xl overflow-hidden">
             <div className="p-6 pb-0">
               <div className="w-full border-b-4 border-[#E98C5F] pb-4 mb-6 flex flex-row items-center justify-between gap-4">
-                {logoUrl && (
-                  <div style={{ width: 40, height: 40, flexShrink: 0, backgroundImage: `url('${logoUrl}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />
-                )}
+                <div className="flex-shrink-0">
+                  <img
+                    src={logoUrl || '/drone.png'}
+                    alt="Logo"
+                    className="h-8 md:h-10 w-auto object-contain"
+                  />
+                </div>
                 <div className="text-right flex-1">
                   <h1 className="text-xl font-bold text-[#1B556B]">Entrar</h1>
                   <p className="text-xs font-medium text-[#32AF9D] mt-0.5">Acesse o CRM de Contratos</p>
