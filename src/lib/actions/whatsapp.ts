@@ -623,7 +623,7 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
       phone: chat.phone,
       message: '[Conversa importada do WhatsApp — histórico anterior à conexão com o CRM]',
       status: 'enviado',
-      created_at: chat.lastMessageTime ? new Date(Number(chat.lastMessageTime) * 1000).toISOString() : new Date().toISOString(),
+      created_at: (chat as any).lastMessageTime ? new Date(Number((chat as any).lastMessageTime) * 1000).toISOString() : new Date().toISOString(),
     })
     imported++
   }
