@@ -11,7 +11,21 @@ type Rule = {
   description?: string | null
 }
 
-async function saveRule(rule: Partial<Rule> & { id?: string }) {
+const DEFAULT_RULES = [
+  { criterion_key: 'corporate_email',   label: 'E-mail corporativo',              points: 25, description: 'E-mail não é gmail, hotmail, etc.' },
+  { criterion_key: 'health_sector_fit', label: 'Empresa do setor de saúde',       points: 25, description: 'Nome da empresa contém keywords de saúde' },
+  { criterion_key: 'source_indicacao',  label: 'Origem: Indicação',               points: 30, description: 'Lead veio por indicação de cliente ou parceiro' },
+  { criterion_key: 'source_evento',     label: 'Origem: Evento',                  points: 20, description: 'Lead captado em evento ou feira' },
+  { criterion_key: 'source_formulario', label: 'Origem: Formulário do site',      points: 15, description: 'Lead veio do formulário público' },
+  { criterion_key: 'source_ligacao',    label: 'Origem: Ligação',                 points: 15, description: 'Lead captado por ligação ativa' },
+  { criterion_key: 'phone_provided',    label: 'Telefone informado',              points: 10, description: 'Lead deixou telefone para contato' },
+  { criterion_key: 'message_detailed',  label: 'Mensagem detalhada',              points: 10, description: 'Mensagem com mais de 20 caracteres' },
+  { criterion_key: 'source_manual',     label: 'Origem: Manual',                  points: 10, description: 'Lead cadastrado manualmente' },
+  { criterion_key: 'source_anuncio',    label: 'Origem: Anúncio',                 points:  5, description: 'Lead veio de anúncio pago' },
+  { criterion_key: 'source_outro',      label: 'Origem: Outro',                   points:  5, description: 'Origem não mapeada' },
+  { criterion_key: 'personal_email',    label: 'E-mail pessoal',                  points:  5, description: 'E-mail é gmail, hotmail, etc.' },
+  { criterion_key: 'other_sector',      label: 'Empresa fora do setor de saúde',  points:  5, description: 'Empresa informada mas fora do perfil típico' },
+]
   const res = await fetch('/api/settings/lead-scoring', {
     method: rule.id ? 'PATCH' : 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -123,7 +137,19 @@ export function LeadScoringEditor({ initialRules }: { initialRules: Rule[] }) {
   const [newPoints, setNewPoints] = useState('10')
   const [newDesc, setNewDesc] = useState('')
   const [saving, setSaving] = useState(false)
-  const [, startTransition] = useTransition()
+  const [restoring, setRestoring] = useState(false)
+
+  async function handleRestore() {
+    if (!confirm('Restaurar padrões de mercado? As regras existentes serão mantidas — apenas regras faltantes serão adicionadas.')) return
+    setRestoring(true)
+    const existingKeys = new Set(rules.map(r => r.criterion_key))
+    const missing = DEFAULT_RULES.filter(r => !existingKeys.has(r.criterion_key))
+    for (const rule of missing) {
+      const res = await saveRule({ ...rule, is_active: true })
+      if (!res.error && res.rule) setRules(prev => [...prev, res.rule].sort((a, b) => b.points - a.points))
+    }
+    setRestoring(false)
+  }
 
   async function handleAdd() {
     if (!newKey.trim() || !newLabel.trim()) return
@@ -157,10 +183,16 @@ export function LeadScoringEditor({ initialRules }: { initialRules: Rule[] }) {
           Soma máxima possível: <strong>{totalMax} pts</strong>
           {totalMax > 100 && <span className="ml-2 text-amber-600 text-xs">(score é limitado a 100)</span>}
         </p>
-        <button onClick={() => setAdding(true)}
-          className="rounded-lg bg-[#1B556B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#164659]">
-          + Nova regra
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleRestore} disabled={restoring}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            {restoring ? 'Restaurando...' : '↺ Restaurar padrões'}
+          </button>
+          <button onClick={() => setAdding(true)}
+            className="rounded-lg bg-[#1B556B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#164659]">
+            + Nova regra
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">

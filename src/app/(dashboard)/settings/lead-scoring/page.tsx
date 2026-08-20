@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { LeadScoringEditor } from '@/components/settings/lead-scoring-editor'
 
@@ -9,7 +10,8 @@ export default async function LeadScoringPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (profile?.role !== 'admin') redirect('/settings')
 
-  const { data: rules } = await supabase
+  const admin = createAdminClient()
+  const { data: rules } = await admin
     .from('lead_scoring_rules')
     .select('*')
     .order('points', { ascending: false })
