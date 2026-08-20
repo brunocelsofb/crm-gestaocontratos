@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
     // Opt-out
     if (!isFromMe && text && isOptOutMessage(text)) {
-      await recordWhatsAppOptOut(supabase, phone)
+      await recordWhatsAppOptOut(phone)
       return NextResponse.json({ ok: true, recorded: 'opt-out' })
     }
 
