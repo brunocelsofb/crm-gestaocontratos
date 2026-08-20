@@ -68,10 +68,24 @@ export async function getEvoQrCode({
       if (base64) return { base64 }
     }
 
-    // 409/403 = já existe — segue para connect
-    if (!createRes.ok && createRes.status !== 409 && createRes.status !== 403) {
-      const msg = createData?.message?.[0] ?? createData?.message ?? createData?.error ?? `Erro HTTP ${createRes.status}`
-      return { error: `Erro ao criar instância: ${msg}` }
+    // 409/403/400 ou mensagem "already exists" = instância já existe — segue para connect
+    const msgStr = typeof createData?.message === 'string'
+      ? createData.message
+      : Array.isArray(createData?.message) ? JSON.stringify(createData.message[0] ?? '') : ''
+
+    const alreadyExists = createRes.status === 409 || createRes.status === 403 || createRes.status === 400
+      || msgStr.toLowerCase().includes('already exists')
+      || msgStr.toLowerCase().includes('já existe')
+
+    if (!createRes.ok && !alreadyExists) {
+      const errorMsg = typeof createData?.message === 'string'
+        ? createData.message
+        : Array.isArray(createData?.message) && createData.message.length > 0
+          ? (typeof createData.message[0] === 'string' ? createData.message[0] : JSON.stringify(createData.message[0]))
+          : createData?.error
+            ? (typeof createData.error === 'string' ? createData.error : JSON.stringify(createData.error))
+            : `HTTP ${createRes.status}`
+      return { error: `Erro ao criar instância: ${errorMsg}` }
     }
   } catch (e: any) {
     return { error: `Falha de rede ao criar instância: ${e.message}` }
@@ -86,8 +100,14 @@ export async function getEvoQrCode({
     console.log('[evo] connect status:', connectRes.status, JSON.stringify(connectData))
 
     if (!connectRes.ok) {
-      const msg = connectData?.message?.[0] ?? connectData?.message ?? connectData?.error ?? `Erro HTTP ${connectRes.status}`
-      return { error: `Erro ao conectar: ${msg}` }
+      const errorMsg = typeof connectData?.message === 'string'
+        ? connectData.message
+        : Array.isArray(connectData?.message) && connectData.message.length > 0
+          ? (typeof connectData.message[0] === 'string' ? connectData.message[0] : JSON.stringify(connectData.message[0]))
+          : connectData?.error
+            ? (typeof connectData.error === 'string' ? connectData.error : JSON.stringify(connectData.error))
+            : `HTTP ${connectRes.status}`
+      return { error: `Erro ao conectar: ${errorMsg}` }
     }
 
     // Evolution v2 retorna QR em diferentes campos
