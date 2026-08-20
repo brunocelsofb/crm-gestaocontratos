@@ -4,34 +4,35 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
-import { sendZApiTextMessage, sendZApiImageMessage, sendZApiDocumentMessage, verifyZApiConnection } from '@/lib/whatsapp/zapi'
+import { sendEvoTextMessage, sendEvoImageMessage, sendEvoDocumentMessage, verifyEvoConnection, getEvoQrCode, getEvoInstanceStatus } from '@/lib/whatsapp/evolution'
+import type { EvoCredentials } from '@/lib/whatsapp/evolution'
 import { canSendAutomatedWhatsApp } from '@/lib/whatsapp/guardrails'
 
 export type ActionState = { error?: string }
 
-async function getZApiCredentials(): Promise<{ instanceId: string; token: string; clientToken: string } | null> {
+async function getEvoCredentials(): Promise<EvoCredentials | null> {
   const supabase = createAdminClient()
-  const { data } = await supabase.from('organization_settings').select('zapi_instance_id, zapi_token, zapi_client_token').eq('id', 'default').maybeSingle()
-  if (!data?.zapi_instance_id || !data?.zapi_token || !data?.zapi_client_token) return null
-  return { instanceId: data.zapi_instance_id, token: data.zapi_token, clientToken: data.zapi_client_token }
+  const { data } = await supabase.from('organization_settings').select('evo_server_url, evo_api_key, evo_instance_name').eq('id', 'default').maybeSingle()
+  if (!data?.evo_server_url || !data?.evo_api_key || !data?.evo_instance_name) return null
+  return { serverUrl: data.evo_server_url, apiKey: data.evo_api_key, instanceName: data.evo_instance_name }
 }
 
-export async function connectZApi(formData: FormData): Promise<ActionState> {
+export async function connectEvo(formData: FormData): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem configurar isso.' }
 
-  const instanceId = (formData.get('zapi_instance_id') as string)?.trim()
-  const token = (formData.get('zapi_token') as string)?.trim()
-  const clientToken = (formData.get('zapi_client_token') as string)?.trim()
+  const serverUrl     = (formData.get('evo_server_url') as string)?.trim()
+  const apiKey        = (formData.get('evo_api_key') as string)?.trim()
+  const instanceName  = (formData.get('evo_instance_name') as string)?.trim()
 
-  if (!instanceId || !token || !clientToken) return { error: 'Preencha Instance ID, Token e Client-Token.' }
+  if (!serverUrl || !apiKey || !instanceName) return { error: 'Preencha Server URL, API Key e Instance Name.' }
 
-  const verify = await verifyZApiConnection({ instanceId, token, clientToken })
+  const verify = await verifyEvoConnection({ serverUrl, apiKey, instanceName })
   if (!verify.ok) return { error: `Não consegui conectar: ${verify.error}` }
 
   const supabase = await createClient()
   const { error } = await supabase
     .from('organization_settings')
-    .update({ zapi_instance_id: instanceId, zapi_token: token, zapi_client_token: clientToken, updated_at: new Date().toISOString() })
+    .update({ evo_server_url: serverUrl, evo_api_key: apiKey, evo_instance_name: instanceName, updated_at: new Date().toISOString() })
     .eq('id', 'default')
 
   if (error) return { error: error.message }
@@ -39,12 +40,12 @@ export async function connectZApi(formData: FormData): Promise<ActionState> {
   return {}
 }
 
-export async function disconnectZApi(): Promise<ActionState> {
+export async function disconnectEvo(): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem configurar isso.' }
   const supabase = await createClient()
   await supabase
     .from('organization_settings')
-    .update({ zapi_instance_id: null, zapi_token: null, zapi_client_token: null })
+    .update({ evo_server_url: null, evo_api_key: null, evo_instance_name: null })
     .eq('id', 'default')
   revalidatePath('/settings')
   return {}
@@ -59,11 +60,11 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   if (!phone) return { error: 'Informe o telefone do destinatário.' }
   if (!message.trim()) return { error: 'Escreva a mensagem.' }
 
-  const creds = await getZApiCredentials()
+  const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado. Vá em Configurações e conecte o Z-API.' }
 
   try {
-    const result = await sendZApiTextMessage({ ...creds, phone, message })
+    const result = await sendEvoTextMessage({ ...creds, phone, message })
 
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
@@ -72,7 +73,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       phone,
       message,
       template_id: templateId,
-      zapi_message_id: result.messageId,
+      zapi_message_id: result?.key?.id,
       status: 'enviado',
     })
 
@@ -118,14 +119,14 @@ export async function sendContractWhatsAppMedia(
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!phone) return { error: 'Informe o telefone do destinatário.' }
 
-  const creds = await getZApiCredentials()
+  const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
   try {
     const result =
       mediaType === 'image'
-        ? await sendZApiImageMessage({ ...creds, phone, imageUrl: mediaUrl })
-        : await sendZApiDocumentMessage({ ...creds, phone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
+        ? await sendEvoImageMessage({ ...creds, phone, imageUrl: mediaUrl })
+        : await sendEvoDocumentMessage({ ...creds, phone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
 
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
@@ -136,7 +137,7 @@ export async function sendContractWhatsAppMedia(
       media_url: mediaUrl,
       media_type: mediaType,
       media_filename: filename,
-      zapi_message_id: result.messageId,
+      zapi_message_id: result?.key?.id,
       status: 'enviado',
     })
 
@@ -221,7 +222,7 @@ export async function buildWhatsAppFromTemplate(templateId: string, contractId: 
 
 export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, templateId: string): Promise<void> {
   const supabase = createAdminClient()
-  const creds = await getZApiCredentials()
+  const creds = await getEvoCredentials()
   if (!creds) return
 
   const filled = await buildWhatsAppFromTemplate(templateId, contractId)
@@ -231,7 +232,7 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
   if (!guard.ok) return
 
   try {
-    const result = await sendZApiTextMessage({ ...creds, phone: filled.phone, message: filled.message })
+    const result = await sendEvoTextMessage({ ...creds, phone: filled.phone, message: filled.message })
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       direction: 'enviado',
@@ -239,7 +240,7 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
       message: filled.message,
       template_id: templateId,
       triggered_automatically: true,
-      zapi_message_id: result.messageId,
+      zapi_message_id: result?.key?.id,
       status: 'enviado',
     })
     await supabase.from('activities').insert({
@@ -396,18 +397,18 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!message.trim()) return { error: 'Escreva a mensagem.' }
 
-  const creds = await getZApiCredentials()
+  const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
   try {
-    const result = await sendZApiTextMessage({ ...creds, phone, message })
+    const result = await sendEvoTextMessage({ ...creds, phone, message })
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
       direction: 'enviado',
       phone,
       message,
-      zapi_message_id: result.messageId,
+      zapi_message_id: result?.key?.id,
       status: 'enviado',
     })
   } catch (e) {
@@ -447,7 +448,7 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
 
   if (!pending || pending.length === 0) return { checked: 0, sent: 0 }
 
-  const creds = await getZApiCredentials()
+  const creds = await getEvoCredentials()
   if (!creds) return { checked: pending.length, sent: 0 }
 
   const supabaseAdmin = supabase
@@ -462,14 +463,14 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
     const { buildReminderMessage } = await import('@/lib/whatsapp/guardrails')
     const reminderMessage = buildReminderMessage(settings ?? { company_name: null, whatsapp_is_online: false, whatsapp_welcome_message: null, whatsapp_welcome_message_online: null, whatsapp_reminder_message: null }, captureUrl)
     try {
-      const result = await sendZApiTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
+      const result = await sendEvoTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
       await supabase.from('contract_whatsapp_messages').insert({
         contract_id: null,
         direction: 'enviado',
         phone: p.phone,
         message: reminderMessage,
         triggered_automatically: true,
-        zapi_message_id: result.messageId,
+        zapi_message_id: result?.key?.id,
         status: 'enviado',
       })
       await supabase.from('whatsapp_capture_prompts').update({ reminder_sent_at: new Date().toISOString() }).eq('phone', p.phone)
@@ -564,7 +565,7 @@ export async function unassignWhatsAppConversation(phone: string): Promise<Actio
 export async function importExistingWhatsAppChats(): Promise<ActionState & { imported?: number; skipped?: number }> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem importar.' }
 
-  const creds = await getZApiCredentials()
+  const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
   const supabase = createAdminClient()

@@ -71,7 +71,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: settings } = await supabase
     .from('organization_settings')
-    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token')
+    .select('name, company_name, company_cnpj, logo_storage_path, proposal_header_text, proposal_footer_text, proposal_brand_color, assistant_monthly_budget_usd, ticket_number_prefix, proposal_number_prefix, inbound_email_domain, mailgun_webhook_signing_key, zapi_instance_id, evo_server_url, evo_api_key, evo_instance_name, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, whatsapp_reminder_message, whatsapp_daily_auto_limit, zapsign_api_token')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -136,7 +136,7 @@ export default async function SettingsPage() {
           currentDomain={settings?.inbound_email_domain ?? ''}
           hasSigningKey={!!settings?.mailgun_webhook_signing_key}
         />
-        <WhatsAppSettingsForm isConnected={!!settings?.zapi_instance_id} />
+        <WhatsAppSettingsForm isConnected={!!(settings as any)?.evo_instance_name} currentServerUrl={(settings as any)?.evo_server_url ?? null} currentInstanceName={(settings as any)?.evo_instance_name ?? null} />
         <WhatsAppBotSettingsForm
           isOnline={settings?.whatsapp_is_online ?? false}
           welcomeMessage={settings?.whatsapp_welcome_message ?? DEFAULT_WELCOME_OFFLINE}
