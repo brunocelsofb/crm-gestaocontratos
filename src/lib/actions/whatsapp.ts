@@ -64,7 +64,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   if (!creds) return { error: 'WhatsApp ainda não está conectado. Vá em Configurações e conecte o Z-API.' }
 
   try {
-    const result = await sendEvoTextMessage({ ...creds, phone, message })
+    const result: any = await sendEvoTextMessage({ ...creds, phone, message })
 
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
@@ -123,7 +123,7 @@ export async function sendContractWhatsAppMedia(
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
   try {
-    const result =
+    const result: any =
       mediaType === 'image'
         ? await sendEvoImageMessage({ ...creds, phone, imageUrl: mediaUrl })
         : await sendEvoDocumentMessage({ ...creds, phone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
@@ -232,7 +232,7 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
   if (!guard.ok) return
 
   try {
-    const result = await sendEvoTextMessage({ ...creds, phone: filled.phone, message: filled.message })
+    const result: any = await sendEvoTextMessage({ ...creds, phone: filled.phone, message: filled.message })
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       direction: 'enviado',
@@ -401,7 +401,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
   try {
-    const result = await sendEvoTextMessage({ ...creds, phone, message })
+    const result: any = await sendEvoTextMessage({ ...creds, phone, message })
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
@@ -463,7 +463,7 @@ export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked:
     const { buildReminderMessage } = await import('@/lib/whatsapp/guardrails')
     const reminderMessage = buildReminderMessage(settings ?? { company_name: null, whatsapp_is_online: false, whatsapp_welcome_message: null, whatsapp_welcome_message_online: null, whatsapp_reminder_message: null }, captureUrl)
     try {
-      const result = await sendEvoTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
+      const result: any = await sendEvoTextMessage({ ...creds, phone: p.phone, message: reminderMessage })
       await supabase.from('contract_whatsapp_messages').insert({
         contract_id: null,
         direction: 'enviado',
