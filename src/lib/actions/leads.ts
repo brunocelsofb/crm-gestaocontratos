@@ -26,7 +26,9 @@ export async function createLead(formData: FormData): Promise<ActionState & { le
   if (!company_name) return { error: 'Empresa é obrigatória.' }
   if (!cnpj) return { error: 'CNPJ é obrigatório.' }
 
-  const { score } = calculateLeadScore({ email, phone, company_name, message, source })
+  // Busca regras dinâmicas do banco
+  const { data: rules } = await supabase.from('lead_scoring_rules').select('criterion_key, label, points, is_active').eq('is_active', true)
+  const { score } = calculateLeadScore({ email, phone, company_name, message, source }, rules ?? undefined)
 
   const { data, error } = await supabase
     .from('leads')

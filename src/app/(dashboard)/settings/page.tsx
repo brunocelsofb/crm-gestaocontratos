@@ -22,6 +22,7 @@ const CONFIG_SECTIONS = [
       { href: '/custom-fields', label: 'Campos Customizados', description: 'Adicione campos personalizados às oportunidades' },
       { href: '/automations', label: 'Automações', description: 'Regras automáticas por gatilho ou tempo' },
       { href: '/tags', label: 'Tags', description: 'Organize e classifique com etiquetas' },
+      { href: '/settings/lead-scoring', label: '⭐ Lead Scoring', description: 'Configure os critérios e pontuações que qualificam automaticamente os leads' },
     ],
   },
   {
