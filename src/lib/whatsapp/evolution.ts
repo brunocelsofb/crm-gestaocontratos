@@ -109,6 +109,19 @@ export async function getEvoQrCode({
   }
 }
 
+export async function getEvoInstanceStatus({
+  serverUrl, apiKey, instanceName
+}: EvoCredentials): Promise<{ state?: string }> {
+  try {
+    const res = await fetch(`${serverUrl}/instance/connectionState/${instanceName}`, {
+      headers: { 'apikey': apiKey },
+    })
+    if (!res.ok) return {}
+    const data = await res.json()
+    return { state: data?.instance?.state ?? data?.state ?? data?.connectionStatus }
+  } catch { return {} }
+}
+
 export async function verifyEvoConnection(creds: EvoCredentials): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${creds.serverUrl}/instance/fetchInstances?instanceName=${creds.instanceName}`, {
