@@ -2,9 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateLeadStatus, assignLead, convertLeadToOpportunity, addLeadNote, deleteLead } from '@/lib/actions/leads'
+import { updateLeadStatus, assignLead, addLeadNote, deleteLead } from '@/lib/actions/leads'
+import { ConvertLeadModal } from './convert-lead-modal'
 
-type UserOption = { id: string; full_name: string }
+type UserOption     = { id: string; full_name: string }
+type PipelineOption = { id: string; name: string }
+type StageOption    = { id: string; name: string; pipeline_id: string }
 
 const STATUS_OPTIONS = [
   { value: 'novo', label: 'Novo' },
@@ -15,16 +18,22 @@ const STATUS_OPTIONS = [
 
 export function LeadActionsPanel({
   leadId,
+  leadName,
   currentStatus,
   currentAssignee,
   users,
+  pipelines = [],
+  stages = [],
   isConverted,
   isAdmin,
 }: {
   leadId: string
+  leadName: string
   currentStatus: string
   currentAssignee: string | null
   users: UserOption[]
+  pipelines?: PipelineOption[]
+  stages?: StageOption[]
   isConverted: boolean
   isAdmin: boolean
 }) {
@@ -32,6 +41,7 @@ export function LeadActionsPanel({
   const [isPending, startTransition] = useTransition()
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [showConvertModal, setShowConvertModal] = useState(false)
 
   function handleStatusChange(status: string) {
     startTransition(async () => {
@@ -114,12 +124,15 @@ export function LeadActionsPanel({
             </select>
           </div>
           <button
-            onClick={handleConvert}
+            onClick={() => setShowConvertModal(true)}
             disabled={isPending}
             className="rounded-md bg-positive-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-positive-700 disabled:opacity-50"
           >
-            {isPending ? 'Processando...' : '✅ Converter em Oportunidade'}
+            ✅ Converter em Oportunidade
           </button>
+          {showConvertModal && (
+            <ConvertLeadModal leadId={leadId} leadName={leadName} pipelines={pipelines} stages={stages} users={users} onClose={() => setShowConvertModal(false)} />
+          )}
           {isAdmin && (
             <button onClick={handleDelete} disabled={isPending} className="text-xs text-negative-600 hover:underline">
               Excluir lead

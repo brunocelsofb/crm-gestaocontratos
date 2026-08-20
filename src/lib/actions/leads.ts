@@ -283,3 +283,91 @@ export async function convertLeadToOpportunity(leadId: string): Promise<ActionSt
   revalidatePath('/pipeline')
   return { contractId: contract.id }
 }
+
+export async function convertLeadWithOptions(
+  leadId: string,
+  options: {
+    pipelineId: string
+    stageId: string
+    responsibleId: string
+    estimatedValue?: number | null
+  }
+): Promise<{ error?: string; contractId?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).single()
+  if (!lead) return { error: 'Lead não encontrado.' }
+  if (lead.status === 'convertido') return { error: 'Lead já foi convertido.' }
+
+  // Empresa
+  let companyId: string | null = null
+  if (lead.cnpj) {
+    const digits = lead.cnpj.replace(/\D/g, '')
+    const { data } = await supabase.from('companies').select('id').or(`cnpj.eq.${digits},cnpj.eq.${lead.cnpj}`).maybeSingle()
+    if (data) companyId = data.id
+  }
+  if (!companyId && lead.company_name) {
+    const { data } = await supabase.from('companies').select('id').ilike('name', lead.company_name.trim()).maybeSingle()
+    if (data) companyId = data.id
+  }
+  if (!companyId && lead.company_name) {
+    const { data } = await supabase.from('companies').insert({ name: lead.company_name, cnpj: lead.cnpj?.replace(/\D/g,'') ?? null, status: 'prospect', owner_id: options.responsibleId }).select('id').single()
+    companyId = data?.id ?? null
+  }
+
+  // Contato
+  let contactId: string | null = null
+  if (companyId && lead.email) {
+    const { data } = await supabase.from('contacts').select('id').eq('company_id', companyId).eq('email', lead.email).maybeSingle()
+    contactId = data?.id ?? null
+  }
+  if (!contactId && companyId) {
+    const { data } = await supabase.from('contacts').insert({ company_id: companyId, name: lead.name, email: lead.email, phone: lead.phone, is_primary: false }).select('id').single()
+    contactId = data?.id ?? null
+  }
+
+  // Contrato/Oportunidade
+  const { data: contract, error } = await supabase.from('contracts').insert({
+    client_name: lead.company_name ?? lead.name,
+    company_id: companyId,
+    contact_id: contactId,
+    owner_id: options.responsibleId,
+    status: 'active',
+    value: options.estimatedValue ?? null,
+    lead_id: leadId,
+    source: lead.source,
+  }).select('id').single()
+
+  if (error || !contract) return { error: error?.message ?? 'Erro ao criar oportunidade.' }
+
+  // Pipeline run
+  await supabase.from('pipeline_runs').insert({
+    contract_id: contract.id,
+    pipeline_id: options.pipelineId,
+    stage_id: options.stageId,
+    status: 'open',
+    entered_at: new Date().toISOString(),
+  })
+
+  // Atualiza status do lead
+  await supabase.from('leads').update({
+    status: 'convertido',
+    converted_contract_id: contract.id,
+    converted_at: new Date().toISOString(),
+  }).eq('id', leadId)
+
+  // Atividade na empresa
+  if (companyId) {
+    await supabase.from('activities').insert({
+      company_id: companyId, user_id: user.id, type: 'note',
+      content: `✅ Lead "${lead.name}" convertido em oportunidade manualmente.`,
+    })
+  }
+
+  revalidatePath('/leads')
+  revalidatePath(`/leads/${leadId}`)
+  revalidatePath('/pipeline')
+  return { contractId: contract.id }
+}

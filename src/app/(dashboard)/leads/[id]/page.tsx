@@ -15,10 +15,12 @@ export default async function LeadDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: lead }, { data: activities }, { data: allProfiles }, isAdmin, whatsappMessages] = await Promise.all([
+  const [{ data: lead }, { data: activities }, { data: allProfiles }, { data: pipelines }, { data: stages }, isAdmin, whatsappMessages] = await Promise.all([
     supabase.from('leads').select('*').eq('id', id).maybeSingle(),
     supabase.from('lead_activities').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name'),
+    supabase.from('pipelines').select('id, name').order('name'),
+    supabase.from('stages').select('id, name, pipeline_id').order('order_index'),
     isCurrentUserAdmin(),
     getWhatsAppMessagesByLead(id),
   ])
@@ -98,9 +100,12 @@ export default async function LeadDetailPage({
 
       <LeadActionsPanel
         leadId={lead.id}
+        leadName={lead.name}
         currentStatus={lead.status}
         currentAssignee={lead.assigned_to}
         users={allProfiles ?? []}
+        pipelines={pipelines ?? []}
+        stages={stages ?? []}
         isConverted={lead.status === 'convertido'}
         isAdmin={isAdmin}
       />
