@@ -33,7 +33,7 @@ export function WhatsAppSettingsForm({ isConnected, currentServerUrl, currentIns
     const instance  = (fd.get('evo_instance_name') as string).trim()
 
     try {
-      const data = await getEvoQrCode({ serverUrl, apiKey, instanceName })
+      const data = await getEvoQrCode({ serverUrl, apiKey, instanceName: instance })
       console.log('[evo qr] resposta:', data)
       if (data.error) setStatus(`❌ ${data.error}`)
       else if (data.base64) setQrCode(data.base64)
