@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { connectEvo, disconnectEvo } from '@/lib/actions/whatsapp'
-import { getEvoQrCode } from '@/lib/whatsapp/evolution'
+import { connectEvo, disconnectEvo, getEvoQrCodeAction, configureEvoWebhook } from '@/lib/actions/whatsapp'
 
 type Props = {
   isConnected: boolean
@@ -33,12 +32,13 @@ export function WhatsAppSettingsForm({ isConnected, currentServerUrl, currentIns
     const instance  = (fd.get('evo_instance_name') as string).trim()
 
     try {
-      const data = await getEvoQrCode({ serverUrl, apiKey, instanceName: instance })
-      console.log('[evo qr] resposta:', data)
-      if (data.error) setStatus(`❌ ${data.error}`)
-      else if (data.base64) setQrCode(data.base64)
-      else if (data.status) setStatus(data.status)
-      else setStatus('QR Code não disponível. Verifique se a instância está desconectada.')
+    // Busca QR Code via Server Action (evita CORS)
+    const data = await getEvoQrCodeAction()
+    console.log('[evo qr] resposta:', data)
+    if (data.error) setStatus(`❌ ${data.error}`)
+    else if (data.base64) setQrCode(data.base64)
+    else if (data.status) setStatus(data.status)
+    else setStatus('QR Code não disponível. Verifique se a instância está desconectada.')
     } catch (e: any) {
       setStatus(`Erro ao buscar QR Code: ${e.message}`)
     }
@@ -125,12 +125,21 @@ export function WhatsAppSettingsForm({ isConnected, currentServerUrl, currentIns
       )}
 
       {/* Instrução de webhook */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
-        <p className="text-xs font-semibold text-gray-600">URL do Webhook (configurar na Evolution API)</p>
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+        <p className="text-xs font-semibold text-gray-600">Webhook configurado automaticamente em:</p>
         <code className="block text-xs font-mono text-gray-700 bg-white border rounded px-2 py-1.5 break-all">
-          {typeof window !== 'undefined' ? window.location.origin : 'https://seu-crm.vercel.app'}/api/whatsapp-inbound/evolution
+          https://crm-gestaocontratos-pi.vercel.app/api/whatsapp-inbound/evolution
         </code>
-        <p className="text-xs text-gray-400">No painel da Evolution API → Settings → Webhooks → MESSAGES_UPSERT</p>
+        <button
+          type="button"
+          onClick={async () => {
+            const res = await configureEvoWebhook()
+            setStatus(res.error ? `❌ ${res.error}` : '✅ Webhook configurado com sucesso!')
+          }}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+        >
+          🔗 Reconfigurar webhook
+        </button>
       </div>
     </div>
   )

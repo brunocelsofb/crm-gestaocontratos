@@ -137,3 +137,30 @@ export async function verifyEvoConnection(creds: EvoCredentials): Promise<{ ok: 
     return { ok: false, error: e.message }
   }
 }
+
+export async function setEvoWebhook({
+  serverUrl, apiKey, instanceName, webhookUrl
+}: EvoCredentials & { webhookUrl: string }): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${serverUrl}/webhook/set/${instanceName}`, {
+      method: 'POST',
+      headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          byEvents: false,
+          base64: false,
+          events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
+        },
+      }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { ok: false, error: data?.message ?? `HTTP ${res.status}` }
+    }
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e.message }
+  }
+}

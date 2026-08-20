@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isCurrentUserAdmin } from '@/lib/auth/role'
-import { sendEvoTextMessage, sendEvoImageMessage, sendEvoDocumentMessage, verifyEvoConnection, getEvoQrCode, getEvoInstanceStatus } from '@/lib/whatsapp/evolution'
+import { sendEvoTextMessage, sendEvoImageMessage, sendEvoDocumentMessage, verifyEvoConnection, getEvoQrCode, getEvoInstanceStatus, setEvoWebhook } from '@/lib/whatsapp/evolution'
 import type { EvoCredentials } from '@/lib/whatsapp/evolution'
 import { canSendAutomatedWhatsApp } from '@/lib/whatsapp/guardrails'
 
@@ -26,9 +26,6 @@ export async function connectEvo(formData: FormData): Promise<ActionState> {
 
   if (!serverUrl || !apiKey || !instanceName) return { error: 'Preencha Server URL, API Key e Instance Name.' }
 
-  const verify = await verifyEvoConnection({ serverUrl, apiKey, instanceName })
-  if (!verify.ok) return { error: `Não consegui conectar: ${verify.error}` }
-
   const supabase = await createClient()
   const { error } = await supabase
     .from('organization_settings')
@@ -36,7 +33,32 @@ export async function connectEvo(formData: FormData): Promise<ActionState> {
     .eq('id', 'default')
 
   if (error) return { error: error.message }
+
+  // Configura webhook automaticamente
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/whatsapp-inbound/evolution`
+  const webhookRes = await setEvoWebhook({ serverUrl, apiKey, instanceName, webhookUrl })
+  if (!webhookRes.ok) console.warn('[evo] webhook não configurado:', webhookRes.error)
+
   revalidatePath('/settings')
+  return {}
+}
+
+// Server Action para obter QR Code — evita CORS (chamada server-side)
+export async function getEvoQrCodeAction(): Promise<{ base64?: string; status?: string; error?: string }> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Acesso negado.' }
+  const creds = await getEvoCredentials()
+  if (!creds) return { error: 'Credenciais da Evolution API não configuradas.' }
+  return getEvoQrCode(creds)
+}
+
+// Server Action para configurar webhook manualmente
+export async function configureEvoWebhook(): Promise<ActionState> {
+  if (!(await isCurrentUserAdmin())) return { error: 'Acesso negado.' }
+  const creds = await getEvoCredentials()
+  if (!creds) return { error: 'Credenciais não configuradas.' }
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/whatsapp-inbound/evolution`
+  const res = await setEvoWebhook({ ...creds, webhookUrl })
+  if (!res.ok) return { error: `Erro ao configurar webhook: ${res.error}` }
   return {}
 }
 
