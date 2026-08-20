@@ -26,6 +26,8 @@ const DEFAULT_RULES = [
   { criterion_key: 'personal_email',    label: 'E-mail pessoal',                  points:  5, description: 'E-mail é gmail, hotmail, etc.' },
   { criterion_key: 'other_sector',      label: 'Empresa fora do setor de saúde',  points:  5, description: 'Empresa informada mas fora do perfil típico' },
 ]
+
+async function saveRule(rule: Partial<Rule> & { id?: string }) {
   const res = await fetch('/api/settings/lead-scoring', {
     method: rule.id ? 'PATCH' : 'POST',
     headers: { 'Content-Type': 'application/json' },
