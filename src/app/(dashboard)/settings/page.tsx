@@ -39,6 +39,14 @@ const CONFIG_SECTIONS = [
     ],
   },
   {
+    title: 'Aparência',
+    adminOnly: true,
+    items: [
+      { href: '/settings/wallpapers', label: 'Papéis de Parede', description: 'Gerencie as imagens de fundo das telas de login e formulários públicos' },
+      { href: '/settings', label: 'Marca & Identidade', description: 'Logo da empresa, cor de fundo e configurações visuais' },
+    ],
+  },
+  {
     title: 'Assinatura Digital',
     items: [
       { href: '/zapsign', label: 'Modelos ZapSign', description: 'Modelos de contrato e aditivo para assinatura digital' },
@@ -57,6 +65,7 @@ const CONFIG_SECTIONS = [
 export default async function SettingsPage() {
   const profile = await getCurrentProfile()
   if (profile?.role !== 'admin') redirect('/')
+  const isAdmin = true
 
   const supabase = await createClient()
   const { data: settings } = await supabase
@@ -86,7 +95,7 @@ export default async function SettingsPage() {
 
       {/* Atalhos pra telas de configuração específicas */}
       <div className="space-y-6">
-        {CONFIG_SECTIONS.map((section) => (
+        {CONFIG_SECTIONS.filter(s => !(s as any).adminOnly || isAdmin).map((section) => (
           <div key={section.title}>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{section.title}</h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
