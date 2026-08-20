@@ -59,17 +59,6 @@ export function LeadActionsPanel({
     })
   }
 
-  function handleConvert() {
-    if (!confirm('Converter este lead numa oportunidade de verdade? Ele vai entrar no funil de vendas.')) return
-    startTransition(async () => {
-      const result = await convertLeadToOpportunity(leadId)
-      if (result.error) {
-        setError(result.error)
-      } else if (result.contractId) {
-        router.push(`/contracts/${result.contractId}`)
-      }
-    })
-  }
 
   function handleAddNote() {
     if (!note.trim()) return
