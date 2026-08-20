@@ -21,8 +21,7 @@ export default async function LeadScoringPage() {
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Lead Scoring</h1>
         <p className="mt-0.5 text-sm text-gray-500">
-          Configure os critérios e pontuações que determinam a qualidade de cada lead.
-          O score máximo é 100 pontos.
+          Defina os pesos dos critérios. O cálculo final do lead terá o teto máximo de 100 pontos.
         </p>
       </div>
       <LeadScoringEditor initialRules={rules ?? []} />
