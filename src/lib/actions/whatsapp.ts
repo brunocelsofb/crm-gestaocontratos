@@ -570,10 +570,17 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
 
   const supabase = createAdminClient()
 
-  let chats
+  let chats: Array<{ phone: string; isGroup: boolean; name?: string }> = []
   try {
-    const { getZApiChats } = await import('@/lib/whatsapp/zapi')
-    chats = await getZApiChats(creds)
+    // Evolution API não tem endpoint de "listar chats" como Z-API.
+    // Buscamos os números únicos já recebidos via webhook no banco.
+    const { data: msgs } = await supabase
+      .from('contract_whatsapp_messages')
+      .select('phone')
+      .eq('direction', 'inbound')
+      .not('phone', 'is', null)
+    const uniquePhones = [...new Set((msgs ?? []).map((m: any) => m.phone))]
+    chats = uniquePhones.map(phone => ({ phone, isGroup: false }))
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Falha ao buscar conversas do WhatsApp.' }
   }
