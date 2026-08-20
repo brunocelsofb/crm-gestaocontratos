@@ -14,7 +14,7 @@ export default async function LeadRoutingPage() {
   const [{ data: rules }, { data: pipelines }, { data: stages }, { data: users }] = await Promise.all([
     admin.from('lead_routing_rules').select('*').order('priority'),
     admin.from('pipelines').select('id, name').order('name'),
-    admin.from('pipeline_stages').select('id, name, pipeline_id').order('position'),
+    admin.from('stages').select('id, name, pipeline_id').order('order_index'),
     admin.from('profiles').select('id, full_name, role').order('full_name'),
   ])
 
