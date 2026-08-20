@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { connectEvo, disconnectEvo } from '@/lib/actions/whatsapp'
+import { getEvoQrCode } from '@/lib/whatsapp/evolution'
 
 type Props = {
   isConnected: boolean
@@ -32,13 +33,12 @@ export function WhatsAppSettingsForm({ isConnected, currentServerUrl, currentIns
     const instance  = (fd.get('evo_instance_name') as string).trim()
 
     try {
-      const qrRes = await fetch(`${serverUrl}/instance/connect/${instance}`, {
-        headers: { apikey: apiKey }
-      })
-      const data = await qrRes.json()
-      if (data.base64) setQrCode(data.base64)
-      else if (data.instance?.state === 'open') setStatus('✅ Instância já conectada!')
-      else setStatus('Instância não retornou QR Code. Verifique se está desconectada.')
+      const data = await getEvoQrCode({ serverUrl, apiKey, instanceName })
+      console.log('[evo qr] resposta:', data)
+      if (data.error) setStatus(`❌ ${data.error}`)
+      else if (data.base64) setQrCode(data.base64)
+      else if (data.status) setStatus(data.status)
+      else setStatus('QR Code não disponível. Verifique se a instância está desconectada.')
     } catch (e: any) {
       setStatus(`Erro ao buscar QR Code: ${e.message}`)
     }
