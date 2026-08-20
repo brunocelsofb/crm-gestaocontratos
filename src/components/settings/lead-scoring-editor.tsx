@@ -140,6 +140,7 @@ export function LeadScoringEditor({ initialRules }: { initialRules: Rule[] }) {
   const [newDesc, setNewDesc] = useState('')
   const [saving, setSaving] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [, startTransition] = useTransition()
 
   async function handleRestore() {
     if (!confirm('Restaurar padrões de mercado? As regras existentes serão mantidas — apenas regras faltantes serão adicionadas.')) return
