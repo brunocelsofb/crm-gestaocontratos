@@ -420,17 +420,22 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
+  // Busca nome do atendente para assinatura
+  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+  const senderName = profile?.full_name ?? null
+  const signedMessage = senderName ? `*${senderName}:* ${message}` : message
+
   // Usa a instância da conversa se disponível, senão usa a padrão
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
 
   try {
-    const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message })
+    const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message: signedMessage })
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
       direction: 'enviado',
       phone,
-      message,
+      message: signedMessage,
       zapi_message_id: result?.key?.id,
       status: 'enviado',
       instance_name: targetCreds.instanceName,
@@ -442,7 +447,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
       sent_by: user.id,
       direction: 'enviado',
       phone,
-      message,
+      message: signedMessage,
       status: 'falhou',
       error_message: errorMsg,
       instance_name: targetCreds.instanceName,

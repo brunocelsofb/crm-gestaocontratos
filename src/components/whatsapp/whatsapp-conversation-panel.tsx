@@ -243,21 +243,28 @@ export function WhatsAppConversationPanel({
       <WhatsAppChatView messages={messages} contactName={displayName} contactPhone={phone} />
 
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-        {/* Seletor de instância */}
+        {/* Instância travada na original da conversa */}
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-gray-500 whitespace-nowrap">Responder via:</span>
-          <select
-            value={selectedInstance}
-            onChange={e => setSelectedInstance(e.target.value)}
-            className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none"
-          >
-            {availableInstances.length === 0 && (
-              <option value={instanceName ?? ''}>{instanceName ?? 'Carregando...'}</option>
-            )}
-            {availableInstances.map(inst => (
-              <option key={inst.name} value={inst.name}>{inst.label}</option>
-            ))}
-          </select>
+          {instanceName ? (
+            <span className="flex-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-[#1B556B] font-medium">
+              📱 {availableInstances.find(i => i.name === instanceName)?.label ?? instanceName}
+              <span className="ml-1 text-gray-400 font-normal">(fixo)</span>
+            </span>
+          ) : (
+            <select
+              value={selectedInstance}
+              onChange={e => setSelectedInstance(e.target.value)}
+              className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none"
+            >
+              {availableInstances.length === 0 && (
+                <option value="">Selecione a instância</option>
+              )}
+              {availableInstances.map(inst => (
+                <option key={inst.name} value={inst.name}>{inst.label}</option>
+              ))}
+            </select>
+          )}
         </div>
         <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
