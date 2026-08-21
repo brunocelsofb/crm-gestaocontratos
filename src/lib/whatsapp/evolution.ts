@@ -74,17 +74,28 @@ export async function getEvoQrCode({
 
   let d1 = await tryConnect()
 
-  // count:0 ou sem QR → restart e reconecta
+  // count:0 → deleta, recria e conecta
   const noQr = (d: any) => !d || d.count === 0 || (!d.base64 && !d.code && !d?.qrcode?.base64 && !d?.qrcode?.code)
   if (noQr(d1)) {
-    console.log('[evo] sem QR — restart e reconecta')
+    console.log('[evo] count:0 — delete + recreate')
     try {
-      const lr = await fetch(`${serverUrl}/instance/restart/${instanceName}`, {
-        method: 'PUT', headers: { 'apikey': apiKey },
+      const dr = await fetch(`${serverUrl}/instance/delete/${instanceName}`, {
+        method: 'DELETE', headers: { 'apikey': apiKey },
       })
-      console.log('[evo] restart:', lr.status)
+      console.log('[evo] delete:', dr.status)
     } catch { /* ignora */ }
-    await new Promise(r => setTimeout(r, 2000))
+    await new Promise(r => setTimeout(r, 800))
+    try {
+      const cr = await fetch(`${serverUrl}/instance/create`, {
+        method: 'POST', headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instanceName, token: '', qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
+      })
+      const cd = await cr.json().catch(() => ({}))
+      console.log('[evo] recreate:', cr.status, JSON.stringify(cd))
+      const freshQr = cd?.qrcode?.base64 ?? cd?.qrcode?.code ?? cd?.base64 ?? cd?.code ?? null
+      if (freshQr) return { base64: formatQr(freshQr) }
+    } catch { /* ignora */ }
+    await new Promise(r => setTimeout(r, 1500))
     d1 = await tryConnect()
   }
 
