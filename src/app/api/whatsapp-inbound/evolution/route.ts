@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         phone,
         message: messageText,
         direction: isFromMe ? 'enviado' : 'recebido',
-        status: isFromMe ? 'enviado' : null,
+        status: 'enviado',
         triggered_automatically: false,
         zapi_message_id: messageId ?? null,
         unlinked_sender_name: pushName,
