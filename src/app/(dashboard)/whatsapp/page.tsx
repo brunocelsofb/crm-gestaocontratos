@@ -15,12 +15,12 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   // por telefone, com a última mensagem de cada uma.
   const { data: openMessages } = await supabase
     .from('contract_whatsapp_messages')
-    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, direction, created_at, lead_id')
+    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, direction, created_at, lead_id, instance_name')
     .is('contract_id', null)
     .order('created_at', { ascending: false })
     .limit(300)
 
-  const latestByPhone = new Map<string, { unlinked_sender_name: string | null; sender_photo_url: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null }>()
+  const latestByPhone = new Map<string, { unlinked_sender_name: string | null; sender_photo_url: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null; instance_name: string | null }>()
   for (const m of openMessages ?? []) {
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
@@ -200,6 +200,11 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
                     {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
                     {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
                   </p>
+                  {c.latest.instance_name && (
+                    <span className="mt-0.5 inline-block rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
+                      via {c.latest.instance_name}
+                    </span>
+                  )}
                   <div className="mt-0.5 flex items-center justify-between">
                     <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
                     {assignments[c.phone] && (
@@ -244,6 +249,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               currentUserId={currentUser?.id ?? ''}
               users={teamUsers ?? []}
               assignment={assignments[selectedPhone!] ?? null}
+              instanceName={latestByPhone.get(selectedPhone!)?.instance_name ?? null}
             />
           ) : selectedContractData?.contract ? (
             <div className="space-y-2">

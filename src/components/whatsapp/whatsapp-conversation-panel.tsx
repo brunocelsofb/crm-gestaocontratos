@@ -34,6 +34,7 @@ export function WhatsAppConversationPanel({
   currentUserId,
   users,
   assignment,
+  instanceName,
 }: {
   phone: string
   displayName: string | null
@@ -43,6 +44,7 @@ export function WhatsAppConversationPanel({
   currentUserId: string
   users: { id: string; full_name: string }[]
   assignment: { assigned_to: string; assigned_to_name: string } | null
+  instanceName?: string | null
 }) {
   const router = useRouter()
   const [showLinkSearch, setShowLinkSearch] = useState(false)
@@ -107,7 +109,7 @@ export function WhatsAppConversationPanel({
   async function handleReply() {
     setBusy(true)
     setError(null)
-    const result = await sendUnlinkedWhatsAppMessage(phone, replyText)
+    const result = await sendUnlinkedWhatsAppMessage(phone, replyText, instanceName ?? undefined)
     setBusy(false)
     if (result.error) setError(result.error)
     else {
@@ -156,10 +158,15 @@ export function WhatsAppConversationPanel({
 
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${leadId ? 'bg-purple-100 text-purple-700' : 'bg-yellow-100 text-yellow-700'}`}>
               {leadId ? '🎯 Já é um Lead' : '⚠️ Sem conta vinculada'}
             </span>
+            {instanceName && (
+              <span className="rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[11px] font-medium text-[#1B556B]">
+                📱 via {instanceName}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {leadId && (

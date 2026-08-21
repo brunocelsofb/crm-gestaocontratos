@@ -19,7 +19,8 @@ export async function POST(request: Request) {
     // Normaliza event name: MESSAGES_UPSERT, messages.upsert, send_message, etc.
     const eventRaw = body?.event ?? body?.type ?? ''
     const event = eventRaw.toLowerCase().replace(/[.\-]/g, '_')
-    console.log('[evo-webhook] event normalizado:', event)
+    const instanceName = body?.instance ?? body?.instanceName ?? null
+    console.log('[evo-webhook] event:', event, '| instance:', instanceName)
 
     if (!['messages_upsert', 'send_message'].includes(event)) {
       return NextResponse.json({ ok: true, skipped: `event=${eventRaw}` })
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
         triggered_automatically: false,
         zapi_message_id: messageId ?? null,
         unlinked_sender_name: pushName,
+        instance_name: instanceName,
         media_url: mediaUrl,
         media_type: mediaType,
         media_filename: mediaFilename,

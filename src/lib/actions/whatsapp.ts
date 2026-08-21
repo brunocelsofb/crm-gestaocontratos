@@ -411,19 +411,20 @@ export async function searchContractsForLinking(query: string): Promise<{ id: st
 // Responder uma conversa AINDA NÃO vinculada — sem isso, o time fica
 // de mãos atadas até alguém formalizar o vínculo, o que não é
 // realista quando a pessoa está esperando resposta na hora.
-export async function sendUnlinkedWhatsAppMessage(phone: string, message: string): Promise<ActionState> {
+export async function sendUnlinkedWhatsAppMessage(phone: string, message: string, instanceName?: string): Promise<ActionState> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!message.trim()) return { error: 'Escreva a mensagem.' }
 
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
+  // Usa a instância da conversa se disponível, senão usa a padrão
+  const targetCreds = instanceName ? { ...creds, instanceName } : creds
+
   try {
-    const result: any = await sendEvoTextMessage({ ...creds, phone, message })
+    const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message })
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
@@ -432,6 +433,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
       message,
       zapi_message_id: result?.key?.id,
       status: 'enviado',
+      instance_name: targetCreds.instanceName,
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
@@ -443,6 +445,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
       message,
       status: 'falhou',
       error_message: errorMsg,
+      instance_name: targetCreds.instanceName,
     })
     return { error: errorMsg }
   }
