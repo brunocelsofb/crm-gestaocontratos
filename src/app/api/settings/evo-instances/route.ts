@@ -1,0 +1,87 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+async function getEvoCreds() {
+  const admin = createAdminClient()
+  const { data } = await admin.from('organization_settings')
+    .select('evo_server_url, evo_api_key').eq('id', 'default').maybeSingle()
+  return data?.evo_server_url && data?.evo_api_key ? data : null
+}
+
+async function guardAdmin() {
+  const s = await createClient()
+  const { data: { user } } = await s.auth.getUser()
+  if (!user) return false
+  const { data: p } = await s.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  return p?.role === 'admin'
+}
+
+// GET — lista todas as instâncias
+export async function GET() {
+  if (!await guardAdmin()) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+  const creds = await getEvoCreds()
+  if (!creds) return NextResponse.json({ error: 'Credenciais não configuradas' }, { status: 400 })
+
+  const res = await fetch(`${creds.evo_server_url}/instance/fetchInstances`, {
+    headers: { apikey: creds.evo_api_key },
+  })
+  const data = await res.json().catch(() => [])
+  return NextResponse.json({ instances: Array.isArray(data) ? data : [] })
+}
+
+// POST — cria nova instância
+export async function POST(req: Request) {
+  if (!await guardAdmin()) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+  const creds = await getEvoCreds()
+  if (!creds) return NextResponse.json({ error: 'Credenciais não configuradas' }, { status: 400 })
+
+  const { instanceName } = await req.json()
+  if (!instanceName) return NextResponse.json({ error: 'Nome obrigatório' }, { status: 400 })
+
+  const res = await fetch(`${creds.evo_server_url}/instance/create`, {
+    method: 'POST',
+    headers: { apikey: creds.evo_api_key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instanceName, qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
+  })
+  const data = await res.json().catch(() => ({}))
+
+  // Registra webhook
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/whatsapp-inbound/evolution`
+  await fetch(`${creds.evo_server_url}/webhook/set/${instanceName}`, {
+    method: 'POST',
+    headers: { apikey: creds.evo_api_key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhook: { enabled: true, url: webhookUrl, webhookByEvents: true, webhookBase64: false, events: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] } }),
+  })
+
+  return NextResponse.json({ ok: res.ok, data })
+}
+
+// DELETE — deleta instância
+export async function DELETE(req: Request) {
+  if (!await guardAdmin()) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+  const creds = await getEvoCreds()
+  if (!creds) return NextResponse.json({ error: 'Credenciais não configuradas' }, { status: 400 })
+
+  const { instanceName } = await req.json()
+  const res = await fetch(`${creds.evo_server_url}/instance/delete/${instanceName}`, {
+    method: 'DELETE',
+    headers: { apikey: creds.evo_api_key },
+  })
+  return NextResponse.json({ ok: res.ok })
+}
+
+// PATCH — conecta instância (QR Code)
+export async function PATCH(req: Request) {
+  if (!await guardAdmin()) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+  const creds = await getEvoCreds()
+  if (!creds) return NextResponse.json({ error: 'Credenciais não configuradas' }, { status: 400 })
+
+  const { instanceName } = await req.json()
+  const res = await fetch(`${creds.evo_server_url}/instance/connect/${instanceName}`, {
+    headers: { apikey: creds.evo_api_key },
+  })
+  const data = await res.json().catch(() => ({}))
+  const qrRaw = data?.qrcode?.base64 ?? data?.base64 ?? data?.code ?? null
+  return NextResponse.json({ qr: qrRaw ? (qrRaw.startsWith('data:') ? qrRaw : `data:image/png;base64,${qrRaw}`) : null })
+}

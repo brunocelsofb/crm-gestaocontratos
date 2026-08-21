@@ -7,6 +7,7 @@ import { NumberingSettingsForm } from '@/components/settings/numbering-settings-
 import { InboundEmailSettingsForm } from '@/components/settings/inbound-email-settings-form'
 import { WhatsAppSettingsForm } from '@/components/settings/whatsapp-settings-form'
 import { WhatsAppBotSettingsForm } from '@/components/settings/whatsapp-bot-settings-form'
+import { WhatsAppInstancesPanel } from '@/components/settings/whatsapp-instances-panel'
 import { DEFAULT_WELCOME_OFFLINE, DEFAULT_WELCOME_ONLINE, DEFAULT_REMINDER } from '@/lib/whatsapp/guardrails'
 
 const CONFIG_SECTIONS = [
@@ -137,6 +138,7 @@ export default async function SettingsPage() {
           hasSigningKey={!!settings?.mailgun_webhook_signing_key}
         />
         <WhatsAppSettingsForm isConnected={!!(settings as any)?.evo_instance_name} currentServerUrl={(settings as any)?.evo_server_url ?? null} currentInstanceName={(settings as any)?.evo_instance_name ?? null} />
+        <WhatsAppInstancesPanel />
         <WhatsAppBotSettingsForm
           isOnline={settings?.whatsapp_is_online ?? false}
           welcomeMessage={settings?.whatsapp_welcome_message ?? DEFAULT_WELCOME_OFFLINE}
