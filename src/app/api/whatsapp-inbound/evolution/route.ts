@@ -119,14 +119,13 @@ export async function POST(request: Request) {
       .from('contract_whatsapp_messages')
       .insert({
         contract_id: contractId,
-        contact_id: contactId,
         phone,
         message: messageText,
         direction: isFromMe ? 'enviado' : 'recebido',
         status: isFromMe ? 'enviado' : 'received',
         triggered_automatically: false,
         zapi_message_id: messageId ?? null,
-        sender_name: pushName,
+        unlinked_sender_name: pushName,
         media_url: mediaUrl,
         media_type: mediaType,
         media_filename: mediaFilename,
