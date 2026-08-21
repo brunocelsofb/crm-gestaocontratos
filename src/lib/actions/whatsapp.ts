@@ -12,9 +12,9 @@ export type ActionState = { error?: string }
 
 async function getEvoCredentials(): Promise<EvoCredentials | null> {
   const supabase = createAdminClient()
-  const { data } = await supabase.from('organization_settings').select('evo_server_url, evo_api_key, evo_instance_name').eq('id', 'default').maybeSingle()
+  const { data } = await supabase.from('organization_settings').select('evo_server_url, evo_api_key, evo_instance_name, evo_instance_token').eq('id', 'default').maybeSingle()
   if (!data?.evo_server_url || !data?.evo_api_key || !data?.evo_instance_name) return null
-  return { serverUrl: data.evo_server_url, apiKey: data.evo_api_key, instanceName: data.evo_instance_name }
+  return { serverUrl: data.evo_server_url, apiKey: data.evo_api_key, instanceName: data.evo_instance_name, instanceToken: (data as any).evo_instance_token ?? null }
 }
 
 export async function connectEvo(formData: FormData): Promise<ActionState> {

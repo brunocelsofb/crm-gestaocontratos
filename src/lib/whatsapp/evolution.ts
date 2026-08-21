@@ -5,6 +5,7 @@ export type EvoCredentials = {
   serverUrl: string
   apiKey: string
   instanceName: string
+  instanceToken?: string | null  // token específico da instância (alternativo à global key)
 }
 
 export async function sendEvoTextMessage({
@@ -62,10 +63,11 @@ export async function getEvoQrCode({
     if (earlyQr) return { base64: formatQr(earlyQr) }
   } catch { /* ignora */ }
 
-  // Passo 2: GET connect
+  // Passo 2: GET connect — usa token da instância se disponível (chave alternativa)
+  const connectKey = instanceToken || apiKey
   const tryConnect = async () => {
     const r = await fetch(`${serverUrl}/instance/connect/${instanceName}`, {
-      headers: { 'apikey': apiKey },
+      headers: { 'apikey': connectKey },
     })
     const d = await r.json().catch(() => ({}))
     console.log('[evo] connect:', r.status, JSON.stringify(d))
