@@ -51,26 +51,43 @@ export async function getEvoQrCode({
 }: EvoCredentials): Promise<{ base64?: string; status?: string; error?: string }> {
   const auth = { 'apikey': apiKey, 'Content-Type': 'application/json' }
 
-  // 1. Deleta instância corrompida (ignora 404/P2025)
+  // 1. Deleta instância corrompida
   try {
     await fetch(`${serverUrl}/instance/delete/${instanceName}`, { method: 'DELETE', headers: auth })
   } catch { /* ignora */ }
 
   await new Promise(r => setTimeout(r, 1000))
 
-  // 2. Cria do zero — v2.1.1 retorna QR na criação
+  // 2. Cria instância do zero
   try {
-    const res = await fetch(`${serverUrl}/instance/create`, {
+    const createRes = await fetch(`${serverUrl}/instance/create`, {
       method: 'POST', headers: auth,
       body: JSON.stringify({ instanceName, qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
     })
-    const d = await res.json().catch(() => ({}))
-    console.log('[evo] create:', res.status, JSON.stringify(d))
+    const data = await createRes.json().catch(() => ({}))
+    console.log('[evo] create:', createRes.status, JSON.stringify(data))
 
-    const qrRaw = d?.qrcode?.base64 ?? d?.qrcode?.code ?? d?.base64 ?? d?.code ?? null
-    if (qrRaw) return { base64: formatQr(qrRaw) }
+    let qr = data?.qrcode?.base64 ?? data?.base64 ?? data?.code ?? null
 
-    return { error: `QR não retornado. Resposta: ${JSON.stringify(d)}` }
+    // 3. QR não pronto ainda (Baileys processando) → aguarda 3s e busca no connect
+    if (!qr || data?.qrcode?.count === 0) {
+      console.log('[evo] QR não pronto — aguardando 3s e buscando no connect')
+      await new Promise(r => setTimeout(r, 3000))
+
+      const connectRes = await fetch(`${serverUrl}/instance/connect/${instanceName}`, {
+        method: 'GET', headers: auth,
+      })
+      const connectData = await connectRes.json().catch(() => ({}))
+      console.log('[evo] connect:', connectRes.status, JSON.stringify(connectData))
+      qr = connectData?.qrcode?.base64 ?? connectData?.base64 ?? connectData?.code ?? null
+    }
+
+    // 4. Retorna QR formatado
+    if (qr && typeof qr === 'string' && qr !== 'undefined') {
+      return { base64: qr.startsWith('data:image') ? qr : `data:image/png;base64,${qr}` }
+    }
+
+    return { error: 'QR Code ainda processando. Clique novamente em Salvar.' }
   } catch (e: any) {
     return { error: String(e) }
   }
