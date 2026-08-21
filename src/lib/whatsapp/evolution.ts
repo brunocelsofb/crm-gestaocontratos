@@ -47,67 +47,33 @@ export async function sendEvoDocumentMessage({
 }
 
 export async function getEvoQrCode({
-  serverUrl, apiKey, instanceName, instanceToken
+  serverUrl, apiKey, instanceName,
 }: EvoCredentials): Promise<{ base64?: string; status?: string; error?: string }> {
-  const h = { 'apikey': apiKey, 'Content-Type': 'application/json' }
-  const connectKey = instanceToken || apiKey
+  const auth = { 'apikey': apiKey, 'Content-Type': 'application/json' }
 
-  // Passo 1: cria instância (ignora se já existe)
+  // 1. Deleta instância corrompida (ignora 404/P2025)
   try {
-    const r = await fetch(`${serverUrl}/instance/create`, {
-      method: 'POST', headers: h,
-      body: JSON.stringify({ instanceName, token: '', qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
-    })
-    const d = await r.json().catch(() => ({}))
-    console.log('[evo] create:', r.status, JSON.stringify(d))
-    const earlyQr = d?.qrcode?.base64 ?? d?.qrcode?.code ?? d?.base64 ?? d?.code ?? null
-    if (earlyQr) return { base64: formatQr(earlyQr) }
+    await fetch(`${serverUrl}/instance/delete/${instanceName}`, { method: 'DELETE', headers: auth })
   } catch { /* ignora */ }
 
-  // Passo 2: GET connect — usa token da instância se disponível (chave alternativa)
-  const tryConnect = async () => {
-    const r = await fetch(`${serverUrl}/instance/connect/${instanceName}`, {
-      headers: { 'apikey': connectKey },
+  await new Promise(r => setTimeout(r, 1000))
+
+  // 2. Cria do zero — v2.1.1 retorna QR na criação
+  try {
+    const res = await fetch(`${serverUrl}/instance/create`, {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ instanceName, qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
     })
-    const d = await r.json().catch(() => ({}))
-    console.log('[evo] connect:', r.status, JSON.stringify(d))
-    return d
+    const d = await res.json().catch(() => ({}))
+    console.log('[evo] create:', res.status, JSON.stringify(d))
+
+    const qrRaw = d?.qrcode?.base64 ?? d?.qrcode?.code ?? d?.base64 ?? d?.code ?? null
+    if (qrRaw) return { base64: formatQr(qrRaw) }
+
+    return { error: `QR não retornado. Resposta: ${JSON.stringify(d)}` }
+  } catch (e: any) {
+    return { error: String(e) }
   }
-
-  let d1 = await tryConnect()
-
-  // count:0 → deleta, recria e conecta
-  const noQr = (d: any) => !d || d.count === 0 || (!d.base64 && !d.code && !d?.qrcode?.base64 && !d?.qrcode?.code)
-  if (noQr(d1)) {
-    console.log('[evo] count:0 — delete + recreate')
-    try {
-      const dr = await fetch(`${serverUrl}/instance/delete/${instanceName}`, {
-        method: 'DELETE', headers: { 'apikey': apiKey },
-      })
-      console.log('[evo] delete:', dr.status)
-    } catch { /* ignora */ }
-    await new Promise(r => setTimeout(r, 800))
-    try {
-      const cr = await fetch(`${serverUrl}/instance/create`, {
-        method: 'POST', headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instanceName, token: '', qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
-      })
-      const cd = await cr.json().catch(() => ({}))
-      console.log('[evo] recreate:', cr.status, JSON.stringify(cd))
-      const freshQr = cd?.qrcode?.base64 ?? cd?.qrcode?.code ?? cd?.base64 ?? cd?.code ?? null
-      if (freshQr) return { base64: formatQr(freshQr) }
-    } catch { /* ignora */ }
-    await new Promise(r => setTimeout(r, 1500))
-    d1 = await tryConnect()
-  }
-
-  const qrRaw = d1?.base64 ?? d1?.code ?? d1?.qrcode?.base64 ?? d1?.qrcode?.code ?? null
-  if (qrRaw) return { base64: formatQr(qrRaw) }
-
-  const state = d1?.instance?.state ?? d1?.state
-  if (state === 'open') return { status: '✅ WhatsApp já está conectado!' }
-
-  return { error: `QR não disponível. Última resposta: ${JSON.stringify(d1)}` }
 }
 
 function formatQr(raw: string): string {
