@@ -50,6 +50,7 @@ export async function getEvoQrCode({
   serverUrl, apiKey, instanceName
 }: EvoCredentials): Promise<{ base64?: string; status?: string; error?: string }> {
   const h = { 'apikey': apiKey, 'Content-Type': 'application/json' }
+  const connectKey = instanceToken || apiKey
 
   // Passo 1: cria instância (ignora se já existe)
   try {
@@ -64,7 +65,6 @@ export async function getEvoQrCode({
   } catch { /* ignora */ }
 
   // Passo 2: GET connect — usa token da instância se disponível (chave alternativa)
-  const connectKey = instanceToken || apiKey
   const tryConnect = async () => {
     const r = await fetch(`${serverUrl}/instance/connect/${instanceName}`, {
       headers: { 'apikey': connectKey },
