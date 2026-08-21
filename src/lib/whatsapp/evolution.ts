@@ -50,7 +50,10 @@ export async function getEvoQrCode({
   serverUrl, apiKey, instanceName
 }: EvoCredentials): Promise<{ base64?: string; status?: string; error?: string }> {
   const h = { 'apikey': apiKey, 'Content-Type': 'application/json' }
-  const connectKey = instanceToken || apiKey
+
+  // Determina a chave de autenticação para connect
+  // instanceToken (do EvoCredentials) tem prioridade sobre apiKey global
+  const connectKey = (instanceToken ?? apiKey) || apiKey
 
   // Passo 1: cria instância (ignora se já existe)
   try {
