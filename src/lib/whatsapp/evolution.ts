@@ -47,86 +47,56 @@ export async function sendEvoDocumentMessage({
 
 export async function getEvoQrCode({
   serverUrl, apiKey, instanceName
-}: EvoCredentials): Promise<{ base64?: string; pairingCode?: string; status?: string; error?: string }> {
-  // 1. Tenta criar a instância (ignora 409/403 se já existir)
+}: EvoCredentials): Promise<{ base64?: string; status?: string; error?: string }> {
+  // Tenta criar instância (ignora se já existir)
   try {
     const createRes = await fetch(`${serverUrl}/instance/create`, {
       method: 'POST',
       headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instanceName,
-        qrcode: true,
-        integration: 'WHATSAPP-BAILEYS',
-      }),
+      body: JSON.stringify({ instanceName, qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
     })
     const createData = await createRes.json().catch(() => ({}))
-    console.log('[evo] create status:', createRes.status, JSON.stringify(createData))
+    console.log('[evo] create:', createRes.status, JSON.stringify(createData))
+    // Se o create já retornou QR, usa ele
+    const earlyQr = createData?.qrcode?.base64 ?? createData?.base64 ?? createData?.code ?? null
+    if (earlyQr) return { base64: formatQr(earlyQr) }
+  } catch { /* instância pode já existir, segue */ }
 
-    // Se criou com sucesso, o QR pode já vir aqui
-    if (createRes.ok) {
-      const base64 = createData?.qrcode?.base64 ?? createData?.base64 ?? createData?.code ?? null
-      if (base64) return { base64 }
-    }
-
-    // 409/403/400 ou mensagem "already exists" = instância já existe — segue para connect
-    const msgStr = typeof createData?.message === 'string'
-      ? createData.message
-      : Array.isArray(createData?.message) ? JSON.stringify(createData.message[0] ?? '') : ''
-
-    const alreadyExists = createRes.status === 409 || createRes.status === 403 || createRes.status === 400
-      || msgStr.toLowerCase().includes('already exists')
-      || msgStr.toLowerCase().includes('já existe')
-
-    if (!createRes.ok && !alreadyExists) {
-      const errorMsg = typeof createData?.message === 'string'
-        ? createData.message
-        : Array.isArray(createData?.message) && createData.message.length > 0
-          ? (typeof createData.message[0] === 'string' ? createData.message[0] : JSON.stringify(createData.message[0]))
-          : createData?.error
-            ? (typeof createData.error === 'string' ? createData.error : JSON.stringify(createData.error))
-            : `HTTP ${createRes.status}`
-      return { error: `Erro ao criar instância: ${errorMsg}` }
-    }
-  } catch (e: any) {
-    return { error: `Falha de rede ao criar instância: ${e.message}` }
-  }
-
-  // 2. Conecta e busca QR Code
+  // Conecta e busca QR
   try {
-    const connectRes = await fetch(`${serverUrl}/instance/connect/${instanceName}`, {
+    const res = await fetch(`${serverUrl}/instance/connect/${instanceName}`, {
+      method: 'GET',
       headers: { 'apikey': apiKey },
     })
-    const connectData = await connectRes.json().catch(() => ({}))
-    console.log('[evo] connect status:', connectRes.status, JSON.stringify(connectData))
+    const data = await res.json().catch(() => ({}))
+    console.log('[evo] connect:', res.status, JSON.stringify(data))
 
-    if (!connectRes.ok) {
-      const errorMsg = typeof connectData?.message === 'string'
-        ? connectData.message
-        : Array.isArray(connectData?.message) && connectData.message.length > 0
-          ? (typeof connectData.message[0] === 'string' ? connectData.message[0] : JSON.stringify(connectData.message[0]))
-          : connectData?.error
-            ? (typeof connectData.error === 'string' ? connectData.error : JSON.stringify(connectData.error))
-            : `HTTP ${connectRes.status}`
-      return { error: `Erro ao conectar: ${errorMsg}` }
+    if (!res.ok) {
+      return { error: parseEvoError(data, res.status) }
     }
 
-    // Evolution v2 retorna QR em diferentes campos
-    const base64 =
-      connectData?.base64 ??
-      connectData?.code ??
-      connectData?.qrcode?.base64 ??
-      connectData?.qrcode ??
-      null
+    const qrRaw = data?.base64 ?? data?.code ?? data?.qrcode?.base64 ?? data?.qrcode ?? null
+    if (qrRaw) return { base64: formatQr(qrRaw) }
 
-    if (base64) return { base64 }
+    const state = data?.instance?.state ?? data?.state
+    if (state === 'open') return { status: '✅ WhatsApp já está conectado!' }
 
-    const state = connectData?.instance?.state ?? connectData?.state
-    if (state === 'open') return { status: '✅ Instância já conectada!' }
-
-    return { error: `QR não disponível. Resposta: ${JSON.stringify(connectData)}` }
+    return { error: `QR não disponível. Resposta: ${JSON.stringify(data)}` }
   } catch (e: any) {
-    return { error: `Falha de rede ao conectar: ${e.message}` }
+    return { error: `Falha de rede: ${e.message}` }
   }
+}
+
+function formatQr(raw: string): string {
+  return raw.startsWith('data:image') ? raw : `data:image/png;base64,${raw}`
+}
+
+function parseEvoError(data: any, status: number): string {
+  if (typeof data?.message === 'string') return data.message
+  if (Array.isArray(data?.message) && data.message.length > 0)
+    return typeof data.message[0] === 'string' ? data.message[0] : JSON.stringify(data.message[0])
+  if (typeof data?.error === 'string') return data.error
+  return `HTTP ${status}`
 }
 
 export async function getEvoInstanceStatus({
