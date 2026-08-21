@@ -81,8 +81,9 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     })
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
-  const { data: zapiSettings } = await supabase.from('organization_settings').select('evo_instance_name').eq('id', 'default').maybeSingle()
+  const { data: zapiSettings } = await supabase.from('organization_settings').select('evo_instance_name, evo_instance_aliases').eq('id', 'default').maybeSingle()
   const isConnected = !!(zapiSettings as any)?.evo_instance_name
+  const instanceAliases = (zapiSettings as any)?.evo_instance_aliases ?? {}
 
   // Métricas do funil de WhatsApp — tudo em contagens de TELEFONES
   // únicos, nunca mensagens individuais (uma conversa tem muitas
@@ -202,7 +203,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
                   </p>
                   {c.latest.instance_name && (
                     <span className="mt-0.5 inline-block rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
-                      via {c.latest.instance_name}
+                      via {(instanceAliases as any)?.[c.latest.instance_name] || c.latest.instance_name}
                     </span>
                   )}
                   <div className="mt-0.5 flex items-center justify-between">
