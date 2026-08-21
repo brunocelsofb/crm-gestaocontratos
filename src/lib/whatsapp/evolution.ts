@@ -74,17 +74,17 @@ export async function getEvoQrCode({
 
   let d1 = await tryConnect()
 
-  // count:0 ou sem QR → logout e reconecta
+  // count:0 ou sem QR → restart e reconecta
   const noQr = (d: any) => !d || d.count === 0 || (!d.base64 && !d.code && !d?.qrcode?.base64 && !d?.qrcode?.code)
   if (noQr(d1)) {
-    console.log('[evo] sem QR — logout e reconecta')
+    console.log('[evo] sem QR — restart e reconecta')
     try {
-      const lr = await fetch(`${serverUrl}/instance/logout/${instanceName}`, {
-        method: 'DELETE', headers: { 'apikey': apiKey },
+      const lr = await fetch(`${serverUrl}/instance/restart/${instanceName}`, {
+        method: 'PUT', headers: { 'apikey': apiKey },
       })
-      console.log('[evo] logout:', lr.status)
+      console.log('[evo] restart:', lr.status)
     } catch { /* ignora */ }
-    await new Promise(r => setTimeout(r, 1200))
+    await new Promise(r => setTimeout(r, 2000))
     d1 = await tryConnect()
   }
 
