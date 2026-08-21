@@ -52,7 +52,10 @@ export async function POST(request: Request) {
 
   try {
     // Processa apenas MESSAGES_UPSERT
-    if (body.event !== 'MESSAGES_UPSERT') return NextResponse.json({ ok: true, skipped: body.event })
+    const eventName = (body.event ?? '').toLowerCase().replace(/[._]/g, '_')
+    if (!['messages_upsert', 'send_message'].includes(eventName)) {
+      return NextResponse.json({ ok: true, skipped: body.event })
+    }
 
     const { key, message: msg, messageTimestamp, pushName } = body.data
     if (!key || !msg) return NextResponse.json({ ok: true, skipped: 'no message' })
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
       contact_id: contact?.id ?? null,
       phone,
       message: text ?? (media ? `[${media.type}]` : '[mensagem sem texto]'),
-      direction: isFromMe ? 'outbound' : 'inbound',
+      direction: isFromMe ? 'enviado' : 'recebido',
       status: 'received',
       triggered_automatically: false,
       zapi_message_id: messageId,

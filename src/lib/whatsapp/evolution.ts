@@ -145,9 +145,9 @@ export async function setEvoWebhook({
         webhook: {
           enabled: true,
           url: webhookUrl,
-          byEvents: false,
-          base64: false,
-          events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
+          webhookByEvents: true,
+          webhookBase64: false,
+          events: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'],
         },
       }),
     })
