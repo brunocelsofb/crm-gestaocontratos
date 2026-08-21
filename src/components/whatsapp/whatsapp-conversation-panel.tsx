@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation } from '@/lib/actions/whatsapp'
@@ -54,6 +54,31 @@ export function WhatsAppConversationPanel({
   const [error, setError] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
   const [showAssignPicker, setShowAssignPicker] = useState(false)
+  const [availableInstances, setAvailableInstances] = useState<string[]>([])
+  const [selectedInstance, setSelectedInstance] = useState<string>(instanceName ?? '')
+
+  // Carrega instâncias disponíveis e pré-seleciona a da conversa
+  const loadInstances = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/evo-instances')
+      const data = await res.json()
+      const names: string[] = (data.instances ?? [])
+        .map((i: any) => i.name ?? i.instance?.instanceName ?? i.instanceName)
+        .filter(Boolean)
+      setAvailableInstances(names)
+      // Pré-seleciona: instância da conversa > primeira disponível
+      if (!selectedInstance && names.length > 0) {
+        setSelectedInstance(instanceName ?? names[0])
+      }
+    } catch { /* ignora */ }
+  }, [instanceName])
+
+  useEffect(() => { loadInstances() }, [loadInstances])
+
+  // Atualiza quando a conversa muda
+  useEffect(() => {
+    setSelectedInstance(instanceName ?? '')
+  }, [instanceName])
 
   async function handleClaim() {
     setBusy(true)
@@ -109,7 +134,7 @@ export function WhatsAppConversationPanel({
   async function handleReply() {
     setBusy(true)
     setError(null)
-    const result = await sendUnlinkedWhatsAppMessage(phone, replyText, instanceName ?? undefined)
+    const result = await sendUnlinkedWhatsAppMessage(phone, replyText, selectedInstance || instanceName || undefined)
     setBusy(false)
     if (result.error) setError(result.error)
     else {
@@ -214,6 +239,22 @@ export function WhatsAppConversationPanel({
       <WhatsAppChatView messages={messages} contactName={displayName} contactPhone={phone} />
 
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+        {/* Seletor de instância */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-gray-500 whitespace-nowrap">Responder via:</span>
+          <select
+            value={selectedInstance}
+            onChange={e => setSelectedInstance(e.target.value)}
+            className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none"
+          >
+            {availableInstances.length === 0 && (
+              <option value="">{instanceName ?? 'Carregando...'}</option>
+            )}
+            {availableInstances.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
         <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
           {busy ? 'Enviando...' : 'Enviar'}
