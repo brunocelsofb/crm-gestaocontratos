@@ -65,10 +65,65 @@ export async function POST(request: Request) {
     let mediaUrl: string | null = null
     let mediaType: string | null = null
     let mediaFilename: string | null = null
-    if (msg?.imageMessage?.url)    { mediaUrl = msg.imageMessage.url;    mediaType = 'image' }
-    if (msg?.audioMessage?.url)    { mediaUrl = msg.audioMessage.url;    mediaType = 'audio' }
-    if (msg?.videoMessage?.url)    { mediaUrl = msg.videoMessage.url;    mediaType = 'video' }
-    if (msg?.documentMessage?.url) { mediaUrl = msg.documentMessage.url; mediaType = 'document'; mediaFilename = msg.documentMessage.fileName ?? null }
+
+    if (msg?.imageMessage)    { mediaType = 'image';    mediaFilename = null }
+    if (msg?.audioMessage)    { mediaType = 'audio';    mediaFilename = null }
+    if (msg?.videoMessage)    { mediaType = 'video';    mediaFilename = null }
+    if (msg?.documentMessage) { mediaType = 'document'; mediaFilename = msg.documentMessage.fileName ?? null }
+
+    // Tenta extrair URL direta (pode ser pública ou interna)
+    const rawUrl =
+      msg?.imageMessage?.url ??
+      msg?.audioMessage?.url ??
+      msg?.videoMessage?.url ??
+      msg?.documentMessage?.url ??
+      null
+
+    // Tenta base64 direto no payload (webhookBase64: true)
+    const rawBase64 =
+      msg?.imageMessage?.base64 ??
+      msg?.audioMessage?.base64 ??
+      msg?.videoMessage?.base64 ??
+      msg?.documentMessage?.base64 ??
+      null
+
+    if (rawBase64 && mediaType) {
+      const mime = mediaType === 'image' ? 'jpeg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'octet-stream'
+      mediaUrl = `data:${mediaType}/${mime};base64,${rawBase64}`
+    } else if (rawUrl && mediaType && messageId) {
+      // Baixa mídia via Evolution API e salva como base64
+      try {
+        const admin = createAdminClient()
+        const { data: orgSettings } = await admin
+          .from('organization_settings')
+          .select('evo_server_url, evo_api_key, evo_instance_name')
+          .eq('id', 'default')
+          .maybeSingle()
+
+        if (orgSettings?.evo_server_url && orgSettings?.evo_api_key && orgSettings?.evo_instance_name) {
+          const dlRes = await fetch(
+            `${orgSettings.evo_server_url}/chat/getBase64FromMediaMessage/${orgSettings.evo_instance_name}`,
+            {
+              method: 'POST',
+              headers: { 'apikey': orgSettings.evo_api_key, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: { key }, convertToMp4: false }),
+            }
+          )
+          if (dlRes.ok) {
+            const dlData = await dlRes.json().catch(() => ({}))
+            const b64 = dlData?.base64 ?? dlData?.data ?? null
+            if (b64) {
+              const mime = mediaType === 'image' ? 'jpeg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'octet-stream'
+              mediaUrl = `data:${mediaType}/${mime};base64,${b64}`
+              console.log('[evo-webhook] mídia baixada via getBase64:', mediaType)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[evo-webhook] falha ao baixar mídia:', e)
+        mediaUrl = rawUrl // fallback para URL original
+      }
+    }
 
     const messageText = text ?? (mediaType ? `[${mediaType}]` : '[mensagem]')
     console.log('[evo-webhook] phone:', phone, '| fromMe:', isFromMe, '| text:', messageText)
