@@ -53,13 +53,15 @@ export async function getEvoQrCode({
     const createRes = await fetch(`${serverUrl}/instance/create`, {
       method: 'POST',
       headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instanceName, qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
+      body: JSON.stringify({ instanceName, token: '', qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
     })
     const createData = await createRes.json().catch(() => ({}))
     console.log('[evo] create:', createRes.status, JSON.stringify(createData))
-    // Se o create já retornou QR, usa ele
-    const earlyQr = createData?.qrcode?.base64 ?? createData?.base64 ?? createData?.code ?? null
-    if (earlyQr) return { base64: formatQr(earlyQr) }
+    const earlyQr = createData?.qrcode?.base64 ?? createData?.qrcode?.code ?? createData?.base64 ?? createData?.code ?? null
+    if (earlyQr) {
+      console.log('[evo] QR obtido no create')
+      return { base64: formatQr(earlyQr) }
+    }
   } catch { /* instância pode já existir, segue */ }
 
   // Conecta e busca QR
