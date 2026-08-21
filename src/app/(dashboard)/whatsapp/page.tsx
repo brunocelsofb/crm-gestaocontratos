@@ -20,11 +20,18 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     .order('created_at', { ascending: false })
     .limit(300)
 
+  // Busca conversas arquivadas
+  const { data: archivedRows } = await supabase
+    .from('whatsapp_conversation_status')
+    .select('phone')
+    .eq('is_archived', true)
+  const archivedPhones = new Set((archivedRows ?? []).map((r: any) => r.phone))
+
   const latestByPhone = new Map<string, { unlinked_sender_name: string | null; sender_photo_url: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null; instance_name: string | null }>()
   for (const m of openMessages ?? []) {
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
-  const openPhones = Array.from(latestByPhone.entries())
+  const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !archivedPhones.has(phone))
 
   const leadIds = openPhones.map(([, m]) => m.lead_id).filter((id): id is string => !!id)
   const { data: leadsData } = leadIds.length ? await supabase.from('leads').select('id, name, company_name').in('id', leadIds) : { data: [] }

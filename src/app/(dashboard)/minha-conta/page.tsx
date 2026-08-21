@@ -4,15 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import { EmailConnectionSettings } from '@/components/settings/email-connection-settings'
 import { EmailSignatureForm } from '@/components/email/email-signature-form'
 import { getConnectedEmailAccount, getEmailSignature } from '@/lib/actions/email'
+import { JobTitleForm } from '@/components/settings/job-title-form'
 
 export default async function MyAccountPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('full_name, email, job_title').eq('id', user.id).maybeSingle()
   const connectedAccount = await getConnectedEmailAccount()
   const signature = await getEmailSignature()
 
@@ -22,6 +21,8 @@ export default async function MyAccountPage() {
         <h1 className="text-lg font-semibold text-gray-900">Minha Conta</h1>
         <p className="mt-0.5 text-sm text-gray-500">{profile?.full_name} · {profile?.email}</p>
       </div>
+
+      <JobTitleForm currentJobTitle={(profile as any)?.job_title ?? null} userId={user.id} />
 
       <Suspense fallback={null}>
         <EmailConnectionSettings

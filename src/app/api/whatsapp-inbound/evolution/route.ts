@@ -199,6 +199,18 @@ export async function POST(request: Request) {
     }
 
     console.log('[evo-webhook] mensagem salva:', inserted?.id)
+
+    // Reabre conversa arquivada ao receber nova mensagem inbound
+    if (!isFromMe) {
+      await supabase.from('whatsapp_conversation_status').upsert({
+        phone,
+        is_archived: false,
+        archived_at: null,
+        archived_by: null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'phone' })
+    }
+
     return NextResponse.json({ ok: true, id: inserted?.id })
 
   } catch (err: any) {

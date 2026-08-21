@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation } from '@/lib/actions/whatsapp'
+import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation } from '@/lib/actions/whatsapp'
 import { convertLeadToOpportunity } from '@/lib/actions/leads'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 
@@ -198,6 +198,19 @@ export function WhatsAppConversationPanel({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={async () => {
+                if (!confirm('Arquivar esta conversa? Ela sairá da lista principal e voltará automaticamente se houver nova mensagem.')) return
+                setBusy(true)
+                await archiveWhatsAppConversation(phone)
+                setBusy(false)
+                router.push('/whatsapp')
+              }}
+              disabled={busy}
+              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            >
+              🗃️ Arquivar
+            </button>
             {leadId && (
               <>
                 <Link href={`/leads/${leadId}`} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">

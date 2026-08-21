@@ -421,9 +421,13 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
   // Busca nome do atendente para assinatura
-  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
   const senderName = profile?.full_name ?? null
-  const signedMessage = senderName ? `*${senderName}:* ${message}` : message
+  const jobTitle = (profile as any)?.job_title ?? null
+  const signature = senderName
+    ? (jobTitle ? `*${senderName} - ${jobTitle}:*` : `*${senderName}:*`)
+    : null
+  const signedMessage = signature ? `${signature} ${message}` : message
 
   // Usa a instância da conversa se disponível, senão usa a padrão
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
@@ -702,4 +706,33 @@ export async function toggleWhatsAppOnlineStatus(isOnline: boolean): Promise<Act
   revalidatePath('/settings')
   revalidatePath('/whatsapp')
   return {}
+}
+
+// ---- Arquivamento de conversas ----
+export async function archiveWhatsAppConversation(phone: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  await supabase.from('whatsapp_conversation_status').upsert({
+    phone,
+    is_archived: true,
+    archived_at: new Date().toISOString(),
+    archived_by: user.id,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'phone' })
+
+  revalidatePath('/whatsapp')
+  return {}
+}
+
+export async function unarchiveWhatsAppConversation(phone: string): Promise<void> {
+  const admin = createAdminClient()
+  await admin.from('whatsapp_conversation_status').upsert({
+    phone,
+    is_archived: false,
+    archived_at: null,
+    archived_by: null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'phone' })
 }
