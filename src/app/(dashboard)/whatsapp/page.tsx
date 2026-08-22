@@ -3,6 +3,7 @@ export const revalidate = 0
 
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { WhatsAppConversationPanel } from '@/components/whatsapp/whatsapp-conversation-panel'
 import { getConversationByPhone, searchContractsForLinking, getWhatsAppAssignments } from '@/lib/actions/whatsapp'
@@ -14,9 +15,10 @@ import { WhatsAppInboxClient } from '@/components/whatsapp/whatsapp-inbox-client
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
   const supabase = await createClient()
+  const adminForStatus = createAdminClient()
 
-  // Busca conversas arquivadas PRIMEIRO
-  const { data: archivedRows } = await supabase
+  // Busca conversas arquivadas PRIMEIRO — usa adminClient para bypasser RLS
+  const { data: archivedRows } = await adminForStatus
     .from('whatsapp_conversation_status')
     .select('phone')
     .eq('is_archived', true)
