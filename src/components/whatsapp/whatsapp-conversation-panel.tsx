@@ -212,7 +212,7 @@ export function WhatsAppConversationPanel({
                 await archiveWhatsAppConversation(phone, instanceName)
                 setBusy(false)
                 setIsArchived(true)
-                router.refresh()
+                window.location.href = '/whatsapp'
               }}
               disabled={busy}
               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"

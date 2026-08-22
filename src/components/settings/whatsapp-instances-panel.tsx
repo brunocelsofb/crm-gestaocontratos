@@ -74,6 +74,48 @@ function AliasEditor({ instanceName, currentAlias, currentClosingMessage, onSave
   )
 }
 
+function ClosingMessageEditor({ instanceName, currentMessage, currentAlias, onSave }: {
+  instanceName: string
+  currentMessage: string
+  currentAlias: string
+  onSave: (msg: string) => void
+}) {
+  const [value, setValue] = useState(currentMessage)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    await fetch('/api/settings/evo-aliases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instanceName, alias: currentAlias, closingMessage: value }),
+    })
+    setSaving(false); setSaved(true)
+    onSave(value)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+        Mensagem de Encerramento
+      </label>
+      <textarea
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        rows={2}
+        placeholder="Ex: Atendimento finalizado! Se precisar, é só chamar. 😊 (deixe vazio para usar o texto padrão)"
+        className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs text-gray-700 focus:border-[#1B556B] focus:outline-none resize-none"
+      />
+      <button onClick={handleSave} disabled={saving}
+        className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+        {saving ? 'Salvando...' : saved ? '✓ Salvo' : 'Salvar mensagem'}
+      </button>
+    </div>
+  )
+}
+
 export function WhatsAppInstancesPanel() {
   const [instances, setInstances] = useState<Instance[]>([])
   const [aliases, setAliases] = useState<Record<string, { label: string; closingMessage?: string }>>({})
@@ -189,6 +231,15 @@ export function WhatsAppInstancesPanel() {
                 onSave={(alias, closingMessage) => setAliases(prev => ({
                   ...prev,
                   [inst.name]: { label: alias, closingMessage: closingMessage || undefined }
+                }))}
+              />
+              <ClosingMessageEditor
+                instanceName={inst.name}
+                currentMessage={aliases[inst.name]?.closingMessage ?? ''}
+                currentAlias={aliases[inst.name]?.label ?? inst.name}
+                onSave={(msg) => setAliases(prev => ({
+                  ...prev,
+                  [inst.name]: { ...(prev[inst.name] ?? { label: inst.name }), closingMessage: msg || undefined }
                 }))}
               />
 
