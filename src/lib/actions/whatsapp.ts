@@ -542,7 +542,8 @@ export async function getConversationByPhone(phone: string): Promise<{
     .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name')
     .ilike('phone', `%${cleanPhone.slice(-8)}%`)
     .is('contract_id', null)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(500)
 
   const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
   let displayName = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null

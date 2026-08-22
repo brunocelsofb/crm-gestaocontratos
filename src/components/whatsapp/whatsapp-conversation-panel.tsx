@@ -213,7 +213,22 @@ export function WhatsAppConversationPanel({
             </button>
             <button
               onClick={async () => {
-                if (!confirm(`Marcar ${phone} como opt-out? Esta pessoa não receberá mais mensagens automáticas.`)) return
+                setBusy(true)
+                const res = await fetch('/api/whatsapp/import-history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone, instanceName: instanceName ?? undefined }),
+                })
+                const data = await res.json()
+                setBusy(false)
+                if (data.error) alert(`Erro: ${data.error}`)
+                else { alert(`✅ ${data.imported} mensagens importadas!`); router.refresh() }
+              }}
+              disabled={busy}
+              className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+            >
+              📥 Importar histórico
+            </button>
                 setBusy(true)
                 await fetch('/api/whatsapp/optout', {
                   method: 'POST',
