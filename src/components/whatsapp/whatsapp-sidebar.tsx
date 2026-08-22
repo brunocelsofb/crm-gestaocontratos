@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react'
 import Link from 'next/link'
 
 type Conv = {
@@ -17,29 +17,46 @@ type Conv = {
   lead?: { id: string; name: string } | null
 }
 
-export function WhatsAppSidebar({
-  open,
-  archived,
-  selectedPhone,
-  assignments,
-  currentUserId,
-  instanceAliases,
-}: {
+export type WhatsAppSidebarRef = {
+  moveToArchived: (phone: string) => void
+}
+
+export const WhatsAppSidebar = forwardRef<WhatsAppSidebarRef, {
   open: Conv[]
   archived: Conv[]
   selectedPhone: string | null
   assignments: Record<string, { assigned_to: string; assigned_to_name: string }>
   currentUserId: string
   instanceAliases: Record<string, any>
-}) {
+}>(function WhatsAppSidebar({ open, archived, selectedPhone, assignments, currentUserId, instanceAliases }, ref) {
+  const [openList, setOpenList] = useState<Conv[]>(open)
+  const [archivedList, setArchivedList] = useState<Conv[]>(archived)
+  const [tab, setTab] = useState<'open' | 'archived'>('open')
+
+  // Sincroniza com props do servidor quando há refresh
+  useEffect(() => { setOpenList(open) }, [open])
+  useEffect(() => { setArchivedList(archived) }, [archived])
+
+  // Expõe método para o pai mover conversa instantaneamente
+  useImperativeHandle(ref, () => ({
+    moveToArchived: (phone: string) => {
+      const norm = (p: string) => p.replace(/\D/g, '')
+      setOpenList(prev => {
+        const conv = prev.find(c => norm(c.phone) === norm(phone))
+        if (conv) setArchivedList(a => [conv, ...a.filter(c => norm(c.phone) !== norm(phone))])
+        return prev.filter(c => norm(c.phone) !== norm(phone))
+      })
+    }
+  }))
+
   const getLabel = (name: string) => {
     const v = instanceAliases[name]
     if (!v) return name
     if (typeof v === 'string') return v
     return v.label || name
   }
-  const [tab, setTab] = useState<'open' | 'archived'>('open')
-  const list = tab === 'open' ? open : archived
+
+  const list = tab === 'open' ? openList : archivedList
 
   return (
     <div className="flex flex-col h-full">
@@ -113,4 +130,4 @@ export function WhatsAppSidebar({
       </div>
     </div>
   )
-}
+})

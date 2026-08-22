@@ -36,6 +36,7 @@ export function WhatsAppConversationPanel({
   assignment,
   instanceName,
   initialIsArchived,
+  onArchiveSuccess,
 }: {
   phone: string
   displayName: string | null
@@ -47,6 +48,7 @@ export function WhatsAppConversationPanel({
   assignment: { assigned_to: string; assigned_to_name: string } | null
   instanceName?: string | null
   initialIsArchived?: boolean
+  onArchiveSuccess?: (phone: string) => void
 }) {
   const router = useRouter()
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
@@ -218,6 +220,7 @@ export function WhatsAppConversationPanel({
                 setBusy(false)
                 if (!res.ok || data.error) { alert(`Erro: ${data.error}`); return }
                 setIsArchived(true)
+                onArchiveSuccess?.(phone)
                 router.push('/whatsapp'); router.refresh()
               }}
               disabled={busy}
@@ -238,6 +241,7 @@ export function WhatsAppConversationPanel({
                 setBusy(false)
                 if (!res.ok || data.error) { alert(`Erro: ${data.error}`); return }
                 setIsArchived(true)
+                onArchiveSuccess?.(phone)
                 router.push('/whatsapp'); router.refresh()
               }}
               disabled={busy}

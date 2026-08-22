@@ -9,6 +9,7 @@ import { getConversationByPhone, searchContractsForLinking, getWhatsAppAssignmen
 import { WhatsAppInboxRealtimeWatcher } from '@/components/whatsapp/whatsapp-inbox-realtime-watcher'
 import { ImportWhatsAppChatsButton } from '@/components/whatsapp/import-whatsapp-chats-button'
 import { WhatsAppSidebar } from '@/components/whatsapp/whatsapp-sidebar'
+import { WhatsAppInboxClient } from '@/components/whatsapp/whatsapp-inbox-client'
 
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
@@ -190,72 +191,22 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       </div>
 
       {/* Inbox — ocupa todo o espaço restante */}
-      <div className="flex flex-1 min-h-0 gap-3">
-        <WhatsAppInboxRealtimeWatcher />
-        <div className="w-72 shrink-0 flex flex-col min-h-0 border-r border-gray-100 pr-2">
-          <WhatsAppSidebar
-            open={openConversations as any}
-            archived={archivedConvList as any}
-            selectedPhone={selectedPhone ?? null}
-            assignments={assignments}
-            currentUserId={currentUser?.id ?? ''}
-            instanceAliases={instanceAliases as any}
-          />
-          <div className="mt-2 flex-shrink-0 space-y-1">
-            {contractConversations.length > 0 && <p className="px-1 text-xs font-semibold uppercase text-gray-400">Contas</p>}
-            {contractConversations.map((c) => (
-              <Link
-                key={c.id}
-                href={`/whatsapp?contract=${c.id}`}
-                className={`block rounded-md px-3 py-2 text-sm hover:bg-gray-100 ${selectedContractId === c.id ? 'border border-brand-200 bg-brand-50' : 'border border-transparent'}`}
-              >
-                <p className="font-medium text-gray-900">{c.contactName || `${c.client_name || c.title} (contato não identificado)`}</p>
-                <p className="truncate text-xs text-gray-500">
-                  {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
-                  {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
-                </p>
-                <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {selectedOpenData ? (
-            <WhatsAppConversationPanel
-              phone={selectedPhone!}
-              displayName={selectedOpenData.displayName}
-              leadId={selectedOpenData.leadId}
-              messages={selectedOpenData.messages}
-              searchContracts={searchContractsForLinking}
-              currentUserId={currentUser?.id ?? ''}
-              users={teamUsers ?? []}
-              assignment={assignments[selectedPhone!] ?? null}
-              instanceName={latestByPhone.get(selectedPhone!)?.instance_name ?? null}
-              initialIsArchived={isArchived(selectedPhone!)}
-            />
-          ) : selectedContractData?.contract ? (
-            <div className="space-y-2">
-              <div>
-                <Link href={`/contracts/${selectedContractData.contract.id}`} className="text-sm font-medium text-brand-700 hover:underline">
-                  {selectedContractData.contract.client_name || selectedContractData.contract.title} →
-                </Link>
-              </div>
-              <ContractWhatsAppSection
-                contractId={selectedContractData.contract.id}
-                isConnected={isConnected}
-                templates={selectedContractData.templates}
-                defaultPhone={selectedContractData.defaultPhone}
-                messageLog={selectedContractData.messages}
-              />
-            </div>
-          ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#b0b8c8' }}>
-              Selecione uma conversa à esquerda.
-            </div>
-          )}
-        </div>
-      </div>
+      <WhatsAppInboxClient
+        open={openConversations as any}
+        archived={archivedConvList as any}
+        selectedPhone={selectedPhone ?? null}
+        selectedContractId={selectedContractId ?? null}
+        assignments={assignments}
+        currentUserId={currentUser?.id ?? ''}
+        instanceAliases={instanceAliases as any}
+        selectedOpenData={selectedOpenData}
+        selectedContractData={selectedContractData}
+        teamUsers={teamUsers ?? []}
+        isConnected={isConnected}
+        contractConversations={contractConversations as any}
+        onSelectContract={() => {}}
+        searchContractsForLinking={searchContractsForLinking}
+      />
     </div>
   )
 }
