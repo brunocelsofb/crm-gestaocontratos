@@ -24,7 +24,7 @@ export function WhatsAppSidebar({
   assignments: Record<string, { assigned_to: string; assigned_to_name: string }>
   currentUserId: string; instanceAliases: Record<string, any>
 }) {
-  const [tab, setTab] = useState<'open' | 'archived'>(' open')
+  const [tab, setTab] = useState<'open' | 'archived'>('open')
 
   const getLabel = (name: string) => {
     const v = instanceAliases[name]
