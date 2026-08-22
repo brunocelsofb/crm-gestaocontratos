@@ -1,9 +1,8 @@
 'use client'
 
-import { useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { WhatsAppSidebar, WhatsAppSidebarRef } from './whatsapp-sidebar'
+import { WhatsAppSidebar } from './whatsapp-sidebar'
 import { WhatsAppConversationPanel } from './whatsapp-conversation-panel'
 import { WhatsAppInboxRealtimeWatcher } from './whatsapp-inbox-realtime-watcher'
 import { ContractWhatsAppSection } from './contract-whatsapp-section'
@@ -19,11 +18,9 @@ export function WhatsAppInboxClient({
   selectedOpenData: any; selectedContractData: any; teamUsers: any[]; isConnected: boolean
   contractConversations: any[]
 }) {
-  const sidebarRef = useRef<WhatsAppSidebarRef>(null)
   const router = useRouter()
 
   function handleArchived(phone: string) {
-    sidebarRef.current?.moveToArchived(phone)
     router.push('/whatsapp')
     router.refresh()
   }
@@ -34,7 +31,6 @@ export function WhatsAppInboxClient({
 
       <div className="w-72 shrink-0 flex flex-col min-h-0 border-r border-gray-100 pr-2">
         <WhatsAppSidebar
-          ref={sidebarRef}
           open={open}
           archived={archived}
           selectedPhone={selectedPhone}
