@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { WhatsAppSidebar, WhatsAppSidebarRef } from './whatsapp-sidebar'
 import { WhatsAppConversationPanel } from './whatsapp-conversation-panel'
 import { WhatsAppInboxRealtimeWatcher } from './whatsapp-inbox-realtime-watcher'
@@ -12,21 +13,25 @@ export function WhatsAppInboxClient({
   assignments, currentUserId, instanceAliases,
   selectedOpenData, selectedContractData, teamUsers,
   isConnected, contractConversations,
-  searchContractsForLinking,
 }: {
   open: any[]; archived: any[]; selectedPhone: string | null; selectedContractId: string | null
   assignments: Record<string, any>; currentUserId: string; instanceAliases: Record<string, any>
   selectedOpenData: any; selectedContractData: any; teamUsers: any[]; isConnected: boolean
-  contractConversations: any[]; onSelectContract?: (id: string) => void
-  searchContractsForLinking?: any
+  contractConversations: any[]
 }) {
   const sidebarRef = useRef<WhatsAppSidebarRef>(null)
+  const router = useRouter()
+
+  function handleArchived(phone: string) {
+    sidebarRef.current?.moveToArchived(phone)
+    router.push('/whatsapp')
+    router.refresh()
+  }
 
   return (
     <div className="flex flex-1 min-h-0 gap-3">
       <WhatsAppInboxRealtimeWatcher />
 
-      {/* Sidebar */}
       <div className="w-72 shrink-0 flex flex-col min-h-0 border-r border-gray-100 pr-2">
         <WhatsAppSidebar
           ref={sidebarRef}
@@ -45,8 +50,7 @@ export function WhatsAppInboxClient({
                 className={`block rounded-md px-3 py-2 text-sm hover:bg-gray-100 ${selectedContractId === c.id ? 'border border-brand-200 bg-brand-50' : 'border border-transparent'}`}>
                 <p className="font-medium text-gray-900">{c.contactName || c.client_name || c.title}</p>
                 <p className="truncate text-xs text-gray-500">
-                  {c.latest?.direction === 'enviado' ? '📤 ' : '📥 '}
-                  {c.latest?.media_type ? `[${c.latest.media_type}]` : c.latest?.message}
+                  {c.latest?.direction === 'enviado' ? '📤 ' : '📥 '}{c.latest?.media_type ? `[${c.latest.media_type}]` : c.latest?.message}
                 </p>
               </Link>
             ))}
@@ -54,7 +58,6 @@ export function WhatsAppInboxClient({
         )}
       </div>
 
-      {/* Área principal */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {selectedOpenData && selectedPhone ? (
           <WhatsAppConversationPanel
@@ -62,14 +65,16 @@ export function WhatsAppInboxClient({
             displayName={selectedOpenData.displayName}
             leadId={selectedOpenData.leadId}
             messages={selectedOpenData.messages}
-            searchContracts={searchContractsForLinking ?? (async () => [])}
+            searchContracts={async () => []}
             currentUserId={currentUserId}
             users={teamUsers}
             assignment={assignments[selectedPhone] ?? null}
-            instanceName={open.find((c: any) => c.phone === selectedPhone)?.latest?.instance_name
-              ?? archived.find((c: any) => c.phone === selectedPhone)?.latest?.instance_name ?? null}
+            instanceName={
+              open.find((c: any) => c.phone === selectedPhone)?.latest?.instance_name ??
+              archived.find((c: any) => c.phone === selectedPhone)?.latest?.instance_name ?? null
+            }
             initialIsArchived={archived.some((c: any) => c.phone === selectedPhone)}
-            onArchiveSuccess={(phone) => sidebarRef.current?.moveToArchived(phone)}
+            onArchiveSuccess={handleArchived}
           />
         ) : selectedContractData?.contract ? (
           <div className="space-y-2 p-2">

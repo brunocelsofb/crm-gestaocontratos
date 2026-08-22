@@ -204,8 +204,6 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
         teamUsers={teamUsers ?? []}
         isConnected={isConnected}
         contractConversations={contractConversations as any}
-        onSelectContract={() => {}}
-        searchContractsForLinking={searchContractsForLinking}
       />
     </div>
   )
