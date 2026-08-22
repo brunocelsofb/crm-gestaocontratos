@@ -207,13 +207,13 @@ export async function POST(request: Request) {
         const { count: prevCount } = await supabase
           .from('contract_whatsapp_messages')
           .select('id', { count: 'exact', head: true })
-          .eq('phone', cleanPhone)
+          .eq('phone', phone)
           .lt('created_at', inserted?.id ? new Date().toISOString() : new Date(0).toISOString())
 
         const { data: convStatus } = await supabase
           .from('whatsapp_conversation_status')
           .select('is_archived')
-          .eq('phone', cleanPhone)
+          .eq('phone', phone)
           .maybeSingle()
 
         const isFirstContact = (prevCount ?? 0) <= 1 // só esta mensagem existe
@@ -244,7 +244,7 @@ export async function POST(request: Request) {
               fetch(`${botCfg.evo_server_url}/message/sendText/${instName}`, {
                 method: 'POST',
                 headers: { 'apikey': botCfg.evo_api_key, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: cleanPhone, text: finalMsg }),
+                body: JSON.stringify({ number: phone, text: finalMsg }),
               }).catch(e => console.warn('[evo-webhook] bot falhou ao enviar:', e))
 
               // Garante que a conversa aparece como aberta na sidebar
@@ -252,10 +252,10 @@ export async function POST(request: Request) {
                 await supabase
                   .from('whatsapp_conversation_status')
                   .update({ is_archived: false, updated_at: new Date().toISOString() })
-                  .eq('phone', cleanPhone)
+                  .eq('phone', phone)
               }
 
-              console.log('[evo-webhook] bot disparado para:', cleanPhone, '| online:', botCfg.whatsapp_is_online)
+              console.log('[evo-webhook] bot disparado para:', phone, '| online:', botCfg.whatsapp_is_online)
             }
           }
         }
