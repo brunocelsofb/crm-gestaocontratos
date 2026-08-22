@@ -251,6 +251,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               users={teamUsers ?? []}
               assignment={assignments[selectedPhone!] ?? null}
               instanceName={latestByPhone.get(selectedPhone!)?.instance_name ?? null}
+              initialIsArchived={archivedPhones.has(selectedPhone!)}
             />
           ) : selectedContractData?.contract ? (
             <div className="space-y-2">

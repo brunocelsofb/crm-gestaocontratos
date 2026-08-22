@@ -45,8 +45,10 @@ export function WhatsAppConversationPanel({
   users: { id: string; full_name: string }[]
   assignment: { assigned_to: string; assigned_to_name: string } | null
   instanceName?: string | null
+  initialIsArchived?: boolean
 }) {
   const router = useRouter()
+  const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
   const [showLinkSearch, setShowLinkSearch] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ContractOption[]>([])
@@ -204,7 +206,7 @@ export function WhatsAppConversationPanel({
                 setBusy(true)
                 await archiveWhatsAppConversation(phone)
                 setBusy(false)
-                router.push('/whatsapp')
+                setIsArchived(true)
               }}
               disabled={busy}
               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
@@ -291,35 +293,56 @@ export function WhatsAppConversationPanel({
         <WhatsAppChatView messages={messages} contactName={displayName} contactPhone={phone} />
       </div>
 
-      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-        {/* Instância travada na original da conversa */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs text-gray-500 whitespace-nowrap">Responder via:</span>
-          {instanceName ? (
-            <span className="flex-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-[#1B556B] font-medium">
-              📱 {availableInstances.find(i => i.name === instanceName)?.label ?? instanceName}
-              <span className="ml-1 text-gray-400 font-normal">(fixo)</span>
-            </span>
-          ) : (
-            <select
-              value={selectedInstance}
-              onChange={e => setSelectedInstance(e.target.value)}
-              className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none"
-            >
-              {availableInstances.length === 0 && (
-                <option value="">Selecione a instância</option>
-              )}
-              {availableInstances.map(inst => (
-                <option key={inst.name} value={inst.name}>{inst.label}</option>
-              ))}
-            </select>
-          )}
+      {isArchived ? (
+        <div className="flex-shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-center">
+          <p className="text-sm text-gray-500">
+            🔒 Atendimento finalizado. Se o cliente enviar uma nova mensagem, a conversa será reaberta automaticamente.
+          </p>
+          <button
+            onClick={async () => {
+              await fetch('/api/whatsapp/unarchive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+              })
+              setIsArchived(false)
+            }}
+            className="mt-2 text-xs text-[#1B556B] hover:underline"
+          >
+            Reabrir conversa
+          </button>
         </div>
-        <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
-        <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
-          {busy ? 'Enviando...' : 'Enviar'}
-        </button>
-      </div>
+      ) : (
+        <div className="flex-shrink-0 space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+          {/* Instância travada na original da conversa */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-gray-500 whitespace-nowrap">Responder via:</span>
+            {instanceName ? (
+              <span className="flex-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-[#1B556B] font-medium">
+                📱 {availableInstances.find(i => i.name === instanceName)?.label ?? instanceName}
+                <span className="ml-1 text-gray-400 font-normal">(fixo)</span>
+              </span>
+            ) : (
+              <select
+                value={selectedInstance}
+                onChange={e => setSelectedInstance(e.target.value)}
+                className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none"
+              >
+                {availableInstances.length === 0 && (
+                  <option value="">Selecione a instância</option>
+                )}
+                {availableInstances.map(inst => (
+                  <option key={inst.name} value={inst.name}>{inst.label}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+            {busy ? 'Enviando...' : 'Enviar'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
