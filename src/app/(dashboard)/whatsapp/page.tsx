@@ -24,6 +24,8 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const archivedPhonesList = (archivedRows ?? []).map((r: any) => normalizePhone(r.phone))
   const archivedPhones = new Set(archivedPhonesList)
 
+  console.log('[whatsapp/page] arquivados no banco:', archivedPhonesList)
+
   // Busca mensagens EXCLUINDO arquivados na query (não em memória)
   const { data: openMessages } = await supabase
     .from('contract_whatsapp_messages')
@@ -39,6 +41,10 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   for (const m of openMessages ?? []) {
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
+
+  const allPhones = Array.from(latestByPhone.keys()).map(normalizePhone)
+  console.log('[whatsapp/page] phones nas mensagens (amostra):', allPhones.slice(0, 5))
+  console.log('[whatsapp/page] interseção (deve sair da lista):', allPhones.filter(p => archivedPhones.has(p)))
   const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !isArchived(phone))
   const archivedConvList = Array.from(latestByPhone.entries())
     .filter(([phone]) => isArchived(phone))
