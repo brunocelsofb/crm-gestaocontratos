@@ -211,6 +211,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               </Link>
             ))}
           </div>
+        </div>
 
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {selectedOpenData ? (
