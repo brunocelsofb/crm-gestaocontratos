@@ -218,7 +218,7 @@ export function WhatsAppConversationPanel({
                 setBusy(false)
                 if (!res.ok || data.error) { alert(`Erro: ${data.error}`); return }
                 setIsArchived(true)
-                window.location.href = '/whatsapp'
+                router.push('/whatsapp'); router.refresh()
               }}
               disabled={busy}
               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
@@ -238,7 +238,7 @@ export function WhatsAppConversationPanel({
                 setBusy(false)
                 if (!res.ok || data.error) { alert(`Erro: ${data.error}`); return }
                 setIsArchived(true)
-                window.location.href = '/whatsapp'
+                router.push('/whatsapp'); router.refresh()
               }}
               disabled={busy}
               className="rounded-md border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"

@@ -14,29 +14,30 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
   const supabase = await createClient()
 
-  // Conversas SEM contrato (podem ou não já ser um Lead) — agrupadas
-  // por telefone, com a última mensagem de cada uma.
+  // Busca conversas arquivadas PRIMEIRO
+  const { data: archivedRows } = await supabase
+    .from('whatsapp_conversation_status')
+    .select('phone')
+    .eq('is_archived', true)
+  const normalizePhone = (p: string) => String(p).replace(/\D/g, '')
+  const archivedPhonesList = (archivedRows ?? []).map((r: any) => normalizePhone(r.phone))
+  const archivedPhones = new Set(archivedPhonesList)
+
+  // Busca mensagens EXCLUINDO arquivados na query (não em memória)
   const { data: openMessages } = await supabase
     .from('contract_whatsapp_messages')
     .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, direction, created_at, lead_id, instance_name')
     .is('contract_id', null)
     .order('created_at', { ascending: false })
-    .limit(300)
+    .limit(500)
 
-  // Busca conversas arquivadas
-  const { data: archivedRows } = await supabase
-    .from('whatsapp_conversation_status')
-    .select('phone')
-    .eq('is_archived', true)
-  // Normaliza ambos os lados — só dígitos para comparação segura
-  const normalizePhone = (p: string) => String(p).replace(/\D/g, '')
-  const archivedPhones = new Set((archivedRows ?? []).map((r: any) => normalizePhone(r.phone)))
+  // Filtra em memória com normalização
+  const isArchived = (phone: string) => archivedPhones.has(normalizePhone(phone))
 
   const latestByPhone = new Map<string, { unlinked_sender_name: string | null; sender_photo_url: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null; instance_name: string | null }>()
   for (const m of openMessages ?? []) {
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
-  const isArchived = (phone: string) => archivedPhones.has(normalizePhone(phone))
   const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !isArchived(phone))
   const archivedConvList = Array.from(latestByPhone.entries())
     .filter(([phone]) => isArchived(phone))
