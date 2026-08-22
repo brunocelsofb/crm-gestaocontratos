@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getEvoCredentials, sendEvoTextMessage } from '@/lib/whatsapp/evolution'
+import { sendEvoTextMessage } from '@/lib/whatsapp/evolution'
 
 export async function POST(req: Request) {
   const userClient = await createClient()
