@@ -198,6 +198,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: insertError.message })
     }
 
+    // Reabre conversa arquivada SEMPRE ao receber mensagem do cliente
+    if (!isFromMe) {
+      await supabase.from('whatsapp_conversation_status').upsert({
+        phone,
+        is_archived: false,
+        archived_at: null,
+        archived_by: null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'phone' })
+    }
+
     console.log('[evo-webhook] mensagem salva:', inserted?.id)
 
     // Bot de triagem — dispara apenas em PRIMEIRO contato ou nova sessão

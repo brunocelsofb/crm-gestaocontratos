@@ -166,68 +166,40 @@ export function WhatsAppConversationPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white p-2.5">
-        {assignment ? (
-          <>
-            <span className="text-xs text-gray-600">
-              👤 Atendendo: <strong>{assignment.assigned_to === currentUserId ? 'Você' : assignment.assigned_to_name}</strong>
-            </span>
-            {assignment.assigned_to === currentUserId && (
-              <button onClick={handleUnassign} disabled={busy} className="text-xs text-gray-500 hover:underline disabled:opacity-50">
-                Liberar conversa
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <span className="text-xs text-gray-400">Ninguém está atendendo ainda</span>
-            <div className="relative flex gap-2">
-              <button onClick={handleClaim} disabled={busy} className="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50">
-                Assumir conversa
-              </button>
-              <button onClick={() => setShowAssignPicker((v) => !v)} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
-                Atribuir a...
-              </button>
-              {showAssignPicker && (
-                <div className="absolute right-0 top-8 z-10 w-48 rounded-md border border-gray-200 bg-white shadow-md">
-                  {users.map((u) => (
-                    <button key={u.id} onClick={() => handleAssignTo(u.id)} className="block w-full px-3 py-2 text-left text-xs hover:bg-gray-50">
-                      {u.full_name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-gray-200 bg-white p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 mb-1">
+      <div className="flex-shrink-0 rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+        {/* Avatar + nome + badges */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             {profilePicUrl ? (
-              <img src={profilePicUrl} alt="" className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+              <img src={profilePicUrl} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0"
                 onError={() => setProfilePicUrl(null)} />
             ) : (
-              <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-500 flex-shrink-0">
+              <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-500 flex-shrink-0">
                 {(displayName ?? phone).charAt(0).toUpperCase()}
               </div>
             )}
             <div>
               <p className="text-sm font-semibold text-gray-900">{displayName ?? phone}</p>
-              <p className="text-xs text-gray-400">{phone}</p>
+              <p className="text-[10px] text-gray-400">{phone}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${leadId ? 'bg-purple-100 text-purple-700' : 'bg-yellow-100 text-yellow-700'}`}>
-              {leadId ? '🎯 Já é um Lead' : '⚠️ Sem conta vinculada'}
+          <div className="flex flex-wrap items-center gap-1.5 justify-end">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${leadId ? "bg-purple-100 text-purple-700" : "bg-yellow-100 text-yellow-700"}`}>
+              {leadId ? "🎯 Lead" : "⚠️ Novo"}
             </span>
             {instanceName && (
-              <span className="rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[11px] font-medium text-[#1B556B]">
-                📱 via {instanceName}
+              <span className="rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
+                📱 {instanceName}
+              </span>
+            )}
+            {assignment && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600">
+                👤 {assignment.assigned_to === currentUserId ? "Você" : assignment.assigned_to_name}
               </span>
             )}
           </div>
+        </div>
+        {/* Botões de ação */}
           <div className="flex flex-wrap gap-2">
             {isArchived ? (
               <button
@@ -345,7 +317,6 @@ export function WhatsAppConversationPanel({
             </>
             )}
           </div>
-        </div>
 
         {showLinkSearch && (
           <div className="relative mt-2">
@@ -371,7 +342,7 @@ export function WhatsAppConversationPanel({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <WhatsAppChatView messages={messages} contactName={displayName} contactPhone={phone} />
+        <WhatsAppChatView messages={[...messages].reverse()} contactName={displayName} contactPhone={phone} />
       </div>
 
       {isArchived ? (
