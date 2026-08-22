@@ -148,7 +148,7 @@ export function WhatsAppConversationPanel({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-full min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white p-2.5">
         {assignment ? (
           <>
@@ -209,7 +209,23 @@ export function WhatsAppConversationPanel({
               disabled={busy}
               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
             >
-              🗃️ Arquivar
+              🗃️ Finalizar
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm(`Marcar ${phone} como opt-out? Esta pessoa não receberá mais mensagens automáticas.`)) return
+                setBusy(true)
+                await fetch('/api/whatsapp/optout', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone }),
+                })
+                setBusy(false)
+              }}
+              disabled={busy}
+              className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              🚫 Opt-out
             </button>
             {leadId && (
               <>
@@ -253,7 +269,9 @@ export function WhatsAppConversationPanel({
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </div>
 
-      <WhatsAppChatView messages={messages} contactName={displayName} contactPhone={phone} />
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <WhatsAppChatView messages={messages} contactName={displayName} contactPhone={phone} />
+      </div>
 
       <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
         {/* Instância travada na original da conversa */}

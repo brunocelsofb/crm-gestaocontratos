@@ -162,35 +162,21 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* Header compacto */}
+      <div className="flex items-center justify-between px-1 py-2 flex-shrink-0">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#1a1f36', margin: 0 }}>Central de Atendimento WhatsApp</h1>
-          <p style={{ fontSize: 12, color: '#8892a4', marginTop: 3 }}>Conversas, leads e métricas de captação.</p>
+          <h1 className="text-base font-semibold text-gray-900">Central de Atendimento</h1>
+          <p className="text-xs text-gray-400">WhatsApp · {openConversations.length} conversa(s) ativa(s)</p>
         </div>
         <ImportWhatsAppChatsButton />
       </div>
 
-      {/* Gráficos */}
-      <WhatsAppCharts
-        totalEntradas={totalEntradas ?? 0}
-        totalLeads={totalLeadsWpp ?? 0}
-        totalConvertidos={totalConvertidos ?? 0}
-        totalVinculados={totalVinculados ?? 0}
-        totalOptOut={totalOptOut ?? 0}
-        funnelData={funnelData}
-        historyData={historyData}
-      />
-
-      {/* Inbox */}
-      <div style={{ display: 'flex', height: 'calc(100vh - 26rem)', gap: 12 }}>
+      {/* Inbox — ocupa todo o espaço restante */}
+      <div className="flex flex-1 min-h-0 gap-3">
         <WhatsAppInboxRealtimeWatcher />
-        <div className="w-72 shrink-0 space-y-3 overflow-y-auto">
-          <h1 className="px-1 text-lg font-semibold text-gray-900">Central de Atendimento</h1>
-
-          {openConversations.length > 0 && (
-            <div className="space-y-1">
+        <div className="w-72 shrink-0 flex flex-col min-h-0 overflow-y-auto border-r border-gray-100 pr-2">
+          <div className="space-y-1 pb-4">
               <p className="px-1 text-xs font-semibold uppercase text-gray-400">Precisam de atenção ({openConversations.length})</p>
               {openConversations.map((c) => (
                 <Link
@@ -246,7 +232,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {selectedOpenData ? (
             <WhatsAppConversationPanel
               phone={selectedPhone!}
