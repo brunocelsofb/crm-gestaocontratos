@@ -25,15 +25,18 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     .from('whatsapp_conversation_status')
     .select('phone')
     .eq('is_archived', true)
-  const archivedPhones = new Set((archivedRows ?? []).map((r: any) => r.phone))
+  // Normaliza ambos os lados — só dígitos para comparação segura
+  const normalizePhone = (p: string) => String(p).replace(/\D/g, '')
+  const archivedPhones = new Set((archivedRows ?? []).map((r: any) => normalizePhone(r.phone)))
 
   const latestByPhone = new Map<string, { unlinked_sender_name: string | null; sender_photo_url: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null; instance_name: string | null }>()
   for (const m of openMessages ?? []) {
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
-  const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !archivedPhones.has(phone))
+  const isArchived = (phone: string) => archivedPhones.has(normalizePhone(phone))
+  const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !isArchived(phone))
   const archivedConvList = Array.from(latestByPhone.entries())
-    .filter(([phone]) => archivedPhones.has(phone))
+    .filter(([phone]) => isArchived(phone))
     .map(([phone, m]) => ({ phone, latest: m }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
@@ -225,7 +228,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
               users={teamUsers ?? []}
               assignment={assignments[selectedPhone!] ?? null}
               instanceName={latestByPhone.get(selectedPhone!)?.instance_name ?? null}
-              initialIsArchived={archivedPhones.has(selectedPhone!)}
+              initialIsArchived={isArchived(selectedPhone!)}
             />
           ) : selectedContractData?.contract ? (
             <div className="space-y-2">
