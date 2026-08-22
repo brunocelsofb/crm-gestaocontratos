@@ -249,6 +249,7 @@ export function WhatsAppConversationPanel({
                 📤 Desarquivar
               </button>
             ) : (
+            <>
             <button
               onClick={async () => {
                 if (!confirm('Arquivar esta conversa? Ela sairá da lista sem enviar mensagem ao cliente.')) return
@@ -341,6 +342,7 @@ export function WhatsAppConversationPanel({
             <Link href={`/contracts/new`} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
               ➕ Criar oportunidade nova
             </Link>
+            </>
             )}
           </div>
         </div>
