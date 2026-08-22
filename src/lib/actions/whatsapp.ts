@@ -728,11 +728,15 @@ export async function archiveWhatsAppConversation(phone: string, instanceName?: 
   if (creds) {
     const targetCreds = instanceName ? { ...creds, instanceName } : creds
     try {
-      await sendEvoTextMessage({
-        ...targetCreds,
-        phone,
-        message: '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊',
-      })
+      // Busca mensagem personalizada da instância
+      const { data: org } = await createAdminClient()
+        .from('organization_settings').select('evo_instance_aliases').eq('id', 'default').maybeSingle()
+      const aliases = (org as any)?.evo_instance_aliases ?? {}
+      const instanceAlias = instanceName ? aliases[instanceName] : null
+      const closingMsg = (typeof instanceAlias === 'object' ? instanceAlias?.closingMessage : null)
+        ?? '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊'
+
+      await sendEvoTextMessage({ ...targetCreds, phone, message: closingMsg })
     } catch { /* ignora falha no envio da mensagem de encerramento */ }
   }
 

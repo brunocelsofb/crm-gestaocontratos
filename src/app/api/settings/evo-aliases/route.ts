@@ -10,22 +10,39 @@ async function guardAdmin() {
   return p?.role === 'admin'
 }
 
+// Normaliza aliases para suportar tanto string (legado) quanto objeto
+function normalizeAliases(raw: any): Record<string, { label: string; closingMessage?: string }> {
+  if (!raw || typeof raw !== 'object') return {}
+  const result: Record<string, { label: string; closingMessage?: string }> = {}
+  for (const [key, val] of Object.entries(raw)) {
+    if (typeof val === 'string') result[key] = { label: val }
+    else if (val && typeof val === 'object') result[key] = val as any
+  }
+  return result
+}
+
 export async function GET() {
   const admin = createAdminClient()
   const { data } = await admin.from('organization_settings')
     .select('evo_instance_aliases').eq('id', 'default').maybeSingle()
-  return NextResponse.json({ aliases: (data as any)?.evo_instance_aliases ?? {} })
+  return NextResponse.json({ aliases: normalizeAliases((data as any)?.evo_instance_aliases) })
 }
 
+// POST — salva { instanceName, alias, closingMessage? }
 export async function POST(req: Request) {
   if (!await guardAdmin()) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   const admin = createAdminClient()
-  const { instanceName, alias } = await req.json()
+  const { instanceName, alias, closingMessage } = await req.json()
   if (!instanceName) return NextResponse.json({ error: 'instanceName obrigatório' }, { status: 400 })
+
   const { data: current } = await admin.from('organization_settings')
     .select('evo_instance_aliases').eq('id', 'default').maybeSingle()
-  const existing = (current as any)?.evo_instance_aliases ?? {}
-  const updated = { ...existing, [instanceName]: alias || null }
-  await admin.from('organization_settings').update({ evo_instance_aliases: updated }).eq('id', 'default')
-  return NextResponse.json({ ok: true, aliases: updated })
+  const existing = normalizeAliases((current as any)?.evo_instance_aliases)
+  existing[instanceName] = {
+    label: alias || existing[instanceName]?.label || instanceName,
+    ...(closingMessage !== undefined ? { closingMessage: closingMessage || undefined } : {}),
+  }
+
+  await admin.from('organization_settings').update({ evo_instance_aliases: existing }).eq('id', 'default')
+  return NextResponse.json({ ok: true, aliases: existing })
 }

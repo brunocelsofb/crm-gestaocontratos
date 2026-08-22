@@ -22,9 +22,15 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function AliasEditor({ instanceName, currentAlias, onSave }: { instanceName: string; currentAlias: string; onSave: (alias: string) => void }) {
+function AliasEditor({ instanceName, currentAlias, currentClosingMessage, onSave }: {
+  instanceName: string
+  currentAlias: string
+  currentClosingMessage?: string
+  onSave: (alias: string, closingMessage: string) => void
+}) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(currentAlias)
+  const [closing, setClosing] = useState(currentClosingMessage ?? '')
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
@@ -32,23 +38,30 @@ function AliasEditor({ instanceName, currentAlias, onSave }: { instanceName: str
     await fetch('/api/settings/evo-aliases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instanceName, alias: value }),
+      body: JSON.stringify({ instanceName, alias: value, closingMessage: closing }),
     })
     setSaving(false)
     setEditing(false)
-    onSave(value)
+    onSave(value, closing)
   }
 
   if (editing) return (
-    <div className="flex gap-1.5 items-center">
-      <input value={value} onChange={e => setValue(e.target.value)}
-        placeholder="Ex: Bruno Barbosa"
-        className="rounded border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none w-36" />
-      <button onClick={handleSave} disabled={saving}
-        className="rounded bg-[#1B556B] px-2 py-1 text-xs text-white disabled:opacity-50">
-        {saving ? '...' : '✓'}
-      </button>
-      <button onClick={() => setEditing(false)} className="text-gray-400 text-xs">✕</button>
+    <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+      <div className="flex gap-1.5 items-center">
+        <input value={value} onChange={e => setValue(e.target.value)}
+          placeholder="Nome de exibição (ex: Bruno)"
+          className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs focus:border-[#1B556B] focus:outline-none" />
+      </div>
+      <textarea value={closing} onChange={e => setClosing(e.target.value)} rows={2}
+        placeholder="Mensagem de finalização (deixe vazio para usar o padrão)"
+        className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 focus:outline-none resize-none" />
+      <div className="flex gap-1.5">
+        <button onClick={handleSave} disabled={saving}
+          className="rounded bg-[#1B556B] px-2 py-1 text-xs text-white disabled:opacity-50">
+          {saving ? '...' : 'Salvar'}
+        </button>
+        <button onClick={() => setEditing(false)} className="text-gray-400 text-xs">Cancelar</button>
+      </div>
     </div>
   )
 
@@ -56,13 +69,14 @@ function AliasEditor({ instanceName, currentAlias, onSave }: { instanceName: str
     <button onClick={() => setEditing(true)}
       className="text-xs text-gray-400 hover:text-[#1B556B] hover:underline">
       {currentAlias ? `✏️ ${currentAlias}` : '+ Adicionar nome'}
+      {currentClosingMessage && ' · mensagem personalizada'}
     </button>
   )
 }
 
 export function WhatsAppInstancesPanel() {
   const [instances, setInstances] = useState<Instance[]>([])
-  const [aliases, setAliases] = useState<Record<string, string>>({})
+  const [aliases, setAliases] = useState<Record<string, { label: string; closingMessage?: string }>>({})
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -91,7 +105,7 @@ export function WhatsAppInstancesPanel() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  const displayName = (name: string) => aliases[name] || name
+  const displayName = (name: string) => aliases[name]?.label || name
 
   async function handleCreate() {
     if (!newName.trim()) return
@@ -170,8 +184,12 @@ export function WhatsAppInstancesPanel() {
 
               <AliasEditor
                 instanceName={inst.name}
-                currentAlias={aliases[inst.name] ?? ''}
-                onSave={alias => setAliases(prev => ({ ...prev, [inst.name]: alias }))}
+                currentAlias={aliases[inst.name]?.label ?? ''}
+                currentClosingMessage={aliases[inst.name]?.closingMessage}
+                onSave={(alias, closingMessage) => setAliases(prev => ({
+                  ...prev,
+                  [inst.name]: { label: alias, closingMessage: closingMessage || undefined }
+                }))}
               />
 
               <div className="flex gap-2 flex-wrap">
