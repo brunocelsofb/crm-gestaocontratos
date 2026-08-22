@@ -30,8 +30,14 @@ export function WhatsAppSidebar({
   selectedPhone: string | null
   assignments: Record<string, { assigned_to: string; assigned_to_name: string }>
   currentUserId: string
-  instanceAliases: Record<string, string>
+  instanceAliases: Record<string, any>
 }) {
+  const getLabel = (name: string) => {
+    const v = instanceAliases[name]
+    if (!v) return name
+    if (typeof v === 'string') return v
+    return v.label || name
+  }
   const [tab, setTab] = useState<'open' | 'archived'>('open')
   const list = tab === 'open' ? open : archived
 
@@ -91,7 +97,7 @@ export function WhatsAppSidebar({
             </p>
             {c.latest.instance_name && (
               <span className="mt-0.5 inline-block rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
-                via {instanceAliases[c.latest.instance_name] || c.latest.instance_name}
+                via {getLabel(c.latest.instance_name)}
               </span>
             )}
             <div className="mt-0.5 flex items-center justify-between">

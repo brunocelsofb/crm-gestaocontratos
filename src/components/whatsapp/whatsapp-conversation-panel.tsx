@@ -72,7 +72,11 @@ export function WhatsAppConversationPanel({
       const names = (instData.instances ?? [])
         .map((i: any) => i.name ?? i.instance?.instanceName ?? i.instanceName)
         .filter(Boolean)
-        .map((name: string) => ({ name, label: aliases[name] || name }))
+        .map((name: string) => {
+          const v = aliases[name]
+          const label = !v ? name : typeof v === 'string' ? v : v.label || name
+          return { name, label }
+        })
       setAvailableInstances(names)
       if (!selectedInstance && names.length > 0) {
         setSelectedInstance(instanceName ?? names[0].name)
