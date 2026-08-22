@@ -74,7 +74,7 @@ export function WhatsAppConversationPanel({
         .filter(Boolean)
         .map((name: string) => {
           const v = aliases[name]
-          const label = !v ? name : typeof v === 'string' ? v : v.label || name
+          const label = !v ? name : typeof v === 'string' ? v : (v as any).label || name
           return { name, label }
         })
       setAvailableInstances(names)
