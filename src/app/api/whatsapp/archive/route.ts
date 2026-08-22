@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEvoTextMessage } from '@/lib/whatsapp/evolution'
+import { revalidatePath } from 'next/cache'
 
 async function doArchive(phone: string, userId: string, sendClosing: boolean, instanceName: string | null) {
   const admin = createAdminClient()
@@ -35,6 +36,8 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
     console.error('[archive] upsert não persistiu!')
     return { ok: false, error: 'Falha ao salvar no banco.' }
   }
+
+  revalidatePath('/whatsapp')
 
   if (sendClosing) {
     const { data: org } = await admin
