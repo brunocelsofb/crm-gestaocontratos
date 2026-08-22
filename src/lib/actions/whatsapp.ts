@@ -710,7 +710,7 @@ export async function toggleWhatsAppOnlineStatus(isOnline: boolean): Promise<Act
 }
 
 // ---- Arquivamento de conversas ----
-export async function archiveWhatsAppConversation(phone: string): Promise<ActionState> {
+export async function archiveWhatsAppConversation(phone: string, instanceName?: string | null): Promise<ActionState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado.' }
@@ -722,6 +722,19 @@ export async function archiveWhatsAppConversation(phone: string): Promise<Action
     archived_by: user.id,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'phone' })
+
+  // Envia mensagem de encerramento pelo mesmo número da conversa
+  const creds = await getEvoCredentials()
+  if (creds) {
+    const targetCreds = instanceName ? { ...creds, instanceName } : creds
+    try {
+      await sendEvoTextMessage({
+        ...targetCreds,
+        phone,
+        message: '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊',
+      })
+    } catch { /* ignora falha no envio da mensagem de encerramento */ }
+  }
 
   revalidatePath('/whatsapp')
   return {}

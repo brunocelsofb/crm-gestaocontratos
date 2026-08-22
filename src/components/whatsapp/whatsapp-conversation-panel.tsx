@@ -205,7 +205,7 @@ export function WhatsAppConversationPanel({
               onClick={async () => {
                 if (!confirm('Arquivar esta conversa? Ela sairá da lista principal e voltará automaticamente se houver nova mensagem.')) return
                 setBusy(true)
-                await archiveWhatsAppConversation(phone)
+                await archiveWhatsAppConversation(phone, instanceName)
                 setBusy(false)
                 setIsArchived(true)
               }}

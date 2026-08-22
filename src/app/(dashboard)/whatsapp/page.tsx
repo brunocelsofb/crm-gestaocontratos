@@ -5,7 +5,7 @@ import { WhatsAppConversationPanel } from '@/components/whatsapp/whatsapp-conver
 import { getConversationByPhone, searchContractsForLinking, getWhatsAppAssignments } from '@/lib/actions/whatsapp'
 import { WhatsAppInboxRealtimeWatcher } from '@/components/whatsapp/whatsapp-inbox-realtime-watcher'
 import { ImportWhatsAppChatsButton } from '@/components/whatsapp/import-whatsapp-chats-button'
-import { WhatsAppCharts } from '@/components/whatsapp/whatsapp-charts'
+import { WhatsAppSidebar } from '@/components/whatsapp/whatsapp-sidebar'
 
 export default async function WhatsAppInboxPage({ searchParams }: { searchParams: Promise<{ contract?: string; phone?: string }> }) {
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
@@ -32,6 +32,10 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
   const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !archivedPhones.has(phone))
+  const archivedConvList = Array.from(latestByPhone.entries())
+    .filter(([phone]) => archivedPhones.has(phone))
+    .map(([phone, m]) => ({ phone, latest: m }))
+    .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
   const leadIds = openPhones.map(([, m]) => m.lead_id).filter((id): id is string => !!id)
   const { data: leadsData } = leadIds.length ? await supabase.from('leads').select('id, name, company_name').in('id', leadIds) : { data: [] }
@@ -181,46 +185,17 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       {/* Inbox — ocupa todo o espaço restante */}
       <div className="flex flex-1 min-h-0 gap-3">
         <WhatsAppInboxRealtimeWatcher />
-        <div className="w-72 shrink-0 flex flex-col min-h-0 overflow-y-auto border-r border-gray-100 pr-2">
-          {openConversations.length > 0 && (
-            <div className="space-y-1 pb-4">
-              <p className="px-1 text-xs font-semibold uppercase text-gray-400">Precisam de atenção ({openConversations.length})</p>
-              {openConversations.map((c) => (
-                <Link
-                  key={c.phone}
-                  href={`/whatsapp?phone=${encodeURIComponent(c.phone)}`}
-                  className={`block rounded-md border px-3 py-2 text-sm hover:bg-gray-50 ${selectedPhone === c.phone ? 'border-brand-300 bg-brand-50' : c.lead ? 'border-purple-100 bg-purple-50/40' : 'border-yellow-100 bg-yellow-50/40'}`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="truncate font-medium text-gray-900">{c.lead?.name || c.latest.unlinked_sender_name || c.phone}</p>
-                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${c.lead ? 'bg-purple-100 text-purple-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {c.lead ? 'Lead' : 'Novo'}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs text-gray-500">
-                    {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
-                    {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
-                  </p>
-                  {c.latest.instance_name && (
-                    <span className="mt-0.5 inline-block rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
-                      via {(instanceAliases as any)?.[c.latest.instance_name] || c.latest.instance_name}
-                    </span>
-                  )}
-                  <div className="mt-0.5 flex items-center justify-between">
-                    <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
-                    {assignments[c.phone] && (
-                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600">
-                        👤 {assignments[c.phone].assigned_to === currentUser?.id ? 'Você' : assignments[c.phone].assigned_to_name}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-1">
-            {openConversations.length > 0 && <p className="px-1 text-xs font-semibold uppercase text-gray-400">Contas</p>}
+        <div className="w-72 shrink-0 flex flex-col min-h-0 border-r border-gray-100 pr-2">
+          <WhatsAppSidebar
+            open={openConversations as any}
+            archived={archivedConvList as any}
+            selectedPhone={selectedPhone}
+            assignments={assignments}
+            currentUserId={currentUser?.id ?? ''}
+            instanceAliases={instanceAliases as any}
+          />
+          <div className="mt-2 flex-shrink-0 space-y-1">
+            {contractConversations.length > 0 && <p className="px-1 text-xs font-semibold uppercase text-gray-400">Contas</p>}
             {contractConversations.map((c) => (
               <Link
                 key={c.id}
@@ -235,9 +210,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
                 <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
               </Link>
             ))}
-            {contractConversations.length === 0 && <p className="px-1 text-sm text-gray-400">Nenhuma conta com conversa ainda.</p>}
           </div>
-        </div>
 
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {selectedOpenData ? (
