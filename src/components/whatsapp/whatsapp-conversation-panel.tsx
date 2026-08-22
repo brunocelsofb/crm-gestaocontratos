@@ -52,7 +52,15 @@ export function WhatsAppConversationPanel({
 }) {
   const router = useRouter()
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [showLinkSearch, setShowLinkSearch] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/whatsapp/profile-pic?phone=${encodeURIComponent(phone)}`)
+      .then(r => r.json())
+      .then(d => { if (d.url) setProfilePicUrl(d.url) })
+      .catch(() => {})
+  }, [phone])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ContractOption[]>([])
   const [busy, setBusy] = useState(false)
@@ -196,6 +204,20 @@ export function WhatsAppConversationPanel({
 
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 mb-1">
+            {profilePicUrl ? (
+              <img src={profilePicUrl} alt="" className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                onError={() => setProfilePicUrl(null)} />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-500 flex-shrink-0">
+                {(displayName ?? phone).charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{displayName ?? phone}</p>
+              <p className="text-xs text-gray-400">{phone}</p>
+            </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${leadId ? 'bg-purple-100 text-purple-700' : 'bg-yellow-100 text-yellow-700'}`}>
               {leadId ? '🎯 Já é um Lead' : '⚠️ Sem conta vinculada'}
@@ -207,6 +229,26 @@ export function WhatsAppConversationPanel({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            {isArchived ? (
+              <button
+                onClick={async () => {
+                  setBusy(true)
+                  await fetch('/api/whatsapp/unarchive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone }),
+                  })
+                  setBusy(false)
+                  setIsArchived(false)
+                  router.push('/whatsapp')
+                  router.refresh()
+                }}
+                disabled={busy}
+                className="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+              >
+                📤 Desarquivar
+              </button>
+            ) : (
             <button
               onClick={async () => {
                 if (!confirm('Arquivar esta conversa? Ela sairá da lista sem enviar mensagem ao cliente.')) return
@@ -299,6 +341,7 @@ export function WhatsAppConversationPanel({
             <Link href={`/contracts/new`} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
               ➕ Criar oportunidade nova
             </Link>
+            )}
           </div>
         </div>
 

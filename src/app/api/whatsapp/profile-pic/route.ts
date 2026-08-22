@@ -1,0 +1,34 @@
+import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const phone = searchParams.get('phone')
+  if (!phone) return NextResponse.json({ url: null })
+
+  const admin = createAdminClient()
+  const { data: org } = await admin
+    .from('organization_settings')
+    .select('evo_server_url, evo_api_key, evo_instance_name')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  if (!org?.evo_server_url) return NextResponse.json({ url: null })
+
+  try {
+    const cleanPhone = phone.replace(/\D/g, '')
+    const res = await fetch(
+      `${org.evo_server_url}/chat/fetchProfilePictureUrl/${org.evo_instance_name}`,
+      {
+        method: 'POST',
+        headers: { 'apikey': org.evo_api_key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number: cleanPhone }),
+      }
+    )
+    const data = await res.json().catch(() => ({}))
+    const url = data?.profilePictureUrl ?? data?.picture ?? data?.url ?? null
+    return NextResponse.json({ url })
+  } catch {
+    return NextResponse.json({ url: null })
+  }
+}
