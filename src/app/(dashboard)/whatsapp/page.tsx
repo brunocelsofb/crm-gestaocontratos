@@ -16,37 +16,40 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
   const { contract: selectedContractId, phone: selectedPhone } = await searchParams
   const supabase = await createClient()
   const adminForStatus = createAdminClient()
-
-  // Busca conversas arquivadas PRIMEIRO — usa adminClient para bypasser RLS
-  const { data: archivedRows } = await adminForStatus
-    .from('whatsapp_conversation_status')
-    .select('phone')
-    .eq('is_archived', true)
   const normalizePhone = (p: string) => String(p).replace(/\D/g, '')
+
+  // Queries paralelas — reduz latência de sequencial para paralela
+  const [
+    { data: archivedRows },
+    { data: openMessages },
+    { data: { user: currentUser } },
+    { data: teamUsers },
+    { data: recentMessages },
+  ] = await Promise.all([
+    adminForStatus.from('whatsapp_conversation_status').select('phone').eq('is_archived', true),
+    supabase.from('contract_whatsapp_messages')
+      .select('phone, unlinked_sender_name, message, media_type, direction, created_at, lead_id, instance_name')
+      .is('contract_id', null)
+      .order('created_at', { ascending: false })
+      .limit(300),
+    supabase.auth.getUser(),
+    supabase.from('profiles').select('id, full_name').order('full_name'),
+    supabase.from('contract_whatsapp_messages')
+      .select('contract_id, phone, message, media_type, direction, created_at')
+      .not('contract_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(100),
+  ])
+
   const archivedPhonesList = (archivedRows ?? []).map((r: any) => normalizePhone(r.phone))
   const archivedPhones = new Set(archivedPhonesList)
-
-  console.log('[whatsapp/page] arquivados no banco:', archivedPhonesList)
-
-  // Busca mensagens EXCLUINDO arquivados na query (não em memória)
-  const { data: openMessages } = await supabase
-    .from('contract_whatsapp_messages')
-    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, direction, created_at, lead_id, instance_name')
-    .is('contract_id', null)
-    .order('created_at', { ascending: false })
-    .limit(500)
-
-  // Filtra em memória com normalização
   const isArchived = (phone: string) => archivedPhones.has(normalizePhone(phone))
 
-  const latestByPhone = new Map<string, { unlinked_sender_name: string | null; sender_photo_url: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null; instance_name: string | null }>()
+  const latestByPhone = new Map<string, { unlinked_sender_name: string | null; message: string; media_type: string | null; direction: string; created_at: string; lead_id: string | null; instance_name: string | null }>()
   for (const m of openMessages ?? []) {
     if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
   }
 
-  const allPhones = Array.from(latestByPhone.keys()).map(normalizePhone)
-  console.log('[whatsapp/page] phones nas mensagens (amostra):', allPhones.slice(0, 5))
-  console.log('[whatsapp/page] interseção (deve sair da lista):', allPhones.filter(p => archivedPhones.has(p)))
   const openPhones = Array.from(latestByPhone.entries()).filter(([phone]) => !isArchived(phone))
   const archivedConvList = Array.from(latestByPhone.entries())
     .filter(([phone]) => isArchived(phone))
@@ -54,30 +57,18 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
   const leadIds = openPhones.map(([, m]) => m.lead_id).filter((id): id is string => !!id)
-  const { data: leadsData } = leadIds.length ? await supabase.from('leads').select('id, name, company_name').in('id', leadIds) : { data: [] }
+  const [{ data: zapiSettings }, { data: leadsData }, assignments] = await Promise.all([
+    supabase.from('organization_settings').select('evo_instance_name, evo_instance_aliases').eq('id', 'default').maybeSingle(),
+    leadIds.length ? supabase.from('leads').select('id, name, company_name').in('id', leadIds) : Promise.resolve({ data: [] as any[] }),
+    getWhatsAppAssignments(openPhones.map(([phone]) => phone)),
+  ])
+  const isConnected = !!(zapiSettings as any)?.evo_instance_name
+  const instanceAliases = (zapiSettings as any)?.evo_instance_aliases ?? {}
   const leadById = new Map((leadsData ?? []).map((l) => [l.id, l]))
 
   const openConversations = openPhones
-    .map(([phone, m]) => ({
-      phone,
-      latest: m,
-      lead: m.lead_id ? leadById.get(m.lead_id) : null,
-    }))
+    .map(([phone, m]) => ({ phone, latest: m, lead: m.lead_id ? leadById.get(m.lead_id) : null }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
-
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser()
-  const { data: teamUsers } = await supabase.from('profiles').select('id, full_name').order('full_name')
-  const assignments = await getWhatsAppAssignments(openConversations.map((c) => c.phone))
-
-  // Conversas JÁ vinculadas a um contrato.
-  const { data: recentMessages } = await supabase
-    .from('contract_whatsapp_messages')
-    .select('contract_id, phone, message, media_type, direction, created_at')
-    .not('contract_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(200)
 
   const latestByContract = new Map<string, { phone: string; message: string; media_type: string | null; direction: string; created_at: string }>()
   for (const m of recentMessages ?? []) {
@@ -85,11 +76,10 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     if (!latestByContract.has(m.contract_id)) latestByContract.set(m.contract_id, m)
   }
   const contractIds = Array.from(latestByContract.keys())
-  const { data: contracts } = contractIds.length ? await supabase.from('contracts').select('id, title, client_name').in('id', contractIds) : { data: [] }
+  const { data: contracts } = contractIds.length
+    ? await supabase.from('contracts').select('id, title, client_name').in('id', contractIds)
+    : { data: [] }
 
-  // O nome que aparece é sempre o do CONTATO (pessoa) que está na
-  // conversa de verdade — nunca o nome da empresa/conta, mesmo que a
-  // conversa esteja vinculada a um contrato.
   const conversationPhones = Array.from(latestByContract.values()).map((m) => m.phone)
   const contactNameByPhone = new Map<string, string>()
   if (conversationPhones.length > 0) {
@@ -107,10 +97,6 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       return { ...c, latest, contactName: contactNameByPhone.get(latest.phone) ?? null }
     })
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
-
-  const { data: zapiSettings } = await supabase.from('organization_settings').select('evo_instance_name, evo_instance_aliases').eq('id', 'default').maybeSingle()
-  const isConnected = !!(zapiSettings as any)?.evo_instance_name
-  const instanceAliases = (zapiSettings as any)?.evo_instance_aliases ?? {}
 
   // Métricas do funil de WhatsApp — tudo em contagens de TELEFONES
   // únicos, nunca mensagens individuais (uma conversa tem muitas
