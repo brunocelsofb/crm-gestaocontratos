@@ -3,76 +3,80 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEvoTextMessage } from '@/lib/whatsapp/evolution'
 
-export async function POST(req: Request) {
-  const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-
-  const body = await req.json()
-  const phone = body.phone
-  const instanceName = body.instanceName ?? null
-
-  if (!phone) return NextResponse.json({ error: 'phone obrigatório' }, { status: 400 })
-
-  // Normaliza o telefone — remove tudo que não é dígito
-  const cleanPhone = String(phone).replace(/\D/g, '')
-  console.log('[archive] iniciando para phone:', phone, '→ cleanPhone:', cleanPhone, '| instance:', instanceName)
-
+async function doArchive(phone: string, userId: string, sendClosing: boolean, instanceName: string | null) {
   const admin = createAdminClient()
+  const cleanPhone = String(phone).replace(/\D/g, '')
+  console.log('[archive] phone recebido:', phone, '→ cleanPhone:', cleanPhone, '| sendClosing:', sendClosing)
 
-  // Upsert na tabela de status
-  console.log('[archive] executando upsert...')
-  const { data: upsertData, error: upsertError } = await admin
+  const { error } = await admin
     .from('whatsapp_conversation_status')
     .upsert({
       phone: cleanPhone,
       is_archived: true,
       archived_at: new Date().toISOString(),
-      archived_by: user.id,
+      archived_by: userId,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'phone' })
-    .select()
 
-  if (upsertError) {
-    console.error('[archive] ERRO no upsert:', JSON.stringify(upsertError))
-    return NextResponse.json({ error: upsertError.message }, { status: 500 })
+  if (error) {
+    console.error('[archive] ERRO upsert:', error)
+    return { ok: false, error: error.message }
   }
-  console.log('[archive] upsert OK:', JSON.stringify(upsertData))
 
-  // Verifica se foi salvo
+  // Verifica
   const { data: check } = await admin
     .from('whatsapp_conversation_status')
     .select('phone, is_archived')
     .eq('phone', cleanPhone)
     .maybeSingle()
-  console.log('[archive] verificação pós-upsert:', JSON.stringify(check))
+  console.log('[archive] pós-upsert:', check)
 
-  // Busca credenciais e mensagem personalizada
-  const { data: org } = await admin
-    .from('organization_settings')
-    .select('evo_server_url, evo_api_key, evo_instance_name, evo_instance_aliases')
-    .eq('id', 'default')
-    .maybeSingle()
+  if (!check?.is_archived) {
+    console.error('[archive] upsert não persistiu!')
+    return { ok: false, error: 'Falha ao salvar no banco.' }
+  }
 
-  const aliases = (org as any)?.evo_instance_aliases ?? {}
-  const instAlias = instanceName ? aliases[instanceName] : null
-  const closingMsg =
-    (typeof instAlias === 'object' ? instAlias?.closingMessage : null) ??
-    '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊'
+  if (sendClosing) {
+    const { data: org } = await admin
+      .from('organization_settings')
+      .select('evo_server_url, evo_api_key, evo_instance_name, evo_instance_aliases')
+      .eq('id', 'default')
+      .maybeSingle()
 
-  if (org?.evo_server_url && org?.evo_api_key) {
-    const creds = {
-      serverUrl: org.evo_server_url,
-      apiKey: org.evo_api_key,
-      instanceName: instanceName ?? org.evo_instance_name,
-    }
-    try {
-      await sendEvoTextMessage({ ...creds, phone: cleanPhone, message: closingMsg })
-      console.log('[archive] mensagem de encerramento enviada para:', cleanPhone)
-    } catch (e) {
-      console.warn('[archive] falha ao enviar mensagem (não bloqueia):', e)
+    if (org?.evo_server_url && org?.evo_api_key) {
+      const aliases = (org as any)?.evo_instance_aliases ?? {}
+      const inst = instanceName ? aliases[instanceName] : null
+      const msg = (typeof inst === 'object' ? inst?.closingMessage : null)
+        ?? '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊'
+      try {
+        await sendEvoTextMessage({
+          serverUrl: org.evo_server_url,
+          apiKey: org.evo_api_key,
+          instanceName: instanceName ?? org.evo_instance_name,
+          phone: cleanPhone,
+          message: msg,
+        })
+        console.log('[archive] mensagem de encerramento enviada')
+      } catch (e) { console.warn('[archive] falha ao enviar mensagem:', e) }
     }
   }
 
-  return NextResponse.json({ ok: true, phone: cleanPhone, archived: true })
+  return { ok: true }
+}
+
+// POST ?mode=archive → só arquiva
+// POST ?mode=finalize → arquiva + envia mensagem
+export async function POST(req: Request) {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const url = new URL(req.url)
+  const mode = url.searchParams.get('mode') ?? 'finalize'
+  const { phone, instanceName } = await req.json()
+  if (!phone) return NextResponse.json({ error: 'phone obrigatório' }, { status: 400 })
+
+  const result = await doArchive(phone, user.id, mode === 'finalize', instanceName ?? null)
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }

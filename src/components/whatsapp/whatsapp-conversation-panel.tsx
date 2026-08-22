@@ -207,27 +207,43 @@ export function WhatsAppConversationPanel({
           <div className="flex flex-wrap gap-2">
             <button
               onClick={async () => {
-                if (!confirm('Finalizar este atendimento? Uma mensagem de encerramento será enviada ao cliente.')) return
+                if (!confirm('Arquivar esta conversa? Ela sairá da lista sem enviar mensagem ao cliente.')) return
                 setBusy(true)
-                const res = await fetch('/api/whatsapp/archive', {
+                const res = await fetch('/api/whatsapp/archive?mode=archive', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ phone, instanceName }),
                 })
                 const data = await res.json()
                 setBusy(false)
-                if (!res.ok || data.error) {
-                  alert(`Erro ao finalizar: ${data.error ?? 'Tente novamente'}`)
-                  return
-                }
-                console.log('[finalizar] arquivado com sucesso:', data)
+                if (!res.ok || data.error) { alert(`Erro: ${data.error}`); return }
                 setIsArchived(true)
                 window.location.href = '/whatsapp'
               }}
               disabled={busy}
               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
             >
-              🗃️ Finalizar
+              🗃️ Arquivar
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm('Finalizar? Enviará mensagem de encerramento ao cliente e arquivará a conversa.')) return
+                setBusy(true)
+                const res = await fetch('/api/whatsapp/archive?mode=finalize', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone, instanceName }),
+                })
+                const data = await res.json()
+                setBusy(false)
+                if (!res.ok || data.error) { alert(`Erro: ${data.error}`); return }
+                setIsArchived(true)
+                window.location.href = '/whatsapp'
+              }}
+              disabled={busy}
+              className="rounded-md border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+            >
+              ✅ Finalizar
             </button>
             <button
               onClick={async () => {
@@ -353,7 +369,7 @@ export function WhatsAppConversationPanel({
               </select>
             )}
           </div>
-          <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none resize-y min-h-[80px]" />
+          <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none resize-none" />
           <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
             {busy ? 'Enviando...' : 'Enviar'}
           </button>
