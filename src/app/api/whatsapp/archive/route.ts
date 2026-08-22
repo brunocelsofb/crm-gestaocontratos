@@ -8,30 +8,46 @@ export async function POST(req: Request) {
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { phone, instanceName } = await req.json()
+  const body = await req.json()
+  const phone = body.phone
+  const instanceName = body.instanceName ?? null
+
   if (!phone) return NextResponse.json({ error: 'phone obrigatório' }, { status: 400 })
+
+  // Normaliza o telefone — remove tudo que não é dígito
+  const cleanPhone = String(phone).replace(/\D/g, '')
+  console.log('[archive] iniciando para phone:', phone, '→ cleanPhone:', cleanPhone, '| instance:', instanceName)
 
   const admin = createAdminClient()
 
-  // 1. Salva no banco
-  const { error } = await admin
+  // Upsert na tabela de status
+  console.log('[archive] executando upsert...')
+  const { data: upsertData, error: upsertError } = await admin
     .from('whatsapp_conversation_status')
     .upsert({
-      phone,
+      phone: cleanPhone,
       is_archived: true,
       archived_at: new Date().toISOString(),
       archived_by: user.id,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'phone' })
+    .select()
 
-  if (error) {
-    console.error('[archive] erro ao salvar:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (upsertError) {
+    console.error('[archive] ERRO no upsert:', JSON.stringify(upsertError))
+    return NextResponse.json({ error: upsertError.message }, { status: 500 })
   }
+  console.log('[archive] upsert OK:', JSON.stringify(upsertData))
 
-  console.log('[archive] conversa arquivada:', phone)
+  // Verifica se foi salvo
+  const { data: check } = await admin
+    .from('whatsapp_conversation_status')
+    .select('phone, is_archived')
+    .eq('phone', cleanPhone)
+    .maybeSingle()
+  console.log('[archive] verificação pós-upsert:', JSON.stringify(check))
 
-  // 2. Busca mensagem personalizada da instância
+  // Busca credenciais e mensagem personalizada
   const { data: org } = await admin
     .from('organization_settings')
     .select('evo_server_url, evo_api_key, evo_instance_name, evo_instance_aliases')
@@ -44,7 +60,6 @@ export async function POST(req: Request) {
     (typeof instAlias === 'object' ? instAlias?.closingMessage : null) ??
     '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊'
 
-  // 3. Envia mensagem de encerramento
   if (org?.evo_server_url && org?.evo_api_key) {
     const creds = {
       serverUrl: org.evo_server_url,
@@ -52,12 +67,12 @@ export async function POST(req: Request) {
       instanceName: instanceName ?? org.evo_instance_name,
     }
     try {
-      await sendEvoTextMessage({ ...creds, phone, message: closingMsg })
-      console.log('[archive] mensagem de encerramento enviada')
+      await sendEvoTextMessage({ ...creds, phone: cleanPhone, message: closingMsg })
+      console.log('[archive] mensagem de encerramento enviada para:', cleanPhone)
     } catch (e) {
-      console.warn('[archive] falha ao enviar mensagem:', e)
+      console.warn('[archive] falha ao enviar mensagem (não bloqueia):', e)
     }
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, phone: cleanPhone, archived: true })
 }

@@ -216,10 +216,11 @@ export function WhatsAppConversationPanel({
                 })
                 const data = await res.json()
                 setBusy(false)
-                if (data.error) {
-                  alert(`Erro ao finalizar: ${data.error}`)
+                if (!res.ok || data.error) {
+                  alert(`Erro ao finalizar: ${data.error ?? 'Tente novamente'}`)
                   return
                 }
+                console.log('[finalizar] arquivado com sucesso:', data)
                 setIsArchived(true)
                 window.location.href = '/whatsapp'
               }}
@@ -352,7 +353,7 @@ export function WhatsAppConversationPanel({
               </select>
             )}
           </div>
-          <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Responder..." className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none resize-y min-h-[80px]" />
           <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
             {busy ? 'Enviando...' : 'Enviar'}
           </button>
