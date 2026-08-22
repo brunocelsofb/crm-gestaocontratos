@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ContractWhatsAppSection } from '@/components/whatsapp/contract-whatsapp-section'
 import { WhatsAppConversationPanel } from '@/components/whatsapp/whatsapp-conversation-panel'
