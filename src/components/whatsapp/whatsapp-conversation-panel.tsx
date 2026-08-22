@@ -207,10 +207,19 @@ export function WhatsAppConversationPanel({
           <div className="flex flex-wrap gap-2">
             <button
               onClick={async () => {
-                if (!confirm('Arquivar esta conversa? Ela sairá da lista principal e voltará automaticamente se houver nova mensagem.')) return
+                if (!confirm('Finalizar este atendimento? Uma mensagem de encerramento será enviada ao cliente.')) return
                 setBusy(true)
-                await archiveWhatsAppConversation(phone, instanceName)
+                const res = await fetch('/api/whatsapp/archive', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone, instanceName }),
+                })
+                const data = await res.json()
                 setBusy(false)
+                if (data.error) {
+                  alert(`Erro ao finalizar: ${data.error}`)
+                  return
+                }
                 setIsArchived(true)
                 window.location.href = '/whatsapp'
               }}
