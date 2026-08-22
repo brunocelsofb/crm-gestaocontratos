@@ -200,15 +200,68 @@ export async function POST(request: Request) {
 
     console.log('[evo-webhook] mensagem salva:', inserted?.id)
 
-    // Reabre conversa arquivada ao receber nova mensagem inbound
+    // Bot de triagem — dispara apenas em PRIMEIRO contato ou nova sessão
     if (!isFromMe) {
-      await supabase.from('whatsapp_conversation_status').upsert({
-        phone,
-        is_archived: false,
-        archived_at: null,
-        archived_by: null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'phone' })
+      try {
+        // Verifica se é primeira mensagem (nenhuma msg salva antes desta)
+        const { count: prevCount } = await supabase
+          .from('contract_whatsapp_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('phone', cleanPhone)
+          .lt('created_at', inserted?.id ? new Date().toISOString() : new Date(0).toISOString())
+
+        const { data: convStatus } = await supabase
+          .from('whatsapp_conversation_status')
+          .select('is_archived')
+          .eq('phone', cleanPhone)
+          .maybeSingle()
+
+        const isFirstContact = (prevCount ?? 0) <= 1 // só esta mensagem existe
+        const wasArchived = convStatus?.is_archived === true
+
+        if (isFirstContact || wasArchived) {
+          // Busca configurações do bot
+          const { data: botCfg } = await supabase
+            .from('organization_settings')
+            .select('company_name, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, evo_server_url, evo_api_key, evo_instance_name')
+            .eq('id', 'default')
+            .maybeSingle()
+
+          if (botCfg) {
+            const rawMsg = botCfg.whatsapp_is_online
+              ? (botCfg.whatsapp_welcome_message_online ?? botCfg.whatsapp_welcome_message)
+              : botCfg.whatsapp_welcome_message
+
+            if (rawMsg && botCfg.evo_server_url && botCfg.evo_api_key) {
+              const instName = instanceName ?? botCfg.evo_instance_name
+              const company = botCfg.company_name ?? 'nossa empresa'
+              const finalMsg = rawMsg
+                .replace(/\{\{empresa\}\}/gi, company)
+                .replace(/\{\{company\}\}/gi, company)
+                .replace(/\{\{link\}\}/gi, `https://crm-gestaocontratos-pi.vercel.app/captura`)
+
+              // Dispara bot de forma assíncrona (não bloqueia resposta)
+              fetch(`${botCfg.evo_server_url}/message/sendText/${instName}`, {
+                method: 'POST',
+                headers: { 'apikey': botCfg.evo_api_key, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: cleanPhone, text: finalMsg }),
+              }).catch(e => console.warn('[evo-webhook] bot falhou ao enviar:', e))
+
+              // Garante que a conversa aparece como aberta na sidebar
+              if (wasArchived) {
+                await supabase
+                  .from('whatsapp_conversation_status')
+                  .update({ is_archived: false, updated_at: new Date().toISOString() })
+                  .eq('phone', cleanPhone)
+              }
+
+              console.log('[evo-webhook] bot disparado para:', cleanPhone, '| online:', botCfg.whatsapp_is_online)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[evo-webhook] erro no bot de triagem:', e)
+      }
     }
 
     return NextResponse.json({ ok: true, id: inserted?.id })
