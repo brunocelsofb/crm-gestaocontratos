@@ -189,7 +189,7 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
           <WhatsAppSidebar
             open={openConversations as any}
             archived={archivedConvList as any}
-            selectedPhone={selectedPhone}
+            selectedPhone={selectedPhone ?? null}
             assignments={assignments}
             currentUserId={currentUser?.id ?? ''}
             instanceAliases={instanceAliases as any}
