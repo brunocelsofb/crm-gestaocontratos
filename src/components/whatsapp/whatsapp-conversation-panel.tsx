@@ -35,6 +35,7 @@ export function WhatsAppConversationPanel({
   users,
   assignment,
   instanceName,
+  initialIsArchived,
 }: {
   phone: string
   displayName: string | null
