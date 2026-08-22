@@ -14,6 +14,7 @@ const BASE_NAV_ITEMS = [
   { href: '/companies', label: 'Empresas', icon: Building2 },
   { href: '/tickets', label: 'Atendimento', icon: LifeBuoy },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  { href: '/whatsapp/relatorios', label: 'Relatórios WPP', icon: BarChart3 },
   { href: '/surveys-dashboard', label: 'Pesquisas & NPS', icon: BarChart3 },
 ]
 

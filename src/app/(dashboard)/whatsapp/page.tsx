@@ -169,7 +169,13 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
           <h1 className="text-base font-semibold text-gray-900">Central de Atendimento</h1>
           <p className="text-xs text-gray-400">WhatsApp · {openConversations.length} conversa(s) ativa(s)</p>
         </div>
-        <ImportWhatsAppChatsButton />
+        <div className="flex items-center gap-2">
+          <Link href="/whatsapp/relatorios"
+            className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+            📊 Relatórios
+          </Link>
+          <ImportWhatsAppChatsButton />
+        </div>
       </div>
 
       {/* Inbox — ocupa todo o espaço restante */}
