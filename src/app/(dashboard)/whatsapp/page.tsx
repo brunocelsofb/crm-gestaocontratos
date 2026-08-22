@@ -176,7 +176,8 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
       <div className="flex flex-1 min-h-0 gap-3">
         <WhatsAppInboxRealtimeWatcher />
         <div className="w-72 shrink-0 flex flex-col min-h-0 overflow-y-auto border-r border-gray-100 pr-2">
-          <div className="space-y-1 pb-4">
+          {openConversations.length > 0 && (
+            <div className="space-y-1 pb-4">
               <p className="px-1 text-xs font-semibold uppercase text-gray-400">Precisam de atenção ({openConversations.length})</p>
               {openConversations.map((c) => (
                 <Link
