@@ -69,7 +69,6 @@ export function StartImplementationModal({
       }
 
       console.log('[impl-modal] sucesso:', data)
-      alert('✅ Cronograma de implantação gerado com sucesso!')
       onClose()
       router.refresh()
 
