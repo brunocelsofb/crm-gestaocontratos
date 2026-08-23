@@ -12,6 +12,19 @@ import { DEFAULT_WELCOME_OFFLINE, DEFAULT_WELCOME_ONLINE, DEFAULT_REMINDER } fro
 
 const CONFIG_SECTIONS = [
   {
+    title: 'Empresa',
+    items: [
+      { href: '/settings', label: 'Configurações Gerais', description: 'Nome da empresa, CNPJ, logo e dados institucionais' },
+    ],
+  },
+  {
+    title: 'WhatsApp',
+    items: [
+      { href: '/settings/whatsapp-bot', label: '🤖 Bot e Automações', description: 'Configure as mensagens de boas-vindas e o status de atendimento (Online/Offline)' },
+      { href: '/settings/whatsapp-conexoes', label: '📱 Conexões (Evolution API)', description: 'Gerencie as instâncias conectadas, faça leitura do QR Code e configure aliases dos números' },
+    ],
+  },
+  {
     title: 'Oportunidades',
     items: [
       { href: '/pipelines', label: 'Funis e Etapas', description: 'Configure os funis e as etapas do seu processo de vendas' },
@@ -25,13 +38,6 @@ const CONFIG_SECTIONS = [
       { href: '/tags', label: 'Tags', description: 'Organize e classifique com etiquetas' },
       { href: '/settings/lead-scoring', label: '⭐ Lead Scoring', description: 'Configure os critérios e pontuações que qualificam automaticamente os leads' },
       { href: '/settings/lead-routing', label: '🔀 Roteamento de Leads', description: 'Regras automáticas para encaminhar leads ao funil e etapa corretos' },
-    ],
-  },
-  {
-    title: 'WhatsApp',
-    items: [
-      { href: '/settings#whatsapp-bot', label: '🤖 Bot e Automações', description: 'Configure as mensagens de boas-vindas e o status de atendimento (Online/Offline)' },
-      { href: '/settings#whatsapp-conexoes', label: '📱 Conexões (Evolution API)', description: 'Gerencie as instâncias conectadas, faça leitura do QR Code e configure aliases dos números' },
     ],
   },
   {
