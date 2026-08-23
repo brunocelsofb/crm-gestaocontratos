@@ -232,10 +232,43 @@ export function WhatsAppConversationPanel({
                 📱 {instanceName}
               </span>
             )}
-            {assignment && (
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600">
-                👤 {assignment.assigned_to === currentUserId ? "Você" : assignment.assigned_to_name}
-              </span>
+            {assignment ? (
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-[10px] font-medium">
+                  👤 {assignment.assigned_to === currentUserId ? 'Você' : assignment.assigned_to_name}
+                </span>
+                <div className="relative">
+                  <button onClick={() => setShowAssignPicker(v => !v)}
+                    className="rounded-full border border-gray-300 px-2 py-0.5 text-[10px] text-gray-500 hover:bg-gray-50">
+                    🔄
+                  </button>
+                  {showAssignPicker && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowAssignPicker(false)} />
+                      <div className="absolute right-0 top-6 z-20 min-w-[160px] rounded-md border border-gray-200 bg-white shadow-lg">
+                      <p className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase">Transferir para</p>
+                      {users.filter(u => u.id !== assignment.assigned_to).map(u => (
+                        <button key={u.id}
+                          onClick={async () => { setShowAssignPicker(false); setBusy(true); await handleAssignTo(u.id); setBusy(false) }}
+                          className="block w-full px-3 py-2 text-left text-xs hover:bg-gray-50">
+                          {u.full_name}
+                        </button>
+                      ))}
+                      <button onClick={async () => { setShowAssignPicker(false); setBusy(true); await handleUnassign(); setBusy(false) }}
+                        className="block w-full border-t px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">
+                        Liberar conversa
+                      </button>
+                    </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <button onClick={async () => { setBusy(true); await handleClaim(); setBusy(false) }}
+                disabled={busy}
+                className="rounded-full bg-[#1B556B] px-3 py-1 text-[10px] font-semibold text-white hover:bg-[#164659] disabled:opacity-50 flex-shrink-0">
+                🙋‍♂️ Assumir
+              </button>
             )}
           </div>
         </div>
