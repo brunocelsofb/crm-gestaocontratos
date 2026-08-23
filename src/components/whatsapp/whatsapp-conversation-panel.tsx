@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation } from '@/lib/actions/whatsapp'
 import { convertLeadToOpportunity } from '@/lib/actions/leads'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
@@ -21,6 +22,7 @@ type Message = {
   media_filename: string | null
   sender_photo_url: string | null
   delivery_status: string | null
+  unlinked_sender_name?: string | null
 }
 
 type ContractOption = { id: string; label: string }
@@ -51,28 +53,61 @@ export function WhatsAppConversationPanel({
   onArchiveSuccess?: (phone: string) => void
 }) {
   const router = useRouter()
+  const supabase = createClient()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
-
-  // Sincroniza quando a prop muda (ex: nova mensagem reabre conversa)
-  useEffect(() => { setIsArchived(initialIsArchived ?? false) }, [initialIsArchived])
+  const [localMessages, setLocalMessages] = useState<Message[]>(messages)
+  const [showAssignPicker, setShowAssignPicker] = useState(false)
   const [showLinkSearch, setShowLinkSearch] = useState(false)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<ContractOption[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
+  const [selectedInstance, setSelectedInstance] = useState<string>(instanceName ?? '')
 
+  // Sincroniza props com estado local
+  useEffect(() => { setIsArchived(initialIsArchived ?? false) }, [initialIsArchived])
+  useEffect(() => { setLocalMessages(messages) }, [messages])
+
+  // Auto-scroll para mensagem mais recente
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [localMessages])
+
+  // Supabase Realtime — escuta novas mensagens para este telefone
+  useEffect(() => {
+    const channel = supabase
+      .channel(`wpp-${phone}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'contract_crm',
+        table: 'contract_whatsapp_messages',
+        filter: `phone=eq.${phone}`,
+      }, (payload) => {
+        const newMsg = payload.new as Message
+        setLocalMessages(prev => {
+          // Evita duplicata (optimistic já inseriu)
+          if (prev.some(m => m.id === newMsg.id)) return prev
+          return [...prev, newMsg]
+        })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [phone])
+
+  // Foto de perfil
   useEffect(() => {
     fetch(`/api/whatsapp/profile-pic?phone=${encodeURIComponent(phone)}`)
       .then(r => r.json())
       .then(d => { if (d.url) setProfilePicUrl(d.url) })
       .catch(() => {})
   }, [phone])
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ContractOption[]>([])
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [replyText, setReplyText] = useState('')
-  const [showAssignPicker, setShowAssignPicker] = useState(false)
-  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
-  const [selectedInstance, setSelectedInstance] = useState<string>(instanceName ?? '')
 
+  // Instâncias disponíveis
   const loadInstances = useCallback(async () => {
     try {
       const [instRes, aliasRes] = await Promise.all([
@@ -81,7 +116,7 @@ export function WhatsAppConversationPanel({
       ])
       const instData = await instRes.json()
       const aliasData = await aliasRes.json()
-      const aliases: Record<string, string> = aliasData.aliases ?? {}
+      const aliases: Record<string, any> = aliasData.aliases ?? {}
       const names = (instData.instances ?? [])
         .map((i: any) => i.name ?? i.instance?.instanceName ?? i.instanceName)
         .filter(Boolean)
@@ -91,24 +126,49 @@ export function WhatsAppConversationPanel({
           return { name, label }
         })
       setAvailableInstances(names)
-      if (!selectedInstance && names.length > 0) {
-        setSelectedInstance(instanceName ?? names[0].name)
-      }
-    } catch { /* ignora */ }
+      if (!selectedInstance && names.length > 0) setSelectedInstance(instanceName ?? names[0].name)
+    } catch { }
   }, [instanceName])
-
   useEffect(() => { loadInstances() }, [loadInstances])
-
-  // Atualiza quando a conversa muda
-  useEffect(() => {
-    setSelectedInstance(instanceName ?? '')
-  }, [instanceName])
+  useEffect(() => { setSelectedInstance(instanceName ?? '') }, [instanceName])
 
   async function handleClaim() {
     setBusy(true)
     await assignWhatsAppConversation(phone, currentUserId)
     setBusy(false)
     router.refresh()
+  }
+
+  async function handleReply() {
+    if (!replyText.trim()) return
+    // Optimistic update — adiciona imediatamente na tela
+    const optimistic: Message = {
+      id: `opt-${Date.now()}`,
+      phone, message: replyText, direction: 'enviado',
+      status: 'enviado', triggered_automatically: false,
+      error_message: null, created_at: new Date().toISOString(),
+      media_url: null, media_type: null, media_filename: null,
+      sender_photo_url: null, delivery_status: null,
+    }
+    setLocalMessages(prev => [...prev, optimistic])
+    setReplyText('')
+    setBusy(true)
+    const result = await sendUnlinkedWhatsAppMessage(phone, replyText, selectedInstance || instanceName || undefined)
+    setBusy(false)
+    if (result.error) {
+      setError(result.error)
+      setLocalMessages(prev => prev.filter(m => m.id !== optimistic.id))
+    }
+    router.refresh()
+  }
+
+  async function handleConvert() {
+    if (!confirm('Converter este lead numa oportunidade? Ele vai entrar no funil de vendas.')) return
+    setBusy(true)
+    const result = await convertLeadToOpportunity(leadId!)
+    setBusy(false)
+    if ((result as any).error) { setError((result as any).error); return }
+    if ((result as any).contractId) router.push(`/contracts/${(result as any).contractId}`)
   }
 
   async function handleAssignTo(userId: string) {
@@ -345,7 +405,8 @@ export function WhatsAppConversationPanel({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <WhatsAppChatView messages={[...messages].reverse()} contactName={displayName} contactPhone={phone} />
+        <WhatsAppChatView messages={[...localMessages].reverse()} contactName={displayName} contactPhone={phone} />
+        <div ref={messagesEndRef} />
       </div>
 
       {isArchived ? (
@@ -397,6 +458,7 @@ export function WhatsAppConversationPanel({
             {busy ? 'Enviando...' : 'Enviar'}
           </button>
         </div>
+      </div>
       )}
     </div>
   )
