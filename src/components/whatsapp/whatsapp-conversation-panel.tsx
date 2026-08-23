@@ -53,6 +53,9 @@ export function WhatsAppConversationPanel({
   const router = useRouter()
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
+
+  // Sincroniza quando a prop muda (ex: nova mensagem reabre conversa)
+  useEffect(() => { setIsArchived(initialIsArchived ?? false) }, [initialIsArchived])
   const [showLinkSearch, setShowLinkSearch] = useState(false)
 
   useEffect(() => {

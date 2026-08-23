@@ -9,6 +9,7 @@ type ChatMessage = {
   media_filename: string | null
   sender_photo_url: string | null
   delivery_status: string | null
+  unlinked_sender_name?: string | null
   status: string
   error_message: string | null
   triggered_automatically: boolean
@@ -80,6 +81,9 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: { mess
               </div>
             )}
             <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${isSent ? 'bg-[#dcf8c6] text-gray-900' : 'bg-white text-gray-900'}`}>
+              {!isSent && m.unlinked_sender_name && (
+                <p className="text-[10px] font-semibold text-[#1B556B] mb-0.5">{m.unlinked_sender_name}</p>
+              )}
               {m.media_url && m.media_type ? (
                 <MediaContent mediaUrl={m.media_url} mediaType={m.media_type} mediaFilename={m.media_filename} />
               ) : (
