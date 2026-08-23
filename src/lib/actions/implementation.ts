@@ -8,33 +8,45 @@ import { revalidatePath } from 'next/cache'
 export async function createImplementationSchedule(
   contractId: string,
   templateId: string,
-  startDate: string // ISO date
+  startDate: string
 ): Promise<{ error?: string; scheduleId?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autenticado.' }
-
-  const admin = createAdminClient()
-
-  // Busca tarefas do template
-  const { data: tasks } = await admin
-    .from('implementation_template_tasks')
-    .select('*')
-    .eq('template_id', templateId)
-    .order('sort_order')
-
-  if (!tasks?.length) return { error: 'Template sem tarefas.' }
-
   try {
-    // Cria o cronograma com o usuário atual como owner
-    const { data: schedule, error } = await admin
+    console.log('[impl] iniciando | contractId:', contractId, 'templateId:', templateId, 'startDate:', startDate)
+
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error('[impl] auth error:', authError)
+      return { error: 'Não autenticado.' }
+    }
+    console.log('[impl] user:', user.id)
+
+    const admin = createAdminClient()
+
+    const { data: tasks, error: tasksError } = await admin
+      .from('implementation_template_tasks')
+      .select('*')
+      .eq('template_id', templateId)
+      .order('sort_order')
+
+    console.log('[impl] tarefas do template:', tasks?.length ?? 0, 'erro:', tasksError?.message)
+    if (tasksError) return { error: `Erro ao buscar tarefas: ${tasksError.message}` }
+    if (!tasks?.length) return { error: `Template não possui tarefas cadastradas (id: ${templateId}).` }
+
+    const { data: schedule, error: scheduleError } = await admin
       .from('implementation_schedules')
-      .insert({ contract_id: contractId, template_id: templateId, start_date: startDate, created_by: user.id, owner_id: user.id })
+      .insert({
+        contract_id: contractId,
+        template_id: templateId,
+        start_date: startDate,
+        created_by: user.id,
+        owner_id: user.id,
+      })
       .select('id').single()
 
-    if (error || !schedule) return { error: error?.message ?? 'Erro ao criar cronograma.' }
+    console.log('[impl] schedule criado:', schedule?.id, 'erro:', scheduleError?.message)
+    if (scheduleError || !schedule) return { error: `Erro ao criar cronograma: ${scheduleError?.message ?? 'resposta vazia'}` }
 
-    // Clona as tarefas do template
     const taskRows = tasks.map(t => ({
       schedule_id: schedule.id,
       title: t.title,
@@ -43,13 +55,18 @@ export async function createImplementationSchedule(
       end_week: t.end_week,
       sort_order: t.sort_order,
     }))
-    await admin.from('implementation_tasks').insert(taskRows)
+
+    const { error: insertError } = await admin.from('implementation_tasks').insert(taskRows)
+    console.log('[impl] tarefas inseridas:', taskRows.length, 'erro:', insertError?.message)
+    if (insertError) return { error: `Erro ao inserir tarefas: ${insertError.message}` }
 
     revalidatePath(`/contracts/${contractId}`)
+    console.log('[impl] sucesso! scheduleId:', schedule.id)
     return { scheduleId: schedule.id }
+
   } catch (e: any) {
-    console.error('[createImplementationSchedule] erro:', e)
-    return { error: e?.message ?? 'Erro inesperado.' }
+    console.error('[impl] ERRO CRÍTICO:', e?.message, e?.stack)
+    return { error: `Erro crítico: ${e?.message ?? 'Erro desconhecido'}` }
   }
 }
 

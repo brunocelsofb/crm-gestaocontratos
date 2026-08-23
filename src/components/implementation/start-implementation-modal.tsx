@@ -12,10 +12,18 @@ export function StartImplementationModal({
   contractId: string; contractTags: string[]; templates: Template[]; onClose: () => void
 }) {
   const router = useRouter()
-  const matched = templates.find(t =>
+  // Filtra templates pelas tags do contrato; se nenhum bater, mostra todos
+  const filtered = templates.filter(t =>
+    t.trigger_tags.some(tag =>
+      contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase()) || tag.toLowerCase().includes(ct.toLowerCase()))
+    )
+  )
+  const displayTemplates = filtered.length > 0 ? filtered : templates
+
+  const matched = displayTemplates.find(t =>
     t.trigger_tags.some(tag => contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase())))
   )
-  const [templateId, setTemplateId] = useState(matched?.id ?? templates[0]?.id ?? '')
+  const [templateId, setTemplateId] = useState(matched?.id ?? displayTemplates[0]?.id ?? '')
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,9 +63,10 @@ export function StartImplementationModal({
             <label className="block text-sm font-semibold text-[#1B556B] mb-1">Modelo de Implantação</label>
             <select value={templateId} onChange={e => setTemplateId(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
-              {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {displayTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             {matched && <p className="mt-1 text-xs text-green-600">✓ Detectado pelas tags do contrato</p>}
+            {filtered.length === 0 && templates.length > 0 && <p className="mt-1 text-xs text-gray-400">Nenhum template bate com as tags — exibindo todos.</p>}
           </div>
           <div>
             <label className="block text-sm font-semibold text-[#1B556B] mb-1">Data de Início</label>
