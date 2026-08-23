@@ -147,15 +147,6 @@ export default async function SettingsPage() {
           currentDomain={settings?.inbound_email_domain ?? ''}
           hasSigningKey={!!settings?.mailgun_webhook_signing_key}
         />
-        <WhatsAppSettingsForm isConnected={!!(settings as any)?.evo_instance_name} currentServerUrl={(settings as any)?.evo_server_url ?? null} currentInstanceName={(settings as any)?.evo_instance_name ?? null} />
-        <WhatsAppInstancesPanel />
-        <WhatsAppBotSettingsForm
-          isOnline={settings?.whatsapp_is_online ?? false}
-          welcomeMessage={settings?.whatsapp_welcome_message ?? DEFAULT_WELCOME_OFFLINE}
-          welcomeMessageOnline={settings?.whatsapp_welcome_message_online ?? DEFAULT_WELCOME_ONLINE}
-          reminderMessage={settings?.whatsapp_reminder_message ?? DEFAULT_REMINDER}
-          dailyLimit={settings?.whatsapp_daily_auto_limit ?? 3}
-        />
 
         <form method="POST" action="/api/zapsign/save-token" className="space-y-3 rounded-lg border border-gray-200 bg-white p-6">
           <div>
