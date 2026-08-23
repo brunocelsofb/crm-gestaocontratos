@@ -25,27 +25,32 @@ export async function createImplementationSchedule(
 
   if (!tasks?.length) return { error: 'Template sem tarefas.' }
 
-  // Cria o cronograma com o usuário atual como owner
-  const { data: schedule, error } = await admin
-    .from('implementation_schedules')
-    .insert({ contract_id: contractId, template_id: templateId, start_date: startDate, created_by: user.id, owner_id: user.id })
-    .select('id').single()
+  try {
+    // Cria o cronograma com o usuário atual como owner
+    const { data: schedule, error } = await admin
+      .from('implementation_schedules')
+      .insert({ contract_id: contractId, template_id: templateId, start_date: startDate, created_by: user.id, owner_id: user.id })
+      .select('id').single()
 
-  if (error || !schedule) return { error: error?.message ?? 'Erro ao criar cronograma.' }
+    if (error || !schedule) return { error: error?.message ?? 'Erro ao criar cronograma.' }
 
-  // Clona as tarefas do template
-  const taskRows = tasks.map(t => ({
-    schedule_id: schedule.id,
-    title: t.title,
-    reference_doc: t.reference_doc,
-    start_week: t.start_week,
-    end_week: t.end_week,
-    sort_order: t.sort_order,
-  }))
-  await admin.from('implementation_tasks').insert(taskRows)
+    // Clona as tarefas do template
+    const taskRows = tasks.map(t => ({
+      schedule_id: schedule.id,
+      title: t.title,
+      reference_doc: t.reference_doc,
+      start_week: t.start_week,
+      end_week: t.end_week,
+      sort_order: t.sort_order,
+    }))
+    await admin.from('implementation_tasks').insert(taskRows)
 
-  revalidatePath(`/contracts/${contractId}`)
-  return { scheduleId: schedule.id }
+    revalidatePath(`/contracts/${contractId}`)
+    return { scheduleId: schedule.id }
+  } catch (e: any) {
+    console.error('[createImplementationSchedule] erro:', e)
+    return { error: e?.message ?? 'Erro inesperado.' }
+  }
 }
 
 // ---- Completar tarefa ----

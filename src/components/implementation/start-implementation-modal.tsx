@@ -23,10 +23,20 @@ export function StartImplementationModal({
   async function handleStart() {
     if (!templateId || !startDate) { setError('Selecione o template e a data.'); return }
     setSaving(true)
-    const res = await createImplementationSchedule(contractId, templateId, startDate)
-    setSaving(false)
-    if (res.error) { setError(res.error); return }
-    onClose(); router.refresh()
+    setError(null)
+    try {
+      const res = await createImplementationSchedule(contractId, templateId, startDate)
+      if (res.error) {
+        setError(res.error)
+        return
+      }
+      onClose()
+      router.refresh()
+    } catch (e: any) {
+      setError(e?.message ?? 'Erro inesperado ao gerar cronograma.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
