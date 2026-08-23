@@ -5,7 +5,7 @@ import { completeImplementationTask, assignImplementationTask, addTaskComment } 
 import { StartImplementationModal } from './start-implementation-modal'
 
 type Profile = { id: string; full_name: string }
-type Comment = { id: string; text: string; is_completion_note: boolean; created_at: string; profiles: Profile }
+type Comment = { id: string; text: string; is_completion_note: boolean; created_at: string; profiles: Profile; delegated: Profile | null }
 type Task = {
   id: string; title: string; reference_doc: string | null
   start_week: number; end_week: number; sort_order: number
@@ -16,7 +16,8 @@ type Task = {
   task_comments: Comment[]
 }
 type Schedule = {
-  id: string; start_date: string; status: string
+  id: string; start_date: string; status: string; owner_id: string | null
+  owner: Profile | null
   implementation_templates: { name: string } | null
   implementation_tasks: Task[]
 }
@@ -62,15 +63,16 @@ function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => v
 
 function CommentsPanel({ task, users, onClose }: { task: Task; users: Profile[]; onClose: () => void }) {
   const [text, setText] = useState('')
+  const [delegatedTo, setDelegatedTo] = useState('')
   const [saving, setSaving] = useState(false)
   const [localComments, setLocalComments] = useState(task.task_comments)
 
   async function handleAdd() {
     if (!text.trim()) return
     setSaving(true)
-    await addTaskComment(task.id, text)
+    await addTaskComment(task.id, text, delegatedTo || null)
     setSaving(false)
-    setText('')
+    setText(''); setDelegatedTo('')
   }
 
   return (
@@ -88,12 +90,20 @@ function CommentsPanel({ task, users, onClose }: { task: Task; users: Profile[];
           {localComments.map(c => (
             <div key={c.id} className={`rounded-lg p-3 text-sm ${c.is_completion_note ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
               {c.is_completion_note && <p className="text-[10px] font-bold text-green-700 mb-1">📌 Nota de Conclusão</p>}
+              {c.delegated && (
+                <p className="text-[10px] font-bold text-orange-600 mb-1">🔔 Ação solicitada para @{c.delegated.full_name}</p>
+              )}
               <p className="text-gray-800">{c.text}</p>
               <p className="text-[10px] text-gray-400 mt-1">{c.profiles?.full_name} · {new Date(c.created_at).toLocaleString('pt-BR')}</p>
             </div>
           ))}
         </div>
         <div className="border-t p-3 space-y-2">
+          <select value={delegatedTo} onChange={e => setDelegatedTo(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 focus:outline-none">
+            <option value="">Delegar ação para... (opcional)</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+          </select>
           <textarea value={text} onChange={e => setText(e.target.value)} rows={2}
             placeholder="Adicionar comentário..."
             className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm resize-none focus:border-[#1B556B] focus:outline-none" />
@@ -107,7 +117,9 @@ function CommentsPanel({ task, users, onClose }: { task: Task; users: Profile[];
   )
 }
 
-function TaskCard({ task, users, startDate }: { task: Task; users: Profile[]; startDate: string }) {
+function TaskCard({ task, users, startDate, isOwnerOrAdmin, hasPendingBefore }: {
+  task: Task; users: Profile[]; startDate: string; isOwnerOrAdmin: boolean; hasPendingBefore: boolean
+}) {
   const [completeOpen, setCompleteOpen] = useState(false)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [localTask, setLocalTask] = useState(task)
@@ -167,12 +179,20 @@ function TaskCard({ task, users, startDate }: { task: Task; users: Profile[]; st
                 </span>
               )}
             </button>
-            {!localTask.is_completed && (
-              <button onClick={() => setCompleteOpen(true)}
-                className="rounded-md border border-green-300 px-2 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50">
-                ✓ Concluir
-              </button>
-            )}
+            {!localTask.is_completed && (() => {
+              const disabled = !isOwnerOrAdmin || hasPendingBefore
+              const title = !isOwnerOrAdmin
+                ? 'Apenas o dono da implantação pode concluir'
+                : hasPendingBefore
+                ? 'Conclua as fases anteriores primeiro'
+                : undefined
+              return (
+                <button onClick={() => !disabled && setCompleteOpen(true)} disabled={disabled} title={title}
+                  className={`rounded-md border px-2 py-1.5 text-xs font-semibold ${disabled ? 'border-gray-200 text-gray-300 cursor-not-allowed' : 'border-green-300 text-green-700 hover:bg-green-50'}`}>
+                  ✓ Concluir
+                </button>
+              )
+            })()}
           </div>
         </div>
         <div className="mt-3">
@@ -196,9 +216,10 @@ function TaskCard({ task, users, startDate }: { task: Task; users: Profile[]; st
 }
 
 export function ImplementationTab({
-  contractId, contractTags, schedule, templates, users,
+  contractId, contractTags, schedule, templates, users, currentUserId, currentUserRole,
 }: {
-  contractId: string; contractTags: string[]; schedule: Schedule | null; templates: Template[]; users: Profile[]
+  contractId: string; contractTags: string[]; schedule: Schedule | null; templates: Template[]
+  users: Profile[]; currentUserId: string; currentUserRole?: string
 }) {
   const [showStart, setShowStart] = useState(false)
 
@@ -220,12 +241,13 @@ export function ImplementationTab({
     )
   }
 
-  // Agrupa tarefas por semana
+  const isOwnerOrAdmin = currentUserRole === 'admin' || schedule?.owner_id === currentUserId
+
+  const sortedTasks = [...schedule.implementation_tasks].sort((a, b) => a.sort_order - b.sort_order)
+
+  // Agrupa tarefas por semana de início
   const weeks = new Map<number, Task[]>()
-  for (const t of schedule.implementation_tasks.sort((a, b) => a.sort_order - b.sort_order)) {
-    for (let w = t.start_week; w <= t.end_week; w++) {
-      if (!weeks.has(w)) weeks.set(w, [])
-    }
+  for (const t of sortedTasks) {
     if (!weeks.has(t.start_week)) weeks.set(t.start_week, [])
     weeks.get(t.start_week)!.push(t)
   }
@@ -244,7 +266,8 @@ export function ImplementationTab({
               {schedule.implementation_templates?.name ?? 'Cronograma de Implantação'}
             </h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              Início: {new Date(schedule.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} · {doneTasks}/{totalTasks} fases concluídas
+              Início: {new Date(schedule.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} · {doneTasks}/{totalTasks} fases
+              {schedule.owner && <span> · 👤 Dono: <strong>{schedule.owner.full_name}</strong></span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -279,9 +302,14 @@ export function ImplementationTab({
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
               <div className="space-y-2 pl-2">
-                {tasks.map(t => (
-                  <TaskCard key={t.id} task={t} users={users} startDate={schedule.start_date} />
-                ))}
+                {tasks.map(t => {
+                  const taskIndex = sortedTasks.findIndex(st => st.id === t.id)
+                  const hasPendingBefore = sortedTasks.slice(0, taskIndex).some(st => !st.is_completed)
+                  return (
+                    <TaskCard key={t.id} task={t} users={users} startDate={schedule.start_date}
+                      isOwnerOrAdmin={isOwnerOrAdmin} hasPendingBefore={hasPendingBefore} />
+                  )
+                })}
               </div>
             </div>
           ))}

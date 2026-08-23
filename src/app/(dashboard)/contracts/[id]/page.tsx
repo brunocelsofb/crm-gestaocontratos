@@ -707,6 +707,8 @@ export default async function ContractDetailPage({
                 schedule={implementationSchedule as any}
                 templates={implementationTemplates}
                 users={(allProfiles ?? []) as any}
+                currentUserId={currentProfile?.id ?? ''}
+                currentUserRole={currentProfile?.role ?? 'viewer'}
               />
             ),
           },

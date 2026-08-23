@@ -25,10 +25,10 @@ export async function createImplementationSchedule(
 
   if (!tasks?.length) return { error: 'Template sem tarefas.' }
 
-  // Cria o cronograma
+  // Cria o cronograma com o usuário atual como owner
   const { data: schedule, error } = await admin
     .from('implementation_schedules')
-    .insert({ contract_id: contractId, template_id: templateId, start_date: startDate, created_by: user.id })
+    .insert({ contract_id: contractId, template_id: templateId, start_date: startDate, created_by: user.id, owner_id: user.id })
     .select('id').single()
 
   if (error || !schedule) return { error: error?.message ?? 'Erro ao criar cronograma.' }
@@ -75,6 +75,29 @@ export async function completeImplementationTask(
     is_completion_note: true,
   })
 
+  // Log na aba Visão Geral do contrato
+  const { data: task } = await admin
+    .from('implementation_tasks')
+    .select('title, schedule_id')
+    .eq('id', taskId)
+    .maybeSingle()
+  if (task) {
+    const { data: schedule } = await admin
+      .from('implementation_schedules')
+      .select('contract_id')
+      .eq('id', task.schedule_id)
+      .maybeSingle()
+    if (schedule) {
+      const { data: profile } = await admin.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      await admin.from('contract_activities').insert({
+        contract_id: schedule.contract_id,
+        user_id: user.id,
+        type: 'note',
+        content: `✅ Fase de implantação concluída: **${task.title}**\n\nNota técnica por ${profile?.full_name ?? 'usuário'}: ${completionNote}`,
+      })
+    }
+  }
+
   revalidatePath('/')
   return {}
 }
@@ -92,14 +115,18 @@ export async function assignImplementationTask(
 // ---- Adicionar comentário ----
 export async function addTaskComment(
   taskId: string,
-  text: string
+  text: string,
+  delegatedTo?: string | null
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado.' }
 
   const admin = createAdminClient()
-  await admin.from('task_comments').insert({ task_id: taskId, text, author_id: user.id })
+  await admin.from('task_comments').insert({
+    task_id: taskId, text, author_id: user.id,
+    ...(delegatedTo ? { delegated_to: delegatedTo } : {}),
+  })
   revalidatePath('/')
   return {}
 }
@@ -111,12 +138,13 @@ export async function getContractSchedule(contractId: string) {
     .from('implementation_schedules')
     .select(`
       *,
+      owner:profiles!implementation_schedules_owner_id_fkey(id, full_name),
       implementation_templates(name),
       implementation_tasks(
         *,
         profiles!implementation_tasks_assigned_to_fkey(id, full_name),
         completed_by_profile:profiles!implementation_tasks_completed_by_fkey(id, full_name),
-        task_comments(*, profiles(id, full_name))
+        task_comments(*, profiles(id, full_name), delegated:profiles!task_comments_delegated_to_fkey(id, full_name))
       )
     `)
     .eq('contract_id', contractId)
