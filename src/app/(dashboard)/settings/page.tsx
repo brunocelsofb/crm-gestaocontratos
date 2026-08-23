@@ -34,6 +34,8 @@ const CONFIG_SECTIONS = [
       { href: '/settings#whatsapp-conexoes', label: '📱 Conexões (Evolution API)', description: 'Gerencie as instâncias conectadas, faça leitura do QR Code e configure aliases dos números' },
     ],
   },
+  {
+    title: 'Comunicação',
     items: [
       { href: '/email-templates', label: 'Templates de E-mail', description: 'Modelos de e-mail e WhatsApp pré-configurados' },
       { href: '/proposals/templates', label: 'Modelos de Proposta', description: 'Templates de proposta comercial' },
