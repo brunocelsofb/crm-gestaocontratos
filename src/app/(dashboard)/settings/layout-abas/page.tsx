@@ -11,6 +11,21 @@ export const ALL_CONTRACT_TABS = [
   { id: 'carteira', label: 'Carteira' },
 ]
 
+// Detecta o perfil de um pipeline pelo nome
+function getPipelineProfile(name: string): 'contratos' | 'vendas' | 'avulso' {
+  const n = name.toLowerCase()
+  if (n.includes('contrato') || n.includes('gestão')) return 'contratos'
+  if (n.includes('avulso')) return 'avulso'
+  return 'vendas' // Mercado Privado, Mercado Público, Novos Negócios etc.
+}
+
+export function getDefaultHidden(pipelineName: string): string[] {
+  const profile = getPipelineProfile(pipelineName)
+  if (profile === 'contratos') return [] // tudo visível
+  if (profile === 'avulso') return ['implantacao', 'pesquisas', 'carteira', 'emails']
+  return ['implantacao', 'carteira', 'pesquisas'] // vendas: sem implantação, carteira, pesquisas
+}
+
 export default async function LayoutAbasPage() {
   const admin = createAdminClient()
   const [{ data: settings }, { data: pipelines }] = await Promise.all([
@@ -30,6 +45,7 @@ export default async function LayoutAbasPage() {
         allTabs={ALL_CONTRACT_TABS}
         pipelines={(pipelines ?? []) as { id: string; name: string }[]}
         savedConfig={config}
+        getDefaultHidden={getDefaultHidden}
       />
     </div>
   )

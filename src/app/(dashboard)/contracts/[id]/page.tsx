@@ -234,8 +234,22 @@ export default async function ContractDetailPage({
   // Busca o pipeline do contrato (via pipeline_run)
   const pipelineId = contract.current_pipeline_id ?? contract.pipeline_runs?.[0]?.pipeline_id ?? null
   const allPipelineConfig = (tabOrderData.data as any)?.pipeline_tab_config ?? {}
-  const pipelineTabConfig: { order: string[]; hidden: string[] } | null =
-    pipelineId ? (allPipelineConfig[pipelineId] ?? null) : null
+
+  // Busca nome do pipeline para calcular default inteligente
+  const { data: pipelineData } = pipelineId
+    ? await supabase.from('pipelines').select('name').eq('id', pipelineId).maybeSingle()
+    : { data: null }
+
+  function getDefaultHiddenServer(name: string): string[] {
+    const n = name.toLowerCase()
+    if (n.includes('contrato') || n.includes('gestão')) return []
+    if (n.includes('avulso')) return ['implantacao', 'pesquisas', 'carteira', 'emails']
+    return ['implantacao', 'carteira', 'pesquisas']
+  }
+
+  const savedConfig = pipelineId ? (allPipelineConfig[pipelineId] ?? null) : null
+  const defaultHidden = pipelineData?.name ? getDefaultHiddenServer(pipelineData.name) : []
+  const pipelineTabConfig = savedConfig ?? { order: null, hidden: defaultHidden }
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
