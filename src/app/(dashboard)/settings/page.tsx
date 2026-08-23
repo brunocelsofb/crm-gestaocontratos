@@ -5,9 +5,6 @@ import { getCurrentProfile } from '@/lib/auth/role'
 import { OrganizationSettingsForm } from '@/components/settings/organization-settings-form'
 import { NumberingSettingsForm } from '@/components/settings/numbering-settings-form'
 import { InboundEmailSettingsForm } from '@/components/settings/inbound-email-settings-form'
-import { WhatsAppSettingsForm } from '@/components/settings/whatsapp-settings-form'
-import { WhatsAppBotSettingsForm } from '@/components/settings/whatsapp-bot-settings-form'
-import { WhatsAppInstancesPanel } from '@/components/settings/whatsapp-instances-panel'
 import { DEFAULT_WELCOME_OFFLINE, DEFAULT_WELCOME_ONLINE, DEFAULT_REMINDER } from '@/lib/whatsapp/guardrails'
 
 const CONFIG_SECTIONS = [
