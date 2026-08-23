@@ -18,6 +18,7 @@ const CONFIG_SECTIONS = [
     title: 'Implantação',
     items: [
       { href: '/settings/implementation-templates', label: '🚀 Modelos de Implantação', description: 'Crie e edite templates de cronograma (Engenharia Clínica, Hospitalar, etc.)' },
+      { href: '/settings/layout-abas', label: '🗂️ Layout das Abas', description: 'Defina a ordem de exibição das abas na página de Contratos' },
     ],
   },
   {

@@ -225,10 +225,12 @@ export default async function ContractDetailPage({
     contract.owner_id === currentProfile?.id || currentProfile?.role === 'admin'
 
   // Dados de implantação
-  const [implementationSchedule, implementationTemplates] = await Promise.all([
+  const [implementationSchedule, implementationTemplates, tabOrderData] = await Promise.all([
     getContractSchedule(id),
     getImplementationTemplates(),
+    supabase.from('organization_settings').select('contract_tab_order').eq('id', 'default').maybeSingle(),
   ])
+  const tabOrder: string[] | null = (tabOrderData.data as any)?.contract_tab_order ?? null
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
@@ -372,6 +374,7 @@ export default async function ContractDetailPage({
       )}
 
       <ContractTabs
+        tabOrder={tabOrder}
         tabs={[
           {
             id: 'visao-geral',

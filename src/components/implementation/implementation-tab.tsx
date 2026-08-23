@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { completeImplementationTask, assignImplementationTask, addTaskComment } from '@/lib/actions/implementation'
+import { completeImplementationTask, assignImplementationTask, addTaskComment, updateImplementationOwner } from '@/lib/actions/implementation'
 import { StartImplementationModal } from './start-implementation-modal'
 
 type Profile = { id: string; full_name: string }
@@ -29,7 +29,42 @@ function weekLabel(startDate: string, week: number) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 }
 
-function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => void; onDone: () => void }) {
+function OwnerEditor({ scheduleId, owner, users }: { scheduleId: string; owner: Profile | null; users: Profile[] }) {
+  const [editing, setEditing] = useState(false)
+  const [current, setCurrent] = useState(owner)
+  const [saving, setSaving] = useState(false)
+
+  async function handleChange(userId: string) {
+    setSaving(true)
+    await updateImplementationOwner(scheduleId, userId)
+    const found = users.find(u => u.id === userId) ?? null
+    setCurrent(found)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  if (editing) return (
+    <div className="flex items-center gap-2">
+      <select autoFocus defaultValue={current?.id ?? ''}
+        onChange={e => handleChange(e.target.value)}
+        disabled={saving}
+        className="rounded-md border border-[#1B556B] px-2 py-1 text-xs focus:outline-none">
+        {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+      </select>
+      <button onClick={() => setEditing(false)} className="text-xs text-gray-400">✕</button>
+    </div>
+  )
+
+  return (
+    <button onClick={() => setEditing(true)}
+      className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#1B556B] group">
+      👤 <span className="font-medium">{current?.full_name ?? 'Sem dono'}</span>
+      <span className="opacity-0 group-hover:opacity-100 text-[10px]">✏️</span>
+    </button>
+  )
+}
+
+({ task, onClose, onDone }: { task: Task; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -265,9 +300,9 @@ export function ImplementationTab({
             <h3 className="text-sm font-bold text-[#1B556B]">
               {schedule.implementation_templates?.name ?? 'Cronograma de Implantação'}
             </h3>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
               Início: {new Date(schedule.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} · {doneTasks}/{totalTasks} fases
-              {schedule.owner && <span> · 👤 Dono: <strong>{schedule.owner.full_name}</strong></span>}
+              <OwnerEditor scheduleId={schedule.id} owner={schedule.owner} users={users} />
             </p>
           </div>
           <div className="flex items-center gap-3">

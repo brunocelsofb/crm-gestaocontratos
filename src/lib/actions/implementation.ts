@@ -222,3 +222,23 @@ export async function getImplementationTemplates() {
   const { data } = await admin.from('implementation_templates').select('id, name, trigger_tags, description').order('name')
   return data ?? []
 }
+
+// ---- Trocar dono da implantação ----
+export async function updateImplementationOwner(
+  scheduleId: string,
+  newOwnerId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('implementation_schedules')
+    .update({ owner_id: newOwnerId, updated_at: new Date().toISOString() })
+    .eq('id', scheduleId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return {}
+}
