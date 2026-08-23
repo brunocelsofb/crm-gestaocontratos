@@ -8,13 +8,15 @@ export function WhatsAppBotSettingsForm({
   welcomeMessage,
   welcomeMessageOnline,
   reminderMessage,
-  dailyLimit,
+  dailyLimit = 5,
+  companyName,
 }: {
   isOnline: boolean
   welcomeMessage: string
   welcomeMessageOnline: string
   reminderMessage: string
-  dailyLimit: number
+  dailyLimit?: number
+  companyName?: string
 }) {
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
