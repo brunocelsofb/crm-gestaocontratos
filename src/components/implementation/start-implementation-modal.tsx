@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createImplementationSchedule } from '@/lib/actions/implementation'
 
 type Template = { id: string; name: string; trigger_tags: string[]; description: string | null }
 
@@ -12,17 +11,17 @@ export function StartImplementationModal({
   contractId: string; contractTags: string[]; templates: Template[]; onClose: () => void
 }) {
   const router = useRouter()
-  // Filtra templates pelas tags do contrato; se nenhum bater, mostra todos
+
   const filtered = templates.filter(t =>
     t.trigger_tags.some(tag =>
       contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase()) || tag.toLowerCase().includes(ct.toLowerCase()))
     )
   )
   const displayTemplates = filtered.length > 0 ? filtered : templates
-
   const matched = displayTemplates.find(t =>
     t.trigger_tags.some(tag => contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase())))
   )
+
   const [templateId, setTemplateId] = useState(matched?.id ?? displayTemplates[0]?.id ?? '')
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
@@ -30,22 +29,26 @@ export function StartImplementationModal({
 
   async function handleStart() {
     if (!templateId || !startDate) { setError('Selecione o template e a data.'); return }
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     try {
-      const res = await createImplementationSchedule(contractId, templateId, startDate)
-      if (res.error) {
-        console.error('[implantação] erro da action:', res.error)
-        alert(`Erro do Servidor: ${res.error}`)
-        setError(res.error)
+      const res = await fetch('/api/implementation/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractId, templateId, startDate }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        const msg = data.error ?? 'Erro desconhecido'
+        alert(`ERRO: ${msg}`)
+        setError(msg)
         return
       }
       onClose()
       router.refresh()
     } catch (e: any) {
-      console.error('[implantação] erro crítico:', e)
-      alert(`Erro Crítico: ${e?.message ?? 'Tente novamente.'}`)
-      setError(e?.message ?? 'Erro inesperado.')
+      const msg = e?.message ?? 'Erro de conexão'
+      alert(`ERRO CRÍTICO: ${msg}`)
+      setError(msg)
     } finally {
       setSaving(false)
     }
@@ -66,7 +69,7 @@ export function StartImplementationModal({
               {displayTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             {matched && <p className="mt-1 text-xs text-green-600">✓ Detectado pelas tags do contrato</p>}
-            {filtered.length === 0 && templates.length > 0 && <p className="mt-1 text-xs text-gray-400">Nenhum template bate com as tags — exibindo todos.</p>}
+            {filtered.length === 0 && <p className="mt-1 text-xs text-gray-400">Exibindo todos os templates.</p>}
           </div>
           <div>
             <label className="block text-sm font-semibold text-[#1B556B] mb-1">Data de Início</label>
