@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { completeImplementationTask, assignImplementationTask, addTaskComment, updateImplementationOwner } from '@/lib/actions/implementation'
 import { StartImplementationModal } from './start-implementation-modal'
 
-type Profile = { id: string; full_name: string }
+type Profile = { id: string; full_name: string; job_title?: string | null }
 type Comment = { id: string; text: string; is_completion_note: boolean; created_at: string; profiles: Profile; delegated: Profile | null }
 type Task = {
   id: string; title: string; reference_doc: string | null
@@ -49,7 +49,7 @@ function OwnerEditor({ scheduleId, owner, users }: { scheduleId: string; owner: 
         onChange={e => handleChange(e.target.value)}
         disabled={saving}
         className="rounded-md border border-[#1B556B] px-2 py-1 text-xs focus:outline-none">
-        {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+        {users.map(u => <option key={u.id} value={u.id}>{u.full_name}{u.job_title ? ` · ${u.job_title}` : ''}</option>)}
       </select>
       <button onClick={() => setEditing(false)} className="text-xs text-gray-400">✕</button>
     </div>
@@ -126,7 +126,7 @@ function CommentsPanel({ task, users, onClose }: { task: Task; users: Profile[];
             <div key={c.id} className={`rounded-lg p-3 text-sm ${c.is_completion_note ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
               {c.is_completion_note && <p className="text-[10px] font-bold text-green-700 mb-1">📌 Nota de Conclusão</p>}
               {c.delegated && (
-                <p className="text-[10px] font-bold text-orange-600 mb-1">🔔 Ação solicitada para @{c.delegated.full_name}</p>
+                <p className="text-[10px] font-bold text-orange-600 mb-1">🔔 Ação solicitada para @{c.delegated.full_name}{c.delegated.job_title ? `, ${c.delegated.job_title}` : ''}</p>
               )}
               <p className="text-gray-800">{c.text}</p>
               <p className="text-[10px] text-gray-400 mt-1">{c.profiles?.full_name} · {new Date(c.created_at).toLocaleString('pt-BR')}</p>
@@ -137,7 +137,7 @@ function CommentsPanel({ task, users, onClose }: { task: Task; users: Profile[];
           <select value={delegatedTo} onChange={e => setDelegatedTo(e.target.value)}
             className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 focus:outline-none">
             <option value="">Delegar ação para... (opcional)</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+            {users.map(u => <option key={u.id} value={u.id}>{u.full_name}{u.job_title ? ` · ${u.job_title}` : ''}</option>)}
           </select>
           <textarea value={text} onChange={e => setText(e.target.value)} rows={2}
             placeholder="Adicionar comentário..."
@@ -234,7 +234,7 @@ function TaskCard({ task, users, startDate, isOwnerOrAdmin, hasPendingBefore }: 
           <select value={localTask.assigned_to ?? ''} onChange={handleAssign}
             className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs text-gray-600 focus:border-[#1B556B] focus:outline-none bg-white">
             <option value="">👤 Sem responsável</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+            {users.map(u => <option key={u.id} value={u.id}>{u.full_name}{u.job_title ? ` · ${u.job_title}` : ''}</option>)}
           </select>
         </div>
       </div>

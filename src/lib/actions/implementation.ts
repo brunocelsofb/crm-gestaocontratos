@@ -111,11 +111,11 @@ export async function completeImplementationTask(
       .maybeSingle()
     if (schedule) {
       const { data: profile } = await admin.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
-      await admin.from('contract_activities').insert({
+      await admin.from('activities').insert({
         contract_id: schedule.contract_id,
         user_id: user.id,
         type: 'note',
-        content: `✅ Fase de implantação concluída: **${task.title}**\n\nNota técnica por ${profile?.full_name ?? 'usuário'}: ${completionNote}`,
+        content: `✅ Fase de implantação concluída: **${task.title}**\n\nNota técnica: ${completionNote}`,
       })
     }
   }
@@ -191,7 +191,7 @@ export async function getContractSchedule(contractId: string) {
   if (schedule.owner_id) profileIds.add(schedule.owner_id)
 
   const { data: profiles } = profileIds.size
-    ? await admin.from('profiles').select('id, full_name').in('id', Array.from(profileIds))
+    ? await admin.from('profiles').select('id, full_name, job_title').in('id', Array.from(profileIds))
     : { data: [] }
 
   const profileMap = new Map((profiles ?? []).map(p => [p.id, p]))
