@@ -581,6 +581,30 @@ export async function assignWhatsAppConversation(phone: string, userId: string):
   const supabase = await createClient()
   const { error } = await supabase.from('whatsapp_conversation_assignments').upsert({ phone, assigned_to: userId, assigned_at: new Date().toISOString() })
   if (error) return { error: error.message }
+
+  // Notifica o cliente sobre a transferência de forma assíncrona
+  ;(async () => {
+    try {
+      const admin = createAdminClient()
+      const [{ data: profile }, { data: org }] = await Promise.all([
+        admin.from('profiles').select('full_name').eq('id', userId).maybeSingle(),
+        admin.from('organization_settings').select('evo_server_url, evo_api_key, evo_instance_name').eq('id', 'default').maybeSingle(),
+      ])
+      const nome = profile?.full_name ?? 'nossa equipe'
+      if (org?.evo_server_url && org?.evo_api_key) {
+        // Detecta a instância da última mensagem desse phone
+        const { data: lastMsg } = await admin.from('contract_whatsapp_messages')
+          .select('instance_name').eq('phone', phone).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        const instance = lastMsg?.instance_name ?? org.evo_instance_name
+        await fetch(`${org.evo_server_url}/message/sendText/${instance}`, {
+          method: 'POST',
+          headers: { 'apikey': org.evo_api_key, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number: phone, text: `*Transferência de atendimento:* Aguarde um momento, vou transferir você para o(a) *${nome}*... 🔄` }),
+        })
+      }
+    } catch (e) { console.warn('[assign] falha ao notificar transferência:', e) }
+  })()
+
   revalidatePath('/whatsapp')
   return {}
 }

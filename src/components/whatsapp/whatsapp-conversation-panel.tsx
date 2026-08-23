@@ -204,8 +204,6 @@ export function WhatsAppConversationPanel({
     else router.refresh()
   }
 
-  }
-
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-shrink-0 rounded-lg border border-gray-200 bg-white p-3 space-y-2">
