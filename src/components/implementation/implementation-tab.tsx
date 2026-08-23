@@ -64,7 +64,7 @@ function OwnerEditor({ scheduleId, owner, users }: { scheduleId: string; owner: 
   )
 }
 
-({ task, onClose, onDone }: { task: Task; onClose: () => void; onDone: () => void }) {
+function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
