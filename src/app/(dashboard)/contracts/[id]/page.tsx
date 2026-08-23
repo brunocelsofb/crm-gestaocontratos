@@ -39,6 +39,8 @@ import { setContractTag } from '@/lib/actions/tags'
 import { getCurrentProfile } from '@/lib/auth/role'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { ImplementationTab } from '@/components/implementation/implementation-tab'
+import { getContractSchedule, getImplementationTemplates } from '@/lib/actions/implementation'
 
 export default async function ContractDetailPage({
   params,
@@ -222,6 +224,12 @@ export default async function ContractDetailPage({
   const currentProfile = await getCurrentProfile()
   const canChangeStage =
     contract.owner_id === currentProfile?.id || currentProfile?.role === 'admin'
+
+  // Dados de implantação
+  const [implementationSchedule, implementationTemplates] = await Promise.all([
+    getContractSchedule(id),
+    getImplementationTemplates(),
+  ])
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
@@ -689,6 +697,19 @@ export default async function ContractDetailPage({
               />
             ),
           }] : []),
+          {
+            id: 'implantacao',
+            label: '🚀 Implantação',
+            content: (
+              <ImplementationTab
+                contractId={id}
+                contractTags={(currentContractTags ?? []).map((ct: any) => ct.tags?.name ?? '')}
+                schedule={implementationSchedule as any}
+                templates={implementationTemplates}
+                users={(allProfiles ?? []) as any}
+              />
+            ),
+          },
         ]}
       />
     </div>

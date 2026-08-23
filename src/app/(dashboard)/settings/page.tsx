@@ -15,7 +15,11 @@ const CONFIG_SECTIONS = [
     ],
   },
   {
-    title: 'WhatsApp',
+    title: 'Implantação',
+    items: [
+      { href: '/settings/implementation-templates', label: '🚀 Modelos de Implantação', description: 'Crie e edite templates de cronograma (Engenharia Clínica, Hospitalar, etc.)' },
+    ],
+  },
     items: [
       { href: '/settings/whatsapp-bot', label: '🤖 Bot e Automações', description: 'Configure as mensagens de boas-vindas e o status de atendimento (Online/Offline)' },
       { href: '/settings/whatsapp-conexoes', label: '📱 Conexões (Evolution API)', description: 'Gerencie as instâncias conectadas, faça leitura do QR Code e configure aliases dos números' },
