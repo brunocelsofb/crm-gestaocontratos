@@ -27,13 +27,17 @@ export function StartImplementationModal({
     try {
       const res = await createImplementationSchedule(contractId, templateId, startDate)
       if (res.error) {
+        console.error('[implantação] erro da action:', res.error)
+        alert(`Erro do Servidor: ${res.error}`)
         setError(res.error)
         return
       }
       onClose()
       router.refresh()
     } catch (e: any) {
-      setError(e?.message ?? 'Erro inesperado ao gerar cronograma.')
+      console.error('[implantação] erro crítico:', e)
+      alert(`Erro Crítico: ${e?.message ?? 'Tente novamente.'}`)
+      setError(e?.message ?? 'Erro inesperado.')
     } finally {
       setSaving(false)
     }
