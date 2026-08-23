@@ -156,25 +156,64 @@ export async function addTaskComment(
 // ---- Buscar cronograma do contrato ----
 export async function getContractSchedule(contractId: string) {
   const admin = createAdminClient()
-  const { data: schedule } = await admin
+
+  // Busca schedule
+  const { data: schedule, error: schedErr } = await admin
     .from('implementation_schedules')
-    .select(`
-      *,
-      owner:profiles!implementation_schedules_owner_id_fkey(id, full_name),
-      implementation_templates(name),
-      implementation_tasks(
-        *,
-        profiles!implementation_tasks_assigned_to_fkey(id, full_name),
-        completed_by_profile:profiles!implementation_tasks_completed_by_fkey(id, full_name),
-        task_comments(*, profiles(id, full_name), delegated:profiles!task_comments_delegated_to_fkey(id, full_name))
-      )
-    `)
+    .select('*, implementation_templates(name)')
     .eq('contract_id', contractId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  return schedule
+  if (schedErr) console.error('[getContractSchedule] schedule error:', schedErr.message)
+  if (!schedule) return null
+
+  // Busca tasks separadamente (evita erros de FK nomeada)
+  const { data: tasks, error: tasksErr } = await admin
+    .from('implementation_tasks')
+    .select('*')
+    .eq('schedule_id', schedule.id)
+    .order('sort_order')
+
+  if (tasksErr) console.error('[getContractSchedule] tasks error:', tasksErr.message)
+
+  // Busca comentários
+  const taskIds = (tasks ?? []).map(t => t.id)
+  const { data: comments } = taskIds.length
+    ? await admin.from('task_comments').select('*').in('task_id', taskIds).order('created_at')
+    : { data: [] }
+
+  // Busca profiles relevantes
+  const profileIds = new Set<string>()
+  ;(tasks ?? []).forEach(t => { if (t.assigned_to) profileIds.add(t.assigned_to); if (t.completed_by) profileIds.add(t.completed_by) })
+  ;(comments ?? []).forEach(c => { profileIds.add(c.author_id); if (c.delegated_to) profileIds.add(c.delegated_to) })
+  if (schedule.owner_id) profileIds.add(schedule.owner_id)
+
+  const { data: profiles } = profileIds.size
+    ? await admin.from('profiles').select('id, full_name').in('id', Array.from(profileIds))
+    : { data: [] }
+
+  const profileMap = new Map((profiles ?? []).map(p => [p.id, p]))
+
+  const tasksWithComments = (tasks ?? []).map(t => ({
+    ...t,
+    profiles: t.assigned_to ? profileMap.get(t.assigned_to) ?? null : null,
+    completed_by_profile: t.completed_by ? profileMap.get(t.completed_by) ?? null : null,
+    task_comments: (comments ?? [])
+      .filter(c => c.task_id === t.id)
+      .map(c => ({
+        ...c,
+        profiles: profileMap.get(c.author_id) ?? null,
+        delegated: c.delegated_to ? profileMap.get(c.delegated_to) ?? null : null,
+      })),
+  }))
+
+  return {
+    ...schedule,
+    owner: schedule.owner_id ? profileMap.get(schedule.owner_id) ?? null : null,
+    implementation_tasks: tasksWithComments,
+  }
 }
 
 // ---- Buscar templates disponíveis ----
