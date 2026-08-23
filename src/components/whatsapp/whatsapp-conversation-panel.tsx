@@ -204,27 +204,6 @@ export function WhatsAppConversationPanel({
     else router.refresh()
   }
 
-  async function handleConvert() {
-    if (!leadId) return
-    if (!confirm('Converter esse lead em oportunidade agora? Ele entra no funil de Novos Negócios.')) return
-    setBusy(true)
-    setError(null)
-    const result = await convertLeadToOpportunity(leadId)
-    setBusy(false)
-    if (result.error) setError(result.error)
-    else if (result.contractId) router.push(`/contracts/${result.contractId}`)
-  }
-
-  async function handleReply() {
-    setBusy(true)
-    setError(null)
-    const result = await sendUnlinkedWhatsAppMessage(phone, replyText, selectedInstance || instanceName || undefined)
-    setBusy(false)
-    if (result.error) setError(result.error)
-    else {
-      setReplyText('')
-      router.refresh()
-    }
   }
 
   return (
@@ -458,7 +437,6 @@ export function WhatsAppConversationPanel({
             {busy ? 'Enviando...' : 'Enviar'}
           </button>
         </div>
-      </div>
       )}
     </div>
   )
