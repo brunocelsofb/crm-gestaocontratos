@@ -1,28 +1,36 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { TabOrderEditor } from '@/components/settings/tab-order-editor'
+import { TabOrderEditorByPipeline } from '@/components/settings/tab-order-editor'
 
 export const ALL_CONTRACT_TABS = [
   { id: 'visao-geral', label: 'Visão Geral' },
   { id: 'atividades', label: 'Atividades' },
+  { id: 'emails', label: 'E-mails' },
   { id: 'arquivos', label: 'Arquivos' },
   { id: 'implantacao', label: '🚀 Implantação' },
-  { id: 'emails', label: 'Emails' },
   { id: 'pesquisas', label: 'Pesquisas' },
   { id: 'carteira', label: 'Carteira' },
 ]
 
 export default async function LayoutAbasPage() {
   const admin = createAdminClient()
-  const { data } = await admin.from('organization_settings').select('contract_tab_order').eq('id', 'default').maybeSingle()
-  const currentOrder: string[] = (data as any)?.contract_tab_order ?? ALL_CONTRACT_TABS.map(t => t.id)
+  const [{ data: settings }, { data: pipelines }] = await Promise.all([
+    admin.from('organization_settings').select('pipeline_tab_config').eq('id', 'default').maybeSingle(),
+    admin.from('pipelines').select('id, name').order('name'),
+  ])
+
+  const config = (settings as any)?.pipeline_tab_config ?? {}
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">Layout das Abas</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Defina a ordem de exibição das abas na página de Contratos.</p>
+        <h1 className="text-lg font-semibold text-gray-900">Layout das Abas por Funil</h1>
+        <p className="mt-0.5 text-sm text-gray-500">Configure a ordem e visibilidade das abas para cada funil de Contratos.</p>
       </div>
-      <TabOrderEditor allTabs={ALL_CONTRACT_TABS} currentOrder={currentOrder} />
+      <TabOrderEditorByPipeline
+        allTabs={ALL_CONTRACT_TABS}
+        pipelines={(pipelines ?? []) as { id: string; name: string }[]}
+        savedConfig={config}
+      />
     </div>
   )
 }

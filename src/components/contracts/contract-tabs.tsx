@@ -41,14 +41,16 @@ function ContractTabsInner({ tabs }: { tabs: { id: string; label: string; conten
   )
 }
 
-export function ContractTabs({ tabs, tabOrder }: {
+export function ContractTabs({ tabs, tabOrder, hiddenTabs = [] }: {
   tabs: { id: string; label: string; content: ReactNode }[]
   tabOrder?: string[] | null
+  hiddenTabs?: string[]
 }) {
+  const visible = tabs.filter(t => !hiddenTabs.includes(t.id))
   const ordered = tabOrder
-    ? [...tabOrder.map(id => tabs.find(t => t.id === id)).filter(Boolean) as typeof tabs,
-       ...tabs.filter(t => !tabOrder.includes(t.id))]
-    : tabs
+    ? [...tabOrder.map(id => visible.find(t => t.id === id)).filter(Boolean) as typeof tabs,
+       ...visible.filter(t => !tabOrder.includes(t.id))]
+    : visible
 
   return (
     <Suspense fallback={null}>

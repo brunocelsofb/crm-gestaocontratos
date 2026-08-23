@@ -228,9 +228,14 @@ export default async function ContractDetailPage({
   const [implementationSchedule, implementationTemplates, tabOrderData] = await Promise.all([
     getContractSchedule(id),
     getImplementationTemplates(),
-    supabase.from('organization_settings').select('contract_tab_order').eq('id', 'default').maybeSingle(),
+    supabase.from('organization_settings').select('pipeline_tab_config').eq('id', 'default').maybeSingle(),
   ])
-  const tabOrder: string[] | null = (tabOrderData.data as any)?.contract_tab_order ?? null
+
+  // Busca o pipeline do contrato (via pipeline_run)
+  const pipelineId = contract.current_pipeline_id ?? contract.pipeline_runs?.[0]?.pipeline_id ?? null
+  const allPipelineConfig = (tabOrderData.data as any)?.pipeline_tab_config ?? {}
+  const pipelineTabConfig: { order: string[]; hidden: string[] } | null =
+    pipelineId ? (allPipelineConfig[pipelineId] ?? null) : null
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
@@ -374,7 +379,8 @@ export default async function ContractDetailPage({
       )}
 
       <ContractTabs
-        tabOrder={tabOrder}
+        tabOrder={pipelineTabConfig?.order ?? null}
+        hiddenTabs={pipelineTabConfig?.hidden ?? []}
         tabs={[
           {
             id: 'visao-geral',

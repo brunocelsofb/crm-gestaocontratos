@@ -18,7 +18,6 @@ const CONFIG_SECTIONS = [
     title: 'Implantação',
     items: [
       { href: '/settings/implementation-templates', label: '🚀 Modelos de Implantação', description: 'Crie e edite templates de cronograma (Engenharia Clínica, Hospitalar, etc.)' },
-      { href: '/settings/layout-abas', label: '🗂️ Layout das Abas', description: 'Defina a ordem de exibição das abas na página de Contratos' },
     ],
   },
   {
@@ -31,6 +30,7 @@ const CONFIG_SECTIONS = [
   {
     title: 'Oportunidades',
     items: [
+      { href: '/settings/layout-abas', label: '🗂️ Layout das Abas', description: 'Configure a ordem e visibilidade das abas por funil' },
       { href: '/pipelines', label: 'Funis e Etapas', description: 'Configure os funis e as etapas do seu processo de vendas' },
       { href: '/settings/campos-oportunidade', label: 'Campos por Funil', description: 'Defina quais campos são obrigatórios/opcionais em cada funil' },
       { href: '/settings/motivos-perda', label: 'Motivos de Perda', description: 'Cadastre os motivos de perda que aparecem no dashboard de gestão à vista' },
