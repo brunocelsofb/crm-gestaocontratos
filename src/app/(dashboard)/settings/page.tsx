@@ -28,7 +28,12 @@ const CONFIG_SECTIONS = [
     ],
   },
   {
-    title: 'Comunicação',
+    title: 'WhatsApp',
+    items: [
+      { href: '/settings#whatsapp-bot', label: '🤖 Bot e Automações', description: 'Configure as mensagens de boas-vindas e o status de atendimento (Online/Offline)' },
+      { href: '/settings#whatsapp-conexoes', label: '📱 Conexões (Evolution API)', description: 'Gerencie as instâncias conectadas, faça leitura do QR Code e configure aliases dos números' },
+    ],
+  },
     items: [
       { href: '/email-templates', label: 'Templates de E-mail', description: 'Modelos de e-mail e WhatsApp pré-configurados' },
       { href: '/proposals/templates', label: 'Modelos de Proposta', description: 'Templates de proposta comercial' },
