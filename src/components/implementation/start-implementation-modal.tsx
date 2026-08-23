@@ -12,14 +12,20 @@ export function StartImplementationModal({
 }) {
   const router = useRouter()
 
+  // Filtro de templates pelas tags do contrato
   const filtered = templates.filter(t =>
     t.trigger_tags.some(tag =>
-      contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase()) || tag.toLowerCase().includes(ct.toLowerCase()))
+      contractTags.some(ct =>
+        ct.toLowerCase().includes(tag.toLowerCase()) ||
+        tag.toLowerCase().includes(ct.toLowerCase())
+      )
     )
   )
   const displayTemplates = filtered.length > 0 ? filtered : templates
   const matched = displayTemplates.find(t =>
-    t.trigger_tags.some(tag => contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase())))
+    t.trigger_tags.some(tag =>
+      contractTags.some(ct => ct.toLowerCase().includes(tag.toLowerCase()))
+    )
   )
 
   const [templateId, setTemplateId] = useState(matched?.id ?? displayTemplates[0]?.id ?? '')
@@ -28,27 +34,49 @@ export function StartImplementationModal({
   const [error, setError] = useState<string | null>(null)
 
   async function handleStart() {
-    if (!templateId || !startDate) { setError('Selecione o template e a data.'); return }
-    setSaving(true); setError(null)
+    if (!templateId || !startDate) {
+      setError('Selecione o template e a data.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
     try {
+      console.log('[impl-modal] iniciando fetch...', { contractId, templateId, startDate })
+
       const res = await fetch('/api/implementation/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contractId, templateId, startDate }),
       })
-      const data = await res.json()
+
+      console.log('[impl-modal] status:', res.status, res.statusText)
+
+      // Parse seguro — evita falhar se resposta não for JSON
+      const text = await res.text()
+      console.log('[impl-modal] resposta raw:', text.slice(0, 300))
+
+      let data: any = {}
+      try { data = JSON.parse(text) } catch { data = { error: `Resposta inválida do servidor: ${text.slice(0, 100)}` } }
+
       if (!res.ok || data.error) {
-        const msg = data.error ?? 'Erro desconhecido'
-        alert(`ERRO: ${msg}`)
+        const msg = data.error || `Erro HTTP ${res.status}`
+        console.error('[impl-modal] erro:', msg)
+        alert(`ERRO DA API: ${msg}`)
         setError(msg)
         return
       }
+
+      console.log('[impl-modal] sucesso:', data)
+      alert('✅ Cronograma de implantação gerado com sucesso!')
       onClose()
       router.refresh()
+
     } catch (e: any) {
-      const msg = e?.message ?? 'Erro de conexão'
-      alert(`ERRO CRÍTICO: ${msg}`)
-      setError(msg)
+      console.error('[impl-modal] catch:', e)
+      alert(`ERRO DE REDE: ${e?.message ?? 'Falha desconhecida'}`)
+      setError(e?.message ?? 'Erro de rede')
     } finally {
       setSaving(false)
     }
@@ -63,27 +91,47 @@ export function StartImplementationModal({
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-[#1B556B] mb-1">Modelo de Implantação</label>
+            <label className="block text-sm font-semibold text-[#1B556B] mb-1">
+              Modelo de Implantação
+            </label>
             <select value={templateId} onChange={e => setTemplateId(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none">
-              {displayTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {displayTemplates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
-            {matched && <p className="mt-1 text-xs text-green-600">✓ Detectado pelas tags do contrato</p>}
-            {filtered.length === 0 && <p className="mt-1 text-xs text-gray-400">Exibindo todos os templates.</p>}
+            {matched && (
+              <p className="mt-1 text-xs text-green-600">✓ Detectado automaticamente pelas tags do contrato</p>
+            )}
+            {filtered.length === 0 && templates.length > 0 && (
+              <p className="mt-1 text-xs text-gray-400">Nenhuma tag compatível — exibindo todos os modelos.</p>
+            )}
           </div>
+
           <div>
-            <label className="block text-sm font-semibold text-[#1B556B] mb-1">Data de Início</label>
+            <label className="block text-sm font-semibold text-[#1B556B] mb-1">
+              Data de Início da Implantação
+            </label>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1B556B] focus:outline-none" />
-            <p className="mt-1 text-xs text-gray-400">Permite datas retroativas.</p>
+            <p className="mt-1 text-xs text-gray-400">Permite datas retroativas para contratos já iniciados.</p>
           </div>
-          {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+          {error && (
+            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button onClick={handleStart} disabled={saving}
               className="flex-1 rounded-lg bg-[#1B556B] py-2.5 text-sm font-semibold text-white hover:bg-[#164659] disabled:opacity-50">
-              {saving ? 'Gerando...' : '🚀 Gerar Cronograma'}
+              {saving ? '⏳ Gerando cronograma...' : '🚀 Gerar Cronograma'}
             </button>
-            <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button onClick={onClose}
+              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+              Cancelar
+            </button>
           </div>
         </div>
       </div>
