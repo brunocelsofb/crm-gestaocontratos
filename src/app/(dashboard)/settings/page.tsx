@@ -22,7 +22,8 @@ const CONFIG_SECTIONS = [
   },
   {
     title: 'WhatsApp',
-    items: [ label: '🤖 Bot e Automações', description: 'Configure as mensagens de boas-vindas e o status de atendimento (Online/Offline)' },
+    items: [
+      { href: '/settings/whatsapp-bot', label: '🤖 Bot e Automações', description: 'Configure as mensagens de boas-vindas e o status de atendimento (Online/Offline)' },
       { href: '/settings/whatsapp-conexoes', label: '📱 Conexões (Evolution API)', description: 'Gerencie as instâncias conectadas, faça leitura do QR Code e configure aliases dos números' },
     ],
   },
