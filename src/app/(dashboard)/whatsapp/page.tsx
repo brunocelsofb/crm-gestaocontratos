@@ -180,7 +180,6 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
             className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
             📊 Relatórios
           </Link>
-          <ImportWhatsAppChatsButton />
         </div>
       </div>
 

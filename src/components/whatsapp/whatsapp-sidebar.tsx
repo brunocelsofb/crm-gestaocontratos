@@ -62,9 +62,9 @@ export function WhatsAppSidebar({
             }`}>
             <div className="flex items-center justify-between gap-1">
               <p className="truncate font-medium text-gray-900">{c.lead?.name || c.latest.unlinked_sender_name || c.phone}</p>
-              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
-                tab === 'archived' ? 'bg-gray-100 text-gray-500' : c.lead ? 'bg-purple-100 text-purple-700' : 'bg-yellow-100 text-yellow-700'
-              }`}>{tab === 'archived' ? '🗃️' : c.lead ? 'Lead' : 'Novo'}</span>
+              {c.lead && (
+                <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-purple-100 text-purple-700">Lead</span>
+              )}
             </div>
             <p className="truncate text-xs text-gray-500">
               {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}

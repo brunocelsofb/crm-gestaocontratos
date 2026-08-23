@@ -224,9 +224,11 @@ export function WhatsAppConversationPanel({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 justify-end">
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${leadId ? "bg-purple-100 text-purple-700" : "bg-yellow-100 text-yellow-700"}`}>
-              {leadId ? "🎯 Lead" : "⚠️ Novo"}
-            </span>
+            {leadId && (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700">
+                🎯 Lead
+              </span>
+            )}
             {instanceName && (
               <span className="rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
                 📱 {instanceName}
