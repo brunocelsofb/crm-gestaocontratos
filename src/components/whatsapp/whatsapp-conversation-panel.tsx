@@ -442,6 +442,9 @@ export function WhatsAppConversationPanel({
             >
               🗑️ Excluir chat
             </button>
+            <button
+              onClick={async () => {
+                if (!confirm(`Marcar ${phone} como opt-out? Esta pessoa não receberá mais mensagens automáticas.`)) return
                 setBusy(true)
                 await fetch('/api/whatsapp/optout', {
                   method: 'POST',
