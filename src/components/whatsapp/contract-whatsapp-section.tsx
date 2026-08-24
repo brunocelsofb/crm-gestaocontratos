@@ -186,9 +186,10 @@ export function ContractWhatsAppSection({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">{messages.length} mensage{messages.length === 1 ? 'm' : 'ns'} nessa conversa</p>
+    <div className="flex flex-col h-full min-h-0 p-2">
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between pb-2">
+        <p className="text-xs text-gray-400">{messages.length} mensage{messages.length === 1 ? 'm' : 'ns'}</p>
         <div>
           <button onClick={() => setShowNoteBox((v) => !v)} className="text-xs text-brand-700 hover:underline">
             📝 Salvar conversa como nota
@@ -207,9 +208,13 @@ export function ContractWhatsAppSection({
         </div>
       )}
 
-      <WhatsAppChatView messages={messages} contactName={resolvedName ?? 'Sem contato cadastrado'} contactPhone={conversationPhone} />
+      {/* Histórico de mensagens — scroll */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <WhatsAppChatView messages={messages} contactName={resolvedName ?? 'Sem contato cadastrado'} contactPhone={conversationPhone} />
+      </div>
 
-      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
+      {/* Input fixo no bottom */}
+      <div className="shrink-0 space-y-2 rounded-lg border border-gray-200 bg-white p-3 mt-2">
         <p className="text-sm font-medium text-gray-900">Enviar WhatsApp</p>
         {templates.length > 0 && (
           <div>
