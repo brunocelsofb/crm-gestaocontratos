@@ -571,7 +571,7 @@ export function WhatsAppConversationPanel({
         </div>
       )}
       {showConvertModal && (
-        <ConvertLeadModal phone={phone} leadId={leadId} onClose={() => setShowConvertModal(false)} />
+        <ConvertLeadModal phone={phone} leadId={leadId} displayName={localDisplayName} onClose={() => setShowConvertModal(false)} />
       )}
     </div>
   )
