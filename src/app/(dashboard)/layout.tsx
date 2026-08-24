@@ -5,6 +5,7 @@ import { signOut } from '@/lib/actions/auth'
 import { RefreshButton } from '@/components/layout/refresh-button'
 import { NotificationBell } from '@/components/layout/notification-bell'
 import { AssistantPanel } from '@/components/assistant/assistant-panel'
+import { RealtimeWatcher } from '@/components/layout/realtime-watcher'
 import { LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -84,6 +85,7 @@ export default async function DashboardLayout({
         </div>
       </aside>
       <main className="flex-1 p-6">{children}</main>
+      <RealtimeWatcher />
       {profile?.role === 'admin' && <AssistantPanel />}
     </div>
   )
