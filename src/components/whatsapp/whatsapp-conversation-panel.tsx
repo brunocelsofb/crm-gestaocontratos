@@ -71,7 +71,15 @@ export function WhatsAppConversationPanel({
 
   // Sincroniza props com estado local
   useEffect(() => { setIsArchived(initialIsArchived ?? false) }, [initialIsArchived])
-  useEffect(() => { setLocalMessages(messages) }, [messages])
+  // Sincroniza com dados frescos do servidor, preservando mensagens optimistas pendentes
+  useEffect(() => {
+    setLocalMessages(prev => {
+      const pendingOpt = prev.filter(m => m.id.startsWith('opt-'))
+      if (pendingOpt.length === 0) return messages
+      // Mantém optimistas que ainda não foram substituídos pelo Realtime
+      return [...messages, ...pendingOpt]
+    })
+  }, [messages])
 
   // Auto-scroll para mensagem mais recente
   useEffect(() => {
@@ -90,8 +98,24 @@ export function WhatsAppConversationPanel({
       }, (payload) => {
         const newMsg = payload.new as Message
         setLocalMessages(prev => {
-          // Evita duplicata (optimistic já inseriu)
+          // Já existe com esse ID real — ignora
           if (prev.some(m => m.id === newMsg.id)) return prev
+
+          // Procura mensagem optimista (id começa com 'opt-') com texto contido na msg real
+          // A assinatura *Nome:* é adicionada pelo backend, então o texto real contém o texto local
+          const optIdx = prev.findIndex(m =>
+            m.id.startsWith('opt-') &&
+            m.direction === newMsg.direction &&
+            newMsg.message.includes(m.message.trim())
+          )
+
+          if (optIdx !== -1) {
+            // Substitui o optimista pela mensagem real
+            const next = [...prev]
+            next[optIdx] = newMsg
+            return next
+          }
+
           return [...prev, newMsg]
         })
       })
