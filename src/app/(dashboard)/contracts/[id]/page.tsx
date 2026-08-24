@@ -225,31 +225,47 @@ export default async function ContractDetailPage({
     contract.owner_id === currentProfile?.id || currentProfile?.role === 'admin'
 
   // Dados de implantação
-  const [implementationSchedule, implementationTemplates, tabOrderData] = await Promise.all([
+  const [implementationSchedule, implementationTemplates] = await Promise.all([
     getContractSchedule(id),
     getImplementationTemplates(),
-    supabase.from('organization_settings').select('pipeline_tab_config').eq('id', 'default').maybeSingle(),
   ])
 
   // Busca o pipeline do contrato (via pipeline_run)
-  const pipelineId = contract.current_pipeline_id ?? contract.pipeline_runs?.[0]?.pipeline_id ?? null
-  const allPipelineConfig = (tabOrderData.data as any)?.pipeline_tab_config ?? {}
+  const implementationPipelineId = (contract as any)?.current_pipeline_id
+  // Configuração de abas por pipeline — com fallback seguro
+  let pipelineTabConfig: { order: string[] | null; hidden: string[] } = { order: null, hidden: [] }
+  try {
+    const tabOrderData = await supabase
+      .from('organization_settings')
+      .select('pipeline_tab_config')
+      .eq('id', 'default')
+      .maybeSingle()
 
-  // Busca nome do pipeline para calcular default inteligente
-  const { data: pipelineData } = pipelineId
-    ? await supabase.from('pipelines').select('name').eq('id', pipelineId).maybeSingle()
-    : { data: null }
+    const allPipelineConfig = (tabOrderData?.data as any)?.pipeline_tab_config ?? {}
+    const pipelineId = (contract as any)?.current_pipeline_id
+      ?? (contract as any)?.pipeline_runs?.[0]?.pipeline_id
+      ?? null
 
-  function getDefaultHiddenServer(name: string): string[] {
-    const n = name.toLowerCase()
-    if (n.includes('contrato') || n.includes('gestão')) return []
-    if (n.includes('avulso')) return ['implantacao', 'pesquisas', 'carteira', 'emails']
-    return ['implantacao', 'carteira', 'pesquisas']
+    if (pipelineId) {
+      const savedConfig = allPipelineConfig[pipelineId] ?? null
+      if (savedConfig) {
+        pipelineTabConfig = savedConfig
+      } else {
+        // Default inteligente baseado no nome do pipeline
+        const pipelineRes = await supabase
+          .from('pipelines').select('name').eq('id', pipelineId).maybeSingle()
+        const pname = (pipelineRes?.data as any)?.name?.toLowerCase() ?? ''
+        const hidden = pname.includes('contrato') || pname.includes('gestão')
+          ? []
+          : pname.includes('avulso')
+          ? ['implantacao', 'pesquisas', 'carteira', 'emails']
+          : ['implantacao', 'carteira', 'pesquisas']
+        pipelineTabConfig = { order: null, hidden }
+      }
+    }
+  } catch (e) {
+    console.error('[contracts/page] erro ao carregar tab config:', e)
   }
-
-  const savedConfig = pipelineId ? (allPipelineConfig[pipelineId] ?? null) : null
-  const defaultHidden = pipelineData?.name ? getDefaultHiddenServer(pipelineData.name) : []
-  const pipelineTabConfig = savedConfig ?? { order: null, hidden: defaultHidden }
 
   const transferLog = activities
     .filter((a) => a.type === 'transfer')
