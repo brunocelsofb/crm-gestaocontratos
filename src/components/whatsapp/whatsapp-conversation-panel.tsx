@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation } from '@/lib/actions/whatsapp'
+import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation, saveUnlinkedContactName } from '@/lib/actions/whatsapp'
 import { convertLeadToOpportunity } from '@/lib/actions/leads'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 
@@ -59,6 +59,9 @@ export function WhatsAppConversationPanel({
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [localMessages, setLocalMessages] = useState<Message[]>(messages)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(displayName ?? '')
+  const [localDisplayName, setLocalDisplayName] = useState(displayName)
   const [showAssignPicker, setShowAssignPicker] = useState(false)
   const [showLinkSearch, setShowLinkSearch] = useState(false)
   const [query, setQuery] = useState('')
@@ -246,7 +249,28 @@ export function WhatsAppConversationPanel({
               </div>
             )}
             <div>
-              <p className="text-sm font-semibold text-gray-900">{displayName ?? phone}</p>
+              {editingName ? (
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  await saveUnlinkedContactName(phone, nameInput)
+                  setLocalDisplayName(nameInput || null)
+                  setEditingName(false)
+                }} className="flex items-center gap-1">
+                  <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)}
+                    placeholder={phone}
+                    className="rounded border border-[#1B556B] px-2 py-0.5 text-sm font-semibold focus:outline-none w-40" />
+                  <button type="submit" className="text-[#1B556B] text-xs font-semibold hover:underline">✓</button>
+                  <button type="button" onClick={() => setEditingName(false)} className="text-gray-400 text-xs">✕</button>
+                </form>
+              ) : (
+                <button onClick={() => { setNameInput(localDisplayName ?? ''); setEditingName(true) }}
+                  className="group flex items-center gap-1 text-left">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {localDisplayName ?? <span className="text-gray-400 italic">Sem nome — clique para editar</span>}
+                  </p>
+                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-gray-400">✏️</span>
+                </button>
+              )}
               <p className="text-[10px] text-gray-400">{phone}</p>
             </div>
           </div>

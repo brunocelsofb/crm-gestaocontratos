@@ -31,7 +31,11 @@ export async function POST(request: Request) {
     const msgData = Array.isArray(body?.data) ? body.data[0] : (body?.data ?? body)
     const key = msgData?.key ?? msgData?.message?.key
     const msg = msgData?.message ?? msgData?.data?.message ?? null
-    const pushName = msgData?.pushName ?? msgData?.sender ?? msgData?.verifiedBizName ?? null
+    const pushName = msgData?.pushName
+      ?? msgData?.contact?.name         // contato salvo na agenda
+      ?? msgData?.contact?.pushName
+      ?? msgData?.verifiedBizName
+      ?? null
     const messageTimestamp = msgData?.messageTimestamp ?? msgData?.data?.messageTimestamp ?? null
 
     console.log('[evo-webhook] key:', JSON.stringify(key))

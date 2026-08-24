@@ -535,6 +535,7 @@ export async function getConversationByPhone(phone: string): Promise<{
   messages: Awaited<ReturnType<typeof getUnlinkedMessagesByPhone>>
   leadId: string | null
   displayName: string | null
+  manualName: string | null
 }> {
   const supabase = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
@@ -561,7 +562,13 @@ export async function getConversationByPhone(phone: string): Promise<{
     ...Object.values(aliases).map((v: any) => typeof v === 'string' ? v : v?.label),
   ].filter(Boolean).map((s: string) => s.toLowerCase()))
 
-  function isInstanceName(name: string | null): boolean {
+  // Busca nome salvo manualmente (prioridade máxima)
+  const cleanPhoneForLookup = cleanPhone.slice(-11) // últimos 11 dígitos
+  const manualName = (orgData as any)?.whatsapp_contact_names?.[cleanPhone]
+    ?? (orgData as any)?.whatsapp_contact_names?.[cleanPhoneForLookup]
+    ?? null
+
+  if (manualName) return { messages: data ?? [], leadId, displayName: manualName, manualName }
     if (!name) return false
     return instanceLabels.has(name.toLowerCase())
   }
@@ -582,7 +589,7 @@ export async function getConversationByPhone(phone: string): Promise<{
     displayName = lead?.name ?? null
   }
 
-  return { messages: data ?? [], leadId, displayName }
+  return { messages: data ?? [], leadId, displayName, manualName: null }
 }
 
 // ------------------------------------------------------------
@@ -806,4 +813,34 @@ export async function unarchiveWhatsAppConversation(phone: string): Promise<void
     archived_by: null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'phone' })
+}
+
+// ---- Salvar nome manual de contato não vinculado ----
+export async function saveUnlinkedContactName(
+  phone: string,
+  name: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const admin = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+
+  // Salva em organization_settings como mapa phone→name (simples, sem nova tabela)
+  const { data: org } = await admin
+    .from('organization_settings')
+    .select('whatsapp_contact_names')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  const existing = (org as any)?.whatsapp_contact_names ?? {}
+  existing[cleanPhone] = name.trim() || null
+
+  await admin.from('organization_settings')
+    .update({ whatsapp_contact_names: existing })
+    .eq('id', 'default')
+
+  revalidatePath('/whatsapp')
+  return {}
 }
