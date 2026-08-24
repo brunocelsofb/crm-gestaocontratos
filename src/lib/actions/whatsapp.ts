@@ -569,11 +569,13 @@ export async function getConversationByPhone(phone: string): Promise<{
     ?? null
 
   if (manualName) return { messages: data ?? [], leadId, displayName: manualName, manualName }
+
+  function isInstanceName(name: string | null): boolean {
     if (!name) return false
     return instanceLabels.has(name.toLowerCase())
   }
 
-  // Pega o nome do remetente de mensagens RECEBIDAS (direction='recebido'), não enviadas
+  // Pega o nome do remetente de mensagens RECEBIDAS
   let displayName = data
     ?.find((m) => (m as any).direction === 'recebido' && m.unlinked_sender_name && !isInstanceName(m.unlinked_sender_name))
     ?.unlinked_sender_name ?? null
