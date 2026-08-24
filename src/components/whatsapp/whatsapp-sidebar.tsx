@@ -61,7 +61,15 @@ export function WhatsAppSidebar({
               : c.lead ? 'border-purple-100 bg-purple-50/40' : 'border-yellow-100 bg-yellow-50/40'
             }`}>
             <div className="flex items-center justify-between gap-1">
-              <p className="truncate font-medium text-gray-900">{c.lead?.name || c.latest.unlinked_sender_name || c.phone}</p>
+              <p className="truncate font-medium text-gray-900">
+              {(() => {
+                const name = c.lead?.name || c.latest.unlinked_sender_name
+                const label = getLabel(c.latest.instance_name ?? '')
+                // Nunca exibe nome de instância como nome do contato
+                if (name && name !== label) return name
+                return c.phone
+              })()}
+            </p>
               {c.lead && (
                 <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-purple-100 text-purple-700">Lead</span>
               )}

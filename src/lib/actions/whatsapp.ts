@@ -547,12 +547,34 @@ export async function getConversationByPhone(phone: string): Promise<{
     .limit(500)
 
   const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
+
+  // Busca aliases das instâncias para filtrar como displayName
+  const { data: orgData } = await supabase
+    .from('organization_settings')
+    .select('evo_instance_aliases, evo_instance_name')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  const aliases = (orgData as any)?.evo_instance_aliases ?? {}
+  const instanceLabels = new Set<string>([
+    (orgData as any)?.evo_instance_name,
+    ...Object.values(aliases).map((v: any) => typeof v === 'string' ? v : v?.label),
+  ].filter(Boolean).map((s: string) => s.toLowerCase()))
+
+  function isInstanceName(name: string | null): boolean {
+    if (!name) return false
+    return instanceLabels.has(name.toLowerCase())
+  }
+
   // Pega o nome do remetente de mensagens RECEBIDAS (direction='recebido'), não enviadas
-  let displayName = data?.find((m) => (m as any).direction === 'recebido' && m.unlinked_sender_name)?.unlinked_sender_name ?? null
+  let displayName = data
+    ?.find((m) => (m as any).direction === 'recebido' && m.unlinked_sender_name && !isInstanceName(m.unlinked_sender_name))
+    ?.unlinked_sender_name ?? null
 
   // Fallback para qualquer mensagem com nome, se nenhuma recebida tiver
   if (!displayName) {
-    displayName = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
+    const candidate = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
+    if (!isInstanceName(candidate)) displayName = candidate
   }
 
   if (leadId && !displayName) {
