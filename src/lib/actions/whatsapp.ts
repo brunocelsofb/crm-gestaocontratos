@@ -539,19 +539,41 @@ export async function getConversationByPhone(phone: string): Promise<{
 }> {
   const supabase = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
-
-  // Busca por últimos 10 dígitos para cobrir com/sem DDI e variações
   const last10 = cleanPhone.slice(-10)
 
-  const { data } = await supabase
+  // Busca exata primeiro, depois ilike para cobrir variações de DDI
+  let { data } = await supabase
     .from('contract_whatsapp_messages')
     .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
-    .ilike('phone', `%${last10}`)  // termina com os últimos 10 dígitos
+    .eq('phone', cleanPhone)
     .is('contract_id', null)
     .order('created_at', { ascending: true })
     .limit(500)
 
-  console.log('[getConversationByPhone] phone:', cleanPhone, '| last10:', last10, '| msgs:', data?.length ?? 0)
+  // Se não encontrou, tenta match parcial (últimos 10 dígitos)
+  if (!data?.length) {
+    const res = await supabase
+      .from('contract_whatsapp_messages')
+      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
+      .ilike('phone', `%${last10}`)
+      .is('contract_id', null)
+      .order('created_at', { ascending: true })
+      .limit(500)
+    data = res.data
+  }
+
+  // Último fallback: sem filtro de contract_id (conversa pode ter sido vinculada)
+  if (!data?.length) {
+    const res = await supabase
+      .from('contract_whatsapp_messages')
+      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
+      .ilike('phone', `%${last10}`)
+      .order('created_at', { ascending: true })
+      .limit(500)
+    data = res.data
+  }
+
+  console.log('[getConversationByPhone] phone:', cleanPhone, '| msgs:', data?.length ?? 0)
 
   const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
 

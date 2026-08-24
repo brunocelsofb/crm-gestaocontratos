@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useTransition } from 'react'
 import { WhatsAppSidebar } from './whatsapp-sidebar'
 import { WhatsAppConversationPanel } from './whatsapp-conversation-panel'
 import { WhatsAppInboxRealtimeWatcher } from './whatsapp-inbox-realtime-watcher'
@@ -19,6 +20,7 @@ export function WhatsAppInboxClient({
   contractConversations: any[]
 }) {
   const router = useRouter()
+  const [isPending] = useTransition()
 
   function handleArchived(phone: string) {
     router.push('/whatsapp')
@@ -62,9 +64,27 @@ export function WhatsAppInboxClient({
         )}
       </div>
 
-      {/* Área direita: histórico flex-1 + input shrink-0 */}
+      {/* Área direita */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {selectedOpenData && selectedPhone ? (
+        {selectedPhone && !selectedOpenData && !selectedContractData ? (
+          /* Skeleton — phone selecionado mas dados ainda carregando */
+          <div className="flex flex-col h-full animate-pulse p-4 gap-3">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="h-10 w-10 rounded-full bg-gray-200" />
+              <div className="space-y-2 flex-1">
+                <div className="h-4 w-32 rounded bg-gray-200" />
+                <div className="h-3 w-24 rounded bg-gray-100" />
+              </div>
+            </div>
+            <div className="flex-1 space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className={`flex ${i % 2 ? 'justify-end' : ''}`}>
+                  <div className={`h-10 rounded-lg bg-gray-${i % 2 ? '200' : '100'}`} style={{ width: `${40 + i * 10}%` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : selectedOpenData && selectedPhone ? (
           <WhatsAppConversationPanel
             phone={selectedPhone}
             displayName={selectedOpenData.displayName}
