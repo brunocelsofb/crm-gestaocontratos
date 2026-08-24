@@ -547,7 +547,13 @@ export async function getConversationByPhone(phone: string): Promise<{
     .limit(500)
 
   const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
-  let displayName = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
+  // Pega o nome do remetente de mensagens RECEBIDAS (direction='recebido'), não enviadas
+  let displayName = data?.find((m) => (m as any).direction === 'recebido' && m.unlinked_sender_name)?.unlinked_sender_name ?? null
+
+  // Fallback para qualquer mensagem com nome, se nenhuma recebida tiver
+  if (!displayName) {
+    displayName = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
+  }
 
   if (leadId && !displayName) {
     const { data: lead } = await supabase.from('leads').select('name').eq('id', leadId).maybeSingle()

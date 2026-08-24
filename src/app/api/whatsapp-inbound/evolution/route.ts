@@ -198,7 +198,7 @@ export async function POST(request: Request) {
         status: isFromMe ? 'enviado' : 'recebido',
         triggered_automatically: false,
         zapi_message_id: messageId ?? null,
-        unlinked_sender_name: pushName,
+        unlinked_sender_name: isFromMe ? null : pushName,
         instance_name: instanceName,
         media_url: mediaUrl,
         media_type: mediaType,
