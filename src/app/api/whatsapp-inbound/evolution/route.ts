@@ -144,7 +144,12 @@ export async function POST(request: Request) {
         }
       } catch (e) {
         console.warn('[evo-webhook] falha ao baixar mídia:', e)
-        mediaUrl = rawUrl // fallback para URL original
+        mediaUrl = rawUrl // fallback para URL original (pode não ser acessível externamente)
+        // Se tiver messageId, usa proxy local que é sempre acessível
+        if (messageId && mediaType) {
+          const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
+          mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
+        }
       }
     }
 

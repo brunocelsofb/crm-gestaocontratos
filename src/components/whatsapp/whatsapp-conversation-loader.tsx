@@ -43,7 +43,7 @@ export function WhatsAppConversationLoader({
     setData(null)
     setError(null)
 
-    fetch(`/api/whatsapp/conversation?phone=${encodeURIComponent(phone)}`)
+    fetch(`/api/whatsapp/conversation?phone=${encodeURIComponent(phone)}`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
