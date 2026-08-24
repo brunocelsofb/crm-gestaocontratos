@@ -8,10 +8,19 @@ export type EvoCredentials = {
   instanceToken?: string | null  // token específico da instância (alternativo à global key)
 }
 
+export function sanitizePhoneForEvo(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  // Já tem DDI (13 dígitos com 9: 55 + 2 DDD + 9 dígitos)
+  if (digits.length >= 12) return digits
+  // Adiciona DDI 55 (Brasil)
+  return `55${digits}`
+}
+
 export async function sendEvoTextMessage({
   serverUrl, apiKey, instanceName, phone, message
 }: EvoCredentials & { phone: string; message: string }): Promise<{ key?: { id: string } }> {
-  const cleanPhone = phone.replace(/\D/g, '')
+  const cleanPhone = sanitizePhoneForEvo(phone)
+  console.log('[evo] sendText phone:', phone, '→', cleanPhone)
   const res = await fetch(`${serverUrl}/message/sendText/${instanceName}`, {
     method: 'POST',
     headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
@@ -19,7 +28,8 @@ export async function sendEvoTextMessage({
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Evolution API: ${res.status} ${text}`)
+    console.error('[evo] sendText falhou:', res.status, text)
+    throw new Error(`Evolution API ${res.status}: ${text.slice(0, 200)}`)
   }
   return res.json()
 }
@@ -27,7 +37,7 @@ export async function sendEvoTextMessage({
 export async function sendEvoImageMessage({
   serverUrl, apiKey, instanceName, phone, imageUrl, caption
 }: EvoCredentials & { phone: string; imageUrl: string; caption?: string }): Promise<void> {
-  const cleanPhone = phone.replace(/\D/g, '')
+  const cleanPhone = sanitizePhoneForEvo(phone)
   await fetch(`${serverUrl}/message/sendMedia/${instanceName}`, {
     method: 'POST',
     headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
@@ -38,7 +48,7 @@ export async function sendEvoImageMessage({
 export async function sendEvoDocumentMessage({
   serverUrl, apiKey, instanceName, phone, documentUrl, fileName, caption
 }: EvoCredentials & { phone: string; documentUrl: string; fileName: string; caption?: string }): Promise<void> {
-  const cleanPhone = phone.replace(/\D/g, '')
+  const cleanPhone = sanitizePhoneForEvo(phone)
   await fetch(`${serverUrl}/message/sendMedia/${instanceName}`, {
     method: 'POST',
     headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },

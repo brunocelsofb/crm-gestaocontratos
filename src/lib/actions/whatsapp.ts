@@ -108,6 +108,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar WhatsApp.'
+    console.error('[sendContractWhatsApp] erro:', errorMsg, '| phone:', phone)
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
