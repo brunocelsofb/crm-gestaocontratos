@@ -860,3 +860,57 @@ export async function saveUnlinkedContactName(
   revalidatePath('/whatsapp')
   return {}
 }
+
+// ---- Excluir mensagem ----
+export async function deleteWhatsAppMessage(
+  messageId: string,
+  phone: string,
+  zApiMessageId?: string | null
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const admin = createAdminClient()
+  await admin.from('contract_whatsapp_messages').delete().eq('id', messageId)
+
+  // Tenta apagar na Evolution API também
+  if (zApiMessageId) {
+    try {
+      const { data: org } = await admin
+        .from('organization_settings')
+        .select('evo_server_url, evo_api_key, evo_instance_name')
+        .eq('id', 'default').maybeSingle()
+
+      if (org?.evo_server_url) {
+        const cleanPhone = phone.replace(/\D/g, '')
+        await fetch(`${org.evo_server_url}/chat/deleteMessage/${org.evo_instance_name}`, {
+          method: 'DELETE',
+          headers: { apikey: org.evo_api_key, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remoteJid: `${cleanPhone}@s.whatsapp.net`, id: zApiMessageId, fromMe: true }),
+        })
+      }
+    } catch (e) { console.warn('[deleteMessage] Evolution API:', e) }
+  }
+
+  revalidatePath('/whatsapp')
+  return {}
+}
+
+// ---- Excluir conversa inteira ----
+export async function deleteWhatsAppConversation(phone: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+
+  const admin = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+
+  await Promise.all([
+    admin.from('contract_whatsapp_messages').delete().ilike('phone', `%${cleanPhone.slice(-10)}`),
+    admin.from('whatsapp_conversation_status').delete().ilike('phone', `%${cleanPhone.slice(-10)}`),
+  ])
+
+  revalidatePath('/whatsapp')
+  return {}
+}

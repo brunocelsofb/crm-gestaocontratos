@@ -1,5 +1,8 @@
 'use client'
 
+import { useState } from 'react'
+import { deleteWhatsAppMessage } from '@/lib/actions/whatsapp'
+
 type ChatMessage = {
   id: string
   direction: string
@@ -52,7 +55,7 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: { mess
       {chronological.map((m) => {
         const isSent = m.direction === 'enviado'
         return (
-          <div key={m.id} className={`flex items-end gap-2 ${isSent ? 'flex-row-reverse' : ''}`}>
+          <div key={m.id} className={`group flex items-end gap-1 ${isSent ? 'flex-row-reverse' : ''}`}>
             {!isSent && (
               m.sender_photo_url ? (
                 <img src={m.sender_photo_url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
@@ -65,7 +68,14 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: { mess
                 {m.sent_by_name ? m.sent_by_name.charAt(0).toUpperCase() : m.triggered_automatically ? '🤖' : '📱'}
               </div>
             )}
-            <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${isSent ? 'bg-[#dcf8c6] text-gray-900' : 'bg-white text-gray-900'}`}>
+            <div className={`relative max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${isSent ? 'bg-[#dcf8c6] text-gray-900' : 'bg-white text-gray-900'}`}>
+              <button
+                onClick={async () => {
+                  if (!confirm('Excluir esta mensagem?')) return
+                  await deleteWhatsAppMessage(m.id, (m as any).phone ?? contactPhone ?? '')
+                }}
+                className={`absolute opacity-0 group-hover:opacity-100 transition-opacity -top-2 text-[10px] text-red-400 hover:text-red-600 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow ${isSent ? '-left-2' : '-right-2'}`}
+              >🗑</button>
               {!isSent && m.unlinked_sender_name && (
                 <p className="text-[10px] font-semibold text-[#1B556B] mb-0.5">{m.unlinked_sender_name}</p>
               )}

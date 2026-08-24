@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation, saveUnlinkedContactName } from '@/lib/actions/whatsapp'
+import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation, saveUnlinkedContactName, deleteWhatsAppConversation } from '@/lib/actions/whatsapp'
 import { convertLeadToOpportunity } from '@/lib/actions/leads'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 
@@ -430,7 +430,18 @@ export function WhatsAppConversationPanel({
             </button>
             <button
               onClick={async () => {
-                if (!confirm(`Marcar ${phone} como opt-out? Esta pessoa não receberá mais mensagens automáticas.`)) return
+                if (!confirm('⚠️ Excluir TODA esta conversa? Isso remove todas as mensagens do banco. Não pode ser desfeito.')) return
+                setBusy(true)
+                await deleteWhatsAppConversation(phone)
+                setBusy(false)
+                router.push('/whatsapp')
+                router.refresh()
+              }}
+              disabled={busy}
+              className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+            >
+              🗑️ Excluir chat
+            </button>
                 setBusy(true)
                 await fetch('/api/whatsapp/optout', {
                   method: 'POST',
