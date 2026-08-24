@@ -836,8 +836,9 @@ export async function saveUnlinkedContactName(
 
   const admin = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
+  const last10 = cleanPhone.slice(-10)
+  const trimmed = name.trim() || null
 
-  // Salva em organization_settings como mapa phone→name (simples, sem nova tabela)
   const { data: org } = await admin
     .from('organization_settings')
     .select('whatsapp_contact_names')
@@ -845,7 +846,12 @@ export async function saveUnlinkedContactName(
     .maybeSingle()
 
   const existing = (org as any)?.whatsapp_contact_names ?? {}
-  existing[cleanPhone] = name.trim() || null
+  // Salva em múltiplos formatos para garantir que a busca encontre
+  existing[cleanPhone] = trimmed
+  existing[last10] = trimmed
+  if (!cleanPhone.startsWith('55') && cleanPhone.length >= 10) {
+    existing[`55${cleanPhone}`] = trimmed
+  }
 
   await admin.from('organization_settings')
     .update({ whatsapp_contact_names: existing })

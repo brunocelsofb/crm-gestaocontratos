@@ -258,13 +258,27 @@ export function WhatsAppConversationPanel({
               {editingName ? (
                 <form onSubmit={async (e) => {
                   e.preventDefault()
-                  await saveUnlinkedContactName(phone, nameInput)
-                  setLocalDisplayName(nameInput || null)
+                  if (!nameInput.trim()) { setEditingName(false); return }
+                  await saveUnlinkedContactName(phone, nameInput.trim())
+                  setLocalDisplayName(nameInput.trim())
                   setEditingName(false)
+                  router.refresh()
                 }} className="flex items-center gap-1">
-                  <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)}
+                  <input
+                    autoFocus
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onBlur={async () => {
+                      if (nameInput.trim() && nameInput.trim() !== (localDisplayName ?? '')) {
+                        await saveUnlinkedContactName(phone, nameInput.trim())
+                        setLocalDisplayName(nameInput.trim())
+                        router.refresh()
+                      }
+                      setEditingName(false)
+                    }}
                     placeholder={phone}
-                    className="rounded border border-[#1B556B] px-2 py-0.5 text-sm font-semibold focus:outline-none w-40" />
+                    className="rounded border border-[#1B556B] px-2 py-0.5 text-sm font-semibold focus:outline-none w-44"
+                  />
                   <button type="submit" className="text-[#1B556B] text-xs font-semibold hover:underline">✓</button>
                   <button type="button" onClick={() => setEditingName(false)} className="text-gray-400 text-xs">✕</button>
                 </form>
