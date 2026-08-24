@@ -26,15 +26,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: `event=${eventRaw}` })
     }
 
-    // Extrai dados — Evolution v2 com webhookByEvents
-    const msgData = body?.data ?? body
-    const key = msgData?.key
-    const msg = msgData?.message
-    const pushName = msgData?.pushName ?? msgData?.sender ?? null
-    const messageTimestamp = msgData?.messageTimestamp ?? null
+    // Extrai dados — Evolution v2 suporta múltiplos formatos
+    // Pode vir como body.data (objeto), body.data[0] (array) ou body direto
+    const msgData = Array.isArray(body?.data) ? body.data[0] : (body?.data ?? body)
+    const key = msgData?.key ?? msgData?.message?.key
+    const msg = msgData?.message ?? msgData?.data?.message ?? null
+    const pushName = msgData?.pushName ?? msgData?.sender ?? msgData?.verifiedBizName ?? null
+    const messageTimestamp = msgData?.messageTimestamp ?? msgData?.data?.messageTimestamp ?? null
 
     console.log('[evo-webhook] key:', JSON.stringify(key))
-    console.log('[evo-webhook] message:', JSON.stringify(msg))
+    console.log('[evo-webhook] msg keys:', msg ? Object.keys(msg) : 'null')
 
     if (!key?.remoteJid) {
       console.warn('[evo-webhook] sem remoteJid, ignorando')
@@ -52,13 +53,20 @@ export async function POST(request: Request) {
     const isFromMe = key.fromMe === true
     const messageId = key.id
 
-    // Extrai texto
+    // Extrai texto — cobre todos os tipos de mensagem da Evolution API
     const text =
-      msg?.conversation ??
-      msg?.extendedTextMessage?.text ??
-      msg?.imageMessage?.caption ??
-      msg?.documentMessage?.caption ??
-      msg?.videoMessage?.caption ??
+      msg?.conversation ??                          // texto simples
+      msg?.extendedTextMessage?.text ??             // texto com formatação/reply
+      msg?.imageMessage?.caption ??                 // legenda de imagem
+      msg?.videoMessage?.caption ??                 // legenda de vídeo
+      msg?.documentMessage?.caption ??              // legenda de documento
+      msg?.documentWithCaptionMessage?.message?.documentMessage?.caption ?? // doc+caption
+      msg?.buttonsMessage?.contentText ??           // botões
+      msg?.listMessage?.description ??              // lista
+      msg?.templateMessage?.hydratedTemplate?.hydratedContentText ?? // template
+      msg?.ephemeralMessage?.message?.conversation ?? // mensagem efêmera
+      msg?.viewOnceMessage?.message?.imageMessage?.caption ?? // visualizar uma vez
+      msg?.reactionMessage?.text ??                // reação (emoji)
       null
 
     // Extrai mídia
@@ -66,10 +74,19 @@ export async function POST(request: Request) {
     let mediaType: string | null = null
     let mediaFilename: string | null = null
 
-    if (msg?.imageMessage)    { mediaType = 'image';    mediaFilename = null }
-    if (msg?.audioMessage)    { mediaType = 'audio';    mediaFilename = null }
-    if (msg?.videoMessage)    { mediaType = 'video';    mediaFilename = null }
+    const FRIENDLY: Record<string, string> = {
+      image: '[Imagem]', audio: '[Áudio]', video: '[Vídeo]',
+      document: '[Documento]', sticker: '[Figurinha]', contact: '[Contato]',
+      location: '[Localização]',
+    }
+
+    if (msg?.imageMessage)    { mediaType = 'image' }
+    if (msg?.audioMessage)    { mediaType = 'audio' }
+    if (msg?.videoMessage)    { mediaType = 'video' }
     if (msg?.documentMessage) { mediaType = 'document'; mediaFilename = msg.documentMessage.fileName ?? null }
+    if (msg?.stickerMessage)  { mediaType = 'sticker' }
+    if (msg?.contactMessage)  { mediaType = 'contact' }
+    if (msg?.locationMessage) { mediaType = 'location' }
 
     // Tenta extrair URL direta (pode ser pública ou interna)
     const rawUrl =
@@ -125,8 +142,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const messageText = text ?? (mediaType ? `[${mediaType}]` : '[mensagem]')
-    console.log('[evo-webhook] phone:', phone, '| fromMe:', isFromMe, '| text:', messageText)
+    const messageText = text ?? (mediaType ? (FRIENDLY[mediaType] ?? `[${mediaType}]`) : '[mensagem]')
+    console.log('[evo-webhook] phone:', phone, '| fromMe:', isFromMe, '| mediaType:', mediaType, '| text:', messageText?.slice(0, 80))
 
     // Deduplicação
     if (messageId) {
