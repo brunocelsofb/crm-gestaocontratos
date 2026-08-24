@@ -198,15 +198,6 @@ export function WhatsAppConversationPanel({
     router.refresh()
   }
 
-  async function handleConvert() {
-    if (!confirm('Converter este lead numa oportunidade? Ele vai entrar no funil de vendas.')) return
-    setBusy(true)
-    const result = await convertLeadToOpportunity(leadId!)
-    setBusy(false)
-    if ((result as any).error) { setError((result as any).error); return }
-    if ((result as any).contractId) router.push(`/contracts/${(result as any).contractId}`)
-  }
-
   async function handleAssignTo(userId: string) {
     setBusy(true)
     await assignWhatsAppConversation(phone, userId)
