@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 type Conv = {
@@ -24,7 +25,10 @@ export function WhatsAppSidebar({
   assignments: Record<string, { assigned_to: string; assigned_to_name: string }>
   currentUserId: string; instanceAliases: Record<string, any>
 }) {
+  const router = useRouter()
   const [tab, setTab] = useState<'open' | 'archived'>('open')
+  const [isPending, startTransition] = useTransition()
+  const [pendingPhone, setPendingPhone] = useState<string | null>(null)
 
   const getLabel = (name: string) => {
     const v = instanceAliases[name]
@@ -53,10 +57,14 @@ export function WhatsAppSidebar({
             {tab === 'open' ? 'Nenhuma conversa em aberto.' : 'Nenhuma conversa arquivada.'}
           </p>
         )}
-        {list.map((c) => (
-          <Link key={c.phone} href={`/whatsapp?phone=${encodeURIComponent(c.phone)}`}
-            className={`block rounded-md border px-3 py-2 text-sm hover:bg-gray-50 ${
-              selectedPhone === c.phone ? 'border-brand-300 bg-brand-50'
+        {list.map((c) => {
+          const isSelected = selectedPhone === c.phone
+          const isLoading = isPending && pendingPhone === c.phone
+          return (
+          <button key={c.phone}
+            onClick={() => { setPendingPhone(c.phone); startTransition(() => { router.push(`/whatsapp?phone=${encodeURIComponent(c.phone)}`) }) }}
+            className={`w-full text-left rounded-md border px-3 py-2 text-sm hover:bg-gray-50 ${isLoading ? 'opacity-50' : ''} ${
+              isSelected ? 'border-brand-300 bg-brand-50'
               : tab === 'archived' ? 'border-gray-200 bg-gray-50/60'
               : c.lead ? 'border-purple-100 bg-purple-50/40' : 'border-yellow-100 bg-yellow-50/40'
             }`}>

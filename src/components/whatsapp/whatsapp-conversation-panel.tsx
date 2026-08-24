@@ -283,12 +283,14 @@ export function WhatsAppConversationPanel({
                   <button type="button" onClick={() => setEditingName(false)} className="text-gray-400 text-xs">✕</button>
                 </form>
               ) : (
-                <button onClick={() => { setNameInput(localDisplayName ?? ''); setEditingName(true) }}
-                  className="group flex items-center gap-1 text-left">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {localDisplayName ?? <span className="text-gray-400 italic">Sem nome — clique para editar</span>}
-                  </p>
-                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-gray-400">✏️</span>
+                <button
+                  onClick={() => { setNameInput(localDisplayName ?? ''); setEditingName(true) }}
+                  className="flex items-center gap-1.5 text-left hover:bg-gray-100 rounded px-1 -mx-1 py-0.5 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-gray-900">
+                    {localDisplayName ?? <span className="text-gray-400 italic font-normal text-xs">Sem nome — clique para editar</span>}
+                  </span>
+                  <span className="text-[10px] text-gray-300">✏️</span>
                 </button>
               )}
               <p className="text-[10px] text-gray-400">{phone}</p>
