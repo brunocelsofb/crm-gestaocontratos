@@ -64,7 +64,7 @@ function OwnerEditor({ scheduleId, owner, users }: { scheduleId: string; owner: 
   )
 }
 
-function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => void; onDone: () => void }) {
+function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => void; onDone: (note: string) => void }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -73,7 +73,8 @@ function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => v
     setSaving(true)
     await completeImplementationTask(task.id, note)
     setSaving(false)
-    onDone(); onClose()
+    onDone(note)
+    onClose()
   }
 
   return (
@@ -96,16 +97,32 @@ function CompleteModal({ task, onClose, onDone }: { task: Task; onClose: () => v
   )
 }
 
-function CommentsPanel({ task, users, onClose }: { task: Task; users: Profile[]; onClose: () => void }) {
+function CommentsPanel({ task, users, onClose, onCommentAdded }: {
+  task: Task; users: Profile[]; onClose: () => void; onCommentAdded?: (c: Comment) => void
+}) {
   const [text, setText] = useState('')
   const [delegatedTo, setDelegatedTo] = useState('')
   const [saving, setSaving] = useState(false)
   const [localComments, setLocalComments] = useState(task.task_comments)
 
+  // Sincroniza com dados frescos
+  useEffect(() => { setLocalComments(task.task_comments) }, [task.task_comments])
+
   async function handleAdd() {
     if (!text.trim()) return
     setSaving(true)
     await addTaskComment(task.id, text, delegatedTo || null)
+    const newComment: any = {
+      id: `opt-${Date.now()}`,
+      text,
+      is_completion_note: false,
+      created_at: new Date().toISOString(),
+      profiles: null,
+      delegated: null,
+      delegated_to: delegatedTo || null,
+    }
+    setLocalComments(prev => [...prev, newComment])
+    onCommentAdded?.(newComment)
     setSaving(false)
     setText(''); setDelegatedTo('')
   }
@@ -158,6 +175,11 @@ function TaskCard({ task, users, startDate, isOwnerOrAdmin, hasPendingBefore }: 
   const [completeOpen, setCompleteOpen] = useState(false)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [localTask, setLocalTask] = useState(task)
+  const [localComments, setLocalComments] = useState(task.task_comments)
+
+  // Sincroniza com dados frescos do servidor (após router.refresh)
+  useEffect(() => { setLocalTask(task) }, [task])
+  useEffect(() => { setLocalComments(task.task_comments) }, [task.task_comments])
 
   const weekStart = weekLabel(startDate, task.start_week)
   const weekEnd = task.end_week > task.start_week ? weekLabel(startDate, task.end_week) : null
@@ -208,9 +230,9 @@ function TaskCard({ task, users, startDate, isOwnerOrAdmin, hasPendingBefore }: 
             <button onClick={() => setCommentsOpen(true)}
               className="relative rounded-md border border-gray-200 p-1.5 text-gray-400 hover:bg-gray-50 hover:text-[#1B556B]">
               💬
-              {task.task_comments.length > 0 && (
+              {localComments.length > 0 && (
                 <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-[#1B556B] text-[8px] text-white flex items-center justify-center">
-                  {task.task_comments.length}
+                  {localComments.length}
                 </span>
               )}
             </button>
@@ -240,11 +262,23 @@ function TaskCard({ task, users, startDate, isOwnerOrAdmin, hasPendingBefore }: 
       </div>
 
       {completeOpen && (
-        <CompleteModal task={task} onClose={() => setCompleteOpen(false)}
-          onDone={() => setLocalTask(prev => ({ ...prev, is_completed: true, completed_at: new Date().toISOString() }))} />
+        <CompleteModal task={localTask} onClose={() => setCompleteOpen(false)}
+          onDone={(note) => {
+            setLocalTask(prev => ({
+              ...prev,
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completion_note: note,
+            }))
+          }} />
       )}
       {commentsOpen && (
-        <CommentsPanel task={localTask} users={users} onClose={() => setCommentsOpen(false)} />
+        <CommentsPanel
+          task={{ ...localTask, task_comments: localComments }}
+          users={users}
+          onClose={() => setCommentsOpen(false)}
+          onCommentAdded={(c) => setLocalComments(prev => [...prev, c])}
+        />
       )}
     </>
   )
