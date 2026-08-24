@@ -2,29 +2,49 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { phone, name } = await req.json()
-  const cleanPhone = (phone ?? '').replace(/\D/g, '')
+    const { phone, name } = await req.json()
+    if (!phone) return NextResponse.json({ error: 'phone obrigatório' }, { status: 400 })
 
-  // Verifica se já existe lead com esse telefone
-  const { data: existing } = await supabase
-    .from('leads')
-    .select('id')
-    .ilike('phone', `%${cleanPhone.slice(-10)}`)
-    .limit(1)
-    .maybeSingle()
+    const cleanPhone = String(phone).replace(/\D/g, '')
 
-  if (existing) return NextResponse.json({ leadId: existing.id })
+    // Verifica se já existe lead com esse telefone
+    const { data: existing } = await supabase
+      .from('leads')
+      .select('id')
+      .ilike('phone', `%${cleanPhone.slice(-10)}`)
+      .limit(1)
+      .maybeSingle()
 
-  // Cria novo lead
-  const { data: lead, error } = await supabase
-    .from('leads')
-    .insert({ name: name || phone, phone: cleanPhone, status: 'aberto' })
-    .select('id').single()
+    if (existing?.id) {
+      console.log('[ensure-lead] lead já existe:', existing.id)
+      return NextResponse.json({ leadId: existing.id })
+    }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ leadId: lead.id })
+    // Cria novo lead com campos mínimos obrigatórios
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .insert({
+        name: (name || phone).slice(0, 255),
+        phone: cleanPhone,
+      })
+      .select('id')
+      .single()
+
+    if (error) {
+      console.error('[ensure-lead] erro ao criar lead:', JSON.stringify(error))
+      return NextResponse.json({ error: `Erro ao criar lead: ${error.message}` }, { status: 500 })
+    }
+
+    console.log('[ensure-lead] lead criado:', lead.id)
+    return NextResponse.json({ leadId: lead.id })
+
+  } catch (e: any) {
+    console.error('[ensure-lead] erro inesperado:', e?.message)
+    return NextResponse.json({ error: e?.message ?? 'Erro interno' }, { status: 500 })
+  }
 }
