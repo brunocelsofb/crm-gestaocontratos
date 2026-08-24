@@ -19,11 +19,11 @@ type Conv = {
 }
 
 export function WhatsAppSidebar({
-  open, archived, selectedPhone, assignments, currentUserId, instanceAliases,
+  open, archived, selectedPhone, assignments, currentUserId, instanceAliases, onSelectPhone,
 }: {
   open: Conv[]; archived: Conv[]; selectedPhone: string | null
   assignments: Record<string, { assigned_to: string; assigned_to_name: string }>
-  currentUserId: string; instanceAliases: Record<string, any>
+  currentUserId: string; instanceAliases: Record<string, any>; onSelectPhone?: (phone: string) => void
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<'open' | 'archived'>('open')
@@ -62,7 +62,14 @@ export function WhatsAppSidebar({
           const isLoading = isPending && pendingPhone === c.phone
           return (
           <button key={c.phone}
-            onClick={() => { setPendingPhone(c.phone); startTransition(() => { router.push(`/whatsapp?phone=${encodeURIComponent(c.phone)}`) }) }}
+            onClick={() => {
+              setPendingPhone(c.phone)
+              if (onSelectPhone) {
+                onSelectPhone(c.phone)
+              } else {
+                startTransition(() => { router.push(`/whatsapp?phone=${encodeURIComponent(c.phone)}`) })
+              }
+            }}
             className={`w-full text-left rounded-md border px-3 py-2 text-sm hover:bg-gray-50 ${isLoading ? 'opacity-50' : ''} ${
               isSelected ? 'border-brand-300 bg-brand-50'
               : tab === 'archived' ? 'border-gray-200 bg-gray-50/60'
