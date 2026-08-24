@@ -539,20 +539,26 @@ export async function getConversationByPhone(phone: string): Promise<{
 }> {
   const supabase = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
+
+  // Busca por últimos 10 dígitos para cobrir com/sem DDI e variações
+  const last10 = cleanPhone.slice(-10)
+
   const { data } = await supabase
     .from('contract_whatsapp_messages')
-    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name')
-    .ilike('phone', `%${cleanPhone.slice(-8)}%`)
+    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
+    .ilike('phone', `%${last10}`)  // termina com os últimos 10 dígitos
     .is('contract_id', null)
     .order('created_at', { ascending: true })
     .limit(500)
 
+  console.log('[getConversationByPhone] phone:', cleanPhone, '| last10:', last10, '| msgs:', data?.length ?? 0)
+
   const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
 
-  // Busca aliases das instâncias para filtrar como displayName
+  // Busca configs de org numa só query
   const { data: orgData } = await supabase
     .from('organization_settings')
-    .select('evo_instance_aliases, evo_instance_name')
+    .select('evo_instance_aliases, evo_instance_name, whatsapp_contact_names')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -562,11 +568,13 @@ export async function getConversationByPhone(phone: string): Promise<{
     ...Object.values(aliases).map((v: any) => typeof v === 'string' ? v : v?.label),
   ].filter(Boolean).map((s: string) => s.toLowerCase()))
 
-  // Busca nome salvo manualmente (prioridade máxima)
-  const cleanPhoneForLookup = cleanPhone.slice(-11) // últimos 11 dígitos
-  const manualName = (orgData as any)?.whatsapp_contact_names?.[cleanPhone]
-    ?? (orgData as any)?.whatsapp_contact_names?.[cleanPhoneForLookup]
+  const contactNames = (orgData as any)?.whatsapp_contact_names ?? {}
+  const manualName = contactNames[cleanPhone]
+    ?? contactNames[last10]
+    ?? contactNames[`55${last10}`]
     ?? null
+
+  console.log('[getConversationByPhone] manualName:', manualName)
 
   if (manualName) return { messages: data ?? [], leadId, displayName: manualName, manualName }
 
