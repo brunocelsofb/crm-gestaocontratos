@@ -7,7 +7,7 @@ type Pipeline = { id: string; name: string; defaultHidden?: string[] }
 type PipelineConfig = { order: string[]; hidden: string[] }
 
 export function TabOrderEditorByPipeline({
-  allTabs, pipelines, savedConfig, getDefaultHidden,
+  allTabs, pipelines, savedConfig,
 }: {
   allTabs: Tab[]; pipelines: Pipeline[]; savedConfig: Record<string, PipelineConfig>
 }) {
