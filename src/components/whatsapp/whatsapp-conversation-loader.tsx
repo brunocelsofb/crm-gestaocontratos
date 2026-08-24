@@ -1,14 +1,14 @@
-import { Suspense } from 'react'
-import { getConversationByPhone, getWhatsAppAssignments, searchContractsForLinking } from '@/lib/actions/whatsapp'
-import { getImplementationTemplates } from '@/lib/actions/implementation'
-import { WhatsAppConversationPanel } from './whatsapp-conversation-panel'
-import { createAdminClient } from '@/lib/supabase/admin'
+'use client'
 
-// Skeleton mostrado enquanto mensagens carregam
+import { useState, useEffect } from 'react'
+import { WhatsAppConversationPanel } from './whatsapp-conversation-panel'
+
+type Profile = { id: string; full_name: string; job_title?: string | null }
+
 function MessagesSkeleton() {
   return (
-    <div className="flex flex-col h-full animate-pulse">
-      <div className="shrink-0 rounded-lg border border-gray-200 bg-white p-3 mb-2">
+    <div className="flex flex-col h-full animate-pulse p-4 gap-3">
+      <div className="shrink-0 rounded-lg border border-gray-100 bg-white p-3">
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-full bg-gray-200" />
           <div className="space-y-1.5 flex-1">
@@ -18,69 +18,57 @@ function MessagesSkeleton() {
         </div>
       </div>
       <div className="flex-1 bg-[#e5ddd5] rounded-lg p-4 space-y-3">
-        {[80, 60, 75, 50, 90].map((w, i) => (
+        {[80, 55, 70, 45, 85].map((w, i) => (
           <div key={i} className={`flex ${i % 2 ? 'justify-end' : ''}`}>
             <div className="h-10 rounded-lg bg-white/60" style={{ width: `${w}%` }} />
           </div>
         ))}
       </div>
-      <div className="shrink-0 rounded-lg border border-gray-200 bg-white p-3 mt-2">
-        <div className="h-10 w-full rounded bg-gray-100" />
-      </div>
+      <div className="shrink-0 rounded-lg border border-gray-100 bg-white p-3 h-16" />
     </div>
-  )
-}
-
-// Busca dados e renderiza o painel — este é o componente "lento"
-async function ConversationData({
-  phone, currentUserId, users, isArchivedInitial,
-}: {
-  phone: string; currentUserId: string; users: { id: string; full_name: string }[]; isArchivedInitial: boolean
-}) {
-  const admin = createAdminClient()
-  const [conv, assignments, { data: orgData }] = await Promise.all([
-    getConversationByPhone(phone),
-    getWhatsAppAssignments([phone]),
-    admin.from('organization_settings').select('evo_instance_aliases').eq('id', 'default').maybeSingle(),
-  ])
-
-  const aliases = (orgData as any)?.evo_instance_aliases ?? {}
-  const getLabel = (name: string) => {
-    const v = aliases[name]
-    if (!v) return name
-    return typeof v === 'string' ? v : (v as any).label || name
-  }
-  const instanceName = (conv.messages.find((m: any) => m.instance_name) as any)?.instance_name ?? null
-
-  return (
-    <WhatsAppConversationPanel
-      phone={phone}
-      displayName={conv.displayName}
-      leadId={conv.leadId}
-      messages={conv.messages as any}
-      searchContracts={searchContractsForLinking}
-      currentUserId={currentUserId}
-      users={users}
-      assignment={assignments[phone] ?? null}
-      instanceName={instanceName}
-      initialIsArchived={isArchivedInitial}
-    />
   )
 }
 
 export function WhatsAppConversationLoader({
   phone, currentUserId, users, isArchivedInitial,
 }: {
-  phone: string; currentUserId: string; users: { id: string; full_name: string }[]; isArchivedInitial: boolean
+  phone: string; currentUserId: string; users: Profile[]; isArchivedInitial: boolean
 }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setData(null)
+    setError(null)
+
+    fetch(`/api/whatsapp/conversation?phone=${encodeURIComponent(phone)}`)
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [phone])
+
+  if (loading) return <MessagesSkeleton />
+  if (error) return (
+    <div className="flex items-center justify-center h-full text-sm text-red-500">
+      Erro ao carregar: {error}
+    </div>
+  )
+  if (!data) return null
+
   return (
-    <Suspense fallback={<MessagesSkeleton />}>
-      <ConversationData
-        phone={phone}
-        currentUserId={currentUserId}
-        users={users}
-        isArchivedInitial={isArchivedInitial}
-      />
-    </Suspense>
+    <WhatsAppConversationPanel
+      phone={phone}
+      displayName={data.displayName ?? null}
+      leadId={data.leadId ?? null}
+      messages={data.messages ?? []}
+      searchContracts={async () => []}
+      currentUserId={currentUserId}
+      users={users}
+      assignment={data.assignment ?? null}
+      instanceName={data.instanceName ?? null}
+      initialIsArchived={isArchivedInitial}
+    />
   )
 }
