@@ -469,9 +469,10 @@ export function WhatsAppConversationPanel({
             <button onClick={() => setShowLinkSearch((v) => !v)} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
               🔍 Vincular a conta existente
             </button>
-            <Link href={`/contracts/new`} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            <button onClick={() => setShowConvertModal(true)}
+              className="rounded-md border border-green-300 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50">
               ➕ Criar oportunidade nova
-            </Link>
+            </button>
             </>
             )}
           </div>
@@ -481,17 +482,20 @@ export function WhatsAppConversationPanel({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar conta pelo nome..."
+              placeholder="Buscar conta pelo nome... (mín. 2 caracteres)"
               className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
               autoFocus
             />
-            {results.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-md">
-                {results.map((r) => (
-                  <button key={r.id} onClick={() => handleLink(r.id)} disabled={busy} className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50">
+            {query.length >= 2 && (
+              <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-md max-h-48 overflow-y-auto">
+                {results.length > 0 ? results.map((r) => (
+                  <button key={r.id} onClick={() => handleLink(r.id)} disabled={busy}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50 border-b border-gray-50 last:border-0">
                     {r.label}
                   </button>
-                ))}
+                )) : (
+                  <p className="px-3 py-2 text-xs text-gray-400">Nenhuma conta encontrada para "{query}"</p>
+                )}
               </div>
             )}
           </div>
