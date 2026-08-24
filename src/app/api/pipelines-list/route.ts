@@ -2,34 +2,46 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const pipelineId = searchParams.get('pipelineId')
-  const withStages = searchParams.get('withStages') === 'true'
-  const supabase = await createClient()
+  try {
+    const { searchParams } = new URL(req.url)
+    const pipelineId = searchParams.get('pipelineId')
+    const withStages = searchParams.get('withStages') === 'true'
+    const supabase = await createClient()
 
-  if (pipelineId) {
-    // Busca stages de um pipeline específico
-    const { data } = await supabase
-      .from('pipeline_stages')
-      .select('id, name')
-      .eq('pipeline_id', pipelineId)
-      .order('position')
-    return NextResponse.json({ stages: data ?? [] })
+    if (pipelineId) {
+      // Stages de um pipeline específico
+      const { data, error } = await supabase
+        .from('stages')
+        .select('id, name, pipeline_id')
+        .eq('pipeline_id', pipelineId)
+        .order('order_index')
+      if (error) console.error('[pipelines-list]', error.message)
+      return NextResponse.json({ stages: data ?? [] })
+    }
+
+    if (withStages) {
+      // Pipelines + todas as stages em paralelo
+      const [{ data: pipelines, error: pe }, { data: stages, error: se }] = await Promise.all([
+        supabase.from('pipelines').select('id, name').order('name'),
+        supabase.from('stages').select('id, name, pipeline_id').order('order_index'),
+      ])
+      if (pe) console.error('[pipelines-list] pipelines:', pe.message)
+      if (se) console.error('[pipelines-list] stages:', se.message)
+
+      // Monta pipeline_stages para compatibilidade com o modal
+      const ps = (pipelines ?? []).map((p: any) => ({
+        ...p,
+        pipeline_stages: (stages ?? []).filter((s: any) => s.pipeline_id === p.id),
+      }))
+      console.log('[pipelines-list] pipelines:', ps.length, '| stages:', stages?.length ?? 0)
+      return NextResponse.json({ pipelines: ps, stages: stages ?? [] })
+    }
+
+    const { data } = await supabase.from('pipelines').select('id, name').order('name')
+    return NextResponse.json({ pipelines: data ?? [] })
+
+  } catch (e: any) {
+    console.error('[pipelines-list] erro:', e.message)
+    return NextResponse.json({ pipelines: [], stages: [] })
   }
-
-  if (withStages) {
-    // Carrega todos os pipelines com suas stages de uma vez
-    const { data } = await supabase
-      .from('pipelines')
-      .select('id, name, pipeline_stages(id, name, position)')
-      .order('name')
-    const pipelines = (data ?? []).map((p: any) => ({
-      ...p,
-      pipeline_stages: [...(p.pipeline_stages ?? [])].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0)),
-    }))
-    return NextResponse.json({ pipelines })
-  }
-
-  const { data } = await supabase.from('pipelines').select('id, name').order('name')
-  return NextResponse.json({ pipelines: data ?? [] })
 }
