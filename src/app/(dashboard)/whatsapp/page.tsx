@@ -161,10 +161,14 @@ export default async function WhatsAppInboxPage({ searchParams }: { searchParams
     }
   }
 
+  // Não busca mensagens aqui — isso é feito no WhatsAppConversationLoader via Suspense
+  // para não bloquear a renderização da página
   let selectedOpenData = null
   if (selectedPhone) {
-    const conv = await getConversationByPhone(selectedPhone)
-    selectedOpenData = conv
+    // Apenas verifica se o phone existe nas conversas abertas para saber se renderiza o painel
+    const exists = openConversations.some(c => c.phone === selectedPhone) ||
+      archivedConvList.some(c => c.phone === selectedPhone)
+    if (exists) selectedOpenData = { phone: selectedPhone }
   }
 
   return (
