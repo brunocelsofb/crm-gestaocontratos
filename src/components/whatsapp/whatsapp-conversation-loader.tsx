@@ -50,7 +50,7 @@ async function ConversationData({
     if (!v) return name
     return typeof v === 'string' ? v : (v as any).label || name
   }
-  const instanceName = conv.messages.find((m: any) => m.instance_name)?.instance_name ?? null
+  const instanceName = (conv.messages.find((m: any) => m.instance_name) as any)?.instance_name ?? null
 
   return (
     <WhatsAppConversationPanel
