@@ -21,7 +21,7 @@ export function useGlobalRealtime() {
       debounceRef.current = setTimeout(() => {
         console.log('[realtime] refresh por:', table)
         router.refresh()
-      }, 600)
+      }, 300)
     }
 
     const channel = supabase
