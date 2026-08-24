@@ -99,8 +99,9 @@ export function WhatsAppSidebar({
                 </span>
               )}
             </div>
-          </Link>
-        ))}
+          </button>
+          )
+        })}
       </div>
     </div>
   )
