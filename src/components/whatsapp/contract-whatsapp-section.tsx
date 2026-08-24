@@ -231,7 +231,18 @@ export function ContractWhatsAppSection({
         </div>
         <div>
           <label className="block text-xs text-gray-500">Mensagem</label>
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onInput={(e) => {
+              const el = e.currentTarget
+              el.style.height = 'auto'
+              el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+            }}
+            rows={1}
+            className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none resize-none overflow-y-auto"
+            style={{ minHeight: '38px', maxHeight: '160px' }}
+          />
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
         <div className="flex items-center gap-2">
