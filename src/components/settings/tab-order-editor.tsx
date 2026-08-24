@@ -3,14 +3,13 @@
 import { useState } from 'react'
 
 type Tab = { id: string; label: string }
-type Pipeline = { id: string; name: string }
+type Pipeline = { id: string; name: string; defaultHidden?: string[] }
 type PipelineConfig = { order: string[]; hidden: string[] }
 
 export function TabOrderEditorByPipeline({
   allTabs, pipelines, savedConfig, getDefaultHidden,
 }: {
   allTabs: Tab[]; pipelines: Pipeline[]; savedConfig: Record<string, PipelineConfig>
-  getDefaultHidden?: (name: string) => string[]
 }) {
   const [selectedPipeline, setSelectedPipeline] = useState(pipelines[0]?.id ?? '')
   const [configs, setConfigs] = useState<Record<string, PipelineConfig>>(savedConfig)
@@ -21,8 +20,7 @@ export function TabOrderEditorByPipeline({
     if (configs[pid]) return configs[pid]
     // Default inteligente: aplica hidden baseado no nome do pipeline
     const pipeline = pipelines.find(p => p.id === pid)
-    const defaultHidden = pipeline && getDefaultHidden ? getDefaultHidden(pipeline.name) : []
-    return { order: allTabs.map(t => t.id), hidden: defaultHidden }
+    return { order: allTabs.map(t => t.id), hidden: pipeline?.defaultHidden ?? [] }
   }
 
   const getSortedTabs = (pid: string) => {
