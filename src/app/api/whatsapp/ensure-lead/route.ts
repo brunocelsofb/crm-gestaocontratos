@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   // Cria novo lead
   const { data: lead, error } = await supabase
     .from('leads')
-    .insert({ name: name || phone, phone: cleanPhone, owner_id: user.id, status: 'aberto' })
+    .insert({ name: name || phone, phone: cleanPhone, status: 'aberto' })
     .select('id').single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
