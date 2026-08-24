@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation, saveUnlinkedContactName, deleteWhatsAppConversation } from '@/lib/actions/whatsapp'
-import { convertLeadToOpportunity } from '@/lib/actions/leads'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
+import { ConvertLeadModal } from '@/components/whatsapp/convert-lead-modal'
 
 type Message = {
   id: string
@@ -222,14 +222,18 @@ export function WhatsAppConversationPanel({
     router.refresh()
   }
 
+  const [showConvertModal, setShowConvertModal] = useState(false)
+
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([])
-      return
-    }
-    const timeout = setTimeout(() => searchContracts(query).then(setResults), 300)
+    if (query.trim().length < 2) { setResults([]); return }
+    const timeout = setTimeout(() => {
+      fetch(`/api/whatsapp/link-account?q=${encodeURIComponent(query)}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(d => setResults(d.results ?? []))
+        .catch(() => setResults([]))
+    }, 300)
     return () => clearTimeout(timeout)
-  }, [query, searchContracts])
+  }, [query])
 
   async function handleLink(contractId: string) {
     setBusy(true)
@@ -465,7 +469,8 @@ export function WhatsAppConversationPanel({
                 <Link href={`/leads/${leadId}`} className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
                   Ver Lead completo
                 </Link>
-                <button onClick={handleConvert} disabled={busy} className="rounded-md bg-positive-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-positive-700 disabled:opacity-50">
+                <button onClick={() => setShowConvertModal(true)} disabled={busy}
+                  className="rounded-md bg-positive-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-positive-700 disabled:opacity-50">
                   ✅ Converter em oportunidade
                 </button>
               </>
@@ -569,6 +574,9 @@ export function WhatsAppConversationPanel({
             {busy ? 'Enviando...' : 'Enviar'}
           </button>
         </div>
+      )}
+      {showConvertModal && (
+        <ConvertLeadModal phone={phone} leadId={leadId} onClose={() => setShowConvertModal(false)} />
       )}
     </div>
   )
