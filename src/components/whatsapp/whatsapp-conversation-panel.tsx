@@ -62,6 +62,12 @@ export function WhatsAppConversationPanel({
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(displayName ?? '')
   const [localDisplayName, setLocalDisplayName] = useState(displayName)
+
+  // Sincroniza quando dados frescos chegam do servidor
+  useEffect(() => {
+    setLocalDisplayName(displayName)
+    setNameInput(displayName ?? '')
+  }, [displayName])
   const [showAssignPicker, setShowAssignPicker] = useState(false)
   const [showLinkSearch, setShowLinkSearch] = useState(false)
   const [query, setQuery] = useState('')

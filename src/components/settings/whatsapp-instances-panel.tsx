@@ -191,9 +191,19 @@ export function WhatsAppInstancesPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-[#1B556B]">Instâncias conectadas</h3>
-        <button onClick={fetchAll} className="text-xs text-gray-400 hover:text-gray-600">↻ Atualizar</button>
+        <div className="flex gap-2">
+          <button onClick={async () => {
+            const res = await fetch('/api/settings/evo-instances?action=sync-webhooks')
+            const data = await res.json()
+            const synced = data.synced?.filter((r: any) => r.ok).length ?? 0
+            alert(`✅ Webhooks sincronizados em ${synced} instância(s).`)
+          }} className="rounded-md border border-[#1B556B] px-3 py-1 text-xs font-medium text-[#1B556B] hover:bg-[#1B556B]/5">
+            🔗 Sincronizar Webhooks
+          </button>
+          <button onClick={fetchAll} className="text-xs text-gray-400 hover:text-gray-600">↻ Atualizar</button>
+        </div>
       </div>
 
       {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</p>}
