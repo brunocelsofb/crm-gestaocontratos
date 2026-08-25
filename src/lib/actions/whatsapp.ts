@@ -125,7 +125,8 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     }
     console.log('[sendContractWhatsApp] inserida:', inserted?.id, '| phone:', normalizedPhone)
 
-    // Espelha com contract_id null → aparece na Central com indicador de origem
+    // Espelha com contract_id null → aparece na Central
+    // Não usa unlinked_sender_name para não poluir o nome do contato na sidebar
     await admin.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
@@ -136,7 +137,6 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       triggered_automatically: false,
       zapi_message_id: evoResult?.key?.id ?? null,
       instance_name: instanceName ?? creds.instanceName,
-      unlinked_sender_name: senderName ? `${senderName} (Via Oportunidade)` : 'Via Oportunidade',
     })
 
     // 3. Desarquiva com phone normalizado (mesmo DDI do banco)

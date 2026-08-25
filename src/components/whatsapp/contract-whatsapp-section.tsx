@@ -60,7 +60,14 @@ export function ContractWhatsAppSection({
   function addMessage(msg: WhatsAppLog) {
     if (processedIds.current.has(msg.id)) return
     processedIds.current.add(msg.id)
-    setMessages(prev => [msg, ...prev.filter(m => m.id !== msg.id)])
+    setMessages(prev => {
+      const unique = new Map(prev.map(m => [m.id, m]))
+      unique.set(msg.id, msg)
+      // Mantém DESC (mais recente primeiro)
+      return Array.from(unique.values()).sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+    })
   }
 
   // Ao montar, faz fetch completo pelo phone (inclui msgs sem contract_id)
