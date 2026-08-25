@@ -193,12 +193,9 @@ export function ContractWhatsAppSection({
       const newMsg = (result as any).message
       console.log('[ContractWhatsApp] MENSAGEM INJETADA:', newMsg?.id, '| sent_by_name:', newMsg?.sent_by_name)
       if (newMsg?.id) {
-        // Estado DESC. WhatsAppChatView faz .reverse() → ASC → base da tela = mais recente.
-        // Inserir no INÍCIO do DESC = mais recente = após .reverse() fica no FINAL = base.
         addMessage(newMsg)
       }
-      // Sempre faz refresh para garantir sincronismo
-      router.refresh()
+      // Realtime cuida da sincronia — sem router.refresh()
     }
   }
 
@@ -229,7 +226,7 @@ export function ContractWhatsAppSection({
     if (result.error) setError(result.error)
     else {
       if (fileInputRef.current) fileInputRef.current.value = ''
-      router.refresh()
+      // Sem router.refresh — Realtime atualiza automaticamente
     }
   }
 

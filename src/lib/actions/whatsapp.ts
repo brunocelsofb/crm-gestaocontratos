@@ -152,8 +152,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       metadata: { kind: 'sent', phone, message },
     }).then(({ error: e }) => { if (e) console.warn('[sendContractWhatsApp] activity err:', e.message) })
 
-    revalidatePath(`/contracts/${contractId}`)
-    // Garante que sent_by_name está no objeto (mesmo que o banco não retorne)
+    // Retorna a mensagem para injeção local no estado
     return { message: { ...inserted, sent_by_name: senderName } }
 
   } catch (e: any) {
