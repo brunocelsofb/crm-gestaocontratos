@@ -130,10 +130,12 @@ export function ContractWhatsAppSection({
         { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages' },
         (payload) => {
           const msg = payload.new as any
-          // Filtra pelo phone normalizado — captura Central e Oportunidade
+          // Filtra: aceita mensagens deste phone OU deste contract_id
           const msgPhone = (msg.phone ?? '').replace(/\D/g, '')
-          if (!msgPhone.endsWith(cleanPhone.slice(-10))) return
-          // Deduplicação blindada por id
+          const matchPhone = msgPhone.endsWith(cleanPhone.slice(-10))
+          const matchContract = msg.contract_id === contractId
+          if (!matchPhone && !matchContract) return
+          // Deduplicação por id
           setMessages(prev => {
             if (prev.some(m => m.id === msg.id)) return prev
             return [msg as WhatsAppLog, ...prev]
@@ -144,7 +146,9 @@ export function ContractWhatsAppSection({
         'postgres_changes',
         { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
-          setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m))
+          setMessages(prev => prev.map(m =>
+            m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m
+          ))
         }
       )
       .subscribe()

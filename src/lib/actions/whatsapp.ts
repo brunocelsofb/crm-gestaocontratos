@@ -123,25 +123,9 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       console.error('[sendContractWhatsApp] insert err:', insertErr.message)
       return { error: insertErr.message }
     }
-    console.log('[sendContractWhatsApp] inserida:', inserted?.id, '| phone:', normalizedPhone)
 
-    // Espelha com contract_id null → aparece na Central
-    // Não usa unlinked_sender_name para não poluir o nome do contato na sidebar
-    await admin.from('contract_whatsapp_messages').insert({
-      contract_id: null,
-      sent_by: user.id,
-      direction: 'enviado',
-      phone: normalizedPhone,
-      message: signedMessage,
-      status: 'enviado',
-      triggered_automatically: false,
-      zapi_message_id: evoResult?.key?.id ?? null,
-      instance_name: instanceName ?? creds.instanceName,
-    })
-
-    // 3. Desarquiva com phone normalizado (mesmo DDI do banco)
+    // Desarquiva
     await unarchiveWhatsAppConversation(normalizedPhone)
-    console.log('[sendContractWhatsApp] desarquivada:', normalizedPhone)
 
     return { message: { ...inserted, sent_by_name: senderName } }
 
