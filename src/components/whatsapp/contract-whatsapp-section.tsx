@@ -55,6 +55,13 @@ export function ContractWhatsAppSection({
   // WhatsAppChatView faz .reverse() → ASC → flex-col → mais recente na base.
   // Estado mantido em DESC. Nova mensagem vai no INÍCIO (DESC) = mais recente.
   const [messages, setMessages] = useState<WhatsAppLog[]>(messageLog)
+  const processedIds = useRef(new Set<string>(messageLog.map(m => m.id)))
+
+  function addMessage(msg: WhatsAppLog) {
+    if (processedIds.current.has(msg.id)) return
+    processedIds.current.add(msg.id)
+    setMessages(prev => [msg, ...prev.filter(m => m.id !== msg.id)])
+  }
 
   // Ao montar, faz fetch completo pelo phone (inclui msgs sem contract_id)
   useEffect(() => {
@@ -107,10 +114,7 @@ export function ContractWhatsAppSection({
       .on('postgres_changes',
         { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === (payload.new as any).id)) return prev
-            return [payload.new as WhatsAppLog, ...prev]
-          })
+          addMessage(payload.new as WhatsAppLog)
         }
       )
       .on('postgres_changes',
@@ -136,10 +140,7 @@ export function ContractWhatsAppSection({
         (payload) => {
           const msg = payload.new as any
           // Captura qualquer mensagem do número (enviada pela Central ou recebida do cliente)
-          setMessages((prev) => {
-            if (prev.some((m: any) => m.id === msg.id)) return prev
-            return [msg as WhatsAppLog, ...prev]
-          })
+          addMessage(msg as WhatsAppLog)
         }
       )
       .subscribe()
@@ -187,7 +188,7 @@ export function ContractWhatsAppSection({
       if (newMsg?.id) {
         // Estado DESC. WhatsAppChatView faz .reverse() → ASC → base da tela = mais recente.
         // Inserir no INÍCIO do DESC = mais recente = após .reverse() fica no FINAL = base.
-        setMessages(prev => [newMsg, ...prev.filter((m: any) => m.id !== newMsg.id)])
+        addMessage(newMsg)
       }
       // Sempre faz refresh para garantir sincronismo
       router.refresh()
