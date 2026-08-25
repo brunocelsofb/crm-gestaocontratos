@@ -438,13 +438,19 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
 
   try {
     const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message: signedMessage })
+
+    // Desarquiva conversa se estava arquivada
+    await supabase.from('whatsapp_conversation_status')
+      .upsert({ phone, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
+
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
+      sent_by_name: senderName,
       direction: 'enviado',
       phone,
       message: signedMessage,
-      zapi_message_id: result?.key?.id,
+      evo_message_id: result?.key?.id,
       status: 'enviado',
       instance_name: targetCreds.instanceName,
     })
@@ -453,6 +459,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
+      sent_by_name: senderName,
       direction: 'enviado',
       phone,
       message: signedMessage,

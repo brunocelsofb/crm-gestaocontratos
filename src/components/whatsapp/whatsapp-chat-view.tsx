@@ -37,7 +37,9 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
     return <video controls src={mediaUrl} className="max-w-[240px] rounded-md" />
   }
   return (
-    <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm underline">
+    <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
+      download={mediaFilename ?? 'documento.pdf'}
+      className="flex items-center gap-1.5 text-sm underline">
       📎 {mediaFilename ?? 'Arquivo'}
     </a>
   )

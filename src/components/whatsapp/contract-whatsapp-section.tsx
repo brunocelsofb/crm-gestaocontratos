@@ -133,9 +133,15 @@ export function ContractWhatsAppSection({
   async function handleSend() {
     setBusy(true)
     setError(null)
+    const optimistic: any = {
+      id: `opt-${Date.now()}`, direction: 'enviado', message, status: 'enviado',
+      created_at: new Date().toISOString(), media_url: null, media_type: null,
+    }
+    setMessages(prev => [...prev, optimistic])
     const result = await sendContractWhatsApp(contractId, phone, message, templateId || null, selectedInstance || null)
     setBusy(false)
     if (result.error) {
+      setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setError(result.error)
     } else {
       setMessage('')

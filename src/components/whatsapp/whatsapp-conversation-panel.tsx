@@ -297,10 +297,13 @@ export function WhatsAppConversationPanel({
                 🎯 Lead
               </span>
             )}
-            {instanceName && (
-              <span className="rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
-                📱 {instanceName}
-              </span>
+            {availableInstances.length > 0 && (
+              <select value={selectedInstance} onChange={e => setSelectedInstance(e.target.value)}
+                className="rounded-full border border-[#1B556B]/30 bg-[#1B556B]/5 px-2 py-0.5 text-[10px] font-medium text-[#1B556B] focus:outline-none">
+                {availableInstances.map(i => (
+                  <option key={i.name} value={i.name}>📱 {i.label}</option>
+                ))}
+              </select>
             )}
             {assignment ? (
               <div className="flex items-center gap-1.5 flex-shrink-0">
