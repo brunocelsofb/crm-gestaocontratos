@@ -80,21 +80,11 @@ export function ContractWhatsAppSection({
       .then(r => r.json())
       .then(d => {
         const phoneMessages: WhatsAppLog[] = d.messages ?? []
-        if (phoneMessages.length === 0) return
-        // Adiciona todos de uma vez, registrando IDs no Set
-        const newOnes = phoneMessages.filter(m => !processedIds.current.has(m.id))
-        if (newOnes.length === 0) return
-        newOnes.forEach(m => processedIds.current.add(m.id))
-        setMessages(prev => {
-          const unique = new Map(prev.map(m => [m.id, m]))
-          newOnes.forEach(m => unique.set(m.id, m))
-          return Array.from(unique.values()).sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )
-        })
+        // Usa addMessage para garantir que IDs ficam no Set (evita Realtime duplicar)
+        phoneMessages.forEach(m => addMessage(m))
       })
       .catch(console.error)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
@@ -130,16 +120,11 @@ export function ContractWhatsAppSection({
         { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages' },
         (payload) => {
           const msg = payload.new as any
-          // Filtra: aceita mensagens deste phone OU deste contract_id
           const msgPhone = (msg.phone ?? '').replace(/\D/g, '')
           const matchPhone = msgPhone.endsWith(cleanPhone.slice(-10))
           const matchContract = msg.contract_id === contractId
           if (!matchPhone && !matchContract) return
-          // Deduplicação por id
-          setMessages(prev => {
-            if (prev.some(m => m.id === msg.id)) return prev
-            return [msg as WhatsAppLog, ...prev]
-          })
+          addMessage(msg as WhatsAppLog)
         }
       )
       .on(
