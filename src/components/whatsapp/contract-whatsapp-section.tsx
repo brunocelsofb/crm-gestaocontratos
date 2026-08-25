@@ -146,10 +146,11 @@ export function ContractWhatsAppSection({
       setMessage('')
       setTemplateId('')
       const newMsg = (result as any).message
-      console.log('[ContractWhatsApp] MENSAGEM INJETADA NO ESTADO:', newMsg)
-      if (newMsg) {
+      console.log('[ContractWhatsApp] MENSAGEM INJETADA:', newMsg?.id, '| sent_by_name:', newMsg?.sent_by_name)
+      if (newMsg?.id) {
         setMessages(prev => [newMsg, ...prev.filter((m: any) => m.id !== newMsg.id)])
       }
+      // Sempre faz refresh para garantir sincronismo
       router.refresh()
     }
   }

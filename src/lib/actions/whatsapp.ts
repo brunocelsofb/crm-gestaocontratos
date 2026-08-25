@@ -81,28 +81,28 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   if (!message.trim()) return { error: 'Escreva a mensagem.' }
 
   const creds = await getEvoCredentials()
-  if (!creds) return { error: 'WhatsApp ainda não está conectado. Vá em Configurações e conecte o Z-API.' }
+  if (!creds) return { error: 'WhatsApp não está conectado. Vá em Configurações.' }
 
-  // Busca nome e cargo para assinatura (igual à Central)
-  const { data: profile } = await supabase.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
-  const senderName = profile?.full_name ?? null
+  const admin = createAdminClient()
+
+  // Nome e cargo para assinatura
+  const { data: profile } = await admin.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
+  const senderName = (profile as any)?.full_name ?? null
   const jobTitle = (profile as any)?.job_title ?? null
   const signature = senderName
     ? (jobTitle ? `*${senderName} - ${jobTitle}:*` : `*${senderName}:*`)
     : null
   const signedMessage = signature ? `${signature} ${message}` : message
-
   const evoCreds = instanceName ? { ...creds, instanceName } : creds
-  const usedInstance = instanceName ?? creds.instanceName
-
-  const admin = createAdminClient()
 
   try {
-    const result: any = await sendEvoTextMessage({ ...evoCreds, phone, message: signedMessage })
-    console.log('[sendContractWhatsApp] evo ok:', result?.key?.id)
+    // 1. Envia via Evolution API
+    const evoResult: any = await sendEvoTextMessage({ ...evoCreds, phone, message: signedMessage })
+    console.log('[sendContractWhatsApp] evo ok:', evoResult?.key?.id)
 
-    // INSERT da mensagem
-    const { data: inserted, error: insertErr } = await admin.from('contract_whatsapp_messages')
+    // 2. INSERT com contract_id e retorno imediato
+    const { data: inserted, error: insertErr } = await admin
+      .from('contract_whatsapp_messages')
       .insert({
         contract_id: contractId,
         sent_by: user.id,
@@ -111,41 +111,24 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
         phone,
         message: signedMessage,
         template_id: templateId,
-        evo_message_id: result?.key?.id,
-        instance_name: usedInstance,
+        evo_message_id: evoResult?.key?.id,
+        instance_name: instanceName ?? creds.instanceName,
         status: 'enviado',
       })
       .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, sent_by_name, lead_id')
       .single()
 
-    const insertedWithName = inserted ? { ...inserted, sent_by_name: senderName } : null
-
-    if (insertErr) console.error('[sendContractWhatsApp] insert err:', insertErr.message)
-    else console.log('[sendContractWhatsApp] mensagem inserida:', inserted?.id, '| sent_by_name:', senderName)
-
-    // Desarquivamento: busca por ILIKE para cobrir variações de DDI
-    const last10 = phone.replace(/\D/g, '').slice(-10)
-    const { data: existingStatus } = await admin
-      .from('whatsapp_conversation_status')
-      .select('phone')
-      .ilike('phone', `%${last10}`)
-      .maybeSingle()
-
-    if (existingStatus?.phone) {
-      const { error: updateErr } = await admin
-        .from('whatsapp_conversation_status')
-        .update({ is_archived: false, updated_at: new Date().toISOString() })
-        .eq('phone', existingStatus.phone)
-      if (updateErr) console.error('[sendContractWhatsApp] ERRO UPDATE:', updateErr.message)
-      else console.log('[sendContractWhatsApp] desarquivado:', existingStatus.phone)
-    } else {
-      // Não existe ainda — cria
-      const { error: insertErr2 } = await admin
-        .from('whatsapp_conversation_status')
-        .insert({ phone: phone.replace(/\D/g, ''), is_archived: false })
-      if (insertErr2) console.error('[sendContractWhatsApp] ERRO INSERT status:', insertErr2.message)
+    if (insertErr) {
+      console.error('[sendContractWhatsApp] insert err:', insertErr.message)
+      return { error: insertErr.message }
     }
+    console.log('[sendContractWhatsApp] inserida:', inserted?.id, '| sent_by_name:', senderName)
 
+    // 3. Desarquiva usando a MESMA função da Central (que funciona)
+    await unarchiveWhatsAppConversation(phone)
+    console.log('[sendContractWhatsApp] desarquivada:', phone)
+
+    // 4. Log de atividade
     await admin.from('activities').insert({
       contract_id: contractId,
       user_id: user.id,
@@ -155,21 +138,17 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     }).then(({ error: e }) => { if (e) console.warn('[sendContractWhatsApp] activity err:', e.message) })
 
     revalidatePath(`/contracts/${contractId}`)
-    return { message: insertedWithName }
-  } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar WhatsApp.'
-    console.error('[sendContractWhatsApp] CATCH:', errorMsg, '| phone:', phone)
+    // Garante que sent_by_name está no objeto (mesmo que o banco não retorne)
+    return { message: { ...inserted, sent_by_name: senderName } }
+
+  } catch (e: any) {
+    const errorMsg = e?.message ?? 'Falha ao enviar WhatsApp.'
+    console.error('[sendContractWhatsApp] CATCH:', errorMsg)
     await admin.from('contract_whatsapp_messages').insert({
-      contract_id: contractId,
-      sent_by: user.id,
-      sent_by_name: senderName,
-      direction: 'enviado',
-      phone,
-      message: signedMessage,
-      template_id: templateId,
-      instance_name: usedInstance,
-      status: 'falhou',
-      error_message: errorMsg,
+      contract_id: contractId, sent_by: user.id, sent_by_name: senderName,
+      direction: 'enviado', phone, message: signedMessage,
+      template_id: templateId, instance_name: instanceName ?? creds.instanceName,
+      status: 'falhou', error_message: errorMsg,
     })
     return { error: errorMsg }
   }
