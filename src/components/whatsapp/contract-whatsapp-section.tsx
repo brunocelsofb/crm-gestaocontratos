@@ -118,22 +118,39 @@ export function ContractWhatsAppSection({
   }, [])
 
   useEffect(() => {
+    const cleanPhone = (defaultPhone ?? '').replace(/\D/g, '')
+    const normalizedPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone
+    if (!normalizedPhone) return
+
     const supabase = createClient()
     const channel = supabase
-      .channel(`whatsapp:${contractId}`)
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
-        (payload) => { addMessage(payload.new as WhatsAppLog) }
+      .channel(`whatsapp-oportunidade:${contractId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages' },
+        (payload) => {
+          const msg = payload.new as any
+          // Filtra pelo phone normalizado — captura Central e Oportunidade
+          const msgPhone = (msg.phone ?? '').replace(/\D/g, '')
+          if (!msgPhone.endsWith(cleanPhone.slice(-10))) return
+          // Deduplicação blindada por id
+          setMessages(prev => {
+            if (prev.some(m => m.id === msg.id)) return prev
+            return [msg as WhatsAppLog, ...prev]
+          })
+        }
       )
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
           setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m))
         }
       )
       .subscribe()
+
     return () => { supabase.removeChannel(channel) }
-  }, [contractId])
+  }, [contractId, defaultPhone])
 
   const conversationPhone = messages[0]?.phone ?? defaultPhone ?? ''
   const [phone, setPhone] = useState(defaultPhone ?? conversationPhone)

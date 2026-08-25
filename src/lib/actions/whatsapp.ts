@@ -143,16 +143,6 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     await unarchiveWhatsAppConversation(normalizedPhone)
     console.log('[sendContractWhatsApp] desarquivada:', normalizedPhone)
 
-    // 4. Log de atividade
-    await admin.from('activities').insert({
-      contract_id: contractId,
-      user_id: user.id,
-      type: 'whatsapp',
-      content: `WhatsApp enviado para ${phone}.`,
-      metadata: { kind: 'sent', phone, message },
-    }).then(({ error: e }) => { if (e) console.warn('[sendContractWhatsApp] activity err:', e.message) })
-
-    // Retorna a mensagem para injeção local no estado
     return { message: { ...inserted, sent_by_name: senderName } }
 
   } catch (e: any) {
