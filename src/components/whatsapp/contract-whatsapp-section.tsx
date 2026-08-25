@@ -60,7 +60,9 @@ export function ContractWhatsAppSection({
       prevLengthRef.current = messageLog.length
       setMessages(messageLog)
     }
-  }, [messageLog])  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
+  }, [messageLog])
+
+  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
 
   // Carrega instâncias disponíveis
