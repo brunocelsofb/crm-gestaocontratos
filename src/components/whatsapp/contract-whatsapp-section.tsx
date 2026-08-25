@@ -78,7 +78,6 @@ export function ContractWhatsAppSection({
   }, [])
 
   useEffect(() => {
-    if (!conversationPhone) return
     const supabase = createClient()
     const channel = supabase
       .channel(`whatsapp:${contractId}`)
@@ -92,32 +91,37 @@ export function ContractWhatsAppSection({
         }
       )
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `phone=eq.${conversationPhone}` },
-        (payload) => {
-          const msg = payload.new as any
-          // Só captura mensagens recebidas (do cliente) — enviadas já estão no estado
-          if (msg.direction !== 'recebido') return
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === msg.id)) return prev
-            return [msg as WhatsAppLog, ...prev]
-          })
-        }
-      )
-      .on('postgres_changes',
         { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
           setMessages((prev) => prev.map((m) => (m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m)))
         }
       )
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
-  }, [contractId, conversationPhone])
+  }, [contractId])
 
-  // O telefone "da conversa" (pra saber quem é a pessoa de verdade no
-  // cabeçalho) é o da mensagem mais recente já trocada — não o
-  // contato principal do contrato, que pode ser outra pessoa.
   const conversationPhone = messages[0]?.phone ?? defaultPhone ?? ''
+
+  // Canal Realtime para respostas recebidas (pelo phone, não contract_id)
+  useEffect(() => {
+    if (!conversationPhone) return
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`whatsapp-phone:${conversationPhone}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `phone=eq.${conversationPhone}` },
+        (payload) => {
+          const msg = payload.new as any
+          if (msg.direction !== 'recebido') return
+          setMessages((prev) => {
+            if (prev.some((m: any) => m.id === msg.id)) return prev
+            return [msg as WhatsAppLog, ...prev]
+          })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [conversationPhone])
   const [phone, setPhone] = useState(defaultPhone ?? conversationPhone)
   const [message, setMessage] = useState('')
   const [templateId, setTemplateId] = useState('')
