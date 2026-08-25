@@ -148,11 +148,12 @@ export function ContractWhatsAppSection({
       const newMsg = (result as any).message
       console.log('[ContractWhatsApp] MENSAGEM INJETADA NO ESTADO:', newMsg)
       if (newMsg) {
-        // messageLog vem DESC do servidor, estado está em ASC (já invertido no useState)
-        // WhatsAppChatView faz .reverse() → exibe DESC → mais recente no fundo
-        // Portanto inserimos no FIM do array ASC
+        // Estado está em ASC (mais antiga → mais nova)
+        // WhatsAppChatView faz .reverse() para exibir → DESC
+        // "Base da tela" = mais nova = deve estar no FIM do ASC = INÍCIO do DESC
+        // Então inserimos no FIM do array ASC:
         setMessages(prev => {
-          const withoutDupes = prev.filter(m => m.id !== newMsg.id)
+          const withoutDupes = prev.filter((m: any) => m.id !== newMsg.id)
           return [...withoutDupes, newMsg]
         })
       } else {

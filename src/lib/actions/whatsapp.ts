@@ -115,15 +115,23 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
         instance_name: usedInstance,
         status: 'enviado',
       })
-      .select()
+      .select('id, contract_id, sent_by, sent_by_name, direction, phone, message, status, created_at, media_url, media_type, media_filename, instance_name, triggered_automatically, delivery_status, error_message, lead_id, sender_photo_url')
       .single()
 
     if (insertErr) console.error('[sendContractWhatsApp] insert err:', insertErr.message)
     else console.log('[sendContractWhatsApp] mensagem inserida:', inserted?.id)
 
-    // Desarquiva via adminClient — normaliza phone igual à sidebar
-    const phoneForStatus = phone.replace(/\D/g, '')
-    const { error: upsertErr } = await admin.from('whatsapp_conversation_status')
+    // Busca o phone exato como está salvo na tabela de status
+    // (pode ter DDI diferente do phone passado como parâmetro)
+    const { data: existingStatus } = await admin
+      .from('whatsapp_conversation_status')
+      .select('phone')
+      .ilike('phone', `%${phone.replace(/\D/g, '').slice(-10)}`)
+      .maybeSingle()
+
+    const phoneForStatus = existingStatus?.phone ?? phone.replace(/\D/g, '')
+    const { error: upsertErr } = await admin
+      .from('whatsapp_conversation_status')
       .upsert({ phone: phoneForStatus, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
 
     if (upsertErr) console.error('[sendContractWhatsApp] ERRO UPDATE desarquivar:', upsertErr.message, '| phone:', phoneForStatus)
