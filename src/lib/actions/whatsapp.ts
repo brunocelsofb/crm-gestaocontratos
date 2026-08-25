@@ -8,7 +8,7 @@ import { sendEvoTextMessage, sendEvoImageMessage, sendEvoDocumentMessage, verify
 import type { EvoCredentials } from '@/lib/whatsapp/evolution'
 import { canSendAutomatedWhatsApp } from '@/lib/whatsapp/guardrails'
 
-export type ActionState = { error?: string }
+export type ActionState = { error?: string; message?: any }
 
 async function getEvoCredentials(): Promise<EvoCredentials | null> {
   const supabase = createAdminClient()
@@ -145,14 +145,9 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     })
     return { error: errorMsg }
   }
-  }
-
-  revalidatePath(`/contracts/${contractId}`)
-  return {}
 }
 
-// Envio de imagem ou documento — o arquivo já precisa estar
-// hospedado (subido pro nosso Storage antes, pela tela).
+// Envio de imagem ou documento
 export async function sendContractWhatsAppMedia(
   contractId: string,
   phone: string,
