@@ -193,12 +193,7 @@ export function ContractWhatsAppSection({
     } else {
       setMessage('')
       setTemplateId('')
-      const newMsg = (result as any).message
-      console.log('[ContractWhatsApp] MENSAGEM INJETADA:', newMsg?.id, '| sent_by_name:', newMsg?.sent_by_name)
-      if (newMsg?.id) {
-        addMessage(newMsg)
-      }
-      // Realtime cuida da sincronia — sem router.refresh()
+      // Realtime é a única fonte — não injeta localmente
     }
   }
 
