@@ -83,30 +83,44 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado. Vá em Configurações e conecte o Z-API.' }
 
-  // Usa instância específica se informada
+  // Busca nome e cargo para assinatura (igual à Central)
+  const { data: profile } = await supabase.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
+  const senderName = profile?.full_name ?? null
+  const jobTitle = (profile as any)?.job_title ?? null
+  const signature = senderName
+    ? (jobTitle ? `*${senderName} - ${jobTitle}:*` : `*${senderName}:*`)
+    : null
+  const signedMessage = signature ? `${signature} ${message}` : message
+
   const evoCreds = instanceName ? { ...creds, instanceName } : creds
+  const usedInstance = instanceName ?? creds.instanceName
 
   try {
-    const result: any = await sendEvoTextMessage({ ...evoCreds, phone, message })
+    const result: any = await sendEvoTextMessage({ ...evoCreds, phone, message: signedMessage })
 
-    // Salva COM contract_id (vinculado) E phone para aparecer na central
+    // Salva na tabela unificada com sent_by_name
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
+      sent_by_name: senderName,
       direction: 'enviado',
       phone,
-      message,
+      message: signedMessage,
       template_id: templateId,
       evo_message_id: result?.key?.id,
-      instance_name: instanceName ?? creds.instanceName,
+      instance_name: usedInstance,
       status: 'enviado',
     })
+
+    // Desarquiva conversa (igual à Central)
+    await supabase.from('whatsapp_conversation_status')
+      .upsert({ phone, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
 
     await supabase.from('activities').insert({
       contract_id: contractId,
       user_id: user.id,
       type: 'whatsapp',
-      content: `WhatsApp enviado pra ${phone}.`,
+      content: `WhatsApp enviado para ${phone}.`,
       metadata: { kind: 'sent', phone, message },
     })
   } catch (e) {
@@ -115,10 +129,12 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
+      sent_by_name: senderName,
       direction: 'enviado',
       phone,
-      message,
+      message: signedMessage,
       template_id: templateId,
+      instance_name: usedInstance,
       status: 'falhou',
       error_message: errorMsg,
     })
