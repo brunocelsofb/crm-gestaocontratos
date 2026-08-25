@@ -123,14 +123,12 @@ export function ContractWhatsAppSection({
       .channel(`whatsapp:${contractId}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
-        (payload) => {
-          addMessage(payload.new as WhatsAppLog)
-        }
+        (payload) => { addMessage(payload.new as WhatsAppLog) }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
-          setMessages((prev) => prev.map((m) => (m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m)))
+          setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m))
         }
       )
       .subscribe()
@@ -138,24 +136,6 @@ export function ContractWhatsAppSection({
   }, [contractId])
 
   const conversationPhone = messages[0]?.phone ?? defaultPhone ?? ''
-
-  // Canal Realtime para respostas recebidas (pelo phone, não contract_id)
-  useEffect(() => {
-    if (!conversationPhone) return
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`whatsapp-phone:${conversationPhone}`)
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `phone=eq.${conversationPhone}` },
-        (payload) => {
-          const msg = payload.new as any
-          // Captura qualquer mensagem do número (enviada pela Central ou recebida do cliente)
-          addMessage(msg as WhatsAppLog)
-        }
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [conversationPhone])
   const [phone, setPhone] = useState(defaultPhone ?? conversationPhone)
   const [message, setMessage] = useState('')
   const [templateId, setTemplateId] = useState('')
