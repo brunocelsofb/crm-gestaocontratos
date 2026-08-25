@@ -51,8 +51,16 @@ export function ContractWhatsAppSection({
   // Mantém as mensagens em estado local (não só a prop) — é isso que
   // permite mensagem nova aparecer sozinha via tempo real, sem
   // precisar de router.refresh() (que recarrega a página inteira).
-  const [messages, setMessages] = useState(messageLog)
-  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
+  const [messages, setMessages] = useState<WhatsAppLog[]>(messageLog)
+
+  // Sincroniza quando dados frescos chegam do servidor (router.refresh)
+  const prevLengthRef = useRef(messageLog.length)
+  useEffect(() => {
+    if (messageLog.length !== prevLengthRef.current || messageLog.at(-1)?.id !== messages.find(m => !m.id.startsWith('opt-'))?.id) {
+      prevLengthRef.current = messageLog.length
+      setMessages(messageLog)
+    }
+  }, [messageLog])  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
 
   // Carrega instâncias disponíveis
@@ -131,21 +139,31 @@ export function ContractWhatsAppSection({
   }
 
   async function handleSend() {
-    setBusy(true)
-    setError(null)
+    if (!message.trim()) return
+    setBusy(true); setError(null)
+
+    // Busca nome do usuário para mostrar já na optimista
     const optimistic: any = {
-      id: `opt-${Date.now()}`, direction: 'enviado', message, status: 'enviado',
-      created_at: new Date().toISOString(), media_url: null, media_type: null,
+      id: `opt-${Date.now()}`,
+      direction: 'enviado',
+      message,
+      status: 'enviado',
+      sent_by_name: null, // será preenchido após refresh
+      created_at: new Date().toISOString(),
+      media_url: null, media_type: null,
     }
     setMessages(prev => [...prev, optimistic])
+
     const result = await sendContractWhatsApp(contractId, phone, message, templateId || null, selectedInstance || null)
     setBusy(false)
+
     if (result.error) {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setError(result.error)
     } else {
       setMessage('')
       setTemplateId('')
+      // router.refresh() força re-render do Server Component e atualiza messageLog
       router.refresh()
     }
   }
