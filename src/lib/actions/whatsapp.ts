@@ -115,27 +115,36 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
         instance_name: usedInstance,
         status: 'enviado',
       })
-      .select('id, contract_id, sent_by, sent_by_name, direction, phone, message, status, created_at, media_url, media_type, media_filename, instance_name, triggered_automatically, delivery_status, error_message, lead_id, sender_photo_url')
+      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, sent_by_name, lead_id')
       .single()
 
-    if (insertErr) console.error('[sendContractWhatsApp] insert err:', insertErr.message)
-    else console.log('[sendContractWhatsApp] mensagem inserida:', inserted?.id)
+    const insertedWithName = inserted ? { ...inserted, sent_by_name: senderName } : null
 
-    // Busca o phone exato como está salvo na tabela de status
-    // (pode ter DDI diferente do phone passado como parâmetro)
+    if (insertErr) console.error('[sendContractWhatsApp] insert err:', insertErr.message)
+    else console.log('[sendContractWhatsApp] mensagem inserida:', inserted?.id, '| sent_by_name:', senderName)
+
+    // Desarquivamento: busca por ILIKE para cobrir variações de DDI
+    const last10 = phone.replace(/\D/g, '').slice(-10)
     const { data: existingStatus } = await admin
       .from('whatsapp_conversation_status')
       .select('phone')
-      .ilike('phone', `%${phone.replace(/\D/g, '').slice(-10)}`)
+      .ilike('phone', `%${last10}`)
       .maybeSingle()
 
-    const phoneForStatus = existingStatus?.phone ?? phone.replace(/\D/g, '')
-    const { error: upsertErr } = await admin
-      .from('whatsapp_conversation_status')
-      .upsert({ phone: phoneForStatus, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
-
-    if (upsertErr) console.error('[sendContractWhatsApp] ERRO UPDATE desarquivar:', upsertErr.message, '| phone:', phoneForStatus)
-    else console.log('[sendContractWhatsApp] conversa desarquivada:', phoneForStatus)
+    if (existingStatus?.phone) {
+      const { error: updateErr } = await admin
+        .from('whatsapp_conversation_status')
+        .update({ is_archived: false, updated_at: new Date().toISOString() })
+        .eq('phone', existingStatus.phone)
+      if (updateErr) console.error('[sendContractWhatsApp] ERRO UPDATE:', updateErr.message)
+      else console.log('[sendContractWhatsApp] desarquivado:', existingStatus.phone)
+    } else {
+      // Não existe ainda — cria
+      const { error: insertErr2 } = await admin
+        .from('whatsapp_conversation_status')
+        .insert({ phone: phone.replace(/\D/g, ''), is_archived: false })
+      if (insertErr2) console.error('[sendContractWhatsApp] ERRO INSERT status:', insertErr2.message)
+    }
 
     await admin.from('activities').insert({
       contract_id: contractId,
@@ -146,7 +155,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     }).then(({ error: e }) => { if (e) console.warn('[sendContractWhatsApp] activity err:', e.message) })
 
     revalidatePath(`/contracts/${contractId}`)
-    return { message: inserted }
+    return { message: insertedWithName }
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar WhatsApp.'
     console.error('[sendContractWhatsApp] CATCH:', errorMsg, '| phone:', phone)

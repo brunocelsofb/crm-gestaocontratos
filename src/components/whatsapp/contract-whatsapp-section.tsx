@@ -148,25 +148,9 @@ export function ContractWhatsAppSection({
       const newMsg = (result as any).message
       console.log('[ContractWhatsApp] MENSAGEM INJETADA NO ESTADO:', newMsg)
       if (newMsg) {
-        // Estado está em ASC (mais antiga → mais nova)
-        // WhatsAppChatView faz .reverse() para exibir → DESC
-        // "Base da tela" = mais nova = deve estar no FIM do ASC = INÍCIO do DESC
-        // Então inserimos no FIM do array ASC:
-        setMessages(prev => {
-          const withoutDupes = prev.filter((m: any) => m.id !== newMsg.id)
-          return [...withoutDupes, newMsg]
-        })
-      } else {
-        console.warn('[ContractWhatsApp] action não retornou message, usando fallback local')
-        setMessages(prev => [...prev, {
-          id: `local-${Date.now()}`, direction: 'enviado', message,
-          status: 'enviado', created_at: new Date().toISOString(),
-          media_url: null, media_type: null, media_filename: null,
-          sent_by_name: null, sender_photo_url: null,
-          triggered_automatically: false, delivery_status: null,
-          error_message: null, lead_id: null,
-        } as any])
+        setMessages(prev => [newMsg, ...prev.filter((m: any) => m.id !== newMsg.id)])
       }
+      router.refresh()
     }
   }
 
