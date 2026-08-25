@@ -142,13 +142,24 @@ export function ContractWhatsAppSection({
     } else {
       setMessage('')
       setTemplateId('')
-      // Insere a mensagem real retornada pelo banco diretamente no estado local
-      if ((result as any).message) {
-        setMessages(prev => {
-          // Remove qualquer optimista pendente e adiciona a real
-          const filtered = prev.filter(m => !String(m.id).startsWith('opt-'))
-          return [...filtered, (result as any).message]
-        })
+      const newMsg = (result as any).message
+      console.log('[ContractWhatsApp] MENSAGEM INJETADA NO ESTADO:', newMsg)
+      if (newMsg) {
+        setMessages(prev => [...prev, newMsg])
+      } else {
+        // fallback: cria objeto local se action não retornou a mensagem
+        console.warn('[ContractWhatsApp] action não retornou message, usando fallback local')
+        setMessages(prev => [...prev, {
+          id: `local-${Date.now()}`,
+          direction: 'enviado',
+          message,
+          status: 'enviado',
+          created_at: new Date().toISOString(),
+          media_url: null, media_type: null, media_filename: null,
+          sent_by_name: null, sender_photo_url: null,
+          triggered_automatically: false, delivery_status: null,
+          error_message: null, lead_id: null,
+        } as any])
       }
     }
   }
