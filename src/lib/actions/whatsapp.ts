@@ -121,12 +121,13 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     if (insertErr) console.error('[sendContractWhatsApp] insert err:', insertErr.message)
     else console.log('[sendContractWhatsApp] mensagem inserida:', inserted?.id)
 
-    // Desarquiva via adminClient (bypassa RLS)
+    // Desarquiva via adminClient — normaliza phone igual à sidebar
+    const phoneForStatus = phone.replace(/\D/g, '')
     const { error: upsertErr } = await admin.from('whatsapp_conversation_status')
-      .upsert({ phone, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
+      .upsert({ phone: phoneForStatus, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
 
-    if (upsertErr) console.error('[sendContractWhatsApp] upsert status err:', upsertErr.message)
-    else console.log('[sendContractWhatsApp] conversa desarquivada:', phone)
+    if (upsertErr) console.error('[sendContractWhatsApp] ERRO UPDATE desarquivar:', upsertErr.message, '| phone:', phoneForStatus)
+    else console.log('[sendContractWhatsApp] conversa desarquivada:', phoneForStatus)
 
     await admin.from('activities').insert({
       contract_id: contractId,

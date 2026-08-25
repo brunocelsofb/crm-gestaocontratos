@@ -56,19 +56,22 @@ export function ContractWhatsAppSection({
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
 
-  // Carrega instâncias disponíveis
+  // Carrega instâncias com aliases (mesma lógica da Central)
   useEffect(() => {
-    fetch('/api/settings/evo-instances', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        const list = (d.instances ?? []).map((i: any) => {
-          const name = i.instance?.instanceName ?? i.instanceName ?? i.name ?? ''
-          return { name, label: name }
-        }).filter((i: any) => i.name)
-        setAvailableInstances(list)
-        if (list[0]) setSelectedInstance(list[0].name)
-      })
-      .catch(console.error)
+    Promise.all([
+      fetch('/api/settings/evo-instances', { credentials: 'include' }).then(r => r.json()),
+      fetch('/api/settings/evo-aliases', { credentials: 'include' }).then(r => r.json()).catch(() => ({ aliases: {} })),
+    ]).then(([instData, aliasData]) => {
+      const aliases: Record<string, any> = aliasData.aliases ?? {}
+      const list = (instData.instances ?? []).map((i: any) => {
+        const name = i.instance?.instanceName ?? i.instanceName ?? i.name ?? ''
+        const v = aliases[name]
+        const label = !v ? name : typeof v === 'string' ? v : (v as any).label || name
+        return { name, label }
+      }).filter((i: any) => i.name)
+      setAvailableInstances(list)
+      if (list[0]) setSelectedInstance(list[0].name)
+    }).catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -145,16 +148,18 @@ export function ContractWhatsAppSection({
       const newMsg = (result as any).message
       console.log('[ContractWhatsApp] MENSAGEM INJETADA NO ESTADO:', newMsg)
       if (newMsg) {
-        setMessages(prev => [...prev, newMsg])
+        // messageLog vem DESC do servidor, estado está em ASC (já invertido no useState)
+        // WhatsAppChatView faz .reverse() → exibe DESC → mais recente no fundo
+        // Portanto inserimos no FIM do array ASC
+        setMessages(prev => {
+          const withoutDupes = prev.filter(m => m.id !== newMsg.id)
+          return [...withoutDupes, newMsg]
+        })
       } else {
-        // fallback: cria objeto local se action não retornou a mensagem
         console.warn('[ContractWhatsApp] action não retornou message, usando fallback local')
         setMessages(prev => [...prev, {
-          id: `local-${Date.now()}`,
-          direction: 'enviado',
-          message,
-          status: 'enviado',
-          created_at: new Date().toISOString(),
+          id: `local-${Date.now()}`, direction: 'enviado', message,
+          status: 'enviado', created_at: new Date().toISOString(),
           media_url: null, media_type: null, media_filename: null,
           sent_by_name: null, sender_photo_url: null,
           triggered_automatically: false, delivery_status: null,
