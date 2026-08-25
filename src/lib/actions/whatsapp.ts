@@ -136,7 +136,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       triggered_automatically: false,
       zapi_message_id: evoResult?.key?.id ?? null,
       instance_name: instanceName ?? creds.instanceName,
-      unlinked_sender_name: senderName ? `${senderName} (Oportunidade)` : 'Oportunidade',
+      unlinked_sender_name: senderName ? `${senderName} (Via Oportunidade)` : 'Via Oportunidade',
     })
 
     // 3. Desarquiva com phone normalizado (mesmo DDI do banco)

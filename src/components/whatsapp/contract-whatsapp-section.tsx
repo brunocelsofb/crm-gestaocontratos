@@ -56,6 +56,29 @@ export function ContractWhatsAppSection({
   // Estado mantido em DESC. Nova mensagem vai no INÍCIO (DESC) = mais recente.
   const [messages, setMessages] = useState<WhatsAppLog[]>(messageLog)
 
+  // Busca mensagens pelo phone (recebidas não têm contract_id)
+  useEffect(() => {
+    if (!defaultPhone) return
+    const cleanPhone = defaultPhone.replace(/\D/g, '')
+    const normalizedPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone
+    fetch(`/api/whatsapp/conversation?phone=${encodeURIComponent(normalizedPhone)}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        const phoneMessages: WhatsAppLog[] = d.messages ?? []
+        if (phoneMessages.length === 0) return
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id))
+          const newOnes = phoneMessages.filter(m => !existingIds.has(m.id))
+          if (newOnes.length === 0) return prev
+          // Merge e reordena DESC
+          return [...prev, ...newOnes].sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        })
+      })
+      .catch(console.error)
+  }, [defaultPhone])
+
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
 
