@@ -98,21 +98,23 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   try {
     const result: any = await sendEvoTextMessage({ ...evoCreds, phone, message: signedMessage })
 
-    // Salva na tabela unificada com sent_by_name
-    await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: contractId,
-      sent_by: user.id,
-      sent_by_name: senderName,
-      direction: 'enviado',
-      phone,
-      message: signedMessage,
-      template_id: templateId,
-      evo_message_id: result?.key?.id,
-      instance_name: usedInstance,
-      status: 'enviado',
-    })
+    const { data: inserted } = await supabase.from('contract_whatsapp_messages')
+      .insert({
+        contract_id: contractId,
+        sent_by: user.id,
+        sent_by_name: senderName,
+        direction: 'enviado',
+        phone,
+        message: signedMessage,
+        template_id: templateId,
+        evo_message_id: result?.key?.id,
+        instance_name: usedInstance,
+        status: 'enviado',
+      })
+      .select()
+      .single()
 
-    // Desarquiva conversa (igual à Central)
+    // Desarquiva conversa
     await supabase.from('whatsapp_conversation_status')
       .upsert({ phone, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
 
@@ -123,6 +125,9 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       content: `WhatsApp enviado para ${phone}.`,
       metadata: { kind: 'sent', phone, message },
     })
+
+    revalidatePath(`/contracts/${contractId}`)
+    return { message: inserted }
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar WhatsApp.'
     console.error('[sendContractWhatsApp] erro:', errorMsg, '| phone:', phone)
@@ -139,6 +144,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       error_message: errorMsg,
     })
     return { error: errorMsg }
+  }
   }
 
   revalidatePath(`/contracts/${contractId}`)

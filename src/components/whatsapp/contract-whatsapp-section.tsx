@@ -144,29 +144,22 @@ export function ContractWhatsAppSection({
     if (!message.trim()) return
     setBusy(true); setError(null)
 
-    // Busca nome do usuário para mostrar já na optimista
-    const optimistic: any = {
-      id: `opt-${Date.now()}`,
-      direction: 'enviado',
-      message,
-      status: 'enviado',
-      sent_by_name: null, // será preenchido após refresh
-      created_at: new Date().toISOString(),
-      media_url: null, media_type: null,
-    }
-    setMessages(prev => [...prev, optimistic])
-
     const result = await sendContractWhatsApp(contractId, phone, message, templateId || null, selectedInstance || null)
     setBusy(false)
 
     if (result.error) {
-      setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setError(result.error)
     } else {
       setMessage('')
       setTemplateId('')
-      // router.refresh() força re-render do Server Component e atualiza messageLog
-      router.refresh()
+      // Insere a mensagem real retornada pelo banco diretamente no estado local
+      if ((result as any).message) {
+        setMessages(prev => {
+          // Remove qualquer optimista pendente e adiciona a real
+          const filtered = prev.filter(m => !String(m.id).startsWith('opt-'))
+          return [...filtered, (result as any).message]
+        })
+      }
     }
   }
 
