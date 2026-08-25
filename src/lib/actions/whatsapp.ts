@@ -85,7 +85,9 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
 
   const admin = createAdminClient()
 
-  // Nome e cargo para assinatura
+  // Normaliza phone: garante DDI 55 (Brasil)
+  const rawPhone = phone.replace(/\D/g, '')
+  const normalizedPhone = rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone
   const { data: profile } = await admin.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
   const senderName = (profile as any)?.full_name ?? null
   const jobTitle = (profile as any)?.job_title ?? null
@@ -96,18 +98,18 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   const evoCreds = instanceName ? { ...creds, instanceName } : creds
 
   try {
-    // 1. Envia via Evolution API
-    const evoResult: any = await sendEvoTextMessage({ ...evoCreds, phone, message: signedMessage })
-    console.log('[sendContractWhatsApp] evo ok:', evoResult?.key?.id)
+    // 1. Envia via Evolution API (Evolution já sanitiza o DDI internamente)
+    const evoResult: any = await sendEvoTextMessage({ ...evoCreds, phone: normalizedPhone, message: signedMessage })
+    console.log('[sendContractWhatsApp] evo ok | phone:', normalizedPhone)
 
-    // 2. INSERT com contract_id e retorno imediato
+    // 2. INSERT com contract_id (aba Oportunidade)
     const { data: inserted, error: insertErr } = await admin
       .from('contract_whatsapp_messages')
       .insert({
         contract_id: contractId,
         sent_by: user.id,
         direction: 'enviado',
-        phone,
+        phone: normalizedPhone,
         message: signedMessage,
         status: 'enviado',
         triggered_automatically: false,
@@ -121,14 +123,14 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       console.error('[sendContractWhatsApp] insert err:', insertErr.message)
       return { error: insertErr.message }
     }
-    console.log('[sendContractWhatsApp] inserida:', inserted?.id)
+    console.log('[sendContractWhatsApp] inserida:', inserted?.id, '| phone:', normalizedPhone)
 
-    // Espelha com contract_id null → aparece na Central de Atendimento
+    // Espelha com contract_id null → aparece na Central
     await admin.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
+      phone: normalizedPhone,
       message: signedMessage,
       status: 'enviado',
       triggered_automatically: false,
@@ -136,10 +138,9 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       instance_name: instanceName ?? creds.instanceName,
     })
 
-    // 3. Desarquiva — usa o phone exato como está na tabela de status
-    // A Central salva sem transformar o phone, então passamos direto
-    await unarchiveWhatsAppConversation(phone)
-    console.log('[sendContractWhatsApp] desarquivada:', phone)
+    // 3. Desarquiva com phone normalizado (mesmo DDI do banco)
+    await unarchiveWhatsAppConversation(normalizedPhone)
+    console.log('[sendContractWhatsApp] desarquivada:', normalizedPhone)
 
     // 4. Log de atividade
     await admin.from('activities').insert({
