@@ -148,7 +148,8 @@ export function ContractWhatsAppSection({
       const newMsg = (result as any).message
       console.log('[ContractWhatsApp] MENSAGEM INJETADA:', newMsg?.id, '| sent_by_name:', newMsg?.sent_by_name)
       if (newMsg?.id) {
-        setMessages(prev => [newMsg, ...prev.filter((m: any) => m.id !== newMsg.id)])
+        // Estado em ASC → WhatsAppChatView reverte → mais recente na base
+        setMessages(prev => [...prev.filter((m: any) => m.id !== newMsg.id), newMsg])
       }
       // Sempre faz refresh para garantir sincronismo
       router.refresh()

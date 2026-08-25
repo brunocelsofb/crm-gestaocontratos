@@ -121,9 +121,23 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       console.error('[sendContractWhatsApp] insert err:', insertErr.message)
       return { error: insertErr.message }
     }
-    console.log('[sendContractWhatsApp] inserida:', inserted?.id, '| sent_by_name:', senderName)
+    console.log('[sendContractWhatsApp] inserida:', inserted?.id)
 
-    // 3. Desarquiva usando a MESMA função da Central (que funciona)
+    // Espelha com contract_id null → aparece na Central de Atendimento
+    await admin.from('contract_whatsapp_messages').insert({
+      contract_id: null,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message: signedMessage,
+      status: 'enviado',
+      triggered_automatically: false,
+      zapi_message_id: evoResult?.key?.id ?? null,
+      instance_name: instanceName ?? creds.instanceName,
+    })
+
+    // 3. Desarquiva — usa o phone exato como está na tabela de status
+    // A Central salva sem transformar o phone, então passamos direto
     await unarchiveWhatsAppConversation(phone)
     console.log('[sendContractWhatsApp] desarquivada:', phone)
 
