@@ -51,7 +51,10 @@ export function ContractWhatsAppSection({
   // Mantém as mensagens em estado local (não só a prop) — é isso que
   // permite mensagem nova aparecer sozinha via tempo real, sem
   // precisar de router.refresh() (que recarrega a página inteira).
-  const [messages, setMessages] = useState<WhatsAppLog[]>([...messageLog].reverse())
+  // messageLog vem DESC do servidor.
+  // WhatsAppChatView faz .reverse() → ASC → flex-col → mais recente na base.
+  // Estado mantido em DESC. Nova mensagem vai no INÍCIO (DESC) = mais recente.
+  const [messages, setMessages] = useState<WhatsAppLog[]>(messageLog)
 
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
@@ -75,23 +78,32 @@ export function ContractWhatsAppSection({
   }, [])
 
   useEffect(() => {
+    if (!conversationPhone) return
     const supabase = createClient()
     const channel = supabase
       .channel(`whatsapp:${contractId}`)
-      .on(
-        'postgres_changes',
+      .on('postgres_changes',
         { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
           setMessages((prev) => {
-            // Evita duplicar se a própria pessoa acabou de enviar (já
-            // está no estado local pelo router.refresh do handleSend).
             if (prev.some((m) => m.id === (payload.new as any).id)) return prev
-            return [...prev, payload.new as WhatsAppLog]
+            return [payload.new as WhatsAppLog, ...prev]
           })
         }
       )
-      .on(
-        'postgres_changes',
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `phone=eq.${conversationPhone}` },
+        (payload) => {
+          const msg = payload.new as any
+          // Só captura mensagens recebidas (do cliente) — enviadas já estão no estado
+          if (msg.direction !== 'recebido') return
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev
+            return [msg as WhatsAppLog, ...prev]
+          })
+        }
+      )
+      .on('postgres_changes',
         { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
         (payload) => {
           setMessages((prev) => prev.map((m) => (m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m)))
@@ -99,10 +111,8 @@ export function ContractWhatsAppSection({
       )
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [contractId])
+    return () => { supabase.removeChannel(channel) }
+  }, [contractId, conversationPhone])
 
   // O telefone "da conversa" (pra saber quem é a pessoa de verdade no
   // cabeçalho) é o da mensagem mais recente já trocada — não o
@@ -148,9 +158,9 @@ export function ContractWhatsAppSection({
       const newMsg = (result as any).message
       console.log('[ContractWhatsApp] MENSAGEM INJETADA:', newMsg?.id, '| sent_by_name:', newMsg?.sent_by_name)
       if (newMsg?.id) {
-        // WhatsAppChatView faz .reverse() → ASC vira DESC na tela
-        // Inserir no FIM do estado (ASC) = base da tela (mais recente)
-        setMessages(prev => [...prev.filter((m: any) => m.id !== newMsg.id), newMsg])
+        // Estado DESC. WhatsAppChatView faz .reverse() → ASC → base da tela = mais recente.
+        // Inserir no INÍCIO do DESC = mais recente = após .reverse() fica no FINAL = base.
+        setMessages(prev => [newMsg, ...prev.filter((m: any) => m.id !== newMsg.id)])
       }
       // Sempre faz refresh para garantir sincronismo
       router.refresh()
