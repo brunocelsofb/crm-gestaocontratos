@@ -51,16 +51,7 @@ export function ContractWhatsAppSection({
   // Mantém as mensagens em estado local (não só a prop) — é isso que
   // permite mensagem nova aparecer sozinha via tempo real, sem
   // precisar de router.refresh() (que recarrega a página inteira).
-  const [messages, setMessages] = useState<WhatsAppLog[]>(messageLog)
-
-  // Sincroniza quando dados frescos chegam do servidor (router.refresh)
-  const prevLengthRef = useRef(messageLog.length)
-  useEffect(() => {
-    if (messageLog.length !== prevLengthRef.current || messageLog.at(-1)?.id !== messages.find(m => !m.id.startsWith('opt-'))?.id) {
-      prevLengthRef.current = messageLog.length
-      setMessages(messageLog)
-    }
-  }, [messageLog])
+  const [messages, setMessages] = useState<WhatsAppLog[]>([...messageLog].reverse())
 
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState('')
@@ -79,7 +70,6 @@ export function ContractWhatsAppSection({
       })
       .catch(console.error)
   }, [])
-  useEffect(() => setMessages(messageLog), [messageLog])
 
   useEffect(() => {
     const supabase = createClient()
@@ -93,7 +83,7 @@ export function ContractWhatsAppSection({
             // Evita duplicar se a própria pessoa acabou de enviar (já
             // está no estado local pelo router.refresh do handleSend).
             if (prev.some((m) => m.id === (payload.new as any).id)) return prev
-            return [payload.new as WhatsAppLog, ...prev]
+            return [...prev, payload.new as WhatsAppLog]
           })
         }
       )
