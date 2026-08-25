@@ -106,16 +106,15 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       .insert({
         contract_id: contractId,
         sent_by: user.id,
-        sent_by_name: senderName,
         direction: 'enviado',
         phone,
         message: signedMessage,
-        template_id: templateId,
-        evo_message_id: evoResult?.key?.id,
-        instance_name: instanceName ?? creds.instanceName,
         status: 'enviado',
+        triggered_automatically: false,
+        zapi_message_id: evoResult?.key?.id ?? null,
+        instance_name: instanceName ?? creds.instanceName,
       })
-      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, sent_by_name, lead_id')
+      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, lead_id')
       .single()
 
     if (insertErr) {
@@ -145,10 +144,11 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     const errorMsg = e?.message ?? 'Falha ao enviar WhatsApp.'
     console.error('[sendContractWhatsApp] CATCH:', errorMsg)
     await admin.from('contract_whatsapp_messages').insert({
-      contract_id: contractId, sent_by: user.id, sent_by_name: senderName,
+      contract_id: contractId, sent_by: user.id,
       direction: 'enviado', phone, message: signedMessage,
-      template_id: templateId, instance_name: instanceName ?? creds.instanceName,
       status: 'falhou', error_message: errorMsg,
+      triggered_automatically: false,
+      instance_name: instanceName ?? creds.instanceName,
     })
     return { error: errorMsg }
   }
@@ -288,7 +288,6 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
       direction: 'enviado',
       phone: filled.phone,
       message: filled.message,
-      template_id: templateId,
       triggered_automatically: true,
       zapi_message_id: result?.key?.id,
       status: 'enviado',
@@ -305,7 +304,6 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
       direction: 'enviado',
       phone: filled.phone,
       message: filled.message,
-      template_id: templateId,
       triggered_automatically: true,
       status: 'falhou',
       error_message: e instanceof Error ? e.message : 'Falha desconhecida.',
@@ -470,11 +468,9 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
-      sent_by_name: senderName,
       direction: 'enviado',
       phone,
       message: signedMessage,
-      evo_message_id: result?.key?.id,
       status: 'enviado',
       instance_name: targetCreds.instanceName,
     })
@@ -483,7 +479,6 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
       sent_by: user.id,
-      sent_by_name: senderName,
       direction: 'enviado',
       phone,
       message: signedMessage,
