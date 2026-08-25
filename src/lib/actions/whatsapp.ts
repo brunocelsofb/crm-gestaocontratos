@@ -95,10 +95,14 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   const evoCreds = instanceName ? { ...creds, instanceName } : creds
   const usedInstance = instanceName ?? creds.instanceName
 
+  const admin = createAdminClient()
+
   try {
     const result: any = await sendEvoTextMessage({ ...evoCreds, phone, message: signedMessage })
+    console.log('[sendContractWhatsApp] evo ok:', result?.key?.id)
 
-    const { data: inserted } = await supabase.from('contract_whatsapp_messages')
+    // INSERT da mensagem
+    const { data: inserted, error: insertErr } = await admin.from('contract_whatsapp_messages')
       .insert({
         contract_id: contractId,
         sent_by: user.id,
@@ -114,24 +118,30 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       .select()
       .single()
 
-    // Desarquiva conversa
-    await supabase.from('whatsapp_conversation_status')
+    if (insertErr) console.error('[sendContractWhatsApp] insert err:', insertErr.message)
+    else console.log('[sendContractWhatsApp] mensagem inserida:', inserted?.id)
+
+    // Desarquiva via adminClient (bypassa RLS)
+    const { error: upsertErr } = await admin.from('whatsapp_conversation_status')
       .upsert({ phone, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
 
-    await supabase.from('activities').insert({
+    if (upsertErr) console.error('[sendContractWhatsApp] upsert status err:', upsertErr.message)
+    else console.log('[sendContractWhatsApp] conversa desarquivada:', phone)
+
+    await admin.from('activities').insert({
       contract_id: contractId,
       user_id: user.id,
       type: 'whatsapp',
       content: `WhatsApp enviado para ${phone}.`,
       metadata: { kind: 'sent', phone, message },
-    })
+    }).then(({ error: e }) => { if (e) console.warn('[sendContractWhatsApp] activity err:', e.message) })
 
     revalidatePath(`/contracts/${contractId}`)
     return { message: inserted }
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar WhatsApp.'
-    console.error('[sendContractWhatsApp] erro:', errorMsg, '| phone:', phone)
-    await supabase.from('contract_whatsapp_messages').insert({
+    console.error('[sendContractWhatsApp] CATCH:', errorMsg, '| phone:', phone)
+    await admin.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
       sent_by_name: senderName,
