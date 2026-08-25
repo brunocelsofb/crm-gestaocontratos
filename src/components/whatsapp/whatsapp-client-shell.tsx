@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { WhatsAppSidebar } from './whatsapp-sidebar'
 import { WhatsAppConversationPanel } from './whatsapp-conversation-panel'
 import { WhatsAppInboxRealtimeWatcher } from './whatsapp-inbox-realtime-watcher'
+import { NewConversationModal } from './new-conversation-modal'
 
 type Profile = { id: string; full_name: string; job_title?: string | null }
 
@@ -47,6 +48,8 @@ export function WhatsAppClientShell({
       .catch(() => setLoadingConv(false))
   }, [selectedPhone])
 
+  const [showNewConv, setShowNewConv] = useState(false)
+
   function handleSelectPhone(phone: string) {
     setSelectedPhone(phone)
     startTransition(() => {
@@ -69,6 +72,10 @@ export function WhatsAppClientShell({
 
       {/* Sidebar */}
       <div className="w-72 shrink-0 flex flex-col min-h-0 border-r border-gray-100 pr-2">
+        <button onClick={() => setShowNewConv(true)}
+          className="mb-2 shrink-0 w-full rounded-lg bg-[#1B556B] py-2 text-sm font-semibold text-white hover:bg-[#164659] flex items-center justify-center gap-1.5">
+          ✏️ Nova Conversa
+        </button>
         <WhatsAppSidebar
           open={open}
           archived={archived}
@@ -108,6 +115,7 @@ export function WhatsAppClientShell({
           </div>
         )}
       </div>
+      {showNewConv && <NewConversationModal onClose={() => { setShowNewConv(false); router.refresh() }} />}
     </div>
   )
 }

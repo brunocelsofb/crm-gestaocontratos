@@ -73,11 +73,9 @@ export async function disconnectEvo(): Promise<ActionState> {
   return {}
 }
 
-export async function sendContractWhatsApp(contractId: string, phone: string, message: string, templateId: string | null): Promise<ActionState> {
+export async function sendContractWhatsApp(contractId: string, phone: string, message: string, templateId: string | null, instanceName?: string | null): Promise<ActionState> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!phone) return { error: 'Informe o telefone do destinatário.' }
   if (!message.trim()) return { error: 'Escreva a mensagem.' }
@@ -85,9 +83,13 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado. Vá em Configurações e conecte o Z-API.' }
 
-  try {
-    const result: any = await sendEvoTextMessage({ ...creds, phone, message })
+  // Usa instância específica se informada
+  const evoCreds = instanceName ? { ...creds, instanceName } : creds
 
+  try {
+    const result: any = await sendEvoTextMessage({ ...evoCreds, phone, message })
+
+    // Salva COM contract_id (vinculado) E phone para aparecer na central
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
@@ -95,7 +97,8 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       phone,
       message,
       template_id: templateId,
-      zapi_message_id: result?.key?.id,
+      evo_message_id: result?.key?.id,
+      instance_name: instanceName ?? creds.instanceName,
       status: 'enviado',
     })
 

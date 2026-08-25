@@ -52,6 +52,23 @@ export function ContractWhatsAppSection({
   // permite mensagem nova aparecer sozinha via tempo real, sem
   // precisar de router.refresh() (que recarrega a página inteira).
   const [messages, setMessages] = useState(messageLog)
+  const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
+  const [selectedInstance, setSelectedInstance] = useState('')
+
+  // Carrega instâncias disponíveis
+  useEffect(() => {
+    fetch('/api/settings/evo-instances', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        const list = (d.instances ?? []).map((i: any) => {
+          const name = i.instance?.instanceName ?? i.instanceName ?? i.name ?? ''
+          return { name, label: name }
+        }).filter((i: any) => i.name)
+        setAvailableInstances(list)
+        if (list[0]) setSelectedInstance(list[0].name)
+      })
+      .catch(console.error)
+  }, [])
   useEffect(() => setMessages(messageLog), [messageLog])
 
   useEffect(() => {
@@ -116,7 +133,7 @@ export function ContractWhatsAppSection({
   async function handleSend() {
     setBusy(true)
     setError(null)
-    const result = await sendContractWhatsApp(contractId, phone, message, templateId || null)
+    const result = await sendContractWhatsApp(contractId, phone, message, templateId || null, selectedInstance || null)
     setBusy(false)
     if (result.error) {
       setError(result.error)
@@ -222,6 +239,15 @@ export function ContractWhatsAppSection({
             <select value={templateId} onChange={(e) => handleTemplateChange(e.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
               <option value="">Escrever do zero...</option>
               {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+        {availableInstances.length > 1 && (
+          <div>
+            <label className="block text-xs text-gray-500">Remetente</label>
+            <select value={selectedInstance} onChange={e => setSelectedInstance(e.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none">
+              {availableInstances.map(i => <option key={i.name} value={i.name}>{i.label}</option>)}
             </select>
           </div>
         )}
