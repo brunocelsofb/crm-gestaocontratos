@@ -81,11 +81,14 @@ export function ContractWhatsAppSection({
       .then(d => {
         const phoneMessages: WhatsAppLog[] = d.messages ?? []
         if (phoneMessages.length === 0) return
+        // Adiciona todos de uma vez, registrando IDs no Set
+        const newOnes = phoneMessages.filter(m => !processedIds.current.has(m.id))
+        if (newOnes.length === 0) return
+        newOnes.forEach(m => processedIds.current.add(m.id))
         setMessages(prev => {
-          const existingIds = new Set(prev.map(m => m.id))
-          const newOnes = phoneMessages.filter(m => !existingIds.has(m.id))
-          if (newOnes.length === 0) return prev
-          return [...prev, ...newOnes].sort((a, b) =>
+          const unique = new Map(prev.map(m => [m.id, m]))
+          newOnes.forEach(m => unique.set(m.id, m))
+          return Array.from(unique.values()).sort((a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
         })
