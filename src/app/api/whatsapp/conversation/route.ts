@@ -14,33 +14,26 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
     const cleanPhone = phone.replace(/\D/g, '')
-    
-    // CORREÇÃO: Pegando apenas os últimos 8 dígitos (ignora DDD e 9º dígito)
     const last8 = cleanPhone.slice(-8)
 
-    // Busca TODAS as mensagens do phone (com e sem contract_id)
+    // Fim da frescura de loop. Busca TUDO que termina com os 8 dígitos de uma vez só!
+    const { data } = await admin.from('contract_whatsapp_messages')
+      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
+      .ilike('phone', `%${last8}`)
+      .order('created_at', { ascending: true })
+      .limit(500)
+
     let messages: any[] = []
-    for (const phoneFilter of [
-      (q: any) => q.eq('phone', cleanPhone),
-      (q: any) => q.ilike('phone', `%${last8}`),
-    ]) {
-      const { data } = await phoneFilter(
-        admin.from('contract_whatsapp_messages')
-          .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
-          .order('created_at', { ascending: true })
-          .limit(500)
-      )
-      if (data?.length) {
-        // Deduplica: remove registros espelhados (mesmo message+created_at+direction)
-        const seen = new Set<string>()
-        messages = data.filter((m: any) => {
-          const key = `${m.direction}:${m.message}:${m.created_at?.slice(0, 19)}`
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-        break
-      }
+    
+    if (data?.length) {
+      // Deduplica: remove registros espelhados (mesmo message+created_at+direction)
+      const seen = new Set<string>()
+      messages = data.filter((m: any) => {
+        const key = `${m.direction}:${m.message}:${m.created_at?.slice(0, 19)}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
     }
 
     const leadId = messages.find(m => m.lead_id)?.lead_id ?? null
