@@ -59,6 +59,36 @@ export function WhatsAppConversationPanel({
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [localMessages, setLocalMessages] = useState<Message[]>(messages)
+  const processedIds = useRef(new Set<string>(messages.map(m => m.id)))
+
+  function dedupeAndSet(msgs: Message[]) {
+    const uniqueById = new Map(msgs.map(m => [m.id, m]))
+    const visualSeen = new Set<string>()
+    const final = Array.from(uniqueById.values()).filter(m => {
+      const timeKey = m.created_at ? m.created_at.slice(0, 16) : ''
+      const key = `${m.direction}:${m.message}:${timeKey}`
+      if (visualSeen.has(key)) return false
+      visualSeen.add(key)
+      return true
+    })
+    setLocalMessages(final)
+  }
+
+  function addMessageSafe(msg: Message) {
+    if (!msg?.id || processedIds.current.has(msg.id)) return
+    processedIds.current.add(msg.id)
+    setLocalMessages(prev => {
+      const all = [...prev.filter(m => !m.id.startsWith('opt-')), msg]
+      const uniqueById = new Map(all.map(m => [m.id, m]))
+      const visualSeen = new Set<string>()
+      return Array.from(uniqueById.values()).filter(m => {
+        const key = `${m.direction}:${m.message}:${(m.created_at ?? '').slice(0, 16)}`
+        if (visualSeen.has(key)) return false
+        visualSeen.add(key)
+        return true
+      })
+    })
+  }
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(displayName ?? '')
   const [localDisplayName, setLocalDisplayName] = useState(displayName)
@@ -106,27 +136,7 @@ export function WhatsAppConversationPanel({
         filter: `phone=eq.${phone}`,
       }, (payload) => {
         const newMsg = payload.new as Message
-        setLocalMessages(prev => {
-          // Já existe com esse ID real — ignora
-          if (prev.some(m => m.id === newMsg.id)) return prev
-
-          // Procura mensagem optimista (id começa com 'opt-') com texto contido na msg real
-          // A assinatura *Nome:* é adicionada pelo backend, então o texto real contém o texto local
-          const optIdx = prev.findIndex(m =>
-            m.id.startsWith('opt-') &&
-            m.direction === newMsg.direction &&
-            newMsg.message.includes(m.message.trim())
-          )
-
-          if (optIdx !== -1) {
-            // Substitui o optimista pela mensagem real
-            const next = [...prev]
-            next[optIdx] = newMsg
-            return next
-          }
-
-          return [...prev, newMsg]
-        })
+        addMessageSafe(newMsg)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
