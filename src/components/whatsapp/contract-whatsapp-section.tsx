@@ -48,9 +48,24 @@ export function ContractWhatsAppSection({
     
     processedIds.current.add(msg.id)
     setMessages(prev => {
-      const unique = new Map(prev.map(m => [m.id, m]))
-      unique.set(msg.id, msg)
-      return Array.from(unique.values()).sort((a, b) =>
+      const all = [...prev, msg]
+      
+      // 1. Anti-Duplicação pelo ID do banco
+      const uniqueById = new Map(all.map(m => [m.id, m]))
+      
+      // 2. Anti-Eco Visual (O segredo do sucesso: ignora a mesma mensagem enviada no mesmo minuto)
+      const visualSeen = new Set<string>()
+      const finalMessages = Array.from(uniqueById.values()).filter(m => {
+        const timeKey = m.created_at ? m.created_at.slice(0, 16) : '' // Ex: 2026-08-26T09:15
+        const key = `${m.direction}:${m.message}:${timeKey}`
+        
+        if (visualSeen.has(key)) return false
+        visualSeen.add(key)
+        return true
+      })
+
+      // Ordena certinho para não bagunçar o chat
+      return finalMessages.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
     })
