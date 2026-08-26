@@ -16,7 +16,6 @@ export async function GET(req: Request) {
     const cleanPhone = phone.replace(/\D/g, '')
     const last8 = cleanPhone.slice(-8)
 
-    // Fim da frescura de loop. Busca TUDO que termina com os 8 dígitos de uma vez só!
     const { data } = await admin.from('contract_whatsapp_messages')
       .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
       .ilike('phone', `%${last8}`)
@@ -26,7 +25,6 @@ export async function GET(req: Request) {
     let messages: any[] = []
     
     if (data?.length) {
-      // Deduplica: remove registros espelhados (mesmo message+created_at+direction)
       const seen = new Set<string>()
       messages = data.filter((m: any) => {
         const key = `${m.direction}:${m.message}:${m.created_at?.slice(0, 19)}`
@@ -36,8 +34,11 @@ export async function GET(req: Request) {
       })
     }
 
-    const leadId = messages.find(m => m.lead_id)?.lead_id ?? null
-    const instanceName = messages.find(m => m.instance_name)?.instance_name ?? null
+    // CORREÇÃO AQUI: Criamos uma cópia invertida para achar sempre os dados da mensagem MAIS RECENTE
+    const recentMessages = [...messages].reverse()
+    
+    const leadId = recentMessages.find(m => m.lead_id)?.lead_id ?? null
+    const instanceName = recentMessages.find(m => m.instance_name)?.instance_name ?? null
 
     // Busca nome manual e aliases
     const { data: orgData } = await admin
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
 
     let displayName = manualName
     if (!displayName) {
-      displayName = messages
+      displayName = recentMessages
         .filter(m => m.direction === 'recebido' && m.unlinked_sender_name)
         .find(m => !instanceLabels.has((m.unlinked_sender_name ?? '').toLowerCase()))
         ?.unlinked_sender_name ?? null
