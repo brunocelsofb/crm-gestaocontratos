@@ -30,33 +30,29 @@ export default async function WhatsAppInboxPage({
     supabase.from('profiles').select('id, full_name, job_title'),
   ])
 
-  const normalizePhone = (p: string) => String(p).replace(/\D/g, '')
-
-  // Chave composta phone:instance_name para suporte multi-instância
-  const archivedSet = new Set(
-    (archivedRows ?? []).map((r: any) => `${normalizePhone(r.phone)}:${r.instance_name ?? ''}`)
-  )
-
-  // Agrupa por phone + instance_name
+  // Agrupa por instance_name + últimos 8 dígitos (cobre variações de DDI e 9º dígito)
   const latestByKey = new Map<string, any>()
   for (const m of openMessages ?? []) {
-    const key = `${m.phone}:${m.instance_name ?? ''}`
+    const base8 = (m.phone ?? '').replace(/\D/g, '').slice(-8)
+    const key = `${m.instance_name ?? 'default'}-${base8}`
     if (!latestByKey.has(key)) latestByKey.set(key, m)
   }
 
-  const openConversations = Array.from(latestByKey.entries())
-    .filter(([key]) => {
-      const [p, inst] = key.split(':')
-      return !archivedSet.has(`${normalizePhone(p)}:${inst}`)
+  // archivedSet também normalizado por instance + últimos 8
+  const archivedSet = new Set(
+    (archivedRows ?? []).map((r: any) => {
+      const base8 = (r.phone ?? '').replace(/\D/g, '').slice(-8)
+      return `${r.instance_name ?? 'default'}-${base8}`
     })
+  )
+
+  const openConversations = Array.from(latestByKey.entries())
+    .filter(([key]) => !archivedSet.has(key))
     .map(([, m]) => ({ phone: m.phone, instance: m.instance_name ?? '', latest: m, lead: null }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
   const archivedList = Array.from(latestByKey.entries())
-    .filter(([key]) => {
-      const [p, inst] = key.split(':')
-      return archivedSet.has(`${normalizePhone(p)}:${inst}`)
-    })
+    .filter(([key]) => archivedSet.has(key))
     .map(([, m]) => ({ phone: m.phone, instance: m.instance_name ?? '', latest: m }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
