@@ -6,6 +6,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const phone = searchParams.get('phone')
+    const instance = searchParams.get('instance')
     if (!phone) return NextResponse.json({ error: 'phone obrigatório' }, { status: 400 })
 
     const supabase = await createClient()
@@ -16,31 +17,36 @@ export async function GET(req: Request) {
     const cleanPhone = phone.replace(/\D/g, '')
     const last8 = cleanPhone.slice(-8)
 
-    const { data } = await admin.from('contract_whatsapp_messages')
-      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
-      .ilike('phone', `%${last8}`)
-      .order('created_at', { ascending: true })
-      .limit(500)
-
     let messages: any[] = []
-    
-    if (data?.length) {
-      const seen = new Set<string>()
-      messages = data.filter((m: any) => {
-        const key = `${m.direction}:${m.message}:${m.created_at?.slice(0, 19)}`
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
+    for (const phoneFilter of [
+      (q: any) => q.eq('phone', cleanPhone),
+      (q: any) => q.ilike('phone', `%${last8}`),
+    ]) {
+      let q = phoneFilter(
+        admin.from('contract_whatsapp_messages')
+          .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
+          .order('created_at', { ascending: true })
+          .limit(500)
+      )
+      if (instance) q = q.eq('instance_name', instance)
+
+      const { data } = await q
+      if (data?.length) {
+        const seen = new Set<string>()
+        messages = data.filter((m: any) => {
+          const key = `${m.direction}:${m.message}:${m.created_at?.slice(0, 19)}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        break
+      }
     }
 
-    // CORREÇÃO AQUI: Criamos uma cópia invertida para achar sempre os dados da mensagem MAIS RECENTE
-    const recentMessages = [...messages].reverse()
-    
-    const leadId = recentMessages.find(m => m.lead_id)?.lead_id ?? null
-    const instanceName = recentMessages.find(m => m.instance_name)?.instance_name ?? null
+    const leadId = messages.find(m => m.lead_id)?.lead_id ?? null
+    // instanceName da mensagem mais recente
+    const instanceName = [...messages].reverse().find(m => m.instance_name)?.instance_name ?? null
 
-    // Busca nome manual e aliases
     const { data: orgData } = await admin
       .from('organization_settings')
       .select('evo_instance_aliases, evo_instance_name, whatsapp_contact_names')
@@ -57,13 +63,12 @@ export async function GET(req: Request) {
 
     let displayName = manualName
     if (!displayName) {
-      displayName = recentMessages
+      displayName = messages
         .filter(m => m.direction === 'recebido' && m.unlinked_sender_name)
         .find(m => !instanceLabels.has((m.unlinked_sender_name ?? '').toLowerCase()))
         ?.unlinked_sender_name ?? null
     }
 
-    // Busca atribuição
     const { data: assignment } = await admin
       .from('whatsapp_conversation_assignments')
       .select('assigned_to, profiles!whatsapp_conversation_assignments_assigned_to_fkey(full_name)')

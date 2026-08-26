@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
 type Conv = {
   phone: string
+  instance: string
   latest: {
     unlinked_sender_name: string | null
     message: string
@@ -19,16 +19,20 @@ type Conv = {
 }
 
 export function WhatsAppSidebar({
-  open, archived, selectedPhone, assignments, currentUserId, instanceAliases, onSelectPhone,
+  open, archived, selectedPhone, selectedInstance, assignments,
+  currentUserId, instanceAliases, onSelectConv, onSelectPhone,
 }: {
-  open: Conv[]; archived: Conv[]; selectedPhone: string | null
+  open: Conv[]; archived: Conv[]
+  selectedPhone: string | null; selectedInstance?: string | null
   assignments: Record<string, { assigned_to: string; assigned_to_name: string }>
-  currentUserId: string; instanceAliases: Record<string, any>; onSelectPhone?: (phone: string) => void
+  currentUserId: string; instanceAliases: Record<string, any>
+  onSelectConv?: (phone: string, instance: string) => void
+  onSelectPhone?: (phone: string) => void
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<'open' | 'archived'>('open')
   const [isPending, startTransition] = useTransition()
-  const [pendingPhone, setPendingPhone] = useState<string | null>(null)
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
 
   const getLabel = (name: string) => {
     const v = instanceAliases[name]
@@ -58,55 +62,52 @@ export function WhatsAppSidebar({
           </p>
         )}
         {list.map((c) => {
-          const isSelected = selectedPhone === c.phone
-          const isLoading = isPending && pendingPhone === c.phone
+          const key = `${c.phone}:${c.instance}`
+          const isSelected = selectedPhone === c.phone && (selectedInstance ?? '') === (c.instance ?? '')
+          const isLoading = isPending && pendingKey === key
           return (
-          <button key={c.phone}
-            onClick={() => {
-              setPendingPhone(c.phone)
-              if (onSelectPhone) {
-                onSelectPhone(c.phone)
-              } else {
-                startTransition(() => { router.push(`/whatsapp?phone=${encodeURIComponent(c.phone)}`) })
-              }
-            }}
-            className={`w-full text-left rounded-md border px-3 py-2 text-sm hover:bg-gray-50 ${isLoading ? 'opacity-50' : ''} ${
-              isSelected ? 'border-brand-300 bg-brand-50'
-              : tab === 'archived' ? 'border-gray-200 bg-gray-50/60'
-              : c.lead ? 'border-purple-100 bg-purple-50/40' : 'border-yellow-100 bg-yellow-50/40'
-            }`}>
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate font-medium text-gray-900">
-              {(() => {
-                const name = c.lead?.name || c.latest.unlinked_sender_name
-                const label = getLabel(c.latest.instance_name ?? '')
-                // Nunca exibe nome de instância como nome do contato
-                if (name && name !== label) return name
-                return c.phone
-              })()}
-            </p>
-              {c.lead && (
-                <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-purple-100 text-purple-700">Lead</span>
-              )}
-            </div>
-            <p className="truncate text-xs text-gray-500">
-              {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
-              {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
-            </p>
-            {c.latest.instance_name && (
-              <span className="mt-0.5 inline-block rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
-                via {getLabel(c.latest.instance_name)}
-              </span>
-            )}
-            <div className="mt-0.5 flex items-center justify-between">
-              <p className="text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
-              {assignments[c.phone] && tab === 'open' && (
-                <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600">
-                  👤 {assignments[c.phone].assigned_to === currentUserId ? 'Você' : assignments[c.phone].assigned_to_name}
+            <button key={key}
+              onClick={() => {
+                setPendingKey(key)
+                if (onSelectConv) {
+                  onSelectConv(c.phone, c.instance)
+                } else if (onSelectPhone) {
+                  onSelectPhone(c.phone)
+                } else {
+                  startTransition(() => {
+                    router.push(`/whatsapp?phone=${encodeURIComponent(c.phone)}&instance=${encodeURIComponent(c.instance)}`)
+                  })
+                }
+              }}
+              className={`w-full text-left rounded-md border px-3 py-2 text-sm hover:bg-gray-50 ${isLoading ? 'opacity-50' : ''} ${
+                isSelected ? 'border-brand-300 bg-brand-50'
+                : tab === 'archived' ? 'border-gray-200 bg-gray-50/60'
+                : c.lead ? 'border-purple-100 bg-purple-50/40' : 'border-yellow-100 bg-yellow-50/40'
+              }`}>
+              <div className="flex items-center justify-between gap-1">
+                <p className="truncate font-medium text-gray-900">
+                  {(() => {
+                    const name = c.lead?.name || c.latest.unlinked_sender_name
+                    const label = getLabel(c.latest.instance_name ?? '')
+                    if (name && name !== label) return name
+                    return c.phone
+                  })()}
+                </p>
+                {c.lead && (
+                  <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-purple-100 text-purple-700">Lead</span>
+                )}
+              </div>
+              <p className="truncate text-xs text-gray-500">
+                {c.latest.direction === 'enviado' ? '📤 ' : '📥 '}
+                {c.latest.media_type ? `[${c.latest.media_type}]` : c.latest.message}
+              </p>
+              {c.instance && (
+                <span className="mt-0.5 inline-block rounded-full bg-[#1B556B]/10 px-2 py-0.5 text-[10px] font-medium text-[#1B556B]">
+                  via {getLabel(c.instance)}
                 </span>
               )}
-            </div>
-          </button>
+              <p className="mt-0.5 text-[10px] text-gray-400">{new Date(c.latest.created_at).toLocaleString('pt-BR')}</p>
+            </button>
           )
         })}
       </div>

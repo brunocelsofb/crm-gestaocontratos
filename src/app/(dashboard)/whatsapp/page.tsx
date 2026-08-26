@@ -9,13 +9,12 @@ import { WhatsAppClientShell } from '@/components/whatsapp/whatsapp-client-shell
 export default async function WhatsAppInboxPage({
   searchParams,
 }: {
-  searchParams: Promise<{ contract?: string; phone?: string }>
+  searchParams: Promise<{ contract?: string; phone?: string; instance?: string }>
 }) {
-  const { phone: selectedPhone } = await searchParams
+  const { phone: selectedPhone, instance: selectedInstance } = await searchParams
   const supabase = await createClient()
   const admin = createAdminClient()
 
-  // Só busca o essencial para montar a sidebar — queries mínimas e paralelas
   const [
     { data: { user } },
     { data: archivedRows },
@@ -23,7 +22,7 @@ export default async function WhatsAppInboxPage({
     { data: teamUsers },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    admin.from('whatsapp_conversation_status').select('phone').eq('is_archived', true),
+    admin.from('whatsapp_conversation_status').select('phone, instance_name').eq('is_archived', true),
     admin.from('contract_whatsapp_messages')
       .select('phone, unlinked_sender_name, message, media_type, direction, created_at, lead_id, instance_name')
       .order('created_at', { ascending: false })
@@ -32,21 +31,33 @@ export default async function WhatsAppInboxPage({
   ])
 
   const normalizePhone = (p: string) => String(p).replace(/\D/g, '')
-  const archivedSet = new Set((archivedRows ?? []).map((r: any) => normalizePhone(r.phone)))
 
-  const latestByPhone = new Map<string, any>()
+  // Chave composta phone:instance_name para suporte multi-instância
+  const archivedSet = new Set(
+    (archivedRows ?? []).map((r: any) => `${normalizePhone(r.phone)}:${r.instance_name ?? ''}`)
+  )
+
+  // Agrupa por phone + instance_name
+  const latestByKey = new Map<string, any>()
   for (const m of openMessages ?? []) {
-    if (!latestByPhone.has(m.phone)) latestByPhone.set(m.phone, m)
+    const key = `${m.phone}:${m.instance_name ?? ''}`
+    if (!latestByKey.has(key)) latestByKey.set(key, m)
   }
 
-  const openConversations = Array.from(latestByPhone.entries())
-    .filter(([p]) => !archivedSet.has(normalizePhone(p)))
-    .map(([phone, m]) => ({ phone, latest: m, lead: null }))
+  const openConversations = Array.from(latestByKey.entries())
+    .filter(([key]) => {
+      const [p, inst] = key.split(':')
+      return !archivedSet.has(`${normalizePhone(p)}:${inst}`)
+    })
+    .map(([, m]) => ({ phone: m.phone, instance: m.instance_name ?? '', latest: m, lead: null }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
-  const archivedList = Array.from(latestByPhone.entries())
-    .filter(([p]) => archivedSet.has(normalizePhone(p)))
-    .map(([phone, m]) => ({ phone, latest: m }))
+  const archivedList = Array.from(latestByKey.entries())
+    .filter(([key]) => {
+      const [p, inst] = key.split(':')
+      return archivedSet.has(`${normalizePhone(p)}:${inst}`)
+    })
+    .map(([, m]) => ({ phone: m.phone, instance: m.instance_name ?? '', latest: m }))
     .sort((a, b) => new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime())
 
   const { data: orgData } = await admin
@@ -70,6 +81,7 @@ export default async function WhatsAppInboxPage({
         open={openConversations as any}
         archived={archivedList as any}
         initialPhone={selectedPhone ?? null}
+        initialInstance={selectedInstance ?? null}
         currentUserId={user?.id ?? ''}
         teamUsers={(teamUsers ?? []) as any}
         instanceAliases={(orgData as any)?.evo_instance_aliases ?? {}}
