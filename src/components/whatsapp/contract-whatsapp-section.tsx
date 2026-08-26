@@ -1,14 +1,5 @@
 'use client'
 
-// NOTA DE INCERTEZA: a parte de tempo real (supabase.channel(...).on(
-// 'postgres_changes', ...)) segue o mesmo padrão já usado no sino de
-// notificações deste projeto — se as mensagens não aparecerem
-// sozinhas (só ao recarregar a página), confira em Database →
-// Replication → supabase_realtime no painel do Supabase se a tabela
-// contract_whatsapp_messages está habilitada lá (a migração já tenta
-// habilitar isso via SQL, mas o painel é o jeito mais confiável de
-// confirmar).
-
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { sendContractWhatsApp, buildWhatsAppFromTemplate, sendContractWhatsAppMedia, resolveContactNameByPhone, saveWhatsAppConversationAsNote } from '@/lib/actions/whatsapp'
@@ -48,17 +39,13 @@ export function ContractWhatsAppSection({
   messageLog: WhatsAppLog[]
 }) {
   const router = useRouter()
-  // Mantém as mensagens em estado local (não só a prop) — é isso que
-  // permite mensagem nova aparecer sozinha via tempo real, sem
-  // precisar de router.refresh() (que recarrega a página inteira).
-  // messageLog vem DESC do servidor.
-  // WhatsAppChatView faz .reverse() → ASC → flex-col → mais recente na base.
-  // Estado mantido em DESC. Nova mensagem vai no INÍCIO (DESC) = mais recente.
   const [messages, setMessages] = useState<WhatsAppLog[]>(messageLog)
   const processedIds = useRef(new Set<string>(messageLog.map(m => m.id)))
 
   function addMessage(msg: WhatsAppLog) {
+    if (!msg || !msg.id) return
     if (processedIds.current.has(msg.id)) return
+    
     processedIds.current.add(msg.id)
     setMessages(prev => {
       const unique = new Map(prev.map(m => [m.id, m]))
@@ -114,22 +101,36 @@ export function ContractWhatsAppSection({
 
     const supabase = createClient()
     const channel = supabase
-      .channel(`whatsapp-oportunidade:${contractId}`)
+      .channel(`whatsapp-oportunidade:${contractId}-${normalizedPhone}`)
+      // Canal 1: Escuta explicitamente o TELEFONE (Isso traz as mensagens da Central que não tem contract_id)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages' },
+        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `phone=eq.${normalizedPhone}` },
         (payload) => {
-          const msg = payload.new as any
-          const msgPhone = (msg.phone ?? '').replace(/\D/g, '')
-          const matchPhone = msgPhone.endsWith(cleanPhone.slice(-10))
-          const matchContract = msg.contract_id === contractId
-          if (!matchPhone && !matchContract) return
-          addMessage(msg as WhatsAppLog)
+          addMessage(payload.new as WhatsAppLog)
+        }
+      )
+      // Canal 2: Escuta explicitamente o CONTRATO (Garante que tudo da oportunidade continue funcionando)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
+        (payload) => {
+          addMessage(payload.new as WhatsAppLog)
+        }
+      )
+      // Updates (mudança de status como lido/recebido) por contrato e por telefone
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
+        (payload) => {
+          setMessages(prev => prev.map(m =>
+            m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m
+          ))
         }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `contract_id=eq.${contractId}` },
+        { event: 'UPDATE', schema: 'contract_crm', table: 'contract_whatsapp_messages', filter: `phone=eq.${normalizedPhone}` },
         (payload) => {
           setMessages(prev => prev.map(m =>
             m.id === (payload.new as any).id ? { ...m, ...(payload.new as WhatsAppLog) } : m
@@ -179,7 +180,12 @@ export function ContractWhatsAppSection({
     } else {
       setMessage('')
       setTemplateId('')
-      // Realtime é a única fonte — não injeta localmente
+      
+      if (result.message || result.data) {
+        addMessage((result.message || result.data) as WhatsAppLog)
+      } else if (result.id) {
+        addMessage(result as unknown as WhatsAppLog)
+      }
     }
   }
 
@@ -210,7 +216,12 @@ export function ContractWhatsAppSection({
     if (result.error) setError(result.error)
     else {
       if (fileInputRef.current) fileInputRef.current.value = ''
-      // Sem router.refresh — Realtime atualiza automaticamente
+      
+      if (result.message || result.data) {
+        addMessage((result.message || result.data) as WhatsAppLog)
+      } else if (result.id) {
+        addMessage(result as unknown as WhatsAppLog)
+      }
     }
   }
 
