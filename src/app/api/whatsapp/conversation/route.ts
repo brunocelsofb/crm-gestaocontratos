@@ -14,13 +14,15 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
     const cleanPhone = phone.replace(/\D/g, '')
-    const last10 = cleanPhone.slice(-10)
+    
+    // CORREÇÃO: Pegando apenas os últimos 8 dígitos (ignora DDD e 9º dígito)
+    const last8 = cleanPhone.slice(-8)
 
     // Busca TODAS as mensagens do phone (com e sem contract_id)
     let messages: any[] = []
     for (const phoneFilter of [
       (q: any) => q.eq('phone', cleanPhone),
-      (q: any) => q.ilike('phone', `%${last10}`),
+      (q: any) => q.ilike('phone', `%${last8}`),
     ]) {
       const { data } = await phoneFilter(
         admin.from('contract_whatsapp_messages')
@@ -51,7 +53,7 @@ export async function GET(req: Request) {
       .eq('id', 'default').maybeSingle()
 
     const contactNames = (orgData as any)?.whatsapp_contact_names ?? {}
-    const manualName = contactNames[cleanPhone] ?? contactNames[last10] ?? contactNames[`55${cleanPhone}`] ?? null
+    const manualName = contactNames[cleanPhone] ?? contactNames[last8] ?? contactNames[`55${cleanPhone}`] ?? null
 
     const aliases = (orgData as any)?.evo_instance_aliases ?? {}
     const instanceLabels = new Set<string>(
