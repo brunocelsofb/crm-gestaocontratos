@@ -26,7 +26,6 @@ export default async function WhatsAppInboxPage({
     admin.from('whatsapp_conversation_status').select('phone').eq('is_archived', true),
     admin.from('contract_whatsapp_messages')
       .select('phone, unlinked_sender_name, message, media_type, direction, created_at, lead_id, instance_name')
-      .is('contract_id', null)
       .order('created_at', { ascending: false })
       .limit(200),
     supabase.from('profiles').select('id, full_name, job_title'),
