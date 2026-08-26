@@ -27,7 +27,7 @@ export default async function WhatsAppInboxPage({
     admin.from('contract_whatsapp_messages')
       .select('phone, unlinked_sender_name, message, media_type, direction, created_at, lead_id, instance_name')
       .order('created_at', { ascending: false })
-      .limit(200),
+      .limit(500),
     supabase.from('profiles').select('id, full_name, job_title'),
   ])
 
