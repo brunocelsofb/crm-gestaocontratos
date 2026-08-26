@@ -125,7 +125,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
     }
 
     // Desarquiva
-    await unarchiveWhatsAppConversation(normalizedPhone)
+    await unarchiveWhatsAppConversation(normalizedPhone, instanceName ?? creds.instanceName)
 
     return { message: { ...inserted, sent_by_name: senderName } }
 
@@ -451,8 +451,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message: signedMessage })
 
     // Desarquiva conversa se estava arquivada
-    await supabase.from('whatsapp_conversation_status')
-      .upsert({ phone, is_archived: false, updated_at: new Date().toISOString() }, { onConflict: 'phone' })
+    await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
 
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: null,
@@ -825,20 +824,28 @@ export async function archiveWhatsAppConversation(phone: string, instanceName?: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado.' }
 
-  await supabase.from('whatsapp_conversation_status').upsert({
-    phone,
-    is_archived: true,
-    archived_at: new Date().toISOString(),
-    archived_by: user.id,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'phone' })
+  const inst = instanceName ?? ''
+
+  // Tenta update primeiro; se não existir, insere
+  const { error: updateErr } = await supabase
+    .from('whatsapp_conversation_status')
+    .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: user.id, updated_at: new Date().toISOString() })
+    .eq('phone', phone)
+    .eq('instance_name', inst)
+
+  if (updateErr) {
+    // Não existia — insere
+    await supabase.from('whatsapp_conversation_status').insert({
+      phone, instance_name: inst,
+      is_archived: true, archived_at: new Date().toISOString(), archived_by: user.id,
+    })
+  }
 
   // Envia mensagem de encerramento pelo mesmo número da conversa
   const creds = await getEvoCredentials()
   if (creds) {
     const targetCreds = instanceName ? { ...creds, instanceName } : creds
     try {
-      // Busca mensagem personalizada da instância
       const { data: org } = await createAdminClient()
         .from('organization_settings').select('evo_instance_aliases').eq('id', 'default').maybeSingle()
       const aliases = (org as any)?.evo_instance_aliases ?? {}
@@ -854,15 +861,22 @@ export async function archiveWhatsAppConversation(phone: string, instanceName?: 
   return {}
 }
 
-export async function unarchiveWhatsAppConversation(phone: string): Promise<void> {
+export async function unarchiveWhatsAppConversation(phone: string, instanceName?: string | null): Promise<void> {
   const admin = createAdminClient()
-  await admin.from('whatsapp_conversation_status').upsert({
-    phone,
-    is_archived: false,
-    archived_at: null,
-    archived_by: null,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'phone' })
+  const inst = instanceName ?? ''
+
+  const { error } = await admin
+    .from('whatsapp_conversation_status')
+    .update({ is_archived: false, archived_at: null, archived_by: null, updated_at: new Date().toISOString() })
+    .eq('phone', phone)
+    .eq('instance_name', inst)
+
+  if (error) {
+    // Não existia — insere
+    await admin.from('whatsapp_conversation_status').insert({
+      phone, instance_name: inst, is_archived: false,
+    })
+  }
 }
 
 // ---- Salvar nome manual de contato não vinculado ----
