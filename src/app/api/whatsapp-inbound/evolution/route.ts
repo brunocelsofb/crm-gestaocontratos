@@ -179,7 +179,11 @@ export async function POST(request: Request) {
       }
     }
 
-    const messageText = text ?? (mediaType ? (FRIENDLY[mediaType] ?? `[${mediaType}]`) : '[mensagem]')
+    // Mapeamento defensivo — constraint aceita apenas: image, video, audio, document
+    const dbMediaType = mediaType === 'sticker' ? 'image'
+      : mediaType === 'contact' ? null
+      : mediaType === 'location' ? null
+      : mediaType
     if (!text && !mediaType) {
       console.warn('[evo-webhook] não extraiu texto. msg keys:', msg ? Object.keys(msg) : 'null', '| msgData keys:', Object.keys(msgData ?? {}).slice(0, 10))
     }
@@ -241,7 +245,7 @@ export async function POST(request: Request) {
         unlinked_sender_name: pushName,
         instance_name: instanceName,
         media_url: mediaUrl,
-        media_type: mediaType,
+        media_type: dbMediaType,
         media_filename: mediaFilename,
         created_at: messageTimestamp
           ? new Date(Number(messageTimestamp) * 1000).toISOString()
