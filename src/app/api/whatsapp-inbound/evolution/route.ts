@@ -187,7 +187,7 @@ export async function POST(request: Request) {
     if (!text && !mediaType) {
       console.warn('[evo-webhook] não extraiu texto. msg keys:', msg ? Object.keys(msg) : 'null', '| msgData keys:', Object.keys(msgData ?? {}).slice(0, 10))
     }
-    console.log('[evo-webhook] phone:', phone, '| fromMe:', isFromMe, '| text:', messageText?.slice(0, 80))
+    console.log('[evo-webhook] phone:', phone, '| text:', text?.slice(0, 80), '| mediaType:', mediaType)
 
     // Deduplicação
     if (messageId) {
