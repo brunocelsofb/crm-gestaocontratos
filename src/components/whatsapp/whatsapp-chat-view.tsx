@@ -18,17 +18,32 @@ type ChatMessage = {
   triggered_automatically: boolean
   created_at: string
   sent_by_name?: string | null
+  is_forwarded?: boolean | null
 }
 
-const DELIVERY_TICK: Record<string, string> = {
-  sent: '✓',
-  delivered: '✓✓',
-  read: '✓✓',
+const DELIVERY_TICK: Record<string, string> = { sent: '✓', delivered: '✓✓', read: '✓✓' }
+
+function dayLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Hoje'
+  if (d.toDateString() === yesterday.toDateString()) return 'Ontem'
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function timeLabel(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string; mediaType: string; mediaFilename: string | null }) {
   if (mediaType === 'image') {
-    return <img src={mediaUrl} alt="Imagem enviada" className="max-w-[240px] rounded-md" />
+    return (
+      <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+        <img src={mediaUrl} alt="Imagem" className="max-w-[240px] rounded-md cursor-pointer hover:opacity-90" />
+      </a>
+    )
   }
   if (mediaType === 'audio') {
     return <audio controls src={mediaUrl} className="max-w-[240px]" />
@@ -39,70 +54,131 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   return (
     <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
       download={mediaFilename ?? 'documento.pdf'}
-      className="flex items-center gap-1.5 text-sm underline">
-      📎 {mediaFilename ?? 'Arquivo'}
+      className="flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-sm hover:bg-black/10">
+      <span className="text-2xl">📎</span>
+      <span className="underline truncate max-w-[180px]">{mediaFilename ?? 'Arquivo'}</span>
     </a>
   )
 }
 
-export function WhatsAppChatView({ messages, contactName, contactPhone }: { messages: ChatMessage[]; contactName?: string | null; contactPhone?: string | null }) {
-  const chronological = [...messages].reverse()
-  // Foto de perfil mais recente que a gente tem de quem manda mensagem
-  // (só existe pra mensagens recebidas, não pras que a gente envia).
-  const lastReceivedPhoto = [...messages].find((m) => m.direction === 'recebido' && m.sender_photo_url)?.sender_photo_url ?? null
+export function WhatsAppChatView({ messages, contactName, contactPhone }: {
+  messages: ChatMessage[]; contactName?: string | null; contactPhone?: string | null
+}) {
+  // Ordem cronológica: mais antiga → mais nova (de cima para baixo)
+  const chronological = [...messages].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
+
+  // Agrupa por dia para inserir divisores
+  const groups: { label: string; msgs: ChatMessage[] }[] = []
+  for (const m of chronological) {
+    const label = dayLabel(m.created_at)
+    if (!groups.length || groups[groups.length - 1].label !== label) {
+      groups.push({ label, msgs: [m] })
+    } else {
+      groups[groups.length - 1].msgs.push(m)
+    }
+  }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200">
-      <div className="flex flex-col gap-2 bg-[#e5ddd5] p-4">
-      {chronological.map((m) => {
-        const isSent = m.direction === 'enviado'
-        return (
-          <div key={m.id} className={`group flex items-end gap-1 ${isSent ? 'flex-row-reverse' : ''}`}>
-            {!isSent && (
-              m.sender_photo_url ? (
-                <img src={m.sender_photo_url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
-              ) : (
-                <div className="h-7 w-7 shrink-0 rounded-full bg-gray-300" />
-              )
-            )}
-            {isSent && (
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-medium text-white" title={m.sent_by_name ?? 'Enviado pelo celular'}>
-                {m.sent_by_name ? m.sent_by_name.charAt(0).toUpperCase() : m.triggered_automatically ? '🤖' : '📱'}
-              </div>
-            )}
-            <div className={`relative max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${isSent ? 'bg-[#dcf8c6] text-gray-900' : 'bg-white text-gray-900'}`}>
-              <button
-                onClick={async () => {
-                  if (!confirm('Excluir esta mensagem?')) return
-                  await deleteWhatsAppMessage(m.id, (m as any).phone ?? contactPhone ?? '')
-                }}
-                className={`absolute opacity-0 group-hover:opacity-100 transition-opacity -top-2 text-[10px] text-red-400 hover:text-red-600 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow ${isSent ? '-left-2' : '-right-2'}`}
-              >🗑</button>
-              {!isSent && m.unlinked_sender_name && (
-                <p className="text-[10px] font-semibold text-[#1B556B] mb-0.5">{m.unlinked_sender_name}</p>
-              )}
-              {m.media_url && m.media_type ? (
-                <MediaContent mediaUrl={m.media_url} mediaType={m.media_type} mediaFilename={m.media_filename} />
-              ) : (
-                <p className="whitespace-pre-wrap">{m.message}</p>
-              )}
-              <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-gray-500">
-                {isSent && <span>{m.sent_by_name ?? (m.triggered_automatically ? 'Automação' : 'Pelo celular')} · </span>}
-                {m.triggered_automatically && <span title="Enviado por automação">🤖</span>}
-                <span>{new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                {isSent && m.status === 'falhou' && <span className="text-red-600" title={m.error_message ?? ''}>Falhou</span>}
-                {isSent && m.status === 'enviado' && m.delivery_status && (
-                  <span className={m.delivery_status === 'read' ? 'text-blue-500' : 'text-gray-400'} title={m.delivery_status}>
-                    {DELIVERY_TICK[m.delivery_status] ?? ''}
-                  </span>
-                )}
-              </div>
-            </div>
+    <div className="flex flex-col gap-0.5 bg-[#e5ddd5] p-3 overflow-y-auto h-full">
+      {chronological.length === 0 && (
+        <p className="py-8 text-center text-sm text-gray-500">Nenhuma mensagem ainda.</p>
+      )}
+
+      {groups.map((group) => (
+        <div key={group.label}>
+          {/* Divisor de data */}
+          <div className="flex items-center justify-center my-3">
+            <span className="rounded-full bg-[#e1f3fb] px-3 py-0.5 text-[11px] font-medium text-[#54656f] shadow-sm">
+              {group.label}
+            </span>
           </div>
-        )
-      })}
-      {chronological.length === 0 && <p className="py-8 text-center text-sm text-gray-500">Nenhuma mensagem ainda.</p>}
-      </div>
+
+          {group.msgs.map((m) => {
+            const isSent = m.direction === 'enviado'
+            const senderName = isSent
+              ? (m.sent_by_name ?? (m.triggered_automatically ? 'Automação' : null))
+              : (m.unlinked_sender_name ?? contactName)
+
+            return (
+              <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
+                {/* Avatar */}
+                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
+                  ${isSent ? 'bg-[#1B556B]' : 'bg-gray-400'}`}
+                  title={senderName ?? ''}>
+                  {isSent
+                    ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
+                    : (m.sender_photo_url
+                      ? undefined
+                      : (senderName?.charAt(0).toUpperCase() ?? '?')
+                    )
+                  }
+                  {!isSent && m.sender_photo_url && (
+                    <img src={m.sender_photo_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+                  )}
+                </div>
+
+                {/* Balão */}
+                <div className={`relative max-w-[72%] rounded-lg px-3 pt-1.5 pb-2 text-sm shadow-sm
+                  ${isSent ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'} text-gray-900`}>
+
+                  {/* Botão deletar */}
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Excluir esta mensagem?')) return
+                      await deleteWhatsAppMessage(m.id, (m as any).phone ?? contactPhone ?? '')
+                    }}
+                    className={`absolute opacity-0 group-hover:opacity-100 transition-opacity -top-2 text-[10px] text-red-400
+                      hover:text-red-600 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow
+                      ${isSent ? '-left-2' : '-right-2'}`}>
+                    🗑
+                  </button>
+
+                  {/* Encaminhada */}
+                  {m.is_forwarded && (
+                    <p className="text-[10px] text-gray-400 italic mb-0.5">↪ Encaminhada</p>
+                  )}
+
+                  {/* Nome do remetente (estilo grupo WhatsApp) */}
+                  {senderName && (
+                    <p className={`text-[11px] font-semibold mb-0.5
+                      ${isSent ? 'text-[#1B556B]' : 'text-[#e67e22]'}`}>
+                      {senderName}
+                    </p>
+                  )}
+
+                  {/* Conteúdo */}
+                  {m.media_url && m.media_type ? (
+                    <>
+                      <MediaContent mediaUrl={m.media_url} mediaType={m.media_type} mediaFilename={m.media_filename} />
+                      {m.message && !['[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Figurinha]'].includes(m.message) && (
+                        <p className="mt-1 whitespace-pre-wrap">{m.message}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="whitespace-pre-wrap leading-snug">{m.message}</p>
+                  )}
+
+                  {/* Rodapé: hora + status */}
+                  <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-400 select-none">
+                    {m.triggered_automatically && <span title="Automação">🤖</span>}
+                    <span>{timeLabel(m.created_at)}</span>
+                    {isSent && m.status === 'falhou' && (
+                      <span className="text-red-500" title={m.error_message ?? ''}>✗</span>
+                    )}
+                    {isSent && m.delivery_status && m.status !== 'falhou' && (
+                      <span className={m.delivery_status === 'read' ? 'text-blue-500' : ''}>
+                        {DELIVERY_TICK[m.delivery_status] ?? ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }
