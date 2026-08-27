@@ -184,7 +184,7 @@ export async function POST(request: Request) {
       : mediaType === 'contact' ? null
       : mediaType === 'location' ? null
       : mediaType
-    if (!text && !mediaType) {
+    const finalText = text ?? (mediaType ? (FRIENDLY[mediaType] ?? `[${mediaType}]`) : '[mensagem]')
       console.warn('[evo-webhook] não extraiu texto. msg keys:', msg ? Object.keys(msg) : 'null', '| msgData keys:', Object.keys(msgData ?? {}).slice(0, 10))
     }
     console.log('[evo-webhook] phone:', phone, '| text:', text?.slice(0, 80), '| mediaType:', mediaType)
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
       .insert({
         contract_id: contractId,
         phone,
-        message: messageText,
+        message: finalText,
         direction: 'recebido',
         status: 'recebido',
         triggered_automatically: false,
