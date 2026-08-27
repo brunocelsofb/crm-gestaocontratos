@@ -517,7 +517,7 @@ export function WhatsAppConversationPanel({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <WhatsAppChatView messages={[...localMessages].reverse()} contactName={displayName} contactPhone={phone} />
+        <WhatsAppChatView messages={localMessages} contactName={displayName} contactPhone={phone} />
         <div ref={messagesEndRef} />
       </div>
 

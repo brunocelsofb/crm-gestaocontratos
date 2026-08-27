@@ -22,42 +22,35 @@ export async function POST(request: Request) {
     const instanceName = body?.instance ?? body?.instanceName ?? null
     console.log('[evo-webhook] event:', event, '| instance:', instanceName)
 
-    if (!['messages_upsert', 'send_message'].includes(event)) {
+    if (!['messages_upsert'].includes(event)) {
       return NextResponse.json({ ok: true, skipped: `event=${eventRaw}` })
     }
 
-    // Extrai dados — Evolution v2 suporta múltiplos formatos
-    // Pode vir como body.data (objeto), body.data[0] (array) ou body direto
+    // Extrai dados
     const msgData = Array.isArray(body?.data) ? body.data[0] : (body?.data ?? body)
     const key = msgData?.key ?? msgData?.message?.key
     const msg = msgData?.message ?? msgData?.data?.message ?? null
-    const pushName = msgData?.contactName    // nome da agenda do celular host (Evolution v2)
-      ?? msgData?.pushName                   // nome do perfil WhatsApp do cliente
-      ?? msgData?.contact?.name             // contato salvo
-      ?? msgData?.contact?.pushName
-      ?? msgData?.verifiedBizName
-      ?? null
-    console.log('[evo-webhook] pushName/contactName:', pushName)
+    const pushName = msgData?.contactName ?? msgData?.pushName ?? msgData?.contact?.name ?? null
     const messageTimestamp = msgData?.messageTimestamp ?? msgData?.data?.messageTimestamp ?? null
 
     console.log('[evo-webhook] key:', JSON.stringify(key))
     console.log('[evo-webhook] msg keys:', msg ? Object.keys(msg) : 'null')
 
-    if (!key?.remoteJid) {
-      console.warn('[evo-webhook] sem remoteJid, ignorando')
-      return NextResponse.json({ ok: true, skipped: 'no remoteJid' })
-    }
-
-    // Ignora mensagens de grupo
-    if (key.remoteJid.endsWith('@g.us')) {
-      return NextResponse.json({ ok: true, skipped: 'group message' })
-    }
+    if (!key?.remoteJid) return NextResponse.json({ ok: true, skipped: 'no remoteJid' })
+    if (key.remoteJid.endsWith('@g.us')) return NextResponse.json({ ok: true, skipped: 'group' })
 
     const phone = key.remoteJid.replace(/@.*/, '').replace(/\D/g, '')
     if (!phone) return NextResponse.json({ ok: true, skipped: 'no phone' })
 
     const isFromMe = key.fromMe === true
     const messageId = key.id
+
+    // Ignora mensagens enviadas por nós via API (já salvas pela Server Action)
+    // Só processa mensagens recebidas de clientes
+    if (isFromMe) {
+      console.log('[evo-webhook] ignorando fromMe (já salvo pela action):', messageId)
+      return NextResponse.json({ ok: true, skipped: 'fromMe' })
+    }
 
     // Extrai texto — cobre todos os tipos de mensagem da Evolution API
     const text =
@@ -243,11 +236,11 @@ export async function POST(request: Request) {
         contract_id: contractId,
         phone,
         message: messageText,
-        direction: isFromMe ? 'enviado' : 'recebido',
-        status: isFromMe ? 'enviado' : 'recebido',
+        direction: 'recebido',
+        status: 'recebido',
         triggered_automatically: false,
         zapi_message_id: messageId ?? null,
-        unlinked_sender_name: isFromMe ? null : pushName,
+        unlinked_sender_name: pushName,
         instance_name: instanceName,
         media_url: mediaUrl,
         media_type: mediaType,
