@@ -91,21 +91,19 @@ export async function POST(request: Request) {
     if (msg?.contactMessage)  { mediaType = 'contact' }
     if (msg?.locationMessage) { mediaType = 'location' }
 
-    // Tenta extrair URL direta (pode ser pública ou interna)
-    const rawUrl =
-      msg?.imageMessage?.url ??
-      msg?.audioMessage?.url ??
-      msg?.videoMessage?.url ??
-      msg?.documentMessage?.url ??
-      null
+    console.log('[evo-webhook] mediaType detectado:', mediaType)
 
-    // Tenta base64 direto no payload (webhookBase64: true)
+    const rawUrl =
+      msg?.imageMessage?.url ?? msg?.audioMessage?.url ??
+      msg?.videoMessage?.url ?? msg?.documentMessage?.url ??
+      msg?.stickerMessage?.url ?? null
+
     const rawBase64 =
-      msg?.imageMessage?.base64 ??
-      msg?.audioMessage?.base64 ??
-      msg?.videoMessage?.base64 ??
-      msg?.documentMessage?.base64 ??
-      null
+      msg?.imageMessage?.base64 ?? msg?.audioMessage?.base64 ??
+      msg?.videoMessage?.base64 ?? msg?.documentMessage?.base64 ??
+      msg?.stickerMessage?.base64 ?? null
+
+    console.log('[evo-webhook] rawUrl:', rawUrl?.slice(0, 80) ?? null, '| base64 presente:', !!rawBase64)
 
     // ── Mídia: tenta salvar no Storage, nunca aborta o insert ──
     if (mediaType && (rawBase64 || (rawUrl && messageId))) {
