@@ -7,33 +7,40 @@ import { revalidatePath } from 'next/cache'
 async function doArchive(phone: string, userId: string, sendClosing: boolean, instanceName: string | null) {
   const admin = createAdminClient()
   const cleanPhone = String(phone).replace(/\D/g, '')
-  console.log('[archive] phone recebido:', phone, '→ cleanPhone:', cleanPhone, '| sendClosing:', sendClosing)
+  const last8 = cleanPhone.slice(-8)
 
-  const { error } = await admin
-    .from('whatsapp_conversation_status')
-    .upsert({
+  console.log('[archive] phone recebido:', phone, '→ last8:', last8, '| instance:', instanceName, '| sendClosing:', sendClosing)
+
+  // Busca todas as variações desse número (com/sem 55, com/sem 9)
+  let q = admin.from('whatsapp_conversation_status').select('phone, instance_name').ilike('phone', `%${last8}`)
+  if (instanceName) q = (q as any).eq('instance_name', instanceName)
+  const { data: existing } = await q
+
+  let success = false
+
+  if (existing && existing.length > 0) {
+    for (const row of existing) {
+      const { error } = await admin
+        .from('whatsapp_conversation_status')
+        .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: userId, updated_at: new Date().toISOString() })
+        .eq('phone', row.phone)
+        .eq('instance_name', row.instance_name ?? '')
+
+      if (!error) success = true
+    }
+  } else {
+    const { error } = await admin.from('whatsapp_conversation_status').insert({
       phone: cleanPhone,
+      instance_name: instanceName ?? '',
       is_archived: true,
       archived_at: new Date().toISOString(),
       archived_by: userId,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'phone' })
-
-  if (error) {
-    console.error('[archive] ERRO upsert:', error)
-    return { ok: false, error: error.message }
+    })
+    if (!error) success = true
   }
 
-  // Verifica
-  const { data: check } = await admin
-    .from('whatsapp_conversation_status')
-    .select('phone, is_archived')
-    .eq('phone', cleanPhone)
-    .maybeSingle()
-  console.log('[archive] pós-upsert:', check)
-
-  if (!check?.is_archived) {
-    console.error('[archive] upsert não persistiu!')
+  if (!success) {
+    console.error('[archive] falha ao persistir')
     return { ok: false, error: 'Falha ao salvar no banco.' }
   }
 
@@ -43,8 +50,7 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
     const { data: org } = await admin
       .from('organization_settings')
       .select('evo_server_url, evo_api_key, evo_instance_name, evo_instance_aliases')
-      .eq('id', 'default')
-      .maybeSingle()
+      .eq('id', 'default').maybeSingle()
 
     if (org?.evo_server_url && org?.evo_api_key) {
       const aliases = (org as any)?.evo_instance_aliases ?? {}
@@ -59,7 +65,6 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
           phone: cleanPhone,
           message: msg,
         })
-        console.log('[archive] mensagem de encerramento enviada')
       } catch (e) { console.warn('[archive] falha ao enviar mensagem:', e) }
     }
   }
@@ -67,8 +72,6 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
   return { ok: true }
 }
 
-// POST ?mode=archive → só arquiva
-// POST ?mode=finalize → arquiva + envia mensagem
 export async function POST(req: Request) {
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
