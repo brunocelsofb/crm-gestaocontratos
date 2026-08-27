@@ -34,15 +34,15 @@ export default async function WhatsAppInboxPage({
   const latestByKey = new Map<string, any>()
   for (const m of openMessages ?? []) {
     const base8 = (m.phone ?? '').replace(/\D/g, '').slice(-8)
-    const key = `${m.instance_name ?? 'default'}-${base8}`
+    const key = `${m.instance_name ?? ''}-${base8}`
     if (!latestByKey.has(key)) latestByKey.set(key, m)
   }
 
-  // archivedSet também normalizado por instance + últimos 8
+  // archivedSet normalizado por instance + últimos 8 (usa '' como default)
   const archivedSet = new Set(
     (archivedRows ?? []).map((r: any) => {
       const base8 = (r.phone ?? '').replace(/\D/g, '').slice(-8)
-      return `${r.instance_name ?? 'default'}-${base8}`
+      return `${r.instance_name ?? ''}-${base8}`
     })
   )
 
