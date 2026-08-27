@@ -8,40 +8,60 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
   const admin = createAdminClient()
   const cleanPhone = String(phone).replace(/\D/g, '')
   const last8 = cleanPhone.slice(-8)
+  
+  console.log('[archive] phone recebido:', phone, '→ last8:', last8, '| sendClosing:', sendClosing)
 
-  console.log('[archive] phone recebido:', phone, '→ last8:', last8, '| instance:', instanceName, '| sendClosing:', sendClosing)
-
-  // Busca todas as variações desse número (com/sem 55, com/sem 9)
-  let q = admin.from('whatsapp_conversation_status').select('phone, instance_name').ilike('phone', `%${last8}`)
-  if (instanceName) q = (q as any).eq('instance_name', instanceName)
-  const { data: existing } = await q
-
+  let dbError: any = null
   let success = false
 
+  // 1. Busca variações do número
+  const { data: existing } = await admin
+    .from('whatsapp_conversation_status')
+    .select('phone')
+    .ilike('phone', `%${last8}`)
+
   if (existing && existing.length > 0) {
+    // 2. Se achar, tenta atualizar
     for (const row of existing) {
       const { error } = await admin
         .from('whatsapp_conversation_status')
-        .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: userId, updated_at: new Date().toISOString() })
+        .update({
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+          archived_by: userId,
+          updated_at: new Date().toISOString(),
+        })
         .eq('phone', row.phone)
-        .eq('instance_name', row.instance_name ?? '')
-
-      if (!error) success = true
+        
+      if (error) {
+        dbError = error
+      } else {
+        success = true
+      }
     }
   } else {
-    const { error } = await admin.from('whatsapp_conversation_status').insert({
-      phone: cleanPhone,
-      instance_name: instanceName ?? '',
-      is_archived: true,
-      archived_at: new Date().toISOString(),
-      archived_by: userId,
-    })
-    if (!error) success = true
+    // 3. Se não existir, tenta criar
+    const { error } = await admin
+      .from('whatsapp_conversation_status')
+      .insert({
+        phone: cleanPhone,
+        is_archived: true,
+        archived_at: new Date().toISOString(),
+        archived_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      
+    if (error) {
+      dbError = error
+    } else {
+      success = true
+    }
   }
 
   if (!success) {
-    console.error('[archive] falha ao persistir')
-    return { ok: false, error: 'Falha ao salvar no banco.' }
+    console.error('[archive] Erro do Supabase:', dbError)
+    // A MÁGICA: Retornamos o erro exato que o banco de dados está reclamando
+    return { ok: false, error: `Erro do Banco: ${dbError?.message || dbError?.details || 'Desconhecido'}` }
   }
 
   revalidatePath('/whatsapp')
@@ -50,7 +70,8 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
     const { data: org } = await admin
       .from('organization_settings')
       .select('evo_server_url, evo_api_key, evo_instance_name, evo_instance_aliases')
-      .eq('id', 'default').maybeSingle()
+      .eq('id', 'default')
+      .maybeSingle()
 
     if (org?.evo_server_url && org?.evo_api_key) {
       const aliases = (org as any)?.evo_instance_aliases ?? {}
@@ -65,6 +86,7 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
           phone: cleanPhone,
           message: msg,
         })
+        console.log('[archive] mensagem de encerramento enviada')
       } catch (e) { console.warn('[archive] falha ao enviar mensagem:', e) }
     }
   }
