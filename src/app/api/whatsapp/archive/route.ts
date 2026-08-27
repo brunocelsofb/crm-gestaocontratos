@@ -9,21 +9,32 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
   const cleanPhone = String(phone).replace(/\D/g, '')
   const last8 = cleanPhone.slice(-8)
   
-  console.log('[archive] phone recebido:', phone, '→ last8:', last8, '| sendClosing:', sendClosing)
+  // A correção: Garantimos a instância correta (seja Matheus, Pedro, ou vazio)
+  const targetInstance = instanceName ?? ''
+  
+  console.log('[archive] phone:', phone, '→ last8:', last8, '| instance:', targetInstance)
 
   let dbError: any = null
   let success = false
 
-  // 1. Busca variações do número
-  const { data: existing } = await admin
+  // 1. Busca variações do número PARA ESTA INSTÂNCIA
+  let query = admin
     .from('whatsapp_conversation_status')
     .select('phone')
     .ilike('phone', `%${last8}`)
+    
+  if (targetInstance) {
+    query = query.eq('instance_name', targetInstance)
+  } else {
+    query = query.or('instance_name.is.null,instance_name.eq.""')
+  }
+
+  const { data: existing } = await query
 
   if (existing && existing.length > 0) {
-    // 2. Se achar, tenta atualizar
+    // 2. Atualiza a conversa desta instância específica
     for (const row of existing) {
-      const { error } = await admin
+      let updateQuery = admin
         .from('whatsapp_conversation_status')
         .update({
           is_archived: true,
@@ -32,35 +43,36 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
           updated_at: new Date().toISOString(),
         })
         .eq('phone', row.phone)
-        
-      if (error) {
-        dbError = error
+
+      if (targetInstance) {
+        updateQuery = updateQuery.eq('instance_name', targetInstance)
       } else {
-        success = true
+        updateQuery = updateQuery.or('instance_name.is.null,instance_name.eq.""')
       }
+
+      const { error } = await updateQuery
+      if (error) dbError = error
+      else success = true
     }
   } else {
-    // 3. Se não existir, tenta criar
+    // 3. SE NÃO EXISTIR, INSERE COM A INSTÂNCIA CORRETA (o meu erro estava aqui!)
     const { error } = await admin
       .from('whatsapp_conversation_status')
       .insert({
         phone: cleanPhone,
+        instance_name: targetInstance === '' ? null : targetInstance, // Salva corretamente!
         is_archived: true,
         archived_at: new Date().toISOString(),
         archived_by: userId,
         updated_at: new Date().toISOString(),
       })
       
-    if (error) {
-      dbError = error
-    } else {
-      success = true
-    }
+    if (error) dbError = error
+    else success = true
   }
 
   if (!success) {
     console.error('[archive] Erro do Supabase:', dbError)
-    // A MÁGICA: Retornamos o erro exato que o banco de dados está reclamando
     return { ok: false, error: `Erro do Banco: ${dbError?.message || dbError?.details || 'Desconhecido'}` }
   }
 
@@ -86,8 +98,7 @@ async function doArchive(phone: string, userId: string, sendClosing: boolean, in
           phone: cleanPhone,
           message: msg,
         })
-        console.log('[archive] mensagem de encerramento enviada')
-      } catch (e) { console.warn('[archive] falha ao enviar mensagem:', e) }
+      } catch (e) { console.warn('[archive] falha ao enviar:', e) }
     }
   }
 
