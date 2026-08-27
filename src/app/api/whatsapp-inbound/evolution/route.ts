@@ -114,42 +114,55 @@ export async function POST(request: Request) {
       msg?.documentMessage?.base64 ??
       null
 
-    if (rawBase64 && mediaType) {
-      const mime = mediaType === 'image' ? 'jpeg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'octet-stream'
-      mediaUrl = `data:${mediaType}/${mime};base64,${rawBase64}`
+    // Upload de mídia para Supabase Storage (evita data: URIs gigantes)
+    if (rawBase64 && mediaType && messageId) {
+      try {
+        const admin = createAdminClient()
+        const ext = mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin'
+        const mime = mediaType === 'image' ? 'image/jpeg' : mediaType === 'audio' ? 'audio/ogg' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'
+        const path = `whatsapp-media/${instanceName ?? 'default'}/${messageId}.${ext}`
+        const buffer = Buffer.from(rawBase64, 'base64')
+        const { error: upErr } = await admin.storage.from('proposal-files').upload(path, buffer, { contentType: mime, upsert: true })
+        if (!upErr) {
+          const { data: pub } = admin.storage.from('proposal-files').getPublicUrl(path)
+          mediaUrl = pub.publicUrl
+          console.log('[evo-webhook] mídia salva no Storage:', path)
+        }
+      } catch (e) { console.warn('[evo-webhook] falha upload storage:', e) }
     } else if (rawUrl && mediaType && messageId) {
-      // Baixa mídia via Evolution API e salva como base64
       try {
         const admin = createAdminClient()
         const { data: orgSettings } = await admin
           .from('organization_settings')
           .select('evo_server_url, evo_api_key, evo_instance_name')
-          .eq('id', 'default')
-          .maybeSingle()
+          .eq('id', 'default').maybeSingle()
 
-        if (orgSettings?.evo_server_url && orgSettings?.evo_api_key && orgSettings?.evo_instance_name) {
-          const dlRes = await fetch(
-            `${orgSettings.evo_server_url}/chat/getBase64FromMediaMessage/${orgSettings.evo_instance_name}`,
-            {
-              method: 'POST',
-              headers: { 'apikey': orgSettings.evo_api_key, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message: { key }, convertToMp4: false }),
-            }
-          )
+        const instForDl = instanceName ?? orgSettings?.evo_instance_name
+        if (orgSettings?.evo_server_url && instForDl) {
+          const dlRes = await fetch(`${orgSettings.evo_server_url}/chat/getBase64FromMediaMessage/${instForDl}`, {
+            method: 'POST',
+            headers: { 'apikey': orgSettings.evo_api_key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: { key }, convertToMp4: false }),
+          })
           if (dlRes.ok) {
             const dlData = await dlRes.json().catch(() => ({}))
             const b64 = dlData?.base64 ?? dlData?.data ?? null
             if (b64) {
-              const mime = mediaType === 'image' ? 'jpeg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'octet-stream'
-              mediaUrl = `data:${mediaType}/${mime};base64,${b64}`
-              console.log('[evo-webhook] mídia baixada via getBase64:', mediaType)
+              const ext = mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin'
+              const mime = mediaType === 'image' ? 'image/jpeg' : mediaType === 'audio' ? 'audio/ogg' : 'video/mp4'
+              const path = `whatsapp-media/${instForDl}/${messageId}.${ext}`
+              const buffer = Buffer.from(b64, 'base64')
+              const { error: upErr } = await admin.storage.from('proposal-files').upload(path, buffer, { contentType: mime, upsert: true })
+              if (!upErr) {
+                const { data: pub } = admin.storage.from('proposal-files').getPublicUrl(path)
+                mediaUrl = pub.publicUrl
+                console.log('[evo-webhook] mídia baixada e salva:', path)
+              }
             }
           }
         }
       } catch (e) {
-        console.warn('[evo-webhook] falha ao baixar mídia:', e)
-        mediaUrl = rawUrl // fallback para URL original (pode não ser acessível externamente)
-        // Se tiver messageId, usa proxy local que é sempre acessível
+        console.warn('[evo-webhook] falha mídia, usando proxy:', e)
         if (messageId && mediaType) {
           const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
           mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
@@ -245,11 +258,20 @@ export async function POST(request: Request) {
       const wasArchived = convStatus?.is_archived === true
       const isFirstContact = (prevCount ?? 0) <= 1
 
-      // 2. Atualiza para aberto
-      await supabase.from('whatsapp_conversation_status').upsert({
-        phone, is_archived: false, archived_at: null, archived_by: null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'phone' })
+      // 2. Atualiza para aberto usando PK composta (phone + instance_name)
+      const inst = instanceName ?? ''
+      const { error: statusErr } = await supabase
+        .from('whatsapp_conversation_status')
+        .update({ is_archived: false, archived_at: null, archived_by: null, updated_at: new Date().toISOString() })
+        .eq('phone', phone)
+        .eq('instance_name', inst)
+
+      if (statusErr) {
+        // Não existe ainda — insere
+        await supabase.from('whatsapp_conversation_status').insert({
+          phone, instance_name: inst, is_archived: false,
+        })
+      }
 
       // 3. Bot de triagem — só dispara em primeiro contato ou reabertura
       if (isFirstContact || wasArchived) {
