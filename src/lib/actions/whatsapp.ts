@@ -146,11 +146,12 @@ export async function sendContractWhatsApp(
   }
 }
 
+// Envio de Mídia pela Oportunidade (Imagem, Documento, Áudio, Vídeo) com atualização na Central
 export async function sendContractWhatsAppMedia(
   contractId: string,
   phone: string,
   mediaUrl: string,
-  mediaType: 'image' | 'document',
+  mediaType: 'image' | 'document' | 'video' | 'audio',
   filename: string | null
 ): Promise<ActionState> {
   const supabase = await createClient()
@@ -161,22 +162,27 @@ export async function sendContractWhatsAppMedia(
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
+  const rawPhone = phone.replace(/\D/g, '')
+  const normalizedPhone = rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone
+
   try {
     const result: any =
       mediaType === 'image'
-        ? await sendEvoImageMessage({ ...creds, phone, imageUrl: mediaUrl })
-        : await sendEvoDocumentMessage({ ...creds, phone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
+        ? await sendEvoImageMessage({ ...creds, phone: normalizedPhone, imageUrl: mediaUrl })
+        : await sendEvoDocumentMessage({ ...creds, phone: normalizedPhone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
+
+    const friendlyText = mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`
 
     await supabase.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
-      message: mediaType === 'image' ? '[imagem]' : `[documento] ${filename ?? ''}`,
+      phone: normalizedPhone,
+      message: friendlyText,
       media_url: mediaUrl,
       media_type: mediaType,
       media_filename: filename,
-      zapi_message_id: result?.key?.id,
+      zapi_message_id: result?.key?.id ?? null,
       status: 'enviado',
     })
 
@@ -184,8 +190,8 @@ export async function sendContractWhatsAppMedia(
       contract_id: contractId,
       user_id: user.id,
       type: 'whatsapp',
-      content: `WhatsApp (${mediaType}) enviado pra ${phone}.`,
-      metadata: { kind: 'sent', phone, message: mediaType === 'image' ? '[imagem]' : `[documento] ${filename ?? ''}` },
+      content: `WhatsApp (${mediaType}) enviado pra ${normalizedPhone}.`,
+      metadata: { kind: 'sent', phone: normalizedPhone, message: friendlyText },
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
@@ -193,8 +199,8 @@ export async function sendContractWhatsAppMedia(
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
-      message: mediaType === 'image' ? '[imagem]' : `[documento] ${filename ?? ''}`,
+      phone: normalizedPhone,
+      message: mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`,
       media_url: mediaUrl,
       media_type: mediaType,
       media_filename: filename,
@@ -204,6 +210,7 @@ export async function sendContractWhatsAppMedia(
     return { error: errorMsg }
   }
 
+  // Revalida ambas as rotas para refletir as mídias na Central e na Oportunidade simultaneamente
   revalidatePath('/whatsapp')
   revalidatePath(`/contracts/${contractId}`)
   return {}
