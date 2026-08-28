@@ -46,7 +46,14 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
     )
   }
   if (mediaType === 'audio') {
-    return <audio controls src={mediaUrl} className="max-w-[240px]" />
+    return (
+      <audio controls className="max-w-[250px] w-full">
+        <source src={mediaUrl} type="audio/ogg; codecs=opus" />
+        <source src={mediaUrl} type="audio/ogg" />
+        <source src={mediaUrl} type="audio/mpeg" />
+        Seu navegador não suporta áudio.
+      </audio>
+    )
   }
   if (mediaType === 'video') {
     return <video controls src={mediaUrl} className="max-w-[240px] rounded-md" />
