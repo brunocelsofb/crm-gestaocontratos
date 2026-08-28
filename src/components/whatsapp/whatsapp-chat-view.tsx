@@ -110,15 +110,16 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
 
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
-                {/* Avatar */}
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
-                  ${isSent ? 'bg-[#1B556B]' : 'bg-gray-400'}`}
+                
+                {/* Avatar (Atualizado com cores dinâmicas) */}
+                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm
+                  ${isSent ? 'bg-[#1B556B] text-white' : 'bg-blue-100 text-blue-700'}`}
                   title={senderName ?? ''}>
                   {isSent
                     ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
                     : (m.sender_photo_url
                       ? undefined
-                      : (senderName?.charAt(0).toUpperCase() ?? '?')
+                      : (senderName?.charAt(0).toUpperCase() ?? 'U')
                     )
                   }
                   {!isSent && m.sender_photo_url && (
