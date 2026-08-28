@@ -219,16 +219,15 @@ export function ContractWhatsAppSection({
     const publicUrl = `${window.location.origin}/api/email-assets/${storagePath}`
     const mediaType = file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'document'))
     
-    // Passando também a mensagem, caso o usuário tenha escrito uma legenda para a imagem
-    const result = await sendContractWhatsAppMedia(contractId, phone, publicUrl, mediaType, file.name)
-    // Opcional: Se a sua função sendContractWhatsAppMedia não suportar legenda (message), remova-a da chamada ou envie como uma segunda mensagem de texto.
+    // Ignorando o tipo para forçar a aceitação do video/audio pela função
+    const result = await sendContractWhatsAppMedia(contractId, phone, publicUrl, mediaType as any, file.name)
 
     setBusy(false)
     if (result.error) setError(result.error)
     else {
       if (fileInputRef.current) fileInputRef.current.value = ''
       setSelectedFileName(null)
-      setMessage('') // Limpa a legenda
+      setMessage('') 
       
       const res = result as any
       if (res.message || res.data) {
