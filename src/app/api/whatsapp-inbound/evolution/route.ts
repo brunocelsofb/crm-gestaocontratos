@@ -63,11 +63,21 @@ export async function POST(request: Request) {
     const isFromMe = key.fromMe === true
     const messageId = key.id
 
-    // Ignora mensagens enviadas por nós via API (já salvas pela Server Action)
-    // Só processa mensagens recebidas de clientes
-    if (isFromMe) {
-      console.log('[evo-webhook] ignorando fromMe (já salvo pela action):', messageId)
-      return NextResponse.json({ ok: true, skipped: 'fromMe' })
+    // Para mensagens fromMe: verifica se já foi salva pelo CRM (Server Action)
+    // Se já existe no banco, ignora (eco). Se não existe, foi enviada direto do celular — salva.
+    if (isFromMe && messageId) {
+      const { data: existing } = await supabase
+        .from('contract_whatsapp_messages')
+        .select('id')
+        .eq('zapi_message_id', messageId)
+        .maybeSingle()
+
+      if (existing) {
+        console.log('[evo-webhook] fromMe já salvo pelo CRM, ignorando:', messageId)
+        return NextResponse.json({ ok: true, skipped: 'fromMe-duplicate' })
+      }
+      console.log('[evo-webhook] fromMe do celular físico — salvando:', messageId)
+      // Continua o fluxo normal com direction: 'enviado'
     }
 
     // Extrai texto — cobre todos os tipos de mensagem da Evolution API
@@ -257,11 +267,11 @@ export async function POST(request: Request) {
         contract_id: contractId,
         phone,
         message: finalText,
-        direction: 'recebido',
-        status: 'recebido',
+        direction: isFromMe ? 'enviado' : 'recebido',
+        status: isFromMe ? 'enviado' : 'recebido',
         triggered_automatically: false,
         zapi_message_id: messageId ?? null,
-        unlinked_sender_name: pushName,
+        unlinked_sender_name: isFromMe ? null : pushName,
         instance_name: instanceName,
         media_url: mediaUrl,
         media_type: dbMediaType,
