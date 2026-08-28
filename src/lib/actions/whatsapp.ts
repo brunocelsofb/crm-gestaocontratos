@@ -43,7 +43,6 @@ export async function connectEvo(formData: FormData): Promise<ActionState> {
   return {}
 }
 
-// Server Action para obter QR Code — evita CORS (chamada server-side)
 export async function getEvoQrCodeAction(): Promise<{ base64?: string; status?: string; error?: string }> {
   if (!(await isCurrentUserAdmin())) return { error: 'Acesso negado.' }
   const creds = await getEvoCredentials()
@@ -51,7 +50,6 @@ export async function getEvoQrCodeAction(): Promise<{ base64?: string; status?: 
   return getEvoQrCode(creds)
 }
 
-// Server Action para configurar webhook manualmente
 export async function configureEvoWebhook(): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Acesso negado.' }
   const creds = await getEvoCredentials()
@@ -85,7 +83,6 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
 
   const admin = createAdminClient()
 
-  // Normaliza phone: garante DDI 55 (Brasil)
   const rawPhone = phone.replace(/\D/g, '')
   const normalizedPhone = rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone
   const { data: profile } = await admin.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
@@ -98,11 +95,9 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   const evoCreds = instanceName ? { ...creds, instanceName } : creds
 
   try {
-    // 1. Envia via Evolution API (Evolution já sanitiza o DDI internamente)
     const evoResult: any = await sendEvoTextMessage({ ...evoCreds, phone: normalizedPhone, message: signedMessage })
     console.log('[sendContractWhatsApp] evo ok | phone:', normalizedPhone)
 
-    // 2. INSERT com contract_id (aba Oportunidade)
     const { data: inserted, error: insertErr } = await admin
       .from('contract_whatsapp_messages')
       .insert({
@@ -116,7 +111,7 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
         zapi_message_id: evoResult?.key?.id ?? null,
         instance_name: instanceName ?? creds.instanceName,
       })
-      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, lead_id')
+      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, sent_by, lead_id, zapi_message_id')
       .single()
 
     if (insertErr) {
@@ -124,7 +119,6 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
       return { error: insertErr.message }
     }
 
-    // Desarquiva
     await unarchiveWhatsAppConversation(normalizedPhone, instanceName ?? creds.instanceName)
 
     return { message: { ...inserted, sent_by_name: senderName } }
@@ -143,7 +137,6 @@ export async function sendContractWhatsApp(contractId: string, phone: string, me
   }
 }
 
-// Envio de imagem ou documento
 export async function sendContractWhatsAppMedia(
   contractId: string,
   phone: string,
@@ -152,9 +145,7 @@ export async function sendContractWhatsAppMedia(
   filename: string | null
 ): Promise<ActionState> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
   if (!phone) return { error: 'Informe o telefone do destinatário.' }
 
@@ -301,9 +292,7 @@ export async function sendAutomatedWhatsAppTemplateMessage(contractId: string, t
 }
 
 // ------------------------------------------------------------
-// Conversas SEM conta vinculada — número escreveu, ninguém no CRM
-// reconhece esse telefone ainda. Fica visível na Central de
-// Atendimento até alguém vincular a uma conta.
+// CENTRAL DE ATENDIMENTO GLOBAL - ESPELHO EXATO DA OPORTUNIDADE
 // ------------------------------------------------------------
 export type UnlinkedConversation = {
   phone: string
@@ -319,10 +308,9 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
   const { data } = await supabase
     .from('contract_whatsapp_messages')
     .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at')
-    .is('contract_id', null)
-    .is('lead_id', null)
+    // Sem os filtros de is null para buscar globalmente
     .order('created_at', { ascending: false })
-    .limit(200)
+    .limit(800)
 
   const byPhone = new Map<string, UnlinkedConversation>()
   for (const m of data ?? []) {
@@ -341,36 +329,103 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
 
 export async function getUnlinkedMessagesByPhone(phone: string) {
   const supabase = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+  const last10 = cleanPhone.slice(-10)
+
+  // Ignora o filtro 'is null' para buscar globalmente as mensagens pelo final do telefone
   const { data } = await supabase
     .from('contract_whatsapp_messages')
-    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status')
-    .eq('phone', phone)
-    .is('contract_id', null)
+    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, zapi_message_id')
+    .ilike('phone', `%${last10}`)
     .order('created_at', { ascending: false })
   return data ?? []
 }
 
-// Vincula TODO o histórico de um telefone a um contrato de uma vez —
-// de agora em diante, novas mensagens desse número já entram direto
-// vinculadas (porque o contato/telefone passa a ser reconhecido).
+export async function getConversationByPhone(phone: string): Promise<{
+  messages: Awaited<ReturnType<typeof getUnlinkedMessagesByPhone>>
+  leadId: string | null
+  displayName: string | null
+  manualName: string | null
+}> {
+  const supabase = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+  const last10 = cleanPhone.slice(-10)
+
+  // Busca global de todas as mensagens do telefone ignorando se tem contrato ou não
+  const { data } = await supabase
+    .from('contract_whatsapp_messages')
+    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name, zapi_message_id')
+    .ilike('phone', `%${last10}`)
+    .order('created_at', { ascending: true })
+    .limit(500)
+
+  console.log('[getConversationByPhone] phone:', cleanPhone, '| msgs:', data?.length ?? 0)
+
+  const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
+
+  const { data: orgData } = await supabase
+    .from('organization_settings')
+    .select('evo_instance_aliases, evo_instance_name, whatsapp_contact_names')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  const aliases = (orgData as any)?.evo_instance_aliases ?? {}
+  const instanceLabels = new Set<string>([
+    (orgData as any)?.evo_instance_name,
+    ...Object.values(aliases).map((v: any) => typeof v === 'string' ? v : v?.label),
+  ].filter(Boolean).map((s: string) => s.toLowerCase()))
+
+  const contactNames = (orgData as any)?.whatsapp_contact_names ?? {}
+  const manualName = contactNames[cleanPhone]
+    ?? contactNames[last10]
+    ?? contactNames[`55${last10}`]
+    ?? null
+
+  if (manualName) return { messages: data ?? [], leadId, displayName: manualName, manualName }
+
+  function isInstanceName(name: string | null): boolean {
+    if (!name) return false
+    return instanceLabels.has(name.toLowerCase())
+  }
+
+  let displayName = data
+    ?.find((m) => (m as any).direction === 'recebido' && m.unlinked_sender_name && !isInstanceName(m.unlinked_sender_name))
+    ?.unlinked_sender_name ?? null
+
+  if (!displayName) {
+    const candidate = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
+    if (!isInstanceName(candidate)) displayName = candidate
+  }
+
+  if (leadId && !displayName) {
+    const { data: lead } = await supabase.from('leads').select('name').eq('id', leadId).maybeSingle()
+    displayName = lead?.name ?? null
+  }
+
+  return { messages: data ?? [], leadId, displayName, manualName: null }
+}
+// ------------------------------------------------------------
+
 export async function linkUnlinkedWhatsAppConversation(phone: string, contractId: string): Promise<ActionState> {
   const supabase = await createClient()
+  
+  const cleanPhone = phone.replace(/\D/g, '')
+  const last10 = cleanPhone.slice(-10)
+
   const { data, error } = await supabase
     .from('contract_whatsapp_messages')
     .update({ contract_id: contractId, unlinked_sender_name: null })
-    .eq('phone', phone)
+    .ilike('phone', `%${last10}`)
     .is('contract_id', null)
     .select('id')
 
   if (error) return { error: error.message }
-  // Se não alterou nenhuma linha, algo está bloqueando silenciosamente
-  // (ex: permissão de banco) — melhor avisar do que fingir que deu certo.
-  if (!data || data.length === 0) return { error: 'Não consegui vincular — nenhuma mensagem foi atualizada. Tente de novo ou avise o suporte.' }
+  if (!data || data.length === 0) return { error: 'Nenhuma mensagem atualizada. O vínculo pode já ter sido feito.' }
 
   await supabase.from('activities').insert({
     contract_id: contractId,
     type: 'system',
-    content: `Conversa de WhatsApp (${phone}) vinculada a esta conta.`,
+    content: `Conversa de WhatsApp vinculada a esta conta.`,
   })
 
   revalidatePath('/whatsapp')
@@ -378,13 +433,9 @@ export async function linkUnlinkedWhatsAppConversation(phone: string, contractId
   return {}
 }
 
-// "Salvar como nota" — pega a conversa (ou um resumo dela) e registra
-// como nota no histórico da conta, igual o recurso do PipeRun.
 export async function saveWhatsAppConversationAsNote(contractId: string, noteText: string): Promise<ActionState> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Usuário não autenticado.' }
 
   const { error } = await supabase.from('activities').insert({
@@ -399,9 +450,6 @@ export async function saveWhatsAppConversationAsNote(contractId: string, noteTex
   return {}
 }
 
-// Resolve o NOME de quem está de verdade na conversa, pelo telefone —
-// em vez de assumir que é o contato principal do contrato (que pode
-// ser outra pessoa da mesma empresa).
 export async function resolveContactNameByPhone(phone: string): Promise<string | null> {
   const supabase = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
@@ -410,8 +458,6 @@ export async function resolveContactNameByPhone(phone: string): Promise<string |
   return data?.name ?? null
 }
 
-// Busca contratos pelo nome do cliente/empresa — usado no picker de
-// "vincular conversa não reconhecida a uma conta".
 export async function searchContractsForLinking(query: string): Promise<{ id: string; label: string }[]> {
   const supabase = createAdminClient()
   const { data } = await supabase
@@ -423,9 +469,6 @@ export async function searchContractsForLinking(query: string): Promise<{ id: st
   return (data ?? []).map((c) => ({ id: c.id, label: c.client_name || c.title }))
 }
 
-// Responder uma conversa AINDA NÃO vinculada — sem isso, o time fica
-// de mãos atadas até alguém formalizar o vínculo, o que não é
-// realista quando a pessoa está esperando resposta na hora.
 export async function sendUnlinkedWhatsAppMessage(phone: string, message: string, instanceName?: string): Promise<ActionState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -435,7 +478,6 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
-  // Busca nome do atendente para assinatura
   const { data: profile } = await supabase.from('profiles').select('full_name, job_title').eq('id', user.id).maybeSingle()
   const senderName = profile?.full_name ?? null
   const jobTitle = (profile as any)?.job_title ?? null
@@ -444,23 +486,32 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     : null
   const signedMessage = signature ? `${signature} ${message}` : message
 
-  // Usa a instância da conversa se disponível, senão usa a padrão
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
 
   try {
     const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message: signedMessage })
 
-    // Desarquiva conversa se estava arquivada
     await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
 
+    // Busca inteligente de contract_id mesmo mandando da Central
+    let contractId: string | null = null
+    const admin = createAdminClient()
+    const last10 = phone.replace(/\D/g, '').slice(-10)
+    const { data: linkData } = await admin.from('contract_whatsapp_messages')
+      .select('contract_id').ilike('phone', `%${last10}`).not('contract_id', 'is', null)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      
+    if (linkData?.contract_id) contractId = linkData.contract_id
+
     await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: null,
+      contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone,
       message: signedMessage,
       status: 'enviado',
       instance_name: targetCreds.instanceName,
+      zapi_message_id: result?.key?.id ?? null
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
@@ -481,7 +532,6 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   return {}
 }
 
-// NOVO: Envio de anexo (Imagem, Vídeo, Áudio, Arquivo) para contatos da Central de Atendimento
 export async function sendUnlinkedWhatsAppMedia(
   phone: string,
   mediaUrl: string,
@@ -500,17 +550,25 @@ export async function sendUnlinkedWhatsAppMedia(
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
 
   try {
-    // Desarquiva conversa para manter na caixa de entrada
     await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
 
-    // Usamos DocumentMessage para a maioria para garantir compatibilidade com arquivos variados
     const isImage = mediaType === 'image'
     const result: any = isImage
       ? await sendEvoImageMessage({ ...targetCreds, phone, imageUrl: mediaUrl })
       : await sendEvoDocumentMessage({ ...targetCreds, phone, documentUrl: mediaUrl, fileName: filename ?? 'arquivo' })
 
+    // Busca inteligente de contract_id mesmo mandando da Central
+    let contractId: string | null = null
+    const admin = createAdminClient()
+    const last10 = phone.replace(/\D/g, '').slice(-10)
+    const { data: linkData } = await admin.from('contract_whatsapp_messages')
+      .select('contract_id').ilike('phone', `%${last10}`).not('contract_id', 'is', null)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      
+    if (linkData?.contract_id) contractId = linkData.contract_id
+
     await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: null,
+      contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone,
@@ -544,11 +602,6 @@ export async function sendUnlinkedWhatsAppMedia(
   return {}
 }
 
-// ------------------------------------------------------------
-// Lembrete pra quem recebeu o link de Captação e não preencheu ainda
-// — chamado pelo cron diário. Manda só UMA vez, 24h depois do
-// primeiro contato, pra não ser inconveniente.
-// ------------------------------------------------------------
 export async function checkAndSendWhatsAppCaptureReminders(): Promise<{ checked: number; sent: number }> {
   const supabase = createAdminClient()
 
@@ -608,106 +661,6 @@ export async function getWhatsAppMessagesByLead(leadId: string) {
   return data ?? []
 }
 
-// Busca uma conversa por telefone, direto — funciona tanto pra "sem
-// vínculo nenhum" quanto "já é um lead" (ambas vivem fora de um
-// contrato). Usado pela Central de Atendimento unificada.
-export async function getConversationByPhone(phone: string): Promise<{
-  messages: Awaited<ReturnType<typeof getUnlinkedMessagesByPhone>>
-  leadId: string | null
-  displayName: string | null
-  manualName: string | null
-}> {
-  const supabase = createAdminClient()
-  const cleanPhone = phone.replace(/\D/g, '')
-  const last10 = cleanPhone.slice(-10)
-
-  // Busca exata primeiro, depois ilike para cobrir variações de DDI
-  let { data } = await supabase
-    .from('contract_whatsapp_messages')
-    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
-    .eq('phone', cleanPhone)
-    .is('contract_id', null)
-    .order('created_at', { ascending: true })
-    .limit(500)
-
-  // Se não encontrou, tenta match parcial (últimos 10 dígitos)
-  if (!data?.length) {
-    const res = await supabase
-      .from('contract_whatsapp_messages')
-      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
-      .ilike('phone', `%${last10}`)
-      .is('contract_id', null)
-      .order('created_at', { ascending: true })
-      .limit(500)
-    data = res.data
-  }
-
-  // Último fallback: sem filtro de contract_id (conversa pode ter sido vinculada)
-  if (!data?.length) {
-    const res = await supabase
-      .from('contract_whatsapp_messages')
-      .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, lead_id, unlinked_sender_name, instance_name')
-      .ilike('phone', `%${last10}`)
-      .order('created_at', { ascending: true })
-      .limit(500)
-    data = res.data
-  }
-
-  console.log('[getConversationByPhone] phone:', cleanPhone, '| msgs:', data?.length ?? 0)
-
-  const leadId = data?.find((m) => m.lead_id)?.lead_id ?? null
-
-  // Busca configs de org numa só query
-  const { data: orgData } = await supabase
-    .from('organization_settings')
-    .select('evo_instance_aliases, evo_instance_name, whatsapp_contact_names')
-    .eq('id', 'default')
-    .maybeSingle()
-
-  const aliases = (orgData as any)?.evo_instance_aliases ?? {}
-  const instanceLabels = new Set<string>([
-    (orgData as any)?.evo_instance_name,
-    ...Object.values(aliases).map((v: any) => typeof v === 'string' ? v : v?.label),
-  ].filter(Boolean).map((s: string) => s.toLowerCase()))
-
-  const contactNames = (orgData as any)?.whatsapp_contact_names ?? {}
-  const manualName = contactNames[cleanPhone]
-    ?? contactNames[last10]
-    ?? contactNames[`55${last10}`]
-    ?? null
-
-  console.log('[getConversationByPhone] manualName:', manualName)
-
-  if (manualName) return { messages: data ?? [], leadId, displayName: manualName, manualName }
-
-  function isInstanceName(name: string | null): boolean {
-    if (!name) return false
-    return instanceLabels.has(name.toLowerCase())
-  }
-
-  // Pega o nome do remetente de mensagens RECEBIDAS
-  let displayName = data
-    ?.find((m) => (m as any).direction === 'recebido' && m.unlinked_sender_name && !isInstanceName(m.unlinked_sender_name))
-    ?.unlinked_sender_name ?? null
-
-  // Fallback para qualquer mensagem com nome, se nenhuma recebida tiver
-  if (!displayName) {
-    const candidate = data?.find((m) => m.unlinked_sender_name)?.unlinked_sender_name ?? null
-    if (!isInstanceName(candidate)) displayName = candidate
-  }
-
-  if (leadId && !displayName) {
-    const { data: lead } = await supabase.from('leads').select('name').eq('id', leadId).maybeSingle()
-    displayName = lead?.name ?? null
-  }
-
-  return { messages: data ?? [], leadId, displayName, manualName: null }
-}
-
-// ------------------------------------------------------------
-// Atribuição de conversa (sem contrato ainda) a um atendente — evita
-// dois respondendo a mesma pessoa ao mesmo tempo.
-// ------------------------------------------------------------
 export type ConversationAssignment = { assigned_to: string; assigned_to_name: string; assigned_at: string }
 
 export async function getWhatsAppAssignments(phones: string[]): Promise<Record<string, ConversationAssignment>> {
@@ -730,7 +683,6 @@ export async function assignWhatsAppConversation(phone: string, userId: string):
   const { error } = await supabase.from('whatsapp_conversation_assignments').upsert({ phone, assigned_to: userId, assigned_at: new Date().toISOString() })
   if (error) return { error: error.message }
 
-  // Notifica o cliente sobre a transferência de forma assíncrona
   ;(async () => {
     try {
       const admin = createAdminClient()
@@ -740,7 +692,6 @@ export async function assignWhatsAppConversation(phone: string, userId: string):
       ])
       const nome = profile?.full_name ?? 'nossa equipe'
       if (org?.evo_server_url && org?.evo_api_key) {
-        // Detecta a instância da última mensagem desse phone
         const { data: lastMsg } = await admin.from('contract_whatsapp_messages')
           .select('instance_name').eq('phone', phone).order('created_at', { ascending: false }).limit(1).maybeSingle()
         const instance = lastMsg?.instance_name ?? org.evo_instance_name
@@ -764,11 +715,6 @@ export async function unassignWhatsAppConversation(phone: string): Promise<Actio
   return {}
 }
 
-// ------------------------------------------------------------
-// Importa conversas que já existiam no WhatsApp ANTES de conectar o
-// CRM — sem isso, o time só via o que chegasse a partir de hoje, e o
-// histórico anterior ficava perdido, só no celular.
-// ------------------------------------------------------------
 export async function importExistingWhatsAppChats(): Promise<ActionState & { imported?: number; skipped?: number }> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem importar.' }
 
@@ -779,8 +725,6 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
 
   let chats: Array<{ phone: string; isGroup: boolean; name?: string }> = []
   try {
-    // Evolution API não tem endpoint de "listar chats" como Z-API.
-    // Buscamos os números únicos já recebidos via webhook no banco.
     const { data: msgs } = await supabase
       .from('contract_whatsapp_messages')
       .select('phone')
@@ -801,8 +745,6 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
       continue
     }
 
-    // Já existe alguma mensagem (de qualquer tipo) pra esse telefone?
-    // Não duplica.
     const cleanPhone = chat.phone.replace(/\D/g, '')
     const { count } = await supabase
       .from('contract_whatsapp_messages')
@@ -814,8 +756,6 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
       continue
     }
 
-    // Vê se já bate com algum contato/contrato existente (mesma
-    // lógica do webhook) — senão, entra como "não vinculada".
     const { data: matchingContacts } = await supabase.from('contacts').select('id, company_id').ilike('phone', `%${cleanPhone.slice(-8)}%`)
     let contractId: string | null = null
     if (matchingContacts && matchingContacts.length > 0) {
@@ -839,9 +779,6 @@ export async function importExistingWhatsAppChats(): Promise<ActionState & { imp
   return { imported, skipped }
 }
 
-// ------------------------------------------------------------
-// Configuração do "bot" — mensagens editáveis e status online/offline.
-// ------------------------------------------------------------
 export async function updateWhatsAppBotSettings(formData: FormData): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem configurar isso.' }
 
@@ -869,8 +806,6 @@ export async function updateWhatsAppBotSettings(formData: FormData): Promise<Act
   return {}
 }
 
-// Toggle rápido de "estamos online" — separado da action geral pra
-// poder ficar num botão de um clique só, sem precisar salvar o resto.
 export async function toggleWhatsAppOnlineStatus(isOnline: boolean): Promise<ActionState> {
   if (!(await isCurrentUserAdmin())) return { error: 'Só administradores podem alterar isso.' }
   const supabase = await createClient()
@@ -881,7 +816,6 @@ export async function toggleWhatsAppOnlineStatus(isOnline: boolean): Promise<Act
   return {}
 }
 
-// ---- Arquivamento de conversas ----
 export async function archiveWhatsAppConversation(phone: string, instanceName?: string | null): Promise<ActionState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -889,7 +823,6 @@ export async function archiveWhatsAppConversation(phone: string, instanceName?: 
 
   const inst = instanceName ?? ''
 
-  // Tenta update primeiro; se não existir, insere
   const { error: updateErr } = await supabase
     .from('whatsapp_conversation_status')
     .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: user.id, updated_at: new Date().toISOString() })
@@ -897,14 +830,12 @@ export async function archiveWhatsAppConversation(phone: string, instanceName?: 
     .eq('instance_name', inst)
 
   if (updateErr) {
-    // Não existia — insere
     await supabase.from('whatsapp_conversation_status').insert({
       phone, instance_name: inst,
       is_archived: true, archived_at: new Date().toISOString(), archived_by: user.id,
     })
   }
 
-  // Envia mensagem de encerramento pelo mesmo número da conversa
   const creds = await getEvoCredentials()
   if (creds) {
     const targetCreds = instanceName ? { ...creds, instanceName } : creds
@@ -917,7 +848,7 @@ export async function archiveWhatsAppConversation(phone: string, instanceName?: 
         ?? '*Atendimento finalizado.* Se precisar de mais alguma coisa, basta enviar uma nova mensagem por aqui! 😊'
 
       await sendEvoTextMessage({ ...targetCreds, phone, message: closingMsg })
-    } catch { /* ignora falha no envio da mensagem de encerramento */ }
+    } catch { }
   }
 
   revalidatePath('/whatsapp')
@@ -935,18 +866,13 @@ export async function unarchiveWhatsAppConversation(phone: string, instanceName?
     .eq('instance_name', inst)
 
   if (error) {
-    // Não existia — insere
     await admin.from('whatsapp_conversation_status').insert({
       phone, instance_name: inst, is_archived: false,
     })
   }
 }
 
-// ---- Salvar nome manual de contato não vinculado ----
-export async function saveUnlinkedContactName(
-  phone: string,
-  name: string
-): Promise<{ error?: string }> {
+export async function saveUnlinkedContactName(phone: string, name: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado.' }
@@ -963,7 +889,6 @@ export async function saveUnlinkedContactName(
     .maybeSingle()
 
   const existing = (org as any)?.whatsapp_contact_names ?? {}
-  // Salva em múltiplos formatos para garantir que a busca encontre
   existing[cleanPhone] = trimmed
   existing[last10] = trimmed
   if (!cleanPhone.startsWith('55') && cleanPhone.length >= 10) {
@@ -978,7 +903,7 @@ export async function saveUnlinkedContactName(
   return {}
 }
 
-// ---- Excluir mensagem ----
+// ---- Excluir mensagem CORRIGIDA: Usa chave PK (id) para apagar, e messageId na API ----
 export async function deleteWhatsAppMessage(
   messageId: string,
   phone: string,
@@ -989,9 +914,10 @@ export async function deleteWhatsAppMessage(
   if (!user) return { error: 'Não autenticado.' }
 
   const admin = createAdminClient()
+  
+  // Exclusão SEGURA usando o Primary Key (id)
   await admin.from('contract_whatsapp_messages').delete().eq('id', messageId)
 
-  // Tenta apagar na Evolution API também
   if (zApiMessageId) {
     try {
       const { data: org } = await admin
@@ -1001,7 +927,6 @@ export async function deleteWhatsAppMessage(
 
       if (org?.evo_server_url) {
         const cleanPhone = phone.replace(/\D/g, '')
-        // Evolution v2: aceita `messageId` (não `id`) e `keys` (array)
         const res = await fetch(`${org.evo_server_url}/chat/deleteMessage/${org.evo_instance_name}`, {
           method: 'DELETE',
           headers: { apikey: org.evo_api_key, 'Content-Type': 'application/json' },
@@ -1022,7 +947,6 @@ export async function deleteWhatsAppMessage(
   return {}
 }
 
-// ---- Excluir conversa inteira ----
 export async function deleteWhatsAppConversation(phone: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -1030,10 +954,11 @@ export async function deleteWhatsAppConversation(phone: string): Promise<{ error
 
   const admin = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
+  const last10 = cleanPhone.slice(-10)
 
   await Promise.all([
-    admin.from('contract_whatsapp_messages').delete().ilike('phone', `%${cleanPhone.slice(-10)}`),
-    admin.from('whatsapp_conversation_status').delete().ilike('phone', `%${cleanPhone.slice(-10)}`),
+    admin.from('contract_whatsapp_messages').delete().ilike('phone', `%${last10}`),
+    admin.from('whatsapp_conversation_status').delete().ilike('phone', `%${last10}`),
   ])
 
   revalidatePath('/whatsapp')
