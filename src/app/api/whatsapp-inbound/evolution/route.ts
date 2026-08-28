@@ -22,23 +22,32 @@ export async function POST(request: Request) {
     const instanceName = body?.instance ?? body?.instanceName ?? null
     console.log('[evo-webhook] event:', event, '| instance:', instanceName)
 
-    if (!['messages_upsert', 'messages_delete'].includes(event)) {
+    if (!['messages_upsert', 'messages_delete', 'messages.delete'].includes(event)) {
       return NextResponse.json({ ok: true, skipped: `event=${eventRaw}` })
     }
 
     // Trata exclusão de mensagem (usuário apagou no celular)
-    if (event === 'messages_delete') {
+    if (event === 'messages_delete' || event === 'messages.delete') {
       try {
         const admin = createAdminClient()
-        const keys: any[] = body?.data?.keys ?? body?.keys ?? (body?.data?.id ? [{ id: body.data.id }] : [])
+        // Evolution v2 pode enviar em vários formatos
+        const keys: any[] = body?.data?.keys
+          ?? body?.keys
+          ?? (body?.data?.messageId ? [{ id: body.data.messageId }] : [])
+          ?? (body?.data?.id ? [{ id: body.data.id }] : [])
+          ?? []
+        // Também cobre formato { data: { message: { key: { id } } } }
+        const singleId = body?.data?.message?.key?.id ?? body?.data?.messageId ?? body?.data?.id
+        if (singleId && keys.length === 0) keys.push({ id: singleId })
+
         console.log('[evo-webhook] messages_delete keys:', JSON.stringify(keys))
         for (const k of keys) {
-          const msgId = k?.id ?? k?.messageId
+          const msgId = k?.id ?? k?.messageId ?? k?.key?.id
           if (!msgId) continue
-          await admin.from('contract_whatsapp_messages')
+          const { error } = await admin.from('contract_whatsapp_messages')
             .delete()
             .eq('zapi_message_id', msgId)
-          console.log('[evo-webhook] mensagem deletada do Supabase:', msgId)
+          console.log('[evo-webhook] deletado:', msgId, error ? 'ERRO:' + error.message : 'ok')
         }
       } catch (e) { console.error('[evo-webhook] erro ao processar delete:', e) }
       return NextResponse.json({ ok: true })
