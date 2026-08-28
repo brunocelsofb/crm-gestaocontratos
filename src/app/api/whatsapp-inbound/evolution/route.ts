@@ -30,15 +30,14 @@ export async function POST(request: Request) {
     if (event === 'messages_delete' || event === 'messages.delete') {
       try {
         const admin = createAdminClient()
-        // Evolution v2 pode enviar em vários formatos
-        const keys: any[] = body?.data?.keys
-          ?? body?.keys
-          ?? (body?.data?.messageId ? [{ id: body.data.messageId }] : [])
-          ?? (body?.data?.id ? [{ id: body.data.id }] : [])
-          ?? []
-        // Também cobre formato { data: { message: { key: { id } } } }
-        const singleId = body?.data?.message?.key?.id ?? body?.data?.messageId ?? body?.data?.id
-        if (singleId && keys.length === 0) keys.push({ id: singleId })
+        let keys: any[] = []
+        if (body?.data?.keys) keys = body.data.keys
+        else if (body?.keys) keys = body.keys
+        else if (body?.data?.messageId) keys = [{ id: body.data.messageId }]
+        else if (body?.data?.id) keys = [{ id: body.data.id }]
+
+        const singleId = body?.data?.message?.key?.id
+        if (singleId && keys.length === 0) keys = [{ id: singleId }]
 
         console.log('[evo-webhook] messages_delete keys:', JSON.stringify(keys))
         for (const k of keys) {
