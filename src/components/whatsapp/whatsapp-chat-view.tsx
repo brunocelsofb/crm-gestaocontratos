@@ -68,6 +68,33 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   )
 }
 
+// Novo componente exclusivo para o Avatar (Garante que a letra vai aparecer se a foto falhar)
+function MessageAvatar({ isSent, m, senderName }: { isSent: boolean, m: ChatMessage, senderName: string | null }) {
+  const [imgError, setImgError] = useState(false)
+
+  const fallbackText = isSent
+    ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
+    : (senderName?.charAt(0).toUpperCase() ?? 'U')
+
+  return (
+    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm
+      ${isSent ? 'bg-[#1B556B] text-white' : 'bg-blue-100 text-blue-700'}`}
+      title={senderName ?? 'Usuário'}>
+      
+      {!isSent && m.sender_photo_url && m.sender_photo_url.startsWith('http') && !imgError ? (
+        <img 
+          src={m.sender_photo_url} 
+          alt={fallbackText} 
+          className="h-full w-full rounded-full object-cover" 
+          onError={() => setImgError(true)} 
+        />
+      ) : (
+        <span>{fallbackText}</span>
+      )}
+    </div>
+  )
+}
+
 export function WhatsAppChatView({ messages, contactName, contactPhone }: {
   messages: ChatMessage[]; contactName?: string | null; contactPhone?: string | null
 }) {
@@ -111,29 +138,8 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
                 
-                {/* Avatar (Definitivo com auto-ocultar de imagem quebrada) */}
-                <div className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm overflow-hidden
-                  ${isSent ? 'bg-[#1B556B] text-white' : 'bg-blue-100 text-blue-700'}`}
-                  title={senderName ?? 'Usuário'}>
-                  
-                  {/* Letra no fundo */}
-                  <span className="absolute inset-0 flex items-center justify-center z-0">
-                    {isSent
-                      ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
-                      : (senderName?.charAt(0).toUpperCase() ?? 'U')
-                    }
-                  </span>
-
-                  {/* Foto carrega por cima. Se der erro ao carregar, ela esconde e revela a letra! */}
-                  {!isSent && m.sender_photo_url && m.sender_photo_url.startsWith('http') && (
-                    <img 
-                      src={m.sender_photo_url} 
-                      alt="" 
-                      className="absolute inset-0 h-full w-full object-cover z-10" 
-                      onError={(e) => { e.currentTarget.style.display = 'none' }}
-                    />
-                  )}
-                </div>
+                {/* Chamando o novo Avatar */}
+                <MessageAvatar isSent={isSent} m={m} senderName={senderName} />
 
                 {/* Balão */}
                 <div className={`relative max-w-[72%] rounded-lg px-3 pt-1.5 pb-2 text-sm shadow-sm
