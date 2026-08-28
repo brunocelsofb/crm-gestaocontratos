@@ -22,8 +22,26 @@ export async function POST(request: Request) {
     const instanceName = body?.instance ?? body?.instanceName ?? null
     console.log('[evo-webhook] event:', event, '| instance:', instanceName)
 
-    if (!['messages_upsert'].includes(event)) {
+    if (!['messages_upsert', 'messages_delete'].includes(event)) {
       return NextResponse.json({ ok: true, skipped: `event=${eventRaw}` })
+    }
+
+    // Trata exclusão de mensagem (usuário apagou no celular)
+    if (event === 'messages_delete') {
+      try {
+        const admin = createAdminClient()
+        const keys: any[] = body?.data?.keys ?? body?.keys ?? (body?.data?.id ? [{ id: body.data.id }] : [])
+        console.log('[evo-webhook] messages_delete keys:', JSON.stringify(keys))
+        for (const k of keys) {
+          const msgId = k?.id ?? k?.messageId
+          if (!msgId) continue
+          await admin.from('contract_whatsapp_messages')
+            .delete()
+            .eq('zapi_message_id', msgId)
+          console.log('[evo-webhook] mensagem deletada do Supabase:', msgId)
+        }
+      } catch (e) { console.error('[evo-webhook] erro ao processar delete:', e) }
+      return NextResponse.json({ ok: true })
     }
 
     // Extrai dados

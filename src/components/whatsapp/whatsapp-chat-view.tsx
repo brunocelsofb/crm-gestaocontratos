@@ -111,20 +111,18 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
                 {/* Avatar */}
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
-                  ${isSent ? 'bg-[#1B556B]' : 'bg-gray-400'}`}
-                  title={senderName ?? ''}>
-                  {isSent
-                    ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
-                    : (m.sender_photo_url
-                      ? undefined
-                      : (senderName?.charAt(0).toUpperCase() ?? '?')
-                    )
-                  }
-                  {!isSent && m.sender_photo_url && (
-                    <img src={m.sender_photo_url} alt="" className="h-7 w-7 rounded-full object-cover" />
-                  )}
-                </div>
+                {!isSent && m.sender_photo_url ? (
+                  <img src={m.sender_photo_url} alt={senderName ?? ''} title={senderName ?? ''}
+                    className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
+                    ${isSent ? 'bg-[#1B556B]' : 'bg-gray-500'}`}
+                    title={senderName ?? ''}>
+                    {isSent
+                      ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
+                      : (senderName?.charAt(0).toUpperCase() ?? '?')}
+                  </div>
+                )}
 
                 {/* Balão */}
                 <div className={`relative max-w-[72%] rounded-lg px-3 pt-1.5 pb-2 text-sm shadow-sm

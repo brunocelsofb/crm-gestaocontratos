@@ -938,11 +938,19 @@ export async function deleteWhatsAppMessage(
 
       if (org?.evo_server_url) {
         const cleanPhone = phone.replace(/\D/g, '')
-        await fetch(`${org.evo_server_url}/chat/deleteMessage/${org.evo_instance_name}`, {
+        // Evolution v2: aceita `messageId` (não `id`) e `keys` (array)
+        const res = await fetch(`${org.evo_server_url}/chat/deleteMessage/${org.evo_instance_name}`, {
           method: 'DELETE',
           headers: { apikey: org.evo_api_key, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ remoteJid: `${cleanPhone}@s.whatsapp.net`, id: zApiMessageId, fromMe: true }),
+          body: JSON.stringify({
+            remoteJid: `${cleanPhone}@s.whatsapp.net`,
+            messageId: zApiMessageId,   // v2
+            id: zApiMessageId,          // v1 fallback
+            fromMe: true,
+          }),
         })
+        const resText = await res.text().catch(() => '')
+        console.log('[deleteMessage] Evolution status:', res.status, resText.slice(0, 100))
       }
     } catch (e) { console.warn('[deleteMessage] Evolution API:', e) }
   }

@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url)
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://crm-gestaocontratos-pi.vercel.app'}/api/whatsapp-inbound/evolution`
-  const webhookBody = JSON.stringify({ webhook: { enabled: true, url: webhookUrl, webhookByEvents: true, webhookBase64: false, events: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] } })
+  const webhookBody = JSON.stringify({ webhook: { enabled: true, url: webhookUrl, webhookByEvents: true, webhookBase64: false, events: ['MESSAGES_UPSERT', 'MESSAGES_DELETE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] } })
 
   const res = await fetch(`${creds.evo_server_url}/instance/fetchInstances`, {
     headers: { apikey: creds.evo_api_key },
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   await fetch(`${creds.evo_server_url}/webhook/set/${instanceName}`, {
     method: 'POST',
     headers: { apikey: creds.evo_api_key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ webhook: { enabled: true, url: webhookUrl, webhookByEvents: true, webhookBase64: false, events: ['MESSAGES_UPSERT', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] } }),
+    body: JSON.stringify({ webhook: { enabled: true, url: webhookUrl, webhookByEvents: true, webhookBase64: false, events: ['MESSAGES_UPSERT', 'MESSAGES_DELETE', 'SEND_MESSAGE', 'CONNECTION_UPDATE'] } }),
   })
 
   return NextResponse.json({ ok: res.ok, data })

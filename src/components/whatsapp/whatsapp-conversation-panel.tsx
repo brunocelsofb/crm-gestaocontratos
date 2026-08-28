@@ -107,6 +107,8 @@ export function WhatsAppConversationPanel({
   const [replyText, setReplyText] = useState('')
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState<string>(instanceName ?? '')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
 
   // Sincroniza props com estado local
   useEffect(() => { setIsArchived(initialIsArchived ?? false) }, [initialIsArchived])
