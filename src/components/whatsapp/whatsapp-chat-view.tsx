@@ -19,6 +19,7 @@ type ChatMessage = {
   created_at: string
   sent_by_name?: string | null
   is_forwarded?: boolean | null
+  zapi_message_id?: string | null
 }
 
 const DELIVERY_TICK: Record<string, string> = { sent: '✓', delivered: '✓✓', read: '✓✓' }
@@ -72,8 +73,6 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
     return <video controls src={mediaUrl} className="max-w-[240px] rounded-md" />
   }
   
-  // Para PDFs e outros arquivos
-  // Removi o comando de "download" para que o navegador tente ABRIR o arquivo na aba.
   return (
     <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
       className="flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-sm hover:bg-black/10 transition-colors">
@@ -85,11 +84,9 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   )
 }
 
-// Avatar blindado contra strings vazias do banco de dados
 function MessageAvatar({ isSent, m, senderName }: { isSent: boolean, m: ChatMessage, senderName: string | null | undefined }) {
   const [imgError, setImgError] = useState(false)
 
-  // O uso do || garante que se for "" (vazio), ele assume 'Usuário' ou '📱'
   const safeSenderName = senderName?.trim() || 'Usuário'
   const safeSentByName = m.sent_by_name?.trim() || '📱'
 
@@ -116,15 +113,16 @@ function MessageAvatar({ isSent, m, senderName }: { isSent: boolean, m: ChatMess
   )
 }
 
-export function WhatsAppChatView({ messages, contactName, contactPhone }: {
-  messages: ChatMessage[]; contactName?: string | null; contactPhone?: string | null
+export function WhatsAppChatView({ 
+  messages, contactName, contactPhone, selectable = false, selectedIds = new Set(), onToggleSelect 
+}: {
+  messages: ChatMessage[]; contactName?: string | null; contactPhone?: string | null;
+  selectable?: boolean; selectedIds?: Set<string>; onToggleSelect?: (id: string) => void;
 }) {
-  // Ordem cronológica: mais antiga → mais nova (de cima para baixo)
   const chronological = [...messages].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )
 
-  // Agrupa por dia para inserir divisores
   const groups: { label: string; msgs: ChatMessage[] }[] = []
   for (const m of chronological) {
     const label = dayLabel(m.created_at)
@@ -143,7 +141,6 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
 
       {groups.map((group) => (
         <div key={group.label}>
-          {/* Divisor de data */}
           <div className="flex items-center justify-center my-3">
             <span className="rounded-full bg-[#e1f3fb] px-3 py-0.5 text-[11px] font-medium text-[#54656f] shadow-sm">
               {group.label}
@@ -159,31 +156,39 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
                 
-                {/* Chamando o novo Avatar Blindado */}
+                {/* Caixinha de Seleção para as Notas */}
+                {selectable && (
+                  <div className="flex items-center pb-1">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedIds.has(m.id)}
+                      onChange={() => onToggleSelect?.(m.id)}
+                      className={`w-4 h-4 cursor-pointer rounded border-gray-300 ${isSent ? 'mr-1' : 'ml-1'}`}
+                    />
+                  </div>
+                )}
+
                 <MessageAvatar isSent={isSent} m={m} senderName={senderName} />
 
-                {/* Balão */}
                 <div className={`relative max-w-[72%] rounded-lg px-3 pt-1.5 pb-2 text-sm shadow-sm
                   ${isSent ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'} text-gray-900`}>
 
-                  {/* Botão deletar */}
                   <button
                     onClick={async () => {
                       if (!confirm('Excluir esta mensagem?')) return
-                      await deleteWhatsAppMessage(m.id, (m as any).phone ?? contactPhone ?? '')
+                      // Agora passa o ZAPI_MESSAGE_ID para o backend conseguir apagar no celular!
+                      await deleteWhatsAppMessage(m.id, (m as any).phone ?? contactPhone ?? '', m.zapi_message_id)
                     }}
                     className={`absolute opacity-0 group-hover:opacity-100 transition-opacity -top-2 text-[10px] text-red-400
-                      hover:text-red-600 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow
+                      hover:text-red-600 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow z-10
                       ${isSent ? '-left-2' : '-right-2'}`}>
                     🗑
                   </button>
 
-                  {/* Encaminhada */}
                   {m.is_forwarded && (
                     <p className="text-[10px] text-gray-400 italic mb-0.5">↪ Encaminhada</p>
                   )}
 
-                  {/* Nome do remetente (estilo grupo WhatsApp) */}
                   {senderName && (
                     <p className={`text-[11px] font-semibold mb-0.5
                       ${isSent ? 'text-[#1B556B]' : 'text-[#e67e22]'}`}>
@@ -191,11 +196,9 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
                     </p>
                   )}
 
-                  {/* Conteúdo */}
                   {m.media_url && m.media_type ? (
                     <>
                       <MediaContent mediaUrl={m.media_url} mediaType={m.media_type} mediaFilename={m.media_filename} />
-                      {/* Filtro acionado: só mostra texto extra se não for aquela tag feia de sistema */}
                       {m.message && !isSystemCaption(m.message) && (
                         <p className="mt-1 whitespace-pre-wrap">{m.message}</p>
                       )}
@@ -204,7 +207,6 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
                     <p className="whitespace-pre-wrap leading-snug">{m.message}</p>
                   )}
 
-                  {/* Rodapé: hora + status */}
                   <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-400 select-none">
                     {m.triggered_automatically && <span title="Automação">🤖</span>}
                     <span>{timeLabel(m.created_at)}</span>
