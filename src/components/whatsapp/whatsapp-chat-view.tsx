@@ -68,18 +68,22 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   )
 }
 
-// Novo componente exclusivo para o Avatar (com TypeScript corrigido para aceitar undefined)
+// Avatar blindado contra strings vazias do banco de dados
 function MessageAvatar({ isSent, m, senderName }: { isSent: boolean, m: ChatMessage, senderName: string | null | undefined }) {
   const [imgError, setImgError] = useState(false)
 
+  // O uso do || garante que se for "" (vazio), ele assume 'Usuário' ou '📱'
+  const safeSenderName = senderName?.trim() || 'Usuário'
+  const safeSentByName = m.sent_by_name?.trim() || '📱'
+
   const fallbackText = isSent
-    ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
-    : (senderName?.charAt(0).toUpperCase() ?? 'U')
+    ? (m.triggered_automatically ? '🤖' : (safeSentByName !== '📱' ? safeSentByName.charAt(0).toUpperCase() : '📱'))
+    : safeSenderName.charAt(0).toUpperCase()
 
   return (
     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm
       ${isSent ? 'bg-[#1B556B] text-white' : 'bg-blue-100 text-blue-700'}`}
-      title={senderName ?? 'Usuário'}>
+      title={safeSenderName}>
       
       {!isSent && m.sender_photo_url && m.sender_photo_url.startsWith('http') && !imgError ? (
         <img 
@@ -138,7 +142,7 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
                 
-                {/* Chamando o novo Avatar */}
+                {/* Chamando o novo Avatar Blindado */}
                 <MessageAvatar isSent={isSent} m={m} senderName={senderName} />
 
                 {/* Balão */}
