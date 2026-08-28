@@ -146,7 +146,7 @@ export async function sendContractWhatsApp(
   }
 }
 
-// Envio de Mídia pela Oportunidade (Imagem, Documento, Áudio, Vídeo) com atualização na Central
+// Envio de Mídia pela Oportunidade CORRIGIDO (Garante inserção no banco com contract_id e revalida ambas as rotas)
 export async function sendContractWhatsAppMedia(
   contractId: string,
   phone: string,
@@ -162,8 +162,10 @@ export async function sendContractWhatsAppMedia(
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
+  const admin = createAdminClient()
   const rawPhone = phone.replace(/\D/g, '')
   const normalizedPhone = rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone
+  const friendlyText = mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`
 
   try {
     const result: any =
@@ -171,9 +173,7 @@ export async function sendContractWhatsAppMedia(
         ? await sendEvoImageMessage({ ...creds, phone: normalizedPhone, imageUrl: mediaUrl })
         : await sendEvoDocumentMessage({ ...creds, phone: normalizedPhone, documentUrl: mediaUrl, fileName: filename ?? 'documento' })
 
-    const friendlyText = mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`
-
-    await supabase.from('contract_whatsapp_messages').insert({
+    const { error: insertErr } = await admin.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
@@ -184,9 +184,14 @@ export async function sendContractWhatsAppMedia(
       media_filename: filename,
       zapi_message_id: result?.key?.id ?? null,
       status: 'enviado',
+      instance_name: creds.instanceName,
     })
 
-    await supabase.from('activities').insert({
+    if (insertErr) {
+      console.error('[sendContractWhatsAppMedia] Erro no banco:', insertErr.message)
+    }
+
+    await admin.from('activities').insert({
       contract_id: contractId,
       user_id: user.id,
       type: 'whatsapp',
@@ -195,22 +200,22 @@ export async function sendContractWhatsAppMedia(
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
-    await supabase.from('contract_whatsapp_messages').insert({
+    await admin.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone: normalizedPhone,
-      message: mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`,
+      message: friendlyText,
       media_url: mediaUrl,
       media_type: mediaType,
       media_filename: filename,
       status: 'falhou',
       error_message: errorMsg,
+      instance_name: creds.instanceName,
     })
     return { error: errorMsg }
   }
 
-  // Revalida ambas as rotas para refletir as mídias na Central e na Oportunidade simultaneamente
   revalidatePath('/whatsapp')
   revalidatePath(`/contracts/${contractId}`)
   return {}
