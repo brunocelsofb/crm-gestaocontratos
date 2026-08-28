@@ -37,6 +37,19 @@ function timeLabel(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// Filtro inteligente para ocultar textos "de sistema" como [document] filename.pdf
+function isSystemCaption(msg: string) {
+  const lower = msg.toLowerCase().trim()
+  return lower.startsWith('[imagem]') || 
+         lower.startsWith('[vídeo]') || 
+         lower.startsWith('[video]') || 
+         lower.startsWith('[áudio]') || 
+         lower.startsWith('[audio]') || 
+         lower.startsWith('[documento]') || 
+         lower.startsWith('[document]') || 
+         lower.startsWith('[figurinha]')
+}
+
 function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string; mediaType: string; mediaFilename: string | null }) {
   if (mediaType === 'image') {
     return (
@@ -58,12 +71,16 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   if (mediaType === 'video') {
     return <video controls src={mediaUrl} className="max-w-[240px] rounded-md" />
   }
+  
+  // Para PDFs e outros arquivos
+  // Removi o comando de "download" para que o navegador tente ABRIR o arquivo na aba.
   return (
     <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
-      download={mediaFilename ?? 'documento.pdf'}
-      className="flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-sm hover:bg-black/10">
+      className="flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-sm hover:bg-black/10 transition-colors">
       <span className="text-2xl">📎</span>
-      <span className="underline truncate max-w-[180px]">{mediaFilename ?? 'Arquivo'}</span>
+      <span className="underline truncate max-w-[180px]" title={mediaFilename ?? 'Arquivo'}>
+        {mediaFilename ?? 'Arquivo'}
+      </span>
     </a>
   )
 }
@@ -178,7 +195,8 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
                   {m.media_url && m.media_type ? (
                     <>
                       <MediaContent mediaUrl={m.media_url} mediaType={m.media_type} mediaFilename={m.media_filename} />
-                      {m.message && !['[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Figurinha]'].includes(m.message) && (
+                      {/* Filtro acionado: só mostra texto extra se não for aquela tag feia de sistema */}
+                      {m.message && !isSystemCaption(m.message) && (
                         <p className="mt-1 whitespace-pre-wrap">{m.message}</p>
                       )}
                     </>
