@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { 
   linkUnlinkedWhatsAppConversation, 
   sendUnlinkedWhatsAppMessage, 
-  sendUnlinkedWhatsAppMedia, // <-- Aqui está a nova função que criamos no backend!
+  sendUnlinkedWhatsAppMedia, 
   assignWhatsAppConversation, 
   unassignWhatsAppConversation, 
   archiveWhatsAppConversation, 
@@ -65,7 +65,6 @@ export function WhatsAppConversationPanel({
   const supabase = createClient()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Ref e State para controle de anexo
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
 
@@ -73,19 +72,6 @@ export function WhatsAppConversationPanel({
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [localMessages, setLocalMessages] = useState<Message[]>(messages)
   const processedIds = useRef(new Set<string>(messages.map(m => m.id)))
-
-  function dedupeAndSet(msgs: Message[]) {
-    const uniqueById = new Map(msgs.map(m => [m.id, m]))
-    const visualSeen = new Set<string>()
-    const final = Array.from(uniqueById.values()).filter(m => {
-      const timeKey = m.created_at ? m.created_at.slice(0, 16) : ''
-      const key = `${m.direction}:${m.message}:${timeKey}`
-      if (visualSeen.has(key)) return false
-      visualSeen.add(key)
-      return true
-    })
-    setLocalMessages(final)
-  }
 
   function addMessageSafe(msg: Message) {
     if (!msg?.id || processedIds.current.has(msg.id)) return
@@ -106,7 +92,6 @@ export function WhatsAppConversationPanel({
   const [nameInput, setNameInput] = useState(displayName ?? '')
   const [localDisplayName, setLocalDisplayName] = useState(displayName)
 
-  // Sincroniza quando dados frescos chegam do servidor
   useEffect(() => {
     setLocalDisplayName(displayName)
     setNameInput(displayName ?? '')
@@ -120,27 +105,21 @@ export function WhatsAppConversationPanel({
   const [replyText, setReplyText] = useState('')
   const [availableInstances, setAvailableInstances] = useState<{ name: string; label: string }[]>([])
   const [selectedInstance, setSelectedInstance] = useState<string>(instanceName ?? '')
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [attachedFile, setAttachedFile] = useState<File | null>(null)
 
-  // Sincroniza props com estado local
   useEffect(() => { setIsArchived(initialIsArchived ?? false) }, [initialIsArchived])
-  // Sincroniza com dados frescos do servidor, preservando mensagens optimistas pendentes
+  
   useEffect(() => {
     setLocalMessages(prev => {
       const pendingOpt = prev.filter(m => m.id.startsWith('opt-'))
       if (pendingOpt.length === 0) return messages
-      // Mantém optimistas que ainda não foram substituídos pelo Realtime
       return [...messages, ...pendingOpt]
     })
   }, [messages])
 
-  // Auto-scroll para mensagem mais recente
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [localMessages])
 
-  // Supabase Realtime — escuta novas mensagens para este telefone
   useEffect(() => {
     const channel = supabase
       .channel(`wpp-${phone}`)
@@ -153,11 +132,18 @@ export function WhatsAppConversationPanel({
         const newMsg = payload.new as Message
         addMessageSafe(newMsg)
       })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'contract_crm',
+        table: 'contract_whatsapp_messages',
+      }, (payload) => {
+        const oldId = payload.old?.id
+        if (oldId) setLocalMessages(prev => prev.filter(m => m.id !== oldId))
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [phone])
+  }, [phone, supabase])
 
-  // Foto de perfil
   useEffect(() => {
     fetch(`/api/whatsapp/profile-pic?phone=${encodeURIComponent(phone)}`)
       .then(r => r.json())
@@ -165,7 +151,6 @@ export function WhatsAppConversationPanel({
       .catch(() => {})
   }, [phone])
 
-  // Instâncias disponíveis
   const loadInstances = useCallback(async () => {
     try {
       const [instRes, aliasRes] = await Promise.all([
@@ -197,7 +182,6 @@ export function WhatsAppConversationPanel({
     router.refresh()
   }
 
-  // Função dedicada para Upload de Arquivo na Central
   async function handleFileUpload() {
     const file = fileInputRef.current?.files?.[0]
     if (!file) return
@@ -205,7 +189,6 @@ export function WhatsAppConversationPanel({
     setBusy(true)
     setError(null)
 
-    // Formata nome do arquivo de forma segura
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
     const storagePath = `whatsapp-media/central/${Date.now()}-${safeName}`
     
@@ -220,7 +203,6 @@ export function WhatsAppConversationPanel({
     const publicUrl = `${window.location.origin}/api/email-assets/${storagePath}`
     const mediaType = file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'document'))
     
-    // Envia usando a função que nós criamos no backend
     const result = await sendUnlinkedWhatsAppMedia(phone, publicUrl, mediaType as any, file.name, selectedInstance || instanceName || undefined)
 
     setBusy(false)
@@ -235,7 +217,6 @@ export function WhatsAppConversationPanel({
   }
 
   async function handleReply() {
-    // Se tiver arquivo selecionado, prioriza o envio do anexo
     if (fileInputRef.current?.files?.[0]) {
       await handleFileUpload()
       return
@@ -243,7 +224,6 @@ export function WhatsAppConversationPanel({
 
     if (!replyText.trim()) return
     
-    // Optimistic update — adiciona imediatamente na tela
     const optimistic: Message = {
       id: `opt-${Date.now()}`,
       phone, message: replyText, direction: 'enviado',
@@ -255,7 +235,6 @@ export function WhatsAppConversationPanel({
     setLocalMessages(prev => [...prev, optimistic])
     setReplyText('')
     
-    // Reset auto-resize
     const ta = document.querySelector('textarea[placeholder="Responder..."]') as HTMLTextAreaElement | null
     if (ta) ta.style.height = '34px'
     
@@ -310,7 +289,6 @@ export function WhatsAppConversationPanel({
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-shrink-0 rounded-lg border border-gray-200 bg-white p-3 space-y-2">
-        {/* Avatar + nome + badges */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {profilePicUrl ? (
@@ -417,7 +395,6 @@ export function WhatsAppConversationPanel({
             )}
           </div>
         </div>
-        {/* Botões de ação */}
           <div className="flex flex-wrap gap-2">
             {isArchived ? (
               <button
@@ -605,7 +582,6 @@ export function WhatsAppConversationPanel({
       ) : (
         <div className="flex-shrink-0 space-y-2 rounded-lg border border-gray-200 bg-white p-3">
           
-          {/* Seletor de Instância */}
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs text-gray-500 whitespace-nowrap">Responder via:</span>
             <select
@@ -622,10 +598,8 @@ export function WhatsAppConversationPanel({
             </select>
           </div>
 
-          {/* NOVA BARRA DE MENSAGEM (Agora com o Botão de Anexo Completo!) */}
           <div className="flex items-end gap-2 bg-white rounded-md border border-gray-300 p-1 focus-within:border-[#1B556B]">
             
-            {/* Botão de Anexo (Clipe) */}
             <label className={`cursor-pointer p-2 rounded-full transition-colors self-end mb-[2px]
               ${selectedFileName ? 'text-[#1B556B] bg-[#1B556B]/10' : 'text-gray-500 hover:bg-gray-100'}`} 
               title="Anexar arquivo">
@@ -644,9 +618,7 @@ export function WhatsAppConversationPanel({
               />
             </label>
 
-            {/* Caixa de Texto */}
             <div className="flex-1 min-w-0 flex flex-col">
-              {/* Mostrador do arquivo selecionado */}
               {selectedFileName && (
                 <div className="flex items-center justify-between bg-[#1B556B]/10 text-[#1B556B] text-xs px-2 py-1 rounded mb-1 mr-2 mt-1">
                   <span className="truncate flex-1">📎 {selectedFileName}</span>
@@ -678,7 +650,6 @@ export function WhatsAppConversationPanel({
               />
             </div>
 
-            {/* Botão de Enviar Integrado */}
             <button 
               onClick={handleReply} 
               disabled={busy || (!replyText.trim() && !selectedFileName)} 
