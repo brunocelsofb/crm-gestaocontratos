@@ -68,8 +68,8 @@ function MediaContent({ mediaUrl, mediaType, mediaFilename }: { mediaUrl: string
   )
 }
 
-// Novo componente exclusivo para o Avatar (Garante que a letra vai aparecer se a foto falhar)
-function MessageAvatar({ isSent, m, senderName }: { isSent: boolean, m: ChatMessage, senderName: string | null }) {
+// Novo componente exclusivo para o Avatar (com TypeScript corrigido para aceitar undefined)
+function MessageAvatar({ isSent, m, senderName }: { isSent: boolean, m: ChatMessage, senderName: string | null | undefined }) {
   const [imgError, setImgError] = useState(false)
 
   const fallbackText = isSent
