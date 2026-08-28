@@ -38,7 +38,6 @@ function timeLabel(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-// Filtro inteligente para ocultar textos "de sistema" como [document] filename.pdf
 function isSystemCaption(msg: string) {
   const lower = msg.toLowerCase().trim()
   return lower.startsWith('[imagem]') || 
@@ -155,23 +154,7 @@ export function WhatsAppChatView({
 
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
-<<<<<<< HEAD
-                {/* Avatar */}
-                {!isSent && m.sender_photo_url ? (
-                  <img src={m.sender_photo_url} alt={senderName ?? ''} title={senderName ?? ''}
-                    className="h-7 w-7 shrink-0 rounded-full object-cover" />
-                ) : (
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
-                    ${isSent ? 'bg-[#1B556B]' : 'bg-gray-500'}`}
-                    title={senderName ?? ''}>
-                    {isSent
-                      ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
-                      : (senderName?.charAt(0).toUpperCase() ?? '?')}
-                  </div>
-                )}
-=======
                 
-                {/* Caixinha de Seleção para as Notas */}
                 {selectable && (
                   <div className="flex items-center pb-1">
                     <input 
@@ -184,7 +167,6 @@ export function WhatsAppChatView({
                 )}
 
                 <MessageAvatar isSent={isSent} m={m} senderName={senderName} />
->>>>>>> a9f165ba36187c14301b4a07a3906d06b0c9738b
 
                 <div className={`relative max-w-[72%] rounded-lg px-3 pt-1.5 pb-2 text-sm shadow-sm
                   ${isSent ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'} text-gray-900`}>
@@ -192,7 +174,6 @@ export function WhatsAppChatView({
                   <button
                     onClick={async () => {
                       if (!confirm('Excluir esta mensagem?')) return
-                      // Agora passa o ZAPI_MESSAGE_ID para o backend conseguir apagar no celular!
                       await deleteWhatsAppMessage(m.id, (m as any).phone ?? contactPhone ?? '', m.zapi_message_id)
                     }}
                     className={`absolute opacity-0 group-hover:opacity-100 transition-opacity -top-2 text-[10px] text-red-400
