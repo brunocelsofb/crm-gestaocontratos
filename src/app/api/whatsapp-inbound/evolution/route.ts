@@ -264,8 +264,27 @@ export async function POST(request: Request) {
       contactId = contact.id
       contractId = (contact as any)?.contract_contacts?.[0]?.contract_id ?? null
       console.log('[evo-webhook] contato encontrado:', contactId, '| contrato:', contractId)
-    } else {
-      console.log('[evo-webhook] contato não encontrado para:', phone)
+    }
+
+    // Fallback: busca contract_id em mensagens anteriores do mesmo phone (últimos 8 dígitos)
+    if (!contractId) {
+      const last8 = phone.slice(-8)
+      const { data: linkData } = await supabase
+        .from('contract_whatsapp_messages')
+        .select('contract_id, lead_id')
+        .ilike('phone', `%${last8}`)
+        .not('contract_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (linkData?.contract_id) {
+        contractId = linkData.contract_id
+        console.log('[evo-webhook] contract_id via histórico:', contractId)
+      }
+    }
+
+    if (!contractId) {
+      console.log('[evo-webhook] contato/contrato não encontrado para:', phone)
     }
 
     // Salva mensagem
