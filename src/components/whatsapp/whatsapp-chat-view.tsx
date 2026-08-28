@@ -111,22 +111,27 @@ export function WhatsAppChatView({ messages, contactName, contactPhone }: {
             return (
               <div key={m.id} className={`group flex items-end gap-1 mb-1 ${isSent ? 'flex-row-reverse' : ''}`}>
                 
-                {/* Avatar (À prova de falhas) */}
+                {/* Avatar (Definitivo com auto-ocultar de imagem quebrada) */}
                 <div className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm overflow-hidden
                   ${isSent ? 'bg-[#1B556B] text-white' : 'bg-blue-100 text-blue-700'}`}
                   title={senderName ?? 'Usuário'}>
                   
-                  {/* Letra sempre visível no fundo */}
-                  <span>
+                  {/* Letra no fundo */}
+                  <span className="absolute inset-0 flex items-center justify-center z-0">
                     {isSent
                       ? (m.triggered_automatically ? '🤖' : (m.sent_by_name?.charAt(0).toUpperCase() ?? '📱'))
                       : (senderName?.charAt(0).toUpperCase() ?? 'U')
                     }
                   </span>
 
-                  {/* Foto carrega por cima se for válida e tiver URL correta */}
-                  {!isSent && m.sender_photo_url && m.sender_photo_url.length > 5 && (
-                    <img src={m.sender_photo_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  {/* Foto carrega por cima. Se der erro ao carregar, ela esconde e revela a letra! */}
+                  {!isSent && m.sender_photo_url && m.sender_photo_url.startsWith('http') && (
+                    <img 
+                      src={m.sender_photo_url} 
+                      alt="" 
+                      className="absolute inset-0 h-full w-full object-cover z-10" 
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
                   )}
                 </div>
 
