@@ -4,7 +4,16 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { linkUnlinkedWhatsAppConversation, sendUnlinkedWhatsAppMessage, assignWhatsAppConversation, unassignWhatsAppConversation, archiveWhatsAppConversation, saveUnlinkedContactName, deleteWhatsAppConversation } from '@/lib/actions/whatsapp'
+import { 
+  linkUnlinkedWhatsAppConversation, 
+  sendUnlinkedWhatsAppMessage, 
+  sendUnlinkedWhatsAppMedia, // <-- Aqui está a nova função que criamos no backend!
+  assignWhatsAppConversation, 
+  unassignWhatsAppConversation, 
+  archiveWhatsAppConversation, 
+  saveUnlinkedContactName, 
+  deleteWhatsAppConversation 
+} from '@/lib/actions/whatsapp'
 import { WhatsAppChatView } from '@/components/whatsapp/whatsapp-chat-view'
 import { ConvertLeadModal } from '@/components/whatsapp/convert-lead-modal'
 
@@ -55,6 +64,10 @@ export function WhatsAppConversationPanel({
   const router = useRouter()
   const supabase = createClient()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Ref e State para controle de anexo
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
 
   const [isArchived, setIsArchived] = useState(initialIsArchived ?? false)
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
@@ -184,8 +197,52 @@ export function WhatsAppConversationPanel({
     router.refresh()
   }
 
+  // Função dedicada para Upload de Arquivo na Central
+  async function handleFileUpload() {
+    const file = fileInputRef.current?.files?.[0]
+    if (!file) return
+    
+    setBusy(true)
+    setError(null)
+
+    // Formata nome do arquivo de forma segura
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const storagePath = `whatsapp-media/central/${Date.now()}-${safeName}`
+    
+    const { error: uploadError } = await supabase.storage.from('proposal-files').upload(storagePath, file)
+
+    if (uploadError) {
+      setBusy(false)
+      setError(`Falha no upload: ${uploadError.message}`)
+      return
+    }
+
+    const publicUrl = `${window.location.origin}/api/email-assets/${storagePath}`
+    const mediaType = file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'document'))
+    
+    // Envia usando a função que nós criamos no backend
+    const result = await sendUnlinkedWhatsAppMedia(phone, publicUrl, mediaType as any, file.name, selectedInstance || instanceName || undefined)
+
+    setBusy(false)
+    if (result?.error) {
+      setError(result.error)
+    } else {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setSelectedFileName(null)
+      setReplyText('')
+      router.refresh()
+    }
+  }
+
   async function handleReply() {
+    // Se tiver arquivo selecionado, prioriza o envio do anexo
+    if (fileInputRef.current?.files?.[0]) {
+      await handleFileUpload()
+      return
+    }
+
     if (!replyText.trim()) return
+    
     // Optimistic update — adiciona imediatamente na tela
     const optimistic: Message = {
       id: `opt-${Date.now()}`,
@@ -197,12 +254,15 @@ export function WhatsAppConversationPanel({
     }
     setLocalMessages(prev => [...prev, optimistic])
     setReplyText('')
+    
     // Reset auto-resize
     const ta = document.querySelector('textarea[placeholder="Responder..."]') as HTMLTextAreaElement | null
-    if (ta) ta.style.height = '38px'
+    if (ta) ta.style.height = '34px'
+    
     setBusy(true)
     const result = await sendUnlinkedWhatsAppMessage(phone, replyText, selectedInstance || instanceName || undefined)
     setBusy(false)
+    
     if (result.error) {
       setError(result.error)
       setLocalMessages(prev => prev.filter(m => m.id !== optimistic.id))
@@ -544,7 +604,8 @@ export function WhatsAppConversationPanel({
         </div>
       ) : (
         <div className="flex-shrink-0 space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-          {/* Seletor de instância */}
+          
+          {/* Seletor de Instância */}
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs text-gray-500 whitespace-nowrap">Responder via:</span>
             <select
@@ -560,22 +621,77 @@ export function WhatsAppConversationPanel({
               ))}
             </select>
           </div>
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            onInput={(e) => {
-              const el = e.currentTarget
-              el.style.height = 'auto'
-              el.style.height = Math.min(el.scrollHeight, 160) + 'px'
-            }}
-            rows={1}
-            placeholder="Responder..."
-            className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none resize-none overflow-y-auto"
-            style={{ minHeight: '38px', maxHeight: '160px' }}
-          />
-          <button onClick={handleReply} disabled={busy || !replyText.trim()} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
-            {busy ? 'Enviando...' : 'Enviar'}
-          </button>
+
+          {/* NOVA BARRA DE MENSAGEM (Agora com o Botão de Anexo Completo!) */}
+          <div className="flex items-end gap-2 bg-white rounded-md border border-gray-300 p-1 focus-within:border-[#1B556B]">
+            
+            {/* Botão de Anexo (Clipe) */}
+            <label className={`cursor-pointer p-2 rounded-full transition-colors self-end mb-[2px]
+              ${selectedFileName ? 'text-[#1B556B] bg-[#1B556B]/10' : 'text-gray-500 hover:bg-gray-100'}`} 
+              title="Anexar arquivo">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 transform -rotate-45">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+              </svg>
+              <input 
+                ref={fileInputRef} 
+                type="file" 
+                className="hidden" 
+                accept="image/*, video/*, audio/*, application/pdf, .doc, .docx, .xls, .xlsx" 
+                onChange={(e) => {
+                  if (e.target.files?.[0]) setSelectedFileName(e.target.files[0].name)
+                  else setSelectedFileName(null)
+                }}
+              />
+            </label>
+
+            {/* Caixa de Texto */}
+            <div className="flex-1 min-w-0 flex flex-col">
+              {/* Mostrador do arquivo selecionado */}
+              {selectedFileName && (
+                <div className="flex items-center justify-between bg-[#1B556B]/10 text-[#1B556B] text-xs px-2 py-1 rounded mb-1 mr-2 mt-1">
+                  <span className="truncate flex-1">📎 {selectedFileName}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                      setSelectedFileName(null)
+                    }}
+                    className="ml-2 text-[#1B556B] hover:text-red-600 shrink-0 font-bold px-1"
+                    title="Remover anexo">
+                    ✕
+                  </button>
+                </div>
+              )}
+              
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder={selectedFileName ? "Adicione uma legenda..." : "Responder..."}
+                onInput={(e) => {
+                  const el = e.currentTarget
+                  el.style.height = 'auto'
+                  el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+                }}
+                rows={1}
+                className="w-full px-2 py-1.5 text-sm bg-transparent outline-none resize-none overflow-y-auto"
+                style={{ minHeight: '34px', maxHeight: '160px' }}
+              />
+            </div>
+
+            {/* Botão de Enviar Integrado */}
+            <button 
+              onClick={handleReply} 
+              disabled={busy || (!replyText.trim() && !selectedFileName)} 
+              className="p-2 mb-[2px] rounded-full bg-[#1B556B] text-white hover:bg-[#164659] disabled:opacity-50 disabled:bg-gray-300 disabled:text-gray-500 transition-colors shrink-0"
+              title="Enviar mensagem">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+              </svg>
+            </button>
+          </div>
+          
+          {busy && <p className="text-xs text-[#1B556B] mt-1 text-right">Enviando... aguarde.</p>}
+
         </div>
       )}
       {showConvertModal && (

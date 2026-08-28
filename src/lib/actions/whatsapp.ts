@@ -481,6 +481,69 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   return {}
 }
 
+// NOVO: Envio de anexo (Imagem, Vídeo, Áudio, Arquivo) para contatos da Central de Atendimento
+export async function sendUnlinkedWhatsAppMedia(
+  phone: string,
+  mediaUrl: string,
+  mediaType: 'image' | 'document' | 'video' | 'audio',
+  filename: string | null,
+  instanceName?: string
+): Promise<ActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não autenticado.' }
+  if (!phone) return { error: 'Informe o telefone do destinatário.' }
+
+  const creds = await getEvoCredentials()
+  if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
+
+  const targetCreds = instanceName ? { ...creds, instanceName } : creds
+
+  try {
+    // Desarquiva conversa para manter na caixa de entrada
+    await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
+
+    // Usamos DocumentMessage para a maioria para garantir compatibilidade com arquivos variados
+    const isImage = mediaType === 'image'
+    const result: any = isImage
+      ? await sendEvoImageMessage({ ...targetCreds, phone, imageUrl: mediaUrl })
+      : await sendEvoDocumentMessage({ ...targetCreds, phone, documentUrl: mediaUrl, fileName: filename ?? 'arquivo' })
+
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: null,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message: isImage ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      media_filename: filename,
+      zapi_message_id: result?.key?.id,
+      status: 'enviado',
+      instance_name: targetCreds.instanceName,
+    })
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar arquivo.'
+    await supabase.from('contract_whatsapp_messages').insert({
+      contract_id: null,
+      sent_by: user.id,
+      direction: 'enviado',
+      phone,
+      message: mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      media_filename: filename,
+      status: 'falhou',
+      error_message: errorMsg,
+      instance_name: targetCreds.instanceName,
+    })
+    return { error: errorMsg }
+  }
+
+  revalidatePath('/whatsapp')
+  return {}
+}
+
 // ------------------------------------------------------------
 // Lembrete pra quem recebeu o link de Captação e não preencheu ainda
 // — chamado pelo cron diário. Manda só UMA vez, 24h depois do

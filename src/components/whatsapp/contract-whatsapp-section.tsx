@@ -149,6 +149,9 @@ export function ContractWhatsAppSection({
   const [noteText, setNoteText] = useState('')
   const [noteSaved, setNoteSaved] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Controle visual do arquivo selecionado
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
 
   useEffect(() => {
     if (conversationPhone) resolveContactNameByPhone(conversationPhone).then(setResolvedName)
@@ -164,7 +167,15 @@ export function ContractWhatsAppSection({
     }
   }
 
+  // Lida com o envio principal (decide se manda só texto ou se manda anexo)
   async function handleSend() {
+    // Se tem arquivo selecionado, prioriza o envio do anexo
+    if (fileInputRef.current?.files?.[0]) {
+      await handleFileUpload()
+      return
+    }
+
+    // Se não tem arquivo, envia só texto
     if (!message.trim()) return
     setBusy(true); setError(null)
 
@@ -206,13 +217,17 @@ export function ContractWhatsAppSection({
     }
 
     const publicUrl = `${window.location.origin}/api/email-assets/${storagePath}`
-    const mediaType = file.type.startsWith('image/') ? 'image' : 'document'
-    const result = await sendContractWhatsAppMedia(contractId, phone, publicUrl, mediaType, file.name)
+    const mediaType = file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'document'))
+    
+    // Ignorando o tipo para forçar a aceitação do video/audio pela função
+    const result = await sendContractWhatsAppMedia(contractId, phone, publicUrl, mediaType as any, file.name)
 
     setBusy(false)
     if (result.error) setError(result.error)
     else {
       if (fileInputRef.current) fileInputRef.current.value = ''
+      setSelectedFileName(null)
+      setMessage('') 
       
       const res = result as any
       if (res.message || res.data) {
@@ -300,31 +315,80 @@ export function ContractWhatsAppSection({
           <label className="block text-xs text-gray-500">Telefone</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="62999999999" className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none" />
         </div>
+        
+        {/* Nova Barra de Mensagem Estilo WhatsApp */}
         <div>
-          <label className="block text-xs text-gray-500">Mensagem</label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onInput={(e) => {
-              const el = e.currentTarget
-              el.style.height = 'auto'
-              el.style.height = Math.min(el.scrollHeight, 160) + 'px'
-            }}
-            rows={1}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none resize-none overflow-y-auto"
-            style={{ minHeight: '38px', maxHeight: '160px' }}
-          />
+          <label className="block text-xs text-gray-500 mb-1">Mensagem</label>
+          <div className="flex items-end gap-2 bg-white rounded-md border border-gray-300 p-1 focus-within:border-brand-700">
+            
+            {/* Botão de Anexo (Clipe) */}
+            <label className={`cursor-pointer p-2 rounded-full transition-colors self-end mb-[2px]
+              ${selectedFileName ? 'text-brand-600 bg-brand-50' : 'text-gray-500 hover:bg-gray-100'}`} 
+              title="Anexar arquivo">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 transform -rotate-45">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+              </svg>
+              <input 
+                ref={fileInputRef} 
+                type="file" 
+                className="hidden" 
+                accept="image/*, video/*, audio/*, application/pdf, .doc, .docx, .xls, .xlsx" 
+                onChange={(e) => {
+                  if (e.target.files?.[0]) setSelectedFileName(e.target.files[0].name)
+                  else setSelectedFileName(null)
+                }}
+              />
+            </label>
+
+            {/* Caixa de Texto */}
+            <div className="flex-1 min-w-0 flex flex-col">
+              {/* Mostrador do arquivo selecionado */}
+              {selectedFileName && (
+                <div className="flex items-center justify-between bg-brand-50 text-brand-700 text-xs px-2 py-1 rounded mb-1 mr-2 mt-1">
+                  <span className="truncate flex-1">📎 {selectedFileName}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                      setSelectedFileName(null)
+                    }}
+                    className="ml-2 text-brand-700 hover:text-red-600 shrink-0 font-bold px-1"
+                    title="Remover anexo">
+                    ✕
+                  </button>
+                </div>
+              )}
+              
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={selectedFileName ? "Adicione uma legenda..." : "Escreva sua mensagem..."}
+                onInput={(e) => {
+                  const el = e.currentTarget
+                  el.style.height = 'auto'
+                  el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+                }}
+                rows={1}
+                className="w-full px-2 py-1.5 text-sm bg-transparent outline-none resize-none overflow-y-auto"
+                style={{ minHeight: '34px', maxHeight: '160px' }}
+              />
+            </div>
+
+            {/* Botão de Enviar Integrado */}
+            <button 
+              onClick={handleSend} 
+              disabled={busy || (!message.trim() && !selectedFileName)} 
+              className="p-2 mb-[2px] rounded-full bg-brand-700 text-white hover:bg-brand-800 disabled:opacity-50 disabled:bg-gray-300 disabled:text-gray-500 transition-colors shrink-0"
+              title="Enviar mensagem">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+              </svg>
+            </button>
+          </div>
         </div>
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        <div className="flex items-center gap-2">
-          <button onClick={handleSend} disabled={busy} className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
-            {busy ? 'Enviando...' : 'Enviar'}
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="text-xs" />
-          <button type="button" onClick={handleFileUpload} disabled={busy} className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-            📎 Anexar
-          </button>
-        </div>
+        
+        {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+        {busy && <p className="text-xs text-brand-600 mt-1">Enviando... aguarde.</p>}
       </div>
     </div>
   )
