@@ -123,6 +123,42 @@ export async function POST(request: Request) {
         let mimeType = mediaType === 'image' ? 'image/jpeg' : mediaType === 'sticker' ? 'image/webp' : mediaType === 'audio' ? 'audio/ogg' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'
         const ext = mediaType === 'image' ? 'jpg' : mediaType === 'sticker' ? 'webp' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin'
 
+        // Repassa o mimetype real do payload se disponível
+        const msgMime = msg?.imageMessage?.mimetype ?? msg?.stickerMessage?.mimetype ?? msg?.audioMessage?.mimetype ?? msg?.videoMessage?.mimetype ?? msg?.documentMessage?.mimetype
+        if (msgMime) mimeType = msgMime
+
+        // Se não veio base64 no payload, baixa da Evolution com o msgData completo
+        if (!b64 && rawUrl && messageId) {
+          const { data: orgSettings } = await admin
+            .from('organization_settings')
+            .select('evo_server_url, evo_api_key, evo_instance_name')
+            .eq('id', 'default').maybeSingle()
+
+          const instForDl = instanceName ?? orgSettings?.evo_instance_name
+          if (orgSettings?.evo_server_url && instForDl) {
+            try {
+              const dlRes = await fetch(
+                `${orgSettings.evo_server_url}/chat/getBase64FromMediaMessage/${instForDl}`,
+                {
+                  method: 'POST',
+                  headers: { 'apikey': orgSettings.evo_api_key, 'Content-Type': 'application/json' },
+                  // Envia o msgData completo — formato exigido pela Evolution v1/v2
+                  body: JSON.stringify({ message: msgData.message ?? msg, convertToMp4: false }),
+                }
+              )
+              if (dlRes.ok) {
+                const dlData = await dlRes.json().catch(() => ({}))
+                b64 = dlData?.base64 ?? dlData?.data ?? null
+                console.log('[evo-webhook] getBase64 status:', dlRes.status, '| b64 presente:', !!b64)
+              } else {
+                console.warn('[evo-webhook] getBase64 falhou:', dlRes.status)
+              }
+            } catch (dlErr) {
+              console.warn('[evo-webhook] erro ao chamar getBase64:', dlErr)
+            }
+          }
+        }
+
         if (b64) {
           const path = `${instanceName ?? 'default'}/${messageId ?? Date.now()}.${ext}`
           const buffer = Buffer.from(b64, 'base64')
@@ -133,9 +169,23 @@ export async function POST(request: Request) {
           if (!upErr) {
             const { data: pub } = admin.storage.from('whatsapp-media').getPublicUrl(path)
             mediaUrl = pub.publicUrl
+            console.log('[evo-webhook] mídia salva:', path)
+          } else {
+            console.warn('[evo-webhook] upload Storage falhou:', upErr.message)
+            // Fallback para proxy
+            if (messageId) {
+              const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
+              mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
+            }
           }
+        } else if (messageId) {
+          // Nem base64 nem download funcionou — usa proxy como último recurso
+          const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
+          mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
+          console.warn('[evo-webhook] sem b64, usando proxy:', mediaUrl)
         }
       } catch (e) {
+        console.error('[evo-webhook] erro no bloco de mídia (não fatal):', e)
         if (messageId) {
           const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
           mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
