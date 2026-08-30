@@ -13,57 +13,60 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'invalid json' })
   }
 
-  console.log('[evo-webhook] payload:', JSON.stringify(body, null, 2))
-
   try {
-    // Normaliza event name: MESSAGES_UPSERT, messages.upsert, send_message, etc.
     const eventRaw = body?.event ?? body?.type ?? ''
     const event = eventRaw.toLowerCase().replace(/[.\-]/g, '_')
     const instanceName = body?.instance ?? body?.instanceName ?? null
-    console.log('[evo-webhook] event:', event, '| instance:', instanceName)
 
     if (!['messages_upsert', 'messages_delete', 'messages.delete'].includes(event)) {
       return NextResponse.json({ ok: true, skipped: `event=${eventRaw}` })
     }
 
-    // Trata exclusão de mensagem (usuário apagou no celular)
+    // 1. Trata evento de exclusão no aparelho
     if (event === 'messages_delete' || event === 'messages.delete') {
       try {
         const admin = createAdminClient()
         let keys: any[] = []
-        if (body?.data?.keys) keys = body.data.keys
-        else if (body?.keys) keys = body.keys
-        else if (body?.data?.messageId) keys = [{ id: body.data.messageId }]
-        else if (body?.data?.id) keys = [{ id: body.data.id }]
+        
+        if (body?.data?.keys) {
+          keys = body.data.keys
+        } else if (body?.keys) {
+          keys = body.keys
+        } else if (body?.data?.messageId) {
+          keys = [{ id: body.data.messageId }]
+        } else if (body?.data?.id) {
+          keys = [{ id: body.data.id }]
+        }
 
         const singleId = body?.data?.message?.key?.id
-        if (singleId && keys.length === 0) keys = [{ id: singleId }]
+        if (singleId && keys.length === 0) {
+          keys = [{ id: singleId }]
+        }
 
-        console.log('[evo-webhook] messages_delete keys:', JSON.stringify(keys))
         for (const k of keys) {
           const msgId = k?.id ?? k?.messageId ?? k?.key?.id
           if (!msgId) continue
-          const { error } = await admin.from('contract_whatsapp_messages')
+          
+          await admin.from('contract_whatsapp_messages')
             .delete()
             .eq('zapi_message_id', msgId)
-          console.log('[evo-webhook] deletado:', msgId, error ? 'ERRO:' + error.message : 'ok')
         }
-      } catch (e) { console.error('[evo-webhook] erro ao processar delete:', e) }
+      } catch (e) { 
+        console.error('[evo-webhook] erro ao processar delete:', e) 
+      }
       return NextResponse.json({ ok: true })
     }
 
-    // Extrai dados
+    // 2. Trata envio/recebimento de mensagem
     const msgData = Array.isArray(body?.data) ? body.data[0] : (body?.data ?? body)
     const key = msgData?.key ?? msgData?.message?.key
     const msg = msgData?.message ?? msgData?.data?.message ?? null
     const pushName = msgData?.contactName ?? msgData?.pushName ?? msgData?.contact?.name ?? null
     const messageTimestamp = msgData?.messageTimestamp ?? msgData?.data?.messageTimestamp ?? null
 
-    console.log('[evo-webhook] key:', JSON.stringify(key))
-    console.log('[evo-webhook] msg keys:', msg ? Object.keys(msg) : 'null')
-
-    if (!key?.remoteJid) return NextResponse.json({ ok: true, skipped: 'no remoteJid' })
-    if (key.remoteJid.endsWith('@g.us')) return NextResponse.json({ ok: true, skipped: 'group' })
+    if (!key?.remoteJid || key.remoteJid.endsWith('@g.us')) {
+      return NextResponse.json({ ok: true, skipped: 'group or no remoteJid' })
+    }
 
     const phone = key.remoteJid.replace(/@.*/, '').replace(/\D/g, '')
     if (!phone) return NextResponse.json({ ok: true, skipped: 'no phone' })
@@ -71,8 +74,7 @@ export async function POST(request: Request) {
     const isFromMe = key.fromMe === true
     const messageId = key.id
 
-    // Para mensagens fromMe: verifica se já foi salva pelo CRM (Server Action)
-    // Se já existe no banco, ignora (eco). Se não existe, foi enviada direto do celular — salva.
+    // Ignora eco do CRM (mensagens enviadas pela própria action)
     if (isFromMe && messageId) {
       const { data: existing } = await supabase
         .from('contract_whatsapp_messages')
@@ -81,34 +83,20 @@ export async function POST(request: Request) {
         .maybeSingle()
 
       if (existing) {
-        console.log('[evo-webhook] fromMe já salvo pelo CRM, ignorando:', messageId)
         return NextResponse.json({ ok: true, skipped: 'fromMe-duplicate' })
       }
-      console.log('[evo-webhook] fromMe do celular físico — salvando:', messageId)
-      // Continua o fluxo normal com direction: 'enviado'
     }
 
-    // Extrai texto — cobre todos os tipos de mensagem da Evolution API
+    // Extração de conteúdo
     const text =
-      msg?.conversation ??                          // texto simples recebido
-      msg?.extendedTextMessage?.text ??             // texto com formatação/reply
-      msg?.imageMessage?.caption ??                 // legenda de imagem
-      msg?.videoMessage?.caption ??                 // legenda de vídeo
-      msg?.documentMessage?.caption ??              // legenda de documento
+      msg?.conversation ??
+      msg?.extendedTextMessage?.text ??
+      msg?.imageMessage?.caption ??
+      msg?.videoMessage?.caption ??
+      msg?.documentMessage?.caption ??
       msg?.documentWithCaptionMessage?.message?.documentMessage?.caption ??
-      msg?.buttonsMessage?.contentText ??
-      msg?.listMessage?.description ??
-      msg?.templateMessage?.hydratedTemplate?.hydratedContentText ??
-      msg?.ephemeralMessage?.message?.conversation ??
-      msg?.viewOnceMessage?.message?.imageMessage?.caption ??
-      msg?.reactionMessage?.text ??
-      // Formatos alternativos da Evolution v2
-      msgData?.body ??                              // campo body direto
-      msgData?.text ??                              // campo text direto
-      msgData?.content ??                           // campo content
-      null
+      msgData?.body ?? msgData?.text ?? msgData?.content ?? null
 
-    // Extrai mídia
     let mediaUrl: string | null = null
     let mediaType: string | null = null
     let mediaFilename: string | null = null
@@ -119,72 +107,21 @@ export async function POST(request: Request) {
       location: '[Localização]',
     }
 
-    if (msg?.imageMessage)    { mediaType = 'image' }
-    if (msg?.audioMessage)    { mediaType = 'audio' }
-    if (msg?.videoMessage)    { mediaType = 'video' }
+    if (msg?.imageMessage) { mediaType = 'image' }
+    if (msg?.audioMessage) { mediaType = 'audio' }
+    if (msg?.videoMessage) { mediaType = 'video' }
     if (msg?.documentMessage) { mediaType = 'document'; mediaFilename = msg.documentMessage.fileName ?? null }
-    if (msg?.stickerMessage)  { mediaType = 'sticker' }
-    if (msg?.contactMessage)  { mediaType = 'contact' }
-    if (msg?.locationMessage) { mediaType = 'location' }
+    if (msg?.stickerMessage) { mediaType = 'sticker' }
 
-    console.log('[evo-webhook] mediaType detectado:', mediaType)
+    const rawUrl = msg?.imageMessage?.url ?? msg?.audioMessage?.url ?? msg?.videoMessage?.url ?? msg?.documentMessage?.url ?? msg?.stickerMessage?.url ?? null
+    const rawBase64 = msg?.imageMessage?.base64 ?? msg?.audioMessage?.base64 ?? msg?.videoMessage?.base64 ?? msg?.documentMessage?.base64 ?? msg?.stickerMessage?.base64 ?? null
 
-    const rawUrl =
-      msg?.imageMessage?.url ?? msg?.audioMessage?.url ??
-      msg?.videoMessage?.url ?? msg?.documentMessage?.url ??
-      msg?.stickerMessage?.url ?? null
-
-    const rawBase64 =
-      msg?.imageMessage?.base64 ?? msg?.audioMessage?.base64 ??
-      msg?.videoMessage?.base64 ?? msg?.documentMessage?.base64 ??
-      msg?.stickerMessage?.base64 ?? null
-
-    console.log('[evo-webhook] rawUrl:', rawUrl?.slice(0, 80) ?? null, '| base64 presente:', !!rawBase64)
-
-    // ── Mídia: tenta salvar no Storage, nunca aborta o insert ──
     if (mediaType && (rawBase64 || (rawUrl && messageId))) {
       try {
         const admin = createAdminClient()
         let b64: string | null = rawBase64 ?? null
-        let mimeType = mediaType === 'image' ? 'image/jpeg'
-          : mediaType === 'sticker' ? 'image/webp'
-          : mediaType === 'audio' ? 'audio/ogg'
-          : mediaType === 'video' ? 'video/mp4'
-          : 'application/octet-stream'
-        const ext = mediaType === 'image' ? 'jpg'
-          : mediaType === 'sticker' ? 'webp'
-          : mediaType === 'audio' ? 'ogg'
-          : mediaType === 'video' ? 'mp4'
-          : 'bin'
-
-        // Busca MIME real do payload se disponível
-        const msgMime = msg?.imageMessage?.mimetype ?? msg?.stickerMessage?.mimetype
-          ?? msg?.audioMessage?.mimetype ?? msg?.videoMessage?.mimetype ?? msg?.documentMessage?.mimetype
-        if (msgMime) mimeType = msgMime
-
-        // Baixa da Evolution se não vier base64 no payload
-        if (!b64 && rawUrl && messageId) {
-          const { data: orgSettings } = await admin
-            .from('organization_settings')
-            .select('evo_server_url, evo_api_key, evo_instance_name')
-            .eq('id', 'default').maybeSingle()
-
-          const instForDl = instanceName ?? orgSettings?.evo_instance_name
-          if (orgSettings?.evo_server_url && instForDl) {
-            const dlRes = await fetch(
-              `${orgSettings.evo_server_url}/chat/getBase64FromMediaMessage/${instForDl}`,
-              {
-                method: 'POST',
-                headers: { 'apikey': orgSettings.evo_api_key, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: { key }, convertToMp4: false }),
-              }
-            )
-            if (dlRes.ok) {
-              const dlData = await dlRes.json().catch(() => ({}))
-              b64 = dlData?.base64 ?? dlData?.data ?? null
-            }
-          }
-        }
+        let mimeType = mediaType === 'image' ? 'image/jpeg' : mediaType === 'sticker' ? 'image/webp' : mediaType === 'audio' ? 'audio/ogg' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'
+        const ext = mediaType === 'image' ? 'jpg' : mediaType === 'sticker' ? 'webp' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin'
 
         if (b64) {
           const path = `${instanceName ?? 'default'}/${messageId ?? Date.now()}.${ext}`
@@ -196,18 +133,9 @@ export async function POST(request: Request) {
           if (!upErr) {
             const { data: pub } = admin.storage.from('whatsapp-media').getPublicUrl(path)
             mediaUrl = pub.publicUrl
-            console.log('[evo-webhook] mídia → Storage:', path)
-          } else {
-            console.warn('[evo-webhook] upload Storage falhou:', upErr.message, '— usando proxy')
-            if (messageId) {
-              const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
-              mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
-            }
           }
         }
       } catch (e) {
-        // Nunca aborta — mensagem é salva sem URL se tudo falhar
-        console.error('[evo-webhook] erro no bloco de mídia (não fatal):', e)
         if (messageId) {
           const instParam = instanceName ? `&instance=${encodeURIComponent(instanceName)}` : ''
           mediaUrl = `/api/whatsapp/media?id=${encodeURIComponent(messageId)}${instParam}`
@@ -215,83 +143,63 @@ export async function POST(request: Request) {
       }
     }
 
-    // Mapeamento defensivo — constraint aceita apenas: image, video, audio, document
-    const dbMediaType = mediaType === 'sticker' ? 'image'
-      : mediaType === 'contact' ? null
-      : mediaType === 'location' ? null
-      : mediaType
+    const dbMediaType = mediaType === 'sticker' ? 'image' : mediaType
     const finalText = text ?? (mediaType ? (FRIENDLY[mediaType] ?? `[${mediaType}]`) : '[mensagem]')
-    if (!text && !mediaType) {
-      console.warn('[evo-webhook] não extraiu texto. msg keys:', msg ? Object.keys(msg) : 'null', '| msgData keys:', Object.keys(msgData ?? {}).slice(0, 10))
-    }
-    console.log('[evo-webhook] phone:', phone, '| text:', text?.slice(0, 80), '| mediaType:', mediaType)
 
-    // Deduplicação
+    // Deduplicação genérica
     if (messageId) {
       const { data: dup } = await supabase
         .from('contract_whatsapp_messages')
         .select('id')
         .eq('zapi_message_id', messageId)
         .maybeSingle()
-      if (dup) {
-        console.log('[evo-webhook] duplicata ignorada:', messageId)
-        return NextResponse.json({ ok: true, skipped: 'duplicata' })
-      }
+      if (dup) return NextResponse.json({ ok: true, skipped: 'duplicata' })
     }
 
-    // Opt-out
     if (!isFromMe && text && isOptOutMessage(text)) {
       await recordWhatsAppOptOut(phone)
-      console.log('[evo-webhook] opt-out registrado:', phone)
       return NextResponse.json({ ok: true, recorded: 'opt-out' })
     }
 
-    // Busca contato e contrato associados ao telefone
-    const phoneVariants = [phone, phone.replace(/^55/, ''), `55${phone}`].filter(Boolean)
-    console.log('[evo-webhook] buscando contato para variantes:', phoneVariants)
-
-    let contactId: string | null = null
+    // Vinculação de Oportunidade pelos últimos 10 dígitos
     let contractId: string | null = null
+    let leadId: string | null = null
+    const last10 = phone.slice(-10)
 
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('id, company_id, contract_contacts(contract_id)')
-      .or(phoneVariants.map(p => `phone.eq.${p}`).join(','))
+    const { data: linkData } = await supabase
+      .from('contract_whatsapp_messages')
+      .select('contract_id, lead_id')
+      .ilike('phone', `%${last10}`)
+      .or('contract_id.not.is.null,lead_id.not.is.null')
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    if (contact) {
-      contactId = contact.id
-      contractId = (contact as any)?.contract_contacts?.[0]?.contract_id ?? null
-      console.log('[evo-webhook] contato encontrado:', contactId, '| contrato:', contractId)
+      
+    if (linkData?.contract_id || linkData?.lead_id) {
+      contractId = linkData.contract_id ?? null
+      leadId = linkData.lead_id ?? null
     }
 
-    // Fallback: busca contract_id em mensagens anteriores do mesmo phone (últimos 8 dígitos)
     if (!contractId) {
-      const last8 = phone.slice(-8)
-      const { data: linkData } = await supabase
-        .from('contract_whatsapp_messages')
-        .select('contract_id, lead_id')
-        .ilike('phone', `%${last8}`)
-        .not('contract_id', 'is', null)
-        .order('created_at', { ascending: false })
+      const phoneVariants = [phone, phone.replace(/^55/, ''), `55${phone}`].filter(Boolean)
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id, company_id, contract_contacts(contract_id)')
+        .or(phoneVariants.map(p => `phone.eq.${p}`).join(','))
         .limit(1)
         .maybeSingle()
-      if (linkData?.contract_id) {
-        contractId = linkData.contract_id
-        console.log('[evo-webhook] contract_id via histórico:', contractId)
+
+      if (contact) {
+        contractId = (contact as any)?.contract_contacts?.[0]?.contract_id ?? null
       }
     }
 
-    if (!contractId) {
-      console.log('[evo-webhook] contato/contrato não encontrado para:', phone)
-    }
-
-    // Salva mensagem
-    const { error: insertError, data: inserted } = await supabase
+    // Inserção da mensagem
+    const { data: inserted, error: insertError } = await supabase
       .from('contract_whatsapp_messages')
       .insert({
         contract_id: contractId,
+        lead_id: leadId,
         phone,
         message: finalText,
         direction: isFromMe ? 'enviado' : 'recebido',
@@ -303,87 +211,16 @@ export async function POST(request: Request) {
         media_url: mediaUrl,
         media_type: dbMediaType,
         media_filename: mediaFilename,
-        created_at: messageTimestamp
-          ? new Date(Number(messageTimestamp) * 1000).toISOString()
-          : new Date().toISOString(),
+        created_at: messageTimestamp ? new Date(Number(messageTimestamp) * 1000).toISOString() : new Date().toISOString(),
       })
       .select('id')
       .single()
 
-    if (insertError) {
-      console.error('[evo-webhook] ERRO ao salvar mensagem:', insertError)
-      return NextResponse.json({ ok: false, error: insertError.message })
-    }
+    if (insertError) return NextResponse.json({ ok: false, error: insertError.message })
 
-    // Reabre conversa arquivada — lê status ANTES de atualizar (evita race condition)
-    if (!isFromMe) {
-      // 1. Lê status atual e conta mensagens anteriores em paralelo
-      const [{ data: convStatus }, { count: prevCount }] = await Promise.all([
-        supabase.from('whatsapp_conversation_status').select('is_archived').eq('phone', phone).maybeSingle(),
-        supabase.from('contract_whatsapp_messages').select('id', { count: 'exact', head: true })
-          .eq('phone', phone).lt('created_at', new Date().toISOString()),
-      ])
-
-      const wasArchived = convStatus?.is_archived === true
-      const isFirstContact = (prevCount ?? 0) <= 1
-
-      // 2. Atualiza para aberto usando PK composta (phone + instance_name)
-      const inst = instanceName ?? ''
-      const { error: statusErr } = await supabase
-        .from('whatsapp_conversation_status')
-        .update({ is_archived: false, archived_at: null, archived_by: null, updated_at: new Date().toISOString() })
-        .eq('phone', phone)
-        .eq('instance_name', inst)
-
-      if (statusErr) {
-        // Não existe ainda — insere
-        await supabase.from('whatsapp_conversation_status').insert({
-          phone, instance_name: inst, is_archived: false,
-        })
-      }
-
-      // 3. Bot de triagem — só dispara em primeiro contato ou reabertura
-      if (isFirstContact || wasArchived) {
-        try {
-          const { data: botCfg } = await supabase
-            .from('organization_settings')
-            .select('company_name, whatsapp_is_online, whatsapp_welcome_message, whatsapp_welcome_message_online, evo_server_url, evo_api_key, evo_instance_name')
-            .eq('id', 'default').maybeSingle()
-
-          if (botCfg) {
-            const rawMsg = botCfg.whatsapp_is_online
-              ? (botCfg.whatsapp_welcome_message_online ?? botCfg.whatsapp_welcome_message)
-              : botCfg.whatsapp_welcome_message
-
-            if (rawMsg && botCfg.evo_server_url && botCfg.evo_api_key) {
-              const instName = instanceName ?? botCfg.evo_instance_name
-              const company = botCfg.company_name ?? 'nossa empresa'
-              const finalMsg = rawMsg
-                .replace(/\{\{empresa\}\}/gi, company)
-                .replace(/\{\{company\}\}/gi, company)
-                .replace(/\{\{link\}\}/gi, 'https://crm-gestaocontratos-pi.vercel.app/captura')
-
-              fetch(`${botCfg.evo_server_url}/message/sendText/${instName}`, {
-                method: 'POST',
-                headers: { 'apikey': botCfg.evo_api_key, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: phone, text: finalMsg }),
-              }).then(r => console.log('[evo-webhook] bot status:', r.status))
-                .catch(e => console.error('[evo-webhook] bot ERRO:', e))
-
-              console.log('[evo-webhook] bot agendado | wasArchived:', wasArchived, '| isFirst:', isFirstContact)
-            }
-          }
-        } catch (e) {
-          console.warn('[evo-webhook] erro no bot:', e)
-        }
-      }
-    }
-
-    console.log('[evo-webhook] mensagem salva:', inserted?.id)
     return NextResponse.json({ ok: true, id: inserted?.id })
 
   } catch (err: any) {
-    console.error('[evo-webhook] ERRO FATAL:', err)
     return NextResponse.json({ ok: false, error: err?.message ?? 'erro desconhecido' })
   }
 }
