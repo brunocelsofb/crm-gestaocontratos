@@ -318,11 +318,9 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('contract_whatsapp_messages')
-    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at')
-    .is('contract_id', null)
-    .is('lead_id', null)
+    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at, instance_name')
     .order('created_at', { ascending: false })
-    .limit(200)
+    .limit(500)
 
   const byPhone = new Map<string, UnlinkedConversation>()
   for (const m of data ?? []) {
@@ -341,11 +339,12 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
 
 export async function getUnlinkedMessagesByPhone(phone: string) {
   const supabase = createAdminClient()
+  const cleanPhone = phone.replace(/\D/g, '')
+  const last8 = cleanPhone.slice(-8)
   const { data } = await supabase
     .from('contract_whatsapp_messages')
     .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status')
-    .eq('phone', phone)
-    .is('contract_id', null)
+    .ilike('phone', `%${last8}`)
     .order('created_at', { ascending: false })
   return data ?? []
 }
@@ -447,14 +446,26 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   // Usa a instância da conversa se disponível, senão usa a padrão
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
 
+  // Busca contract_id vinculado ao phone (últimos 8 dígitos)
+  const last8 = phone.replace(/\D/g, '').slice(-8)
+  const admin = createAdminClient()
+  const { data: linkData } = await admin
+    .from('contract_whatsapp_messages')
+    .select('contract_id')
+    .ilike('phone', `%${last8}`)
+    .not('contract_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const contractId = linkData?.contract_id ?? null
+
   try {
     const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message: signedMessage })
 
-    // Desarquiva conversa se estava arquivada
     await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
 
-    await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: null,
+    await admin.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone,
@@ -464,8 +475,8 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
-    await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: null,
+    await admin.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone,
@@ -478,6 +489,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
   }
 
   revalidatePath('/whatsapp')
+  if (contractId) revalidatePath(`/contracts/${contractId}`)
   return {}
 }
 
@@ -499,18 +511,29 @@ export async function sendUnlinkedWhatsAppMedia(
 
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
 
+  // Busca contract_id vinculado ao phone
+  const last8 = phone.replace(/\D/g, '').slice(-8)
+  const admin = createAdminClient()
+  const { data: linkData } = await admin
+    .from('contract_whatsapp_messages')
+    .select('contract_id')
+    .ilike('phone', `%${last8}`)
+    .not('contract_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const contractId = linkData?.contract_id ?? null
+
   try {
-    // Desarquiva conversa para manter na caixa de entrada
     await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
 
-    // Usamos DocumentMessage para a maioria para garantir compatibilidade com arquivos variados
     const isImage = mediaType === 'image'
     const result: any = isImage
       ? await sendEvoImageMessage({ ...targetCreds, phone, imageUrl: mediaUrl })
       : await sendEvoDocumentMessage({ ...targetCreds, phone, documentUrl: mediaUrl, fileName: filename ?? 'arquivo' })
 
-    await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: null,
+    await admin.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone,
@@ -524,8 +547,8 @@ export async function sendUnlinkedWhatsAppMedia(
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar arquivo.'
-    await supabase.from('contract_whatsapp_messages').insert({
-      contract_id: null,
+    await admin.from('contract_whatsapp_messages').insert({
+      contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
       phone,
@@ -541,6 +564,7 @@ export async function sendUnlinkedWhatsAppMedia(
   }
 
   revalidatePath('/whatsapp')
+  if (contractId) revalidatePath(`/contracts/${contractId}`)
   return {}
 }
 
