@@ -329,15 +329,9 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('contract_whatsapp_messages')
-<<<<<<< HEAD
     .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at, instance_name')
     .order('created_at', { ascending: false })
     .limit(500)
-=======
-    .select('phone, unlinked_sender_name, sender_photo_url, message, media_type, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1000)
->>>>>>> ab7d39268d93645e796086d84e5ad0f4500d0530
 
   const byPhone = new Map<string, UnlinkedConversation>()
   for (const m of data ?? []) {
@@ -362,20 +356,11 @@ export async function getUnlinkedWhatsAppConversations(): Promise<UnlinkedConver
 export async function getUnlinkedMessagesByPhone(phone: string) {
   const supabase = createAdminClient()
   const cleanPhone = phone.replace(/\D/g, '')
-<<<<<<< HEAD
   const last8 = cleanPhone.slice(-8)
   const { data } = await supabase
     .from('contract_whatsapp_messages')
     .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status')
     .ilike('phone', `%${last8}`)
-=======
-  const last10 = cleanPhone.slice(-10)
-
-  const { data } = await supabase
-    .from('contract_whatsapp_messages')
-    .select('id, phone, message, direction, status, triggered_automatically, error_message, created_at, media_url, media_type, media_filename, sender_photo_url, delivery_status, zapi_message_id')
-    .ilike('phone', `%${last10}`)
->>>>>>> ab7d39268d93645e796086d84e5ad0f4500d0530
     .order('created_at', { ascending: false })
   return data ?? []
 }
@@ -541,20 +526,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
 
     await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
 
-<<<<<<< HEAD
     await admin.from('contract_whatsapp_messages').insert({
-=======
-    let contractId: string | null = null
-    const admin = createAdminClient()
-    const last10 = phone.replace(/\D/g, '').slice(-10)
-    const { data: linkData } = await admin.from('contract_whatsapp_messages')
-      .select('contract_id').ilike('phone', `%${last10}`).not('contract_id', 'is', null)
-      .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      
-    if (linkData?.contract_id) contractId = linkData.contract_id
-
-    await supabase.from('contract_whatsapp_messages').insert({
->>>>>>> ab7d39268d93645e796086d84e5ad0f4500d0530
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
@@ -622,20 +594,7 @@ export async function sendUnlinkedWhatsAppMedia(
       ? await sendEvoImageMessage({ ...targetCreds, phone, imageUrl: mediaUrl })
       : await sendEvoDocumentMessage({ ...targetCreds, phone, documentUrl: mediaUrl, fileName: filename ?? 'arquivo' })
 
-<<<<<<< HEAD
     await admin.from('contract_whatsapp_messages').insert({
-=======
-    let contractId: string | null = null
-    const admin = createAdminClient()
-    const last10 = phone.replace(/\D/g, '').slice(-10)
-    const { data: linkData } = await admin.from('contract_whatsapp_messages')
-      .select('contract_id').ilike('phone', `%${last10}`).not('contract_id', 'is', null)
-      .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      
-    if (linkData?.contract_id) contractId = linkData.contract_id
-
-    await supabase.from('contract_whatsapp_messages').insert({
->>>>>>> ab7d39268d93645e796086d84e5ad0f4500d0530
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
