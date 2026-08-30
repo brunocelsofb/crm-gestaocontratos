@@ -211,36 +211,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, recorded: 'opt-out' })
     }
 
-    // Vinculação de Oportunidade pelos últimos 10 dígitos
+    // Busca de vínculo infalível — últimos 8 dígitos ignoram DDI, DDD e 9º dígito
     let contractId: string | null = null
     let leadId: string | null = null
-    const last10 = phone.slice(-10)
+    const cleanPhone = phone.replace(/\D/g, '')
+    const last8 = cleanPhone.length >= 8 ? cleanPhone.slice(-8) : cleanPhone
 
+    // 1. Busca em mensagens anteriores com vínculo já estabelecido
     const { data: linkData } = await supabase
       .from('contract_whatsapp_messages')
       .select('contract_id, lead_id')
-      .ilike('phone', `%${last10}`)
+      .ilike('phone', `%${last8}`)
       .or('contract_id.not.is.null,lead_id.not.is.null')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-      
+
     if (linkData?.contract_id || linkData?.lead_id) {
       contractId = linkData.contract_id ?? null
       leadId = linkData.lead_id ?? null
+      console.log('[evo-webhook] vínculo via histórico:', contractId ?? leadId)
     }
 
-    if (!contractId) {
-      const phoneVariants = [phone, phone.replace(/^55/, ''), `55${phone}`].filter(Boolean)
+    // 2. Fallback: busca na tabela de contatos por phone
+    if (!contractId && !leadId) {
       const { data: contact } = await supabase
         .from('contacts')
-        .select('id, company_id, contract_contacts(contract_id)')
-        .or(phoneVariants.map(p => `phone.eq.${p}`).join(','))
+        .select('id, contract_contacts(contract_id)')
+        .ilike('phone', `%${last8}%`)
         .limit(1)
         .maybeSingle()
 
-      if (contact) {
-        contractId = (contact as any)?.contract_contacts?.[0]?.contract_id ?? null
+      if (contact?.contract_contacts?.length) {
+        contractId = (contact.contract_contacts[0] as any)?.contract_id ?? null
+        console.log('[evo-webhook] vínculo via contacts:', contractId)
       }
     }
 
