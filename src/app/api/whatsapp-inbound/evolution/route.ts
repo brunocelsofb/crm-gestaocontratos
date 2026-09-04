@@ -104,14 +104,20 @@ export async function POST(request: Request) {
     const FRIENDLY: Record<string, string> = {
       image: '[Imagem]', audio: '[Áudio]', video: '[Vídeo]',
       document: '[Documento]', sticker: '[Figurinha]', contact: '[Contato]',
-      location: '[Localização]',
+      location: '[Localização]', poll: '[Enquete]', protocol: '[Ação do Sistema]',
+      system: '[Aviso do Sistema]',
     }
 
-    if (msg?.imageMessage) { mediaType = 'image' }
-    if (msg?.audioMessage) { mediaType = 'audio' }
-    if (msg?.videoMessage) { mediaType = 'video' }
+    if (msg?.imageMessage)    { mediaType = 'image' }
+    if (msg?.audioMessage)    { mediaType = 'audio' }
+    if (msg?.videoMessage)    { mediaType = 'video' }
     if (msg?.documentMessage) { mediaType = 'document'; mediaFilename = msg.documentMessage.fileName ?? null }
-    if (msg?.stickerMessage) { mediaType = 'sticker' }
+    if (msg?.stickerMessage)  { mediaType = 'sticker' }
+    if (msg?.contactMessage || msg?.contactsArrayMessage) { mediaType = 'contact' }
+    if (msg?.locationMessage || msg?.liveLocationMessage) { mediaType = 'location' }
+    if (msg?.pollCreationMessage || msg?.pollUpdateMessage) { mediaType = 'poll' }
+    if (msg?.protocolMessage) { mediaType = 'protocol' }
+    if (msgData?.messageStubType) { mediaType = 'system' }
 
     const rawUrl = msg?.imageMessage?.url ?? msg?.audioMessage?.url ?? msg?.videoMessage?.url ?? msg?.documentMessage?.url ?? msg?.stickerMessage?.url ?? null
     const rawBase64 = msg?.imageMessage?.base64 ?? msg?.audioMessage?.base64 ?? msg?.videoMessage?.base64 ?? msg?.documentMessage?.base64 ?? msg?.stickerMessage?.base64 ?? null
@@ -194,7 +200,14 @@ export async function POST(request: Request) {
     }
 
     const dbMediaType = mediaType === 'sticker' ? 'image' : mediaType
-    const finalText = text ?? (mediaType ? (FRIENDLY[mediaType] ?? `[${mediaType}]`) : '[mensagem]')
+    let fallbackText = '[Formato não suportado]'
+    if (msg && typeof msg === 'object') {
+      const keys = Object.keys(msg as object).filter(k => k !== 'messageContextInfo')
+      if (keys.length > 0) fallbackText = `[Formato: ${keys[0]}]`
+    } else if (msgData?.messageStubType) {
+      fallbackText = `[Sistema: ${msgData.messageStubType}]`
+    }
+    const finalText = text ?? (mediaType ? (FRIENDLY[mediaType] ?? `[${mediaType}]`) : fallbackText)
 
     // Deduplicação genérica
     if (messageId) {
