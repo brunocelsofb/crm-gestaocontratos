@@ -506,35 +506,45 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
     : null
   const signedMessage = signature ? `${signature} ${message}` : message
 
+  // 1. Higienização do telefone
+  const rawPhone = phone.replace(/\D/g, '')
+  const normalizedPhone = rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone
+  const last8 = normalizedPhone.slice(-8)
+
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
-
-  // Busca contract_id vinculado ao phone (últimos 8 dígitos)
-  const last8 = phone.replace(/\D/g, '').slice(-8)
   const admin = createAdminClient()
-  const { data: linkData } = await admin
-    .from('contract_whatsapp_messages')
-    .select('contract_id')
-    .ilike('phone', `%${last8}`)
+
+  // 2. Busca de vínculo infalível
+  let contractId: string | null = null
+  const { data: linkData } = await admin.from('contract_whatsapp_messages')
+    .select('contract_id').ilike('phone', `%${last8}`)
     .not('contract_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const contractId = linkData?.contract_id ?? null
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
+  if (linkData?.contract_id) {
+    contractId = linkData.contract_id
+  } else {
+    const { data: contact } = await admin.from('contacts')
+      .select('id, contract_contacts(contract_id)')
+      .ilike('phone', `%${last8}%`).limit(1).maybeSingle()
+    if ((contact?.contract_contacts as any)?.[0]?.contract_id) {
+      contractId = (contact!.contract_contacts as any)[0].contract_id
+    }
+  }
+
+  // 3. Envio e insert com normalizedPhone
   try {
-    const result: any = await sendEvoTextMessage({ ...targetCreds, phone, message: signedMessage })
-
-    await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
-
+    const result: any = await sendEvoTextMessage({ ...targetCreds, phone: normalizedPhone, message: signedMessage })
+    await unarchiveWhatsAppConversation(normalizedPhone, targetCreds.instanceName)
     await admin.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
+      phone: normalizedPhone,
       message: signedMessage,
       status: 'enviado',
       instance_name: targetCreds.instanceName,
-      zapi_message_id: result?.key?.id ?? null
+      zapi_message_id: result?.key?.id ?? null,
     })
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Falha ao enviar.'
@@ -542,7 +552,7 @@ export async function sendUnlinkedWhatsAppMessage(phone: string, message: string
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
+      phone: normalizedPhone,
       message: signedMessage,
       status: 'falhou',
       error_message: errorMsg,
@@ -571,34 +581,46 @@ export async function sendUnlinkedWhatsAppMedia(
   const creds = await getEvoCredentials()
   if (!creds) return { error: 'WhatsApp ainda não está conectado.' }
 
+  // 1. Higienização do telefone
+  const rawPhone = phone.replace(/\D/g, '')
+  const normalizedPhone = rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone
+  const last8 = normalizedPhone.slice(-8)
+
   const targetCreds = instanceName ? { ...creds, instanceName } : creds
-
-  // Busca contract_id vinculado ao phone
-  const last8 = phone.replace(/\D/g, '').slice(-8)
   const admin = createAdminClient()
-  const { data: linkData } = await admin
-    .from('contract_whatsapp_messages')
-    .select('contract_id')
-    .ilike('phone', `%${last8}`)
-    .not('contract_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const contractId = linkData?.contract_id ?? null
 
+  // 2. Busca de vínculo infalível
+  let contractId: string | null = null
+  const { data: linkData } = await admin.from('contract_whatsapp_messages')
+    .select('contract_id').ilike('phone', `%${last8}`)
+    .not('contract_id', 'is', null)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+  if (linkData?.contract_id) {
+    contractId = linkData.contract_id
+  } else {
+    const { data: contact } = await admin.from('contacts')
+      .select('id, contract_contacts(contract_id)')
+      .ilike('phone', `%${last8}%`).limit(1).maybeSingle()
+    if ((contact?.contract_contacts as any)?.[0]?.contract_id) {
+      contractId = (contact!.contract_contacts as any)[0].contract_id
+    }
+  }
+
+  // 3. Envio com normalizedPhone
   try {
-    await unarchiveWhatsAppConversation(phone, targetCreds.instanceName)
+    await unarchiveWhatsAppConversation(normalizedPhone, targetCreds.instanceName)
 
     const isImage = mediaType === 'image'
     const result: any = isImage
-      ? await sendEvoImageMessage({ ...targetCreds, phone, imageUrl: mediaUrl })
-      : await sendEvoDocumentMessage({ ...targetCreds, phone, documentUrl: mediaUrl, fileName: filename ?? 'arquivo' })
+      ? await sendEvoImageMessage({ ...targetCreds, phone: normalizedPhone, imageUrl: mediaUrl })
+      : await sendEvoDocumentMessage({ ...targetCreds, phone: normalizedPhone, documentUrl: mediaUrl, fileName: filename ?? 'arquivo' })
 
     await admin.from('contract_whatsapp_messages').insert({
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
+      phone: normalizedPhone,
       message: isImage ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`,
       media_url: mediaUrl,
       media_type: mediaType,
@@ -613,7 +635,7 @@ export async function sendUnlinkedWhatsAppMedia(
       contract_id: contractId,
       sent_by: user.id,
       direction: 'enviado',
-      phone,
+      phone: normalizedPhone,
       message: mediaType === 'image' ? '[imagem]' : `[${mediaType}] ${filename ?? ''}`,
       media_url: mediaUrl,
       media_type: mediaType,
